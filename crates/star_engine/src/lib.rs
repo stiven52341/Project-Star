@@ -9,6 +9,7 @@
 pub mod app;
 mod engine_world;
 pub mod game;
+mod game_assets;
 pub mod prelude;
 mod runtime;
 mod texture_library;

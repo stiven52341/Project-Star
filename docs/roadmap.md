@@ -34,10 +34,13 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] 4b Systems and stages (`Schedule`).
   - [x] 4c The engine owns the `World`: `Time` and `Input` as resources,
         systems registered in `App` (balls of `sprites_2d` are entities).
-- [ ] **Phase 5 — Assets**: asset folders, handles and caching, sounds,
-      hot-reload, more image formats. (PNG decoding already exists.)
+- [x] **Phase 5 — Assets**:
+  - [x] 5a Asset folder and portable asset paths.
+  - [x] 5b Texture caching: each file is loaded once per filter.
+  - [x] 5c JPEG images (zune-jpeg), besides PNG.
+  - [x] 5d Hot-reload of textures (polling modification times).
 - [ ] **Phase 6 — Scenes**: node tree, serialization.
-- [ ] **Phase 7 — Audio**.
+- [ ] **Phase 7 — Audio**: playback, and loading sounds from the asset folder.
 - [ ] **Phase 8 — 2D physics**.
 - [ ] **Phase 9 — 3D rendering**: materials, lights, indexed meshes. (`Mat4`
       and a perspective camera already exist.)

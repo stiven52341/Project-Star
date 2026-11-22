@@ -187,6 +187,27 @@ fn many_sprites_grow_the_buffers() {
 
 #[test]
 #[ignore = "needs a GPU"]
+fn replaced_textures_show_their_new_image() {
+    let mut gpu = Gpu::new();
+    let texture = gpu.texture(1, 1, &[RED]);
+    let blue_and_green = Image::from_rgba8(2, 1, [BLUE, GREEN].as_flattened().to_vec()).unwrap();
+
+    gpu.scene
+        .replace_texture(texture, &blue_and_green, TextureFilter::Pixelated)
+        .unwrap();
+    let pixels = gpu.draw(&[full_screen(texture)]);
+
+    assert_eq!(pixel(&pixels, 0, 0), BLUE);
+    assert_eq!(pixel(&pixels, SIZE - 1, 0), GREEN);
+    assert!(
+        gpu.scene
+            .replace_texture(TextureId(7), &blue_and_green, TextureFilter::Smooth)
+            .is_err()
+    );
+}
+
+#[test]
+#[ignore = "needs a GPU"]
 fn unknown_textures_are_an_error() {
     let mut gpu = Gpu::new();
     let mut frame = Frame::new();

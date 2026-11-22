@@ -68,9 +68,12 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 23 | Gamepads with **gilrs** (MIT/Apache-2.0) | Maintained and pure Rust, with backends for Windows (WGI/XInput), macOS (IOKit) and Linux (evdev), SDL-style mappings and dead zones. Only `star_platform` knows it. On Linux it needs the libudev headers to build (`libudev-dev`). Rejected: writing our own backends per OS (a lot of platform code for little gain) |
 | 24 | StarScript input: actions in **`project.toml`**, read through `star_script_runtime::input` | Actions are project settings (`[input.actions]`), as an editor panel will show them, so scripts stay clean and the compiler can reject misspelled action names (it receives them in `GameSettings`). `Input.is_down("jump")` is a static call with no object to read the engine's input from, so the generated game copies each action's state into a per-thread table of the runtime once per frame (no allocations; the runtime stays without dependencies) and the calls read it by name. Rejected: declaring actions in scripts (typos in key names only fail while playing) |
 | 25 | Sprites **batched by texture**, in an immediate `Frame` | The game adds sprites every frame (like meshes, decision 9); the renderer groups consecutive sprites that share a texture into one draw call. The order is explicit (layers, then order of addition), so translucent sprites always blend correctly without sorting by depth. Rejected for now: texture arrays or bindless textures (not available on OpenGL ES and older GPUs) and automatic atlases (they belong to the asset pipeline, Phase 5) |
-| 26 | PNG decoding with **png** (MIT/Apache-2.0), in `star_assets` | The image-rs project's decoder: maintained, pure Rust (it builds for every platform, mobile included) and light. PNG is lossless with transparency, the usual format for 2D game art. Only `star_assets` knows it. Rejected: the `image` crate (many formats, but much heavier to build; more formats can come in Phase 5) |
+| 26 | PNG decoding with **png** (MIT/Apache-2.0), in `star_assets` | The image-rs project's decoder: maintained, pure Rust (it builds for every platform, mobile included) and light. PNG is lossless with transparency, the usual format for 2D game art. Only `star_assets` knows it. Rejected: the `image` crate (many formats, but much heavier to build; JPEG came in Phase 5, decision 30) |
 | 27 | ECS with **sparse sets** and closure queries, without `unsafe` | Adding and removing components is O(1) and never moves other components, which suits a node tree where objects change often; going through one type reads contiguous memory. Per-type `RefCell`s let one query change some types while reading others, checked at run time instead of with `unsafe`. Queries take a closure (`World::each`) instead of returning an iterator, since an iterator that lends `&mut` components cannot be written in safe Rust. Rejected: archetype tables (faster iteration over many types, but adding a component moves the whole entity, and they need `unsafe` to be fast) and external ECS crates (decision 5 spirit: own facade, and the scene system will shape it) |
 | 28 | The engine owns the **`World`**; `Time` and `Input` are resources | One source of truth for the game and its systems: a system that moves things reads the same time as `Game::update`, without copying state into the world each frame. The `Game` trait stays as the simple entry point (`update(&mut World)`, `draw(&World, &mut Frame)`), and grows into ECS systems when the game needs them. Rejected: an ECS left to each game (every game would wire the same loop) and passing time and input apart from the world (systems would need another signature) |
+| 29 | **Asset paths** relative to an asset folder, with `/` | Games are copied to other systems and packaged for mobile, where absolute paths, `\` and `../` break or escape the folder; one validated form keeps paths portable and checked when they are written. The folder is found next to the executable first, so a shipped game finds its assets wherever it is launched from. Rejected: plain `std::path::Path` arguments (platform-dependent, and relative to the working directory) |
+| 30 | JPEG decoding with **zune-jpeg** (MIT/Apache-2.0/Zlib) | Pure Rust, maintained, fast and light (one small dependency, `zune-core`); JPEG keeps photos and large backgrounds small. Hidden in `star_assets` like `png` (decision 26). Rejected: `jpeg-decoder` (no longer maintained) and the `image` crate (much heavier) |
+| 31 | **Hot-reload by polling** modification times | Every 0.5 s, one `stat` per loaded file: nothing to install, the same on every platform, and no cost a game notices for hundreds of files. Rejected for now: the `notify` crate (operating system events: immediate, but a dependency with code per platform and its own threads; it can replace the watcher behind the same API if projects grow to thousands of files) |
 
 ## ECS
 
@@ -103,6 +106,30 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   `App::with_system(Stage::Update, system)`; the game's own `update` runs
   right after `Stage::First`. `GameContext::world()` gives the world in
   `Game::start`, to spawn the first entities.
+
+## Assets
+
+- A game's assets live in its **asset folder** (`AssetFolder`, in
+  `star_assets`): `assets/` next to the executable when it exists (a shipped
+  game), otherwise `assets/` in the working directory (development), or the
+  folder given to `App::with_asset_folder`. Editor projects already create it.
+- Assets are named by an **`AssetPath`**, e.g. `"sprites/hero.png"`:
+  relative, always with `/`, and without `.`, `..`, `\` or `:`. The same
+  path works on every platform and can never point outside the folder.
+- Images are decoded by the `ImageFormat` of their extension (any case):
+  PNG through `png`, JPEG (`.jpg`, `.jpeg`) through `zune-jpeg`. Both
+  always give RGBA8; errors name the asset path and the file.
+- **Caching**: `GameContext::load_texture` keeps a `TextureLibrary` (in
+  `star_engine`) from `(path, filter)` to `TextureId`, so loading a file
+  again returns the same texture without decoding or uploading it. A failed
+  load is not remembered: it is tried again.
+- **Hot-reload** (`App::with_hot_reload`, on by default in debug builds):
+  a `FileWatcher` (in `star_assets`) looks at the modification time of every
+  loaded file every 0.5 s of game time; a changed file is decoded again and
+  replaces its texture's image, so the sprites that use it change on the next
+  frame. A file that cannot be read or decoded yet (an image editor still
+  writing it) only logs a warning and keeps the last image.
+- Sounds are loaded in Phase 7, together with their playback.
 
 ## Input
 
@@ -173,13 +200,14 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
   identified by a `TextureId`. `Smooth` filtering blends pixels, `Pixelated`
   keeps them sharp (pixel art). Texture coordinates are clamped, so cells of a
   sprite sheet never bleed into their neighbors.
-- `GameContext::load_texture(path, filter)` reads a PNG file through
-  `star_assets::load_png` (any PNG kind becomes RGBA8). `Image` lives in
-  `star_core`, so `star_assets` produces it and `star_render` consumes it
-  without depending on each other (they share layer 2); `star_engine`
-  connects them. Paths are relative to the working directory until Phase 5
-  brings asset folders. sRGB targets get sRGB
-  textures; other targets (the editor's) get the values unchanged, as with colors.
+- `GameContext::load_texture(path, filter)` loads an image from the asset
+  folder (see [Assets](#assets)). `Image` lives in `star_core`, so
+  `star_assets` produces it and `star_render` consumes it without depending
+  on each other (they share layer 2); `star_engine` connects them. sRGB
+  targets get sRGB textures; other targets (the editor's) get the values
+  unchanged, as with colors.
+- `Renderer::replace_texture(id, &image, filter)` gives a texture a new image
+  under the same `TextureId` (hot-reload uses it).
 - Sprites (`Frame::draw_sprite(Sprite)`) are textured rectangles on the
   `z = 0` plane: position, size (negative mirrors), rotation around an
   anchor, tint, a `TextureRegion` (`TextureRegion::cell` for sprite sheets)

@@ -113,6 +113,23 @@ impl Renderer {
         self.scene.create_texture(image, filter)
     }
 
+    /// Changes the image of the texture `id`, e.g. after its file changed;
+    /// the sprites that use it show the new image from the next frame on.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Rendering`](star_core::EngineError::Rendering)
+    /// if `id` is not a texture of this renderer or the GPU does not support
+    /// textures that big.
+    pub fn replace_texture(
+        &mut self,
+        id: TextureId,
+        image: &Image,
+        filter: TextureFilter,
+    ) -> EngineResult<()> {
+        self.scene.replace_texture(id, image, filter)
+    }
+
     /// Adapts the render target to a new window size.
     pub fn resize(&mut self, size: WindowSize) {
         if size.is_empty() {

@@ -2,15 +2,15 @@
 
 use std::time::{Duration, Instant};
 
-use star_assets::AssetFolder;
 use star_core::{EngineResult, Time};
 use star_ecs::{Schedule, Stage, World};
 use star_input::Input;
 use star_platform::{InputEvent, Window, WindowEventHandler, WindowSize};
 use star_render::{Color, Frame, Renderer, RendererConfig};
 
+use crate::EngineWorld as _;
 use crate::game::{Game, GameContext};
-use crate::texture_library::TextureLibrary;
+use crate::game_assets::GameAssets;
 
 /// Engine state while the game is running.
 pub(crate) struct Runtime<G: Game> {
@@ -22,8 +22,7 @@ pub(crate) struct Runtime<G: Game> {
     /// Holds the game's entities and the engine's resources: [`Time`] and [`Input`].
     world: World,
     schedule: Schedule,
-    assets: AssetFolder,
-    textures: TextureLibrary,
+    assets: GameAssets,
     last_frame_start: Option<Instant>,
 }
 
@@ -34,7 +33,7 @@ impl<G: Game> Runtime<G> {
         clear_color: Color,
         input: Input,
         schedule: Schedule,
-        assets: AssetFolder,
+        assets: GameAssets,
     ) -> Self {
         let mut world = World::new();
         world.insert_resource(Time::new());
@@ -48,7 +47,6 @@ impl<G: Game> Runtime<G> {
             world,
             schedule,
             assets,
-            textures: TextureLibrary::new(),
             last_frame_start: None,
         }
     }
@@ -61,6 +59,13 @@ impl<G: Game> Runtime<G> {
         self.last_frame_start = Some(now);
         if let Some(mut time) = self.world.resource_mut::<Time>() {
             time.advance(delta);
+        }
+    }
+
+    fn reload_changed_assets(&mut self) {
+        if let Some(renderer) = &mut self.renderer {
+            let elapsed = self.world.time().delta();
+            self.assets.reload_changed_textures(renderer, elapsed);
         }
     }
 
@@ -90,8 +95,7 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
         self.game.start(&mut GameContext::new(
             &mut renderer,
             &mut self.world,
-            &self.assets,
-            &mut self.textures,
+            &mut self.assets,
         ))?;
         self.renderer = Some(renderer);
         Ok(())
@@ -108,6 +112,7 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
             return Ok(());
         }
         self.advance_time();
+        self.reload_changed_assets();
         self.simulate()?;
         self.frame.begin(self.clear_color);
         self.game.draw(&self.world, &mut self.frame);
@@ -130,11 +135,11 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
 
 #[cfg(test)]
 mod tests {
+    use star_assets::AssetFolder;
     use star_core::EngineError;
     use star_input::{ActionMap, ButtonState, Key};
 
     use super::*;
-    use crate::EngineWorld as _;
     use crate::game::EmptyGame;
 
     /// A game that has already finished.
@@ -172,7 +177,7 @@ mod tests {
             Color::BLACK,
             input,
             schedule,
-            AssetFolder::new("assets"),
+            GameAssets::new(AssetFolder::new("assets"), false),
         )
     }
 

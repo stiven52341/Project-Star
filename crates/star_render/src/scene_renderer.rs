@@ -96,6 +96,22 @@ impl SceneRenderer {
         Ok(TextureId(self.textures.insert(texture)))
     }
 
+    /// Changes the image of the texture `id`, which keeps being drawn by the
+    /// sprites that use it.
+    pub(crate) fn replace_texture(
+        &mut self,
+        id: TextureId,
+        image: &Image,
+        filter: TextureFilter,
+    ) -> EngineResult<()> {
+        self.texture(id)?;
+        let texture = self
+            .texture_bindings
+            .upload(&self.device, &self.queue, image, filter)?;
+        self.textures.replace(id.0, texture);
+        Ok(())
+    }
+
     /// Draws `frame` into `target`, whose width divided by height is `aspect_ratio`,
     /// and submits the work to the GPU.
     pub(crate) fn render(

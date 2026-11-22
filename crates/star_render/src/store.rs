@@ -15,6 +15,13 @@ impl<T> Store<T> {
     pub(crate) fn get(&self, index: usize) -> Option<&T> {
         self.items.get(index)
     }
+
+    /// Puts `item` in place of the one at `index`; `None` if there is none.
+    pub(crate) fn replace(&mut self, index: usize, item: T) -> Option<T> {
+        self.items
+            .get_mut(index)
+            .map(|slot| std::mem::replace(slot, item))
+    }
 }
 
 impl<T> Default for Store<T> {
@@ -37,5 +44,15 @@ mod tests {
         assert_eq!(store.get(first), Some(&"a"));
         assert_eq!(store.get(second), Some(&"b"));
         assert_eq!(store.get(2), None);
+    }
+
+    #[test]
+    fn replaced_items_keep_their_position() {
+        let mut store = Store::default();
+        let index = store.insert("old");
+
+        assert_eq!(store.replace(index, "new"), Some("old"));
+        assert_eq!(store.get(index), Some(&"new"));
+        assert_eq!(store.replace(1, "nowhere"), None);
     }
 }

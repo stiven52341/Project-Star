@@ -1,11 +1,11 @@
 //! The behavior a game plugs into the engine.
 
-use star_assets::{AssetFolder, AssetPath};
+use star_assets::AssetFolder;
 use star_core::EngineResult;
 use star_ecs::World;
 use star_render::{Frame, Image, MeshId, Renderer, TextureFilter, TextureId, Vertex};
 
-use crate::texture_library::TextureLibrary;
+use crate::game_assets::GameAssets;
 
 /// Logic of a game, called by the engine at fixed points of the game loop.
 ///
@@ -41,29 +41,26 @@ pub trait Game {
 pub struct GameContext<'a> {
     renderer: &'a mut Renderer,
     world: &'a mut World,
-    assets: &'a AssetFolder,
-    textures: &'a mut TextureLibrary,
+    assets: &'a mut GameAssets,
 }
 
 impl<'a> GameContext<'a> {
     pub(crate) fn new(
         renderer: &'a mut Renderer,
         world: &'a mut World,
-        assets: &'a AssetFolder,
-        textures: &'a mut TextureLibrary,
+        assets: &'a mut GameAssets,
     ) -> Self {
         Self {
             renderer,
             world,
             assets,
-            textures,
         }
     }
 
     /// The folder the game's assets are read from.
     #[must_use]
     pub fn assets(&self) -> &AssetFolder {
-        self.assets
+        self.assets.folder()
     }
 
     /// The entities, components and resources of the game.
@@ -104,22 +101,17 @@ impl<'a> GameContext<'a> {
 
     /// Loads the image at `path` in the asset folder, e.g. `"sprites/hero.png"`,
     /// and uploads it to the GPU. Loading the same file with the same
-    /// filter again gives the same texture, without reading it again.
+    /// filter again gives the same texture, without reading it again. With
+    /// hot-reload (see [`App::with_hot_reload`](crate::app::App::with_hot_reload)),
+    /// saving the file while the game runs updates the texture.
     ///
     /// # Errors
     ///
-    /// Returns an error if `path` is not a valid [`AssetPath`], the file
+    /// Returns an error if `path` is not a valid
+    /// [`AssetPath`](star_assets::AssetPath), the file
     /// cannot be read or decoded, or the GPU cannot hold the image.
     pub fn load_texture(&mut self, path: &str, filter: TextureFilter) -> EngineResult<TextureId> {
-        let Self {
-            renderer,
-            assets,
-            textures,
-            ..
-        } = self;
-        textures.load(AssetPath::new(path)?, filter, |path| {
-            renderer.create_texture(&assets.load_image(path)?, filter)
-        })
+        self.assets.load_texture(self.renderer, path, filter)
     }
 }
 

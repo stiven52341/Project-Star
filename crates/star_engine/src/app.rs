@@ -10,6 +10,7 @@ use star_platform::{TargetPlatform, WindowConfig, WindowSize, run_event_loop};
 use star_render::{Color, GraphicsBackend, RendererConfig};
 
 use crate::game::{EmptyGame, Game};
+use crate::game_assets::GameAssets;
 use crate::runtime::Runtime;
 
 /// A game application, configured with a builder and started with
@@ -22,6 +23,7 @@ pub struct App {
     actions: ActionMap,
     schedule: Schedule,
     assets: AssetFolder,
+    hot_reload: bool,
     platform: TargetPlatform,
 }
 
@@ -36,6 +38,7 @@ impl App {
             actions: ActionMap::new(),
             schedule: Schedule::new(),
             assets: AssetFolder::find_default(),
+            hot_reload: cfg!(debug_assertions),
             platform: TargetPlatform::current(),
         }
     }
@@ -103,6 +106,22 @@ impl App {
         self
     }
 
+    /// Enables or disables hot-reload: while the game runs, the textures
+    /// loaded from files are updated when their files change. Enabled by
+    /// default in debug builds, to see changes without restarting the game,
+    /// and disabled in release builds, where assets do not change.
+    #[must_use]
+    pub fn with_hot_reload(mut self, enabled: bool) -> Self {
+        self.hot_reload = enabled;
+        self
+    }
+
+    /// Whether asset files are reloaded when they change.
+    #[must_use]
+    pub fn hot_reload(&self) -> bool {
+        self.hot_reload
+    }
+
     /// The folder the game's assets are read from.
     #[must_use]
     pub fn asset_folder(&self) -> &AssetFolder {
@@ -154,7 +173,7 @@ impl App {
             self.clear_color,
             input,
             self.schedule,
-            self.assets,
+            GameAssets::new(self.assets, self.hot_reload),
         );
         run_event_loop(self.window_config, &mut runtime)
     }
@@ -202,6 +221,12 @@ mod tests {
             app.asset_folder().root(),
             std::path::Path::new("my_game/assets")
         );
+    }
+
+    #[test]
+    fn builder_sets_hot_reload() {
+        assert!(!App::new().with_hot_reload(false).hot_reload());
+        assert!(App::new().with_hot_reload(true).hot_reload());
     }
 
     #[test]
