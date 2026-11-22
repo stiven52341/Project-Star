@@ -57,6 +57,9 @@ Reglas:
   - `cargo test --workspace`
 - **Nada de `unwrap()` / `expect()` / `panic!()`** en código del motor. Los errores se
   propagan con `Result` (`EngineResult<T>`). Solo se permiten en tests.
+  - **Única excepción acordada**: `star_script_runtime::fault`, el punto único
+    que detiene un juego ante un error de StarScript que solo puede ocurrir al
+    jugar (índice fuera de rango, división entera entre cero).
 - Toda API pública lleva documentación `///` (`missing_docs` activado).
   Los nombres propios en CamelCase (p. ej. `ProjectStar`, `PlayStation`) se
   registran en `doc-valid-idents` de `clippy.toml`, sin desactivar el lint.
@@ -107,6 +110,7 @@ Capa 2  star_render, star_audio, star_physics, star_input, star_assets
 Capa 1  star_ecs, star_platform
 Capa 0  star_core, star_math                 (sin dependencias de otras capas)
 Herram. star_script                          (compilador de StarScript; sin dependencias)
+        star_script_runtime                  (soporte del Rust generado; sin dependencias)
 ```
 
 | Crate | Responsabilidad |
@@ -123,6 +127,7 @@ Herram. star_script                          (compilador de StarScript; sin depe
 | `star_scene` | Escenas y árbol de nodos estilo Godot/Unity |
 | `star_engine` | Punto de entrada público que integra todo |
 | `star_script` | Compilador de StarScript (`.star` → Rust). Especificación en `docs/starscript.md` |
+| `star_script_runtime` | Soporte del Rust generado: listas compartidas, campos, igualdad, errores en ejecución |
 | `editor` | Editor visual (egui): gestor de proyectos y ventana principal |
 
 Más detalle en `docs/architecture.md`. Hoja de ruta en `docs/roadmap.md`.

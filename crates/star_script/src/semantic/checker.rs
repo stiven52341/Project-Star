@@ -263,13 +263,7 @@ impl<'ast> Checker<'ast> {
     /// What `init` must still do before `self` is complete, if anything.
     pub(super) fn missing_initialization(&self) -> Option<String> {
         let initialization = self.context.initialization.as_ref()?;
-        let class = self.analysis.classes.class(self.context.class);
-        let mut missing: Vec<String> = initialization
-            .pending_fields
-            .iter()
-            .filter_map(|index| class.fields.get(*index))
-            .map(|field| format!("`{}`", field.name))
-            .collect();
+        let mut missing = self.pending_field_names();
         if initialization.needs_super {
             missing.push("`super.init(…)`".to_owned());
         }
@@ -278,6 +272,25 @@ impl<'ast> Checker<'ast> {
         } else {
             Some(missing.join(", "))
         }
+    }
+
+    /// The fields of its own class that `init` must still assign, if any.
+    pub(super) fn missing_own_fields(&self) -> Option<String> {
+        let missing = self.pending_field_names();
+        (!missing.is_empty()).then(|| missing.join(", "))
+    }
+
+    fn pending_field_names(&self) -> Vec<String> {
+        let Some(initialization) = self.context.initialization.as_ref() else {
+            return Vec::new();
+        };
+        let class = self.analysis.classes.class(self.context.class);
+        initialization
+            .pending_fields
+            .iter()
+            .filter_map(|index| class.fields.get(*index))
+            .map(|field| format!("`{}`", field.name))
+            .collect()
     }
 
     /// Whether the current statement is directly in the body, not nested.

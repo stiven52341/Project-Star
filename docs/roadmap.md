@@ -38,7 +38,8 @@ Se avanza por fases; cada fase deja el motor compilando y con tests en verde.
   - [x] 13.2 Parser y AST (recuperación de errores, todos los errores a la vez).
   - [x] 13.3 Análisis semántico: tipos, inferencia, null safety, clases, herencia
         y construcción segura.
-  - [ ] 13.4 Generación de Rust y prueba de punta a punta (`.star` → binario).
+  - [x] 13.4 Generación de Rust y prueba de punta a punta (`.star` → binario),
+        con el runtime `star_script_runtime`.
   - [ ] 13.5 API del motor para StarScript (ciclo de vida, nodos, input).
   - [ ] 13.6 Integración en el editor: compilar y panel de errores.
   - [ ] 13.7 Modelo de blueprints y traducción a StarScript.

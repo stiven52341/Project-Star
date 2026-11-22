@@ -27,6 +27,8 @@ Capa 0  star_core  star_math
 
 Herramientas: star_script ── compilador StarScript → Rust (sin dependencias;
                              lo usarán el editor y la línea de comandos)
+              star_script_runtime ── soporte del Rust generado (sin
+                             dependencias; lo usan los juegos)
 ```
 
 ## Modelo de juego (objetivo)
@@ -59,6 +61,7 @@ Herramientas: star_script ── compilador StarScript → Rust (sin dependencia
 | 16 | Lenguaje propio **StarScript** compilado a Rust (`star_script`) | Oculta lifetimes y préstamos tras un lenguaje orientado a objetos con tipos estáticos, sin perder el rendimiento de Rust. Flujo: blueprints → StarScript → Rust → máquina. Lexer y parser escritos a mano, sin generadores (`logos`, `pest`): control total de los mensajes de error y cero dependencias. Ver `docs/starscript.md` |
 | 17 | StarScript **null-safe** y con tipos estáticos | `T` nunca es `null`; solo `T?`, con `?.`, `??` y estrechamiento tras comprobar (solo sobre lo inmutable, para que sea sólido). Construcción en dos fases como Swift: `self` no existe hasta que el objeto está completo. Así un juego no puede fallar por un `null` ni por un objeto a medio construir, y el Rust generado usa `Option<T>` sin `unwrap` |
 | 18 | Licencia **GPL-3.0-or-later + excepción para juegos** | El motor y el editor son software libre y sus mejoras deben compartirse, pero los juegos pueden tener cualquier licencia (como la excepción de GCC). Sin la excepción, todo juego enlazado con el motor tendría que ser GPL. Ver `LICENSE-GAME-EXCEPTION.md` |
+| 19 | Objetos de StarScript con **conteo de referencias** (`Rc`) y runtime propio | Liberación automática y accesos que nunca fallan, sin un almacén global ni comprobaciones en cada campo (alternativa descartada: handles con generación, más lentos y con accesos que pueden fallar). Herencia con traits que se extienden; construcción en dos fases mediante una función que crea el objeto. Los errores que solo aparecen al jugar (índice fuera de rango, división entre cero) detienen el juego con un mensaje claro, desde un único punto: `star_script_runtime::fault` (excepción a la decisión 4). Ver `docs/starscript.md`, sección 4 |
 
 ## Render
 

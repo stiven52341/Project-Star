@@ -704,6 +704,20 @@ fn subclasses_must_call_the_base_constructor_when_it_needs_arguments() {
     );
 }
 
+#[test]
+fn own_fields_get_their_value_before_the_base_constructor() {
+    let base = "class Base { var name: string\n init(name: string) { self.name = name } }";
+    assert_valid(&format!(
+        "{base}\nclass Ok extends Base {{ var e: Enemy\n init() {{ e = Enemy()\n super.init(\"x\") }} }}"
+    ));
+    assert_eq!(
+        errors(&format!(
+            "{base}\nclass A extends Base {{ var e: Enemy\n init() {{ super.init(\"x\")\n e = Enemy() }} }}"
+        )),
+        [Kind::SuperInitBeforeFields("`e`".into())]
+    );
+}
+
 // --- Results ---
 
 #[test]

@@ -3,6 +3,7 @@
 use std::error::Error;
 use std::fmt;
 
+use crate::codegen::CodegenError;
 use crate::semantic::SemanticError;
 use crate::{LexError, LineIndex, ParseError, Span};
 
@@ -15,6 +16,8 @@ pub enum CompileError {
     Parse(ParseError),
     /// Found while checking the meaning of the code.
     Semantic(SemanticError),
+    /// Found while translating the code to Rust.
+    Codegen(CodegenError),
 }
 
 impl CompileError {
@@ -25,6 +28,7 @@ impl CompileError {
             Self::Lex(error) => error.span,
             Self::Parse(error) => error.span,
             Self::Semantic(error) => error.span,
+            Self::Codegen(error) => error.span,
         }
     }
 
@@ -46,6 +50,7 @@ impl fmt::Display for CompileError {
             Self::Lex(error) => error.fmt(formatter),
             Self::Parse(error) => error.fmt(formatter),
             Self::Semantic(error) => error.fmt(formatter),
+            Self::Codegen(error) => error.fmt(formatter),
         }
     }
 }
@@ -61,6 +66,12 @@ impl From<LexError> for CompileError {
 impl From<SemanticError> for CompileError {
     fn from(error: SemanticError) -> Self {
         Self::Semantic(error)
+    }
+}
+
+impl From<CodegenError> for CompileError {
+    fn from(error: CodegenError) -> Self {
+        Self::Codegen(error)
     }
 }
 

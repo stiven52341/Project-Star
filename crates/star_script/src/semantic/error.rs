@@ -203,6 +203,9 @@ pub enum SemanticErrorKind {
     MissingSuperInit(String),
     /// `super.init(…)` outside the top level of an `init`, or twice.
     MisplacedSuperInit,
+    /// `super.init(…)` before the subclass gave its own fields a value
+    /// (the names of the fields still missing).
+    SuperInitBeforeFields(String),
     /// `return` in `init` before every field has a value.
     ReturnBeforeInitialization,
 }
@@ -361,6 +364,11 @@ impl fmt::Display for SemanticErrorKind {
             }
             Self::MisplacedSuperInit => formatter.write_str(
                 "`super.init(…)` must be called once, directly in the body of `init`",
+            ),
+            Self::SuperInitBeforeFields(missing) => write!(
+                formatter,
+                "`super.init(…)` must come after giving a value to {missing}, \
+                 because the base `init` may already use the whole object"
             ),
             Self::ReturnBeforeInitialization => {
                 formatter.write_str("`init` cannot return before every field has a value")

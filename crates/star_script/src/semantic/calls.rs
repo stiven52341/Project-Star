@@ -253,6 +253,11 @@ impl Checker<'_> {
                 .is_some_and(|initialization| !initialization.super_called);
         if !well_placed {
             self.error(SemanticErrorKind::MisplacedSuperInit, callee.span);
+        } else if let Some(missing) = self.missing_own_fields() {
+            self.error(
+                SemanticErrorKind::SuperInitBeforeFields(missing),
+                callee.span,
+            );
         }
         self.analysis
             .record(callee, Type::Void, Some(Resolution::SuperConstructor(base)));

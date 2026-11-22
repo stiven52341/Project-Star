@@ -36,7 +36,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 1 | Léxico (lexer) | **Definitivo** |
 | 2 | Sintaxis (parser y AST) | **Definitivo** |
 | 3 | Tipos, null safety y semántica | **Definitivo** |
-| 4 | Generación de Rust | Borrador |
+| 4 | Generación de Rust | **Definitivo** |
 | 5 | API del motor | Pendiente |
 | 6 | Integración en el editor | Pendiente |
 | 7–8 | Blueprints | Borrador |
@@ -224,12 +224,16 @@ cargo run -p star_script --example check -- archivo.star
 | `float` | `f32` (igual que el motor y la GPU) | `0.0` |
 | `bool` | `bool` | `false` |
 | `string` | `String` | `""` |
-| `[T]` (lista) | `Vec<T>` | `[]` |
+| `[T]` (lista) | `List<T>` del runtime (compartida) | `[]` |
 | `T?` (anulable) | `Option<T>` | `null` |
-| Clases | handle del motor (sección 4) | — (necesitan valor) |
+| Clases | referencia compartida `Rc` (sección 4) | — (necesitan valor) |
 
 Las listas se escriben `[int]`, no `Array<int>`, porque `<` es también la
 comparación: `x as int < 3` sería ambiguo.
+
+Los objetos y las listas se **comparten por referencia**, como en GDScript:
+tras `var a = b`, ambos nombres son la misma lista, y `a.push(1)` también se
+ve en `b`. Los números, `bool` y `string` se copian.
 
 ### Inferencia
 
@@ -286,7 +290,11 @@ lo impide.
   medio construir.
 - **Herencia**: si el `init` de la clase base tiene parámetros, el `init` de
   la subclase debe llamar a `super.init(…)` una vez. `super.metodo()` llama a
-  la versión de la clase base.
+  la versión de la clase base. Los constructores no se heredan: cada clase
+  declara el suyo si lo necesita.
+- **Primero los campos propios, después `super.init(…)`** (como en Swift): el
+  `init` de la base puede llamar a métodos que la subclase redefine, y esos
+  métodos ya encuentran todos los campos con valor.
 - **Redefinir métodos**: requiere `override` y los mismos parámetros y tipo de
   retorno. Los campos y constantes no pueden repetir nombres de la base.
 - **Valores de campos y constantes**: no pueden usar `self` ni otros campos.
@@ -312,6 +320,25 @@ lo impide.
   llamarse como un campo: `self.speed = speed`.
 - Los rangos `a..b` solo existen en `for`.
 
+### Valores en ejecución
+
+- `==` compara números, `bool`, `string` y listas **por contenido** (las
+  listas, elemento a elemento); los objetos, **por identidad** (si son el
+  mismo objeto). `null` solo es igual a `null`.
+- Los enteros **dan la vuelta** al desbordarse (`9223372036854775807 + 1` da
+  el mínimo), igual en debug y en release.
+- `a / b` entre enteros redondea hacia cero (`-7 / 2` es `-3`) y `a % b` toma
+  el signo de `a` (`-7 % 3` es `-1`). `float as int` corta los decimales y
+  satura en los extremos.
+- `for x in lista` recorre los elementos que había al empezar: cambiar la
+  lista dentro del bucle no altera el recorrido.
+- `float.to_string()` siempre muestra que es un `float`: `2.0`, no `2`.
+- **Errores en ejecución**: leer fuera de una lista (`lista[5]` con dos
+  elementos) o dividir un entero entre cero **detiene el juego** con un
+  mensaje claro (`StarScript runtime error: index 5 is out of range for a
+  list of length 2`). No se pueden detectar al compilar, y seguir con un
+  valor inventado escondería el fallo.
+
 ### Métodos predefinidos
 
 | Tipo | Métodos |
@@ -325,18 +352,58 @@ lo impide.
 Clase nativa `Debug`: `Debug.print(mensaje: string)`. No hay funciones
 globales: todo es un método de alguna clase.
 
-## 4. Traducción a Rust (borrador)
+## 4. Traducción a Rust (definitiva)
 
-- Cada clase se traduce a un `struct` de Rust con sus campos. La herencia se
-  traduce a **composición**: el struct contiene a su base. Los métodos
-  redefinibles se despachan mediante traits.
-- Los objetos se referencian con **handles** que gestiona el motor (índices
-  con generación), no con referencias de Rust. Así el usuario puede guardar
-  referencias a otros objetos sin chocar con el borrow checker. Usar un objeto
-  destruido da un error claro, no un fallo de memoria.
-- Los nombres que choquen con palabras clave de Rust se generan como
-  identificadores crudos (`r#type`).
-- El Rust generado se compila con `cargo` como un crate más del proyecto. El
+Para ver el Rust de un programa, o compilarlo y ejecutarlo:
+
+```bash
+cargo run -p star_script --example run -- --rust archivo.star   # muestra el Rust
+cargo run -p star_script --example run -- archivo.star          # lo compila y ejecuta
+```
+
+Hasta que exista la API del motor (fase 5), un programa empieza en el
+`static func main()` de una de sus clases (solo una puede tenerlo).
+
+**Resultado**: un archivo Rust, raíz de su propio crate, que depende de
+`star_script_runtime` (listas compartidas, campos, igualdad y errores en
+ejecución). No lleva avisos de licencia: pertenece al autor del juego.
+
+**Objetos**: referencias compartidas con conteo de referencias (`Rc`): un
+objeto se libera cuando nadie lo usa, y acceder a él nunca falla. Dos objetos
+que se referencian entre sí no se liberan; se resolverá con referencias
+débiles. Los nodos del motor (fase 5) serán handles del motor, aparte.
+
+**Cada clase** `Player` genera un módulo `classes::Player` con:
+
+| Elemento | Qué es |
+|----------|--------|
+| `Fields` | Los campos que declara la clase, cada uno en un `Field<T>` del runtime. |
+| `HasFields` | Trait que da acceso a esos campos en objetos de cualquier subclase. |
+| `Object` | Trait con los métodos redefinibles; el de una subclase extiende el de su base. |
+| `Ref` | `Rc<dyn Object>`: referencia a un objeto de la clase o de una subclase. |
+| `Methods` | El código de cada método y las constantes (como funciones). |
+| `Instance` | Los objetos creados como esa clase: los `Fields` de cada clase de su jerarquía. |
+| `init_`, `new` | Construcción en dos fases; `Player(…)` llama a `new`. |
+
+- **Herencia**: un `Player::Ref` se convierte en `Character::Ref` sin coste
+  (los traits se extienden). `is` y `as` usan el trait `AnyObject`, con una
+  conversión por clase.
+- **Métodos**: los redefinibles se llaman por su trait, así cada objeto
+  ejecuta su versión; `super.metodo()` y los métodos `private` llaman
+  directamente al código de su clase.
+- **Construcción**: `init_` recibe una función que crea el objeto final. La
+  subclase prepara sus campos (sin `self`), llama al `init_` de su base, y
+  cuando la clase raíz tiene los suyos se crea el objeto entero; después
+  cada `init` ejecuta el resto de su cuerpo, de la raíz hacia abajo.
+- **Campos**: leer un campo copia su valor y escribirlo lo reemplaza, sin
+  dejar préstamos abiertos: el borrow checker nunca falla en ejecución.
+- **Null safety**: `T?` es `Option<T>`. Donde el compilador demostró que un
+  valor no es `null`, el Rust lo extrae sin comprobar de nuevo.
+- **Nombres**: se conservan tal cual. Los que chocan con Rust se adaptan
+  (`type` → `r#type`, `crate` → `crate_`) y los terminados en `_` reciben
+  otro, así nunca coinciden con los nombres internos del generador (`this_`,
+  `object_`, …).
+- El Rust generado se compila con `cargo` como un crate más. El
   desarrollador necesita la toolchain de Rust instalada.
 
 ## 5. Blueprints (borrador)

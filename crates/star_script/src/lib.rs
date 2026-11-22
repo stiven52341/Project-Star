@@ -8,14 +8,18 @@
 //! 2. [`parser`]: tokens → [syntax tree](ast).
 //! 3. [`semantic`]: syntax tree → [`Analysis`](semantic::Analysis): types,
 //!    names and null safety checked.
+//! 4. [`codegen`]: checked program → Rust code, which depends on the
+//!    `star_script_runtime` crate.
 //!
-//! [`check_source`] runs them all. The language is specified in
+//! [`check_source`] runs the first three and [`compile_source`] all of them. The language is specified in
 //! `docs/starscript.md`. This crate has no dependencies, so the editor and
 //! command-line tools can embed it freely.
 
 pub mod ast;
+pub mod codegen;
 mod diagnostic;
 pub mod lexer;
+pub mod package;
 pub mod parser;
 pub mod semantic;
 mod source;
@@ -67,4 +71,18 @@ pub fn check_source(source: &str) -> Result<CheckedSource, Vec<CompileError>> {
             .collect::<Vec<_>>()
     })?;
     Ok(CheckedSource { syntax, analysis })
+}
+
+/// Compiles the source of a `.star` file into Rust code.
+///
+/// See [`codegen::generate`] for the shape of the result.
+///
+/// # Errors
+///
+/// Returns the mistakes found, as [`check_source`] does, or the construct
+/// that cannot be translated to Rust yet.
+pub fn compile_source(source: &str) -> Result<String, Vec<CompileError>> {
+    let checked = check_source(source)?;
+    codegen::generate(&checked.syntax, &checked.analysis)
+        .map_err(|error| vec![CompileError::Codegen(error)])
 }

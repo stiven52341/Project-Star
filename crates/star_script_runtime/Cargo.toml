@@ -1,0 +1,14 @@
+[package]
+name = "star_script_runtime"
+description = "Support code for the Rust that the StarScript compiler generates."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
