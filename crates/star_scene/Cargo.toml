@@ -13,6 +13,9 @@ star_core.workspace = true
 star_ecs.workspace = true
 star_math.workspace = true
 star_render.workspace = true
+star_assets.workspace = true
+serde.workspace = true
+toml.workspace = true
 
 [lints]
 workspace = true

@@ -4,6 +4,7 @@ use star_assets::AssetFolder;
 use star_core::EngineResult;
 use star_ecs::World;
 use star_render::{Frame, Image, MeshId, Renderer, TextureFilter, TextureId, Vertex};
+use star_scene::Scene;
 
 use crate::game_assets::GameAssets;
 
@@ -114,6 +115,19 @@ impl<'a> GameContext<'a> {
     /// cannot be read or decoded, or the GPU cannot hold the image.
     pub fn load_texture(&mut self, path: &str, filter: TextureFilter) -> EngineResult<TextureId> {
         self.assets.load_texture(self.renderer, path, filter)
+    }
+
+    /// Reads the scene file at `path` in the asset folder, e.g.
+    /// `"levels/one.scene"`, and loads the textures it uses. Keep the scene
+    /// to add copies of it to the world at any time with
+    /// [`Scene::instantiate`], also from systems, while the game runs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `path` is not a valid asset path, the file cannot
+    /// be read, it is not a valid scene, or one of its textures cannot be loaded.
+    pub fn load_scene(&mut self, path: &str) -> EngineResult<Scene> {
+        self.assets.load_scene(self.renderer, path)
     }
 }
 

@@ -35,7 +35,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 
 - **Scenes** as a tree of **nodes** (Godot style), that can be saved and instanced.
 - Each node is backed by an ECS **entity**, with **components** that provide
-  behavior (Unity style).
+  behavior (Unity style). See [Scenes](#scenes).
 - **Systems** go through components every frame in a defined order of stages
   (input → logic → physics → render).
 
@@ -74,6 +74,9 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 29 | **Asset paths** relative to an asset folder, with `/` | Games are copied to other systems and packaged for mobile, where absolute paths, `\` and `../` break or escape the folder; one validated form keeps paths portable and checked when they are written. The folder is found next to the executable first, so a shipped game finds its assets wherever it is launched from. Rejected: plain `std::path::Path` arguments (platform-dependent, and relative to the working directory) |
 | 30 | JPEG decoding with **zune-jpeg** (MIT/Apache-2.0/Zlib) | Pure Rust, maintained, fast and light (one small dependency, `zune-core`); JPEG keeps photos and large backgrounds small. Hidden in `star_assets` like `png` (decision 26). Rejected: `jpeg-decoder` (no longer maintained) and the `image` crate (much heavier) |
 | 31 | **Hot-reload by polling** modification times | Every 0.5 s, one `stat` per loaded file: nothing to install, the same on every platform, and no cost a game notices for hundreds of files. Rejected for now: the `notify` crate (operating system events: immediate, but a dependency with code per platform and its own threads; it can replace the watcher behind the same API if projects grow to thousands of files) |
+| 32 | **Nodes are ECS entities** with `Parent` and `Children` components | One world holds everything, so systems query nodes like any entity and the tree costs nothing to objects outside it. Both directions are stored: children keep their order (drawing, editor) and the parent is found in O(1). Their fields are private and only `Hierarchy` changes them, so they never disagree. Rejected: a separate node tree with entities inside (two sources of truth) and only `Parent` (children would need a search of the world) |
+| 33 | **Global transforms computed once per frame**, before drawing | One walk of the tree from the roots, with a reused work list (no allocations once warm), instead of recomputing ancestors every time a global transform is read. `Affine2` keeps skew from non-uniform scales exact. Rejected for now: dirty flags (they pay off with large static trees; they can be added behind the same components) and 3D transforms (with Phase 9, which brings quaternions) |
+| 34 | `.scene` files in **TOML, a flat list of nodes** | Readable, diff-friendly in git and already used for projects (`serde` and `toml` are workspace dependencies). A flat list with parent positions avoids deep nesting, makes parents-before-children easy to check, and lets one scene file be read in one pass. Textures are named by asset path, so scenes do not depend on load order. Rejected: RON (another dependency) and nested tables (unreadable a few levels deep) |
 
 ## ECS
 
@@ -106,6 +109,39 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   `App::with_system(Stage::Update, system)`; the game's own `update` runs
   right after `Stage::First`. `GameContext::world()` gives the world in
   `Game::start`, to spawn the first entities.
+
+## Scenes
+
+- A **node** is an entity of the world with a `Name` and its place in the
+  tree: `Parent` and `Children` components (`star_scene`), changed only
+  through the `Hierarchy` methods of `World` — `spawn_node(name, parent)`,
+  `set_parent` (which rejects loops), `parent`, `children`, `find_child` and
+  `despawn_node` (the whole subtree). Children keep the order they were
+  added in. Any other component works on nodes as on any entity.
+- A 2D node is placed by a `Transform2D` (position, rotation, scale)
+  relative to its parent. Every frame, after the last stage and before
+  drawing, the engine runs `TransformPropagation`, which walks the tree from
+  the roots and stores each node's `GlobalTransform2D` (an `Affine2` of
+  `star_math`); a node without `Transform2D` passes its parent's on. Systems
+  that read global transforms see those of the end of the previous frame.
+- A `SpriteNode` shows a texture at its node: the engine adds the sprites of
+  every node with a global transform to the frame before `Game::draw`,
+  moved, rotated and scaled with the node.
+- A **`Scene`** is a tree of nodes that can be instanced many times
+  (`scene.instantiate(&mut world, parent)` returns the copy's root; a failed
+  copy leaves nothing behind). `GameContext::load_scene("levels/one.scene")`
+  reads it from the asset folder and loads its textures, so the game can
+  keep it and instance it later from any system, without the renderer.
+  `Scene::capture(&world, root)` takes a subtree of a world, and
+  `Scene::to_text` writes it, naming each texture by the file it came from.
+- **`.scene` files** are TOML: a format version and a flat list of
+  `[[node]]` tables, each with its name, the position of its `parent` in the
+  list (parents come first; the first node is the only root), an optional
+  transform (`position`, `rotation`, `scale`) and an optional
+  `[node.sprite]` (`texture` as an asset path, `filter`, `size`, `region`,
+  `anchor`, `color`, `layer`). Unknown fields are errors, so typos are not
+  silently ignored. Scenes keep names, transforms and sprites; other
+  components (and the StarScript classes of nodes) will join them later.
 
 ## Assets
 
@@ -181,8 +217,10 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
 - `Auto` lets wgpu choose the best GPU; an explicit backend fails with a clear
   error if it does not exist on the platform (e.g. DirectX 12 on Linux).
 - If the chosen adapter is a software (CPU) renderer, a warning is logged.
-- A frame's cycle: systems of `Stage::First` → `Game::update(&mut World)` →
-  systems of `Update`, `Physics` and `Last` → `Game::draw(&World, &mut Frame)` →
+- A frame's cycle: textures whose files changed are reloaded (hot-reload) →
+  systems of `Stage::First` → `Game::update(&mut World)` → systems of
+  `Update`, `Physics` and `Last` → global transforms of the nodes → sprites
+  of the sprite nodes → `Game::draw(&World, &mut Frame)` →
   `Renderer::render(&Frame)`. Meshes are created in `Game::start` with
   `GameContext::create_mesh` and identified by a `MeshId`.
 - `SceneRenderer` (internal) draws a `Frame` into any target; `Renderer`

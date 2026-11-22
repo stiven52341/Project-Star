@@ -2372,6 +2372,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "scene_2d"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "log",
+ "star_engine",
+]
+
+[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2662,10 +2671,13 @@ dependencies = [
 name = "star_scene"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "star_assets",
  "star_core",
  "star_ecs",
  "star_math",
  "star_render",
+ "toml",
 ]
 
 [[package]]

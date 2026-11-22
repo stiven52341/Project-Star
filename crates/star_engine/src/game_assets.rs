@@ -5,6 +5,7 @@ use std::time::Duration;
 use star_assets::{AssetFolder, AssetPath};
 use star_core::EngineResult;
 use star_render::{Renderer, TextureFilter, TextureId};
+use star_scene::Scene;
 
 use crate::texture_library::TextureLibrary;
 
@@ -39,6 +40,20 @@ impl GameAssets {
             .load(folder, AssetPath::new(path)?, filter, |path| {
                 renderer.create_texture(&folder.load_image(path)?, filter)
             })
+    }
+
+    /// Reads the scene file at `path`, loading the textures its sprites show.
+    pub(crate) fn load_scene(
+        &mut self,
+        renderer: &mut Renderer,
+        path: &str,
+    ) -> EngineResult<Scene> {
+        let path = AssetPath::new(path)?;
+        let text = self.folder.read_text(&path)?;
+        Scene::from_text(&text, |texture: &AssetPath, filter| {
+            self.load_texture(renderer, texture.as_str(), filter)
+        })
+        .map_err(|error| star_core::EngineError::Scene(format!("\"{path}\": {error}")))
     }
 
     /// Uploads again the textures whose files changed. A file that cannot be

@@ -62,6 +62,16 @@ impl AssetFolder {
         })
     }
 
+    /// The text of the asset at `path`, e.g. a scene file.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Asset`] if the file cannot be read or is not UTF-8 text.
+    pub fn read_text(&self, path: &AssetPath) -> EngineResult<String> {
+        String::from_utf8(self.read(path)?)
+            .map_err(|_| EngineError::Asset(format!("\"{path}\" is not UTF-8 text")))
+    }
+
     /// Reads and decodes the image at `path`, in the format of its extension.
     ///
     /// # Errors
@@ -127,6 +137,19 @@ mod tests {
         folder.write("levels/one.txt", b"hello");
 
         assert_eq!(folder.0.read(&path("levels/one.txt")).unwrap(), b"hello");
+    }
+
+    #[test]
+    fn text_assets_must_be_utf8() {
+        let folder = TemporaryFolder::new("text");
+        folder.write("level.scene", "name = \"Nivel\"".as_bytes());
+        folder.write("binary.scene", &[0xFF, 0xFE]);
+
+        assert_eq!(
+            folder.0.read_text(&path("level.scene")).unwrap(),
+            "name = \"Nivel\""
+        );
+        assert!(folder.0.read_text(&path("binary.scene")).is_err());
     }
 
     #[test]

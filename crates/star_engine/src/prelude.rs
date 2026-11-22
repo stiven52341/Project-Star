@@ -17,5 +17,5 @@ pub use star_render::{
     TextureId, TextureRegion, Vertex,
 };
 pub use star_scene::{
-    Children, GlobalTransform2D, Hierarchy, Name, Parent, SpriteNode, Transform2D,
+    Children, GlobalTransform2D, Hierarchy, Name, Parent, Scene, SpriteNode, Transform2D,
 };

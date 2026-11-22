@@ -1,0 +1,75 @@
+# A sun with two planets; the Earth has a moon. Every orbit is a node
+# without a sprite: turning it carries its planet around.
+format = 1
+
+[[node]]
+name = "SolarSystem"
+position = [0.0, 0.0]
+
+[[node]]
+name = "Sun"
+parent = 0
+
+[node.sprite]
+texture = "sprites/disc.png"
+size = [2.0, 2.0]
+color = [1.0, 0.8, 0.2, 1.0]
+
+[[node]]
+name = "Glow"
+parent = 1
+rotation = 0.0
+
+[node.sprite]
+texture = "sprites/star.png"
+size = [3.2, 3.2]
+color = [1.0, 0.9, 0.4, 0.6]
+layer = -1
+
+[[node]]
+name = "EarthOrbit"
+parent = 0
+rotation = 0.0
+
+[[node]]
+name = "Earth"
+parent = 3
+position = [3.5, 0.0]
+
+[node.sprite]
+texture = "sprites/disc.png"
+size = [0.8, 0.8]
+color = [0.2, 0.5, 1.0, 1.0]
+layer = 1
+
+[[node]]
+name = "MoonOrbit"
+parent = 4
+rotation = 0.0
+
+[[node]]
+name = "Moon"
+parent = 5
+position = [0.8, 0.0]
+
+[node.sprite]
+texture = "sprites/disc.png"
+size = [0.25, 0.25]
+color = [0.8, 0.8, 0.8, 1.0]
+layer = 2
+
+[[node]]
+name = "MarsOrbit"
+parent = 0
+rotation = 2.0
+
+[[node]]
+name = "Mars"
+parent = 7
+position = [5.5, 0.0]
+
+[node.sprite]
+texture = "sprites/disc.png"
+size = [0.6, 0.6]
+color = [0.9, 0.35, 0.2, 1.0]
+layer = 1

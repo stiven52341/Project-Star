@@ -39,7 +39,13 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] 5b Texture caching: each file is loaded once per filter.
   - [x] 5c JPEG images (zune-jpeg), besides PNG.
   - [x] 5d Hot-reload of textures (polling modification times).
-- [ ] **Phase 6 — Scenes**: node tree, serialization.
+- [x] **Phase 6 — Scenes**:
+  - [x] 6a Node tree on the ECS world (names, parents, children).
+  - [x] 6b 2D transforms relative to the parent, and their propagation.
+  - [x] 6c Sprite nodes, drawn by the engine.
+  - [x] 6d `.scene` files (TOML): loading, instancing, capturing and saving.
+  - Next, on top of it: nodes in StarScript (13.5c) and the real hierarchy
+    and inspector of the editor (Phase 12).
 - [ ] **Phase 7 — Audio**: playback, and loading sounds from the asset folder.
 - [ ] **Phase 8 — 2D physics**.
 - [ ] **Phase 9 — 3D rendering**: materials, lights, indexed meshes. (`Mat4`
