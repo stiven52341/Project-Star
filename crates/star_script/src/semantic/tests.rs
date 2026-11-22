@@ -960,6 +960,31 @@ fn scenes_load_trees_that_may_be_missing() {
 }
 
 #[test]
+fn sounds_are_loaded_and_may_be_missing() {
+    assert_valid_body(
+        "const jump = Sound.load(\"sounds/jump.wav\")\n \
+         if jump != null {\n jump.volume = 0.5\n jump.looping = true\n jump.play()\n \
+         if jump.is_playing() { jump.stop() }\n }\n \
+         Audio.set_volume(Audio.volume() / 2.0)",
+    );
+    assert_eq!(
+        body_errors("const jump: Sound = Sound.load(\"sounds/jump.wav\")"),
+        [mismatch("Sound", "Sound?")]
+    );
+}
+
+#[test]
+fn sounds_only_come_from_files() {
+    assert_eq!(
+        body_errors("const jump = Sound()"),
+        [Kind::PrivateMember {
+            name: "init".into(),
+            owner: "Sound".into(),
+        }]
+    );
+}
+
+#[test]
 fn only_nodes_can_join_the_tree() {
     assert_eq!(
         errors("class G extends Game {\n override func start() { add_child(Enemy()) }\n}"),

@@ -46,7 +46,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] 6d `.scene` files (TOML): loading, instancing, capturing and saving.
   - Next, on top of it: the real hierarchy and inspector of the editor
     (Phase 12), and scenes from StarScript.
-- [ ] **Phase 7 — Audio** (decision 45):
+- [x] **Phase 7 — Audio** (decision 45):
   - [x] 7a Decoding sounds (`SoundFormat`, symphonia): WAV, OGG Vorbis,
         MP3 and FLAC into a `Sound` in memory (`star_core`).
   - [x] 7b Mixer (`star_audio`): voices that play `Sound`s with volume,
@@ -55,7 +55,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] 7c Audio output (cpal) owned by the engine, and loading sounds from
         the asset folder (`GameContext::load_sound`), with an example
         (`sounds_2d`).
-  - [ ] 7d Sounds in StarScript (part of 13.5).
+  - [x] 7d Sounds in StarScript (part of 13.5): `Sound.load`, `play`,
+        `stop`, `is_playing`, `volume` and `looping`, and `Audio.volume`.
 - [ ] **Phase 8 — 2D physics**.
 - [ ] **Phase 9 — 3D rendering**: materials, lights, indexed meshes. (`Mat4`
       and a perspective camera already exist.)
@@ -101,6 +102,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           (`"GamepadLeftStickLeft"`…), `Input.strength(action)` (triggers
           and sticks give how far they go) and `Input.axis(negative,
           positive)`.
+    - [x] 13.5i Sounds in StarScript: `Sound` and `Audio` (step 7d).
   - [x] 13.6 Editor integration: compiling and an error panel.
     - [x] 13.6a Programs of several files (`SourceSet`): each file is read
           on its own and their classes are checked as one program; errors

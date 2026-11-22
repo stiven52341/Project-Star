@@ -103,8 +103,8 @@ pub mod Game {
     }
 }";
 
-/// The modules of the engine classes `Color`, `Node`, `Sprite`, `Camera`
-/// and `Scene`.
+/// The modules of the engine classes `Color`, `Node`, `Sprite`, `Camera`,
+/// `Scene` and `Sound`.
 pub(super) fn node_modules(out: &mut Writer) {
     let modules = [
         COLOR_MODULE,
@@ -112,6 +112,7 @@ pub(super) fn node_modules(out: &mut Writer) {
         SPRITE_MODULE,
         CAMERA_MODULE,
         SCENE_MODULE,
+        SOUND_MODULE,
     ];
     for (index, module) in modules.iter().enumerate() {
         if index > 0 {
@@ -559,6 +560,96 @@ pub mod Scene {
     }
 }";
 
+const SOUND_MODULE: &str = "/// `class Sound`, provided by the engine.
+pub mod Sound {
+    /// A reference to an object of this class.
+    pub type Ref = ::std::rc::Rc<dyn Object>;
+
+    /// The fields of a sound: how it plays, which sound of the runtime it
+    /// is, and the playings it started that may still sound.
+    pub struct Fields {
+        pub volume: ::star_script_runtime::Field<f32>,
+        pub looping: ::star_script_runtime::Field<bool>,
+        pub sound_: ::star_script_runtime::audio::SoundId,
+        pub voices_: ::std::cell::RefCell<::std::vec::Vec<::star_script_runtime::audio::VoiceId>>,
+    }
+
+    /// Gives access to the fields of this class.
+    pub trait HasFields {
+        fn fields(&self) -> &Fields;
+    }
+
+    /// What a sound can do.
+    pub trait Object: crate::AnyObject + HasFields {
+        fn play(self: ::std::rc::Rc<Self>);
+        fn stop(self: ::std::rc::Rc<Self>);
+        fn is_playing(self: ::std::rc::Rc<Self>) -> bool;
+    }
+
+    /// The methods of a sound.
+    pub struct Methods;
+
+    impl Methods {
+        /// `func play`: starts the sound once more, at its `volume`.
+        pub fn play(this_: &Ref) {
+            let fields_ = HasFields::fields(&**this_);
+            let mut voices_ = fields_.voices_.borrow_mut();
+            voices_.retain(|voice_| ::star_script_runtime::audio::is_playing(*voice_));
+            if let ::std::option::Option::Some(voice_) = ::star_script_runtime::audio::play(fields_.sound_, fields_.volume.get(), fields_.looping.get()) {
+                voices_.push(voice_);
+            }
+        }
+
+        /// `func stop`: stops every playing this sound started.
+        pub fn stop(this_: &Ref) {
+            for voice_ in HasFields::fields(&**this_).voices_.borrow_mut().drain(..) {
+                ::star_script_runtime::audio::stop(voice_);
+            }
+        }
+
+        /// `func is_playing`: whether a playing it started still sounds.
+        pub fn is_playing(this_: &Ref) -> bool {
+            let mut voices_ = HasFields::fields(&**this_).voices_.borrow_mut();
+            voices_.retain(|voice_| ::star_script_runtime::audio::is_playing(*voice_));
+            !voices_.is_empty()
+        }
+    }
+
+    /// An object created as this class.
+    pub struct Instance {
+        pub Sound: Fields,
+    }
+
+    impl HasFields for Instance {
+        fn fields(&self) -> &Fields { &self.Sound }
+    }
+
+    impl crate::AnyObject for Instance {
+        fn Sound(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref> { ::std::option::Option::Some(self) }
+    }
+
+    impl Object for Instance {
+        fn play(self: ::std::rc::Rc<Self>) { Methods::play(&(self as Ref)) }
+        fn stop(self: ::std::rc::Rc<Self>) { Methods::stop(&(self as Ref)) }
+        fn is_playing(self: ::std::rc::Rc<Self>) -> bool { Methods::is_playing(&(self as Ref)) }
+    }
+
+    /// `static func load`: the sound at `path`, at full volume and not
+    /// looping; `None` if it cannot be loaded. Sounds of the same file
+    /// share its samples.
+    pub fn load(path: ::std::string::String) -> ::std::option::Option<Ref> {
+        let sound_ = ::star_script_runtime::audio::load(&path)?;
+        ::std::option::Option::Some(::std::rc::Rc::new(Instance {
+            Sound: Fields {
+                volume: ::star_script_runtime::Field::new(1.0),
+                looping: ::star_script_runtime::Field::new(false),
+                sound_,
+                voices_: ::std::cell::RefCell::new(::std::vec::Vec::new()),
+            },
+        }))
+    }
+}";
+
 /// `fn main` that runs the game `class_path` in a window of the engine, with
 /// the input `actions` of the project.
 pub(super) fn game_entry_point(
@@ -588,9 +679,17 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
         .with_title({title:?})
         .with_actions(actions_);
     let folder_ = ::std::clone::Clone::clone(app_.asset_folder());
+    let audio_ = ::std::rc::Rc::new(::std::cell::RefCell::new(::star_engine::star_audio::Audio::silent()));
+    {RUNTIME}::audio::set_backend(EngineAudio_ {{
+        folder: ::std::clone::Clone::clone(&folder_),
+        output: ::std::rc::Rc::clone(&audio_),
+        sounds: ::std::vec::Vec::new(),
+    }});
     {RUNTIME}::scenes::set_loader(move |path_| read_scene_(&folder_, path_));
-    // Created after the loader is set, so its `init` can load scenes too.
+    // Created after the loaders are set, so its `init` can load scenes and
+    // sounds too.
     let game_ = EngineGame_ {{
+        audio: audio_,
         game: {class_path}::new(),
         nodes: ::std::vec::Vec::new(),
         pending: ::std::vec::Vec::new(),
@@ -601,6 +700,8 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
 
 /// Connects the StarScript game with the engine's game loop.
 struct EngineGame_ {{
+    /// Where `Sound`s play: silent until the engine gives the game its audio.
+    audio: ::std::rc::Rc<::std::cell::RefCell<::star_engine::star_audio::Audio>>,
     game: crate::classes::Game::Ref,
     /// Reused list of the nodes whose code runs in a frame.
     nodes: ::std::vec::Vec<crate::classes::Node::Ref>,
@@ -613,8 +714,10 @@ struct EngineGame_ {{
 impl ::star_engine::game::Game for EngineGame_ {{
     fn start(
         &mut self,
-        _context: &mut ::star_engine::game::GameContext<'_>,
+        context: &mut ::star_engine::game::GameContext<'_>,
     ) -> ::star_engine::star_core::EngineResult<()> {{
+        use ::star_engine::EngineWorld as _;
+        *self.audio.borrow_mut() = context.world().audio();
         crate::classes::Game::Object::start(::std::rc::Rc::clone(&self.game));
         ::std::result::Result::Ok(())
     }}
@@ -651,34 +754,9 @@ impl EngineGame_ {{
             ::std::option::Option::None => ::star_engine::star_render::Camera::default(),
         }})
     }}
-}}
-
-/// Copies where the player points, in world units, where `Input` reads it.
-/// The camera is the one the last frame was drawn from: what the player saw.
-fn share_pointer_(
-    input_: &::star_engine::star_input::Input,
-    view_: &::star_engine::star_render::Camera,
-    window_: ::star_engine::star_platform::WindowSize,
-) {{
-    let position_ = input_.pointer().and_then(|pixel_| view_.screen_to_world_2d(pixel_, window_));
-    {RUNTIME}::input::set_pointer(position_.map(|point_| (point_.x, point_.y)));
-}}
-
-/// Copies the state of each action where `Input` reads it.
-fn share_actions_(input_: &::star_engine::star_input::Input) {{
-    let actions_ = input_.actions();
-    for (index_, name_) in ACTION_NAMES_.iter().enumerate() {{
-        let state_ = {RUNTIME}::input::ActionState {{
-            is_down: actions_.is_down(name_),
-            just_pressed: actions_.just_pressed(name_),
-            just_released: actions_.just_released(name_),
-            strength: input_.action_strength(name_),
-        }};
-        {RUNTIME}::input::set_action_state(index_, state_);
-    }}
 }}"
     );
-    let support = [MIRROR_NODES, READ_SCENE];
+    let support = [SHARE_INPUT, MIRROR_NODES, READ_SCENE, ENGINE_AUDIO];
     for line in main.lines().chain(
         support
             .iter()
@@ -687,6 +765,32 @@ fn share_actions_(input_: &::star_engine::star_input::Input) {{
         out.line(line);
     }
 }
+
+const SHARE_INPUT: &str =
+    "/// Copies where the player points, in world units, where `Input` reads it.
+/// The camera is the one the last frame was drawn from: what the player saw.
+fn share_pointer_(
+    input_: &::star_engine::star_input::Input,
+    view_: &::star_engine::star_render::Camera,
+    window_: ::star_engine::star_platform::WindowSize,
+) {
+    let position_ = input_.pointer().and_then(|pixel_| view_.screen_to_world_2d(pixel_, window_));
+    ::star_script_runtime::input::set_pointer(position_.map(|point_| (point_.x, point_.y)));
+}
+
+/// Copies the state of each action where `Input` reads it.
+fn share_actions_(input_: &::star_engine::star_input::Input) {
+    let actions_ = input_.actions();
+    for (index_, name_) in ACTION_NAMES_.iter().enumerate() {
+        let state_ = ::star_script_runtime::input::ActionState {
+            is_down: actions_.is_down(name_),
+            just_pressed: actions_.just_pressed(name_),
+            just_released: actions_.just_released(name_),
+            strength: input_.action_strength(name_),
+        };
+        ::star_script_runtime::input::set_action_state(index_, state_);
+    }
+}";
 
 const MIRROR_NODES: &str = "/// Describes every node of the game's tree to the engine, parents first, so
 /// the world has a node in step with each one.
@@ -799,6 +903,48 @@ fn read_scene_(
         }
     });
     ::std::result::Result::Ok(nodes_.collect())
+}";
+
+const ENGINE_AUDIO: &str = "/// Loads and plays the sounds of StarScript's `Sound` with the engine.
+struct EngineAudio_ {
+    folder: ::star_engine::star_assets::AssetFolder,
+    output: ::std::rc::Rc<::std::cell::RefCell<::star_engine::star_audio::Audio>>,
+    /// Every sound loaded, by its number.
+    sounds: ::std::vec::Vec<::std::sync::Arc<::star_engine::star_core::Sound>>,
+}
+
+impl ::star_script_runtime::audio::AudioBackend for EngineAudio_ {
+    fn load(&mut self, path_: &str) -> ::std::result::Result<::star_script_runtime::audio::SoundId, ::std::string::String> {
+        let sound_ = ::star_engine::star_assets::AssetPath::new(path_)
+            .and_then(|path_| self.folder.load_sound(&path_))
+            .map_err(|error_| error_.to_string())?;
+        self.sounds.push(::std::sync::Arc::new(sound_));
+        ::std::result::Result::Ok(::star_script_runtime::audio::SoundId(self.sounds.len() - 1))
+    }
+
+    fn play(&mut self, sound_: ::star_script_runtime::audio::SoundId, volume_: f32, looping_: bool) -> ::std::result::Result<::star_script_runtime::audio::VoiceId, ::std::string::String> {
+        let sound_ = self.sounds.get(sound_.0).ok_or_else(|| ::std::string::String::from(\"the sound was never loaded\"))?;
+        let settings_ = ::star_engine::star_audio::PlaySettings { volume: volume_, looping: looping_ };
+        self.output.borrow().play(::std::sync::Arc::clone(sound_), settings_)
+            .map(|voice_| ::star_script_runtime::audio::VoiceId(voice_.to_bits()))
+            .map_err(|error_| error_.to_string())
+    }
+
+    fn stop(&mut self, voice_: ::star_script_runtime::audio::VoiceId) {
+        self.output.borrow().stop(::star_engine::star_audio::VoiceId::from_bits(voice_.0));
+    }
+
+    fn is_playing(&self, voice_: ::star_script_runtime::audio::VoiceId) -> bool {
+        self.output.borrow().is_playing(::star_engine::star_audio::VoiceId::from_bits(voice_.0))
+    }
+
+    fn volume(&self) -> f32 {
+        self.output.borrow().volume()
+    }
+
+    fn set_volume(&mut self, volume_: f32) {
+        self.output.borrow().set_volume(volume_);
+    }
 }";
 
 /// The names of the actions and the function that builds their map. The

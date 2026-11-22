@@ -4,12 +4,13 @@
 //! it. It provides what the language needs beyond plain Rust: shared lists,
 //! object fields that can change through shared references, equality as
 //! StarScript defines it, the state of the game's input actions, the scenes
-//! a game loads, and the few
+//! a game loads, the sounds it plays, and the few
 //! runtime errors that cannot be caught at compile time.
 //!
 //! It has no dependencies, so a game built from StarScript only needs the
 //! Rust toolchain and the engine.
 
+pub mod audio;
 mod equality;
 mod fault;
 mod field;

@@ -261,6 +261,20 @@ fn games_read_scenes_through_the_engine() {
 }
 
 #[test]
+fn games_play_sounds_through_the_engine() {
+    let code = rust(
+        "class G extends Game {\n var jump = Sound.load(\"jump.wav\")\n \
+         override func start() {\n jump?.play()\n Audio.set_volume(0.5)\n }\n}",
+    );
+
+    assert!(code.contains("pub mod Sound {"));
+    assert!(code.contains("crate::classes::Sound::load("));
+    assert!(code.contains("::star_script_runtime::audio::set_volume(0.5_f32)"));
+    assert!(code.contains("audio::set_backend(EngineAudio_ {"));
+    assert!(code.contains("*self.audio.borrow_mut() = context.world().audio();"));
+}
+
+#[test]
 fn scenes_create_the_node_classes_that_need_no_arguments() {
     let code = rust(
         "class Rock extends Sprite {\n init() { super.init(\"Rock\", \"rock.png\") }\n}\n\
@@ -283,6 +297,12 @@ fn other_engine_classes_cannot_be_extended() {
     assert_eq!(
         errors[0].to_string(),
         "classes cannot inherit from the engine class `Color` yet"
+    );
+
+    let errors = compile_source("class Loud extends Sound {}").expect_err("engine base");
+    assert_eq!(
+        errors[0].to_string(),
+        "classes cannot inherit from the engine class `Sound` yet"
     );
 
     let errors = compile_source("class Loud extends Debug {}").expect_err("engine base");

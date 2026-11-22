@@ -225,6 +225,9 @@ fn native_call(class: &str, method: &str, arguments: &str) -> Option<String> {
     match (class, method) {
         ("Debug", "print") => Some(format!("{RUNTIME}::print(&({arguments}))")),
         ("Scene", "load") => Some(format!("crate::classes::Scene::load({arguments})")),
+        ("Sound", "load") => Some(format!("crate::classes::Sound::load({arguments})")),
+        ("Audio", "volume") => Some(format!("{RUNTIME}::audio::volume()")),
+        ("Audio", "set_volume") => Some(format!("{RUNTIME}::audio::set_volume({arguments})")),
         _ => None,
     }
 }

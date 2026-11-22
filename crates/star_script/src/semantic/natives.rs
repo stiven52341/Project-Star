@@ -42,6 +42,12 @@ pub const SCENE_CLASS: &str = "Scene";
 /// Name of the engine class of colors: of sprites and of the background.
 pub const COLOR_CLASS: &str = "Color";
 
+/// Name of the engine class of the sounds a game loads and plays.
+pub const SOUND_CLASS: &str = "Sound";
+
+/// Name of the engine class of the game's audio as a whole.
+pub const AUDIO_CLASS: &str = "Audio";
+
 /// The methods of `Input` that take the name of an action.
 pub(super) const INPUT_ACTION_METHODS: [(&str, Type); 4] = [
     ("is_down", Type::Bool),
@@ -109,6 +115,15 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
         true,
     ));
     classes.add(scene);
+
+    add_sound_class(classes);
+    // The volume every sound is scaled by.
+    let mut audio = ClassInfo::new(AUDIO_CLASS.to_owned(), ClassOrigin::Native);
+    audio.methods = vec![
+        native_method("volume", &[], Type::Float, true),
+        native_method("set_volume", &[("volume", Type::Float)], Type::Void, true),
+    ];
+    classes.add(audio);
 
     // A game: the engine calls `start` once and `update` every frame, until
     // `quit` is called or the window is closed. Its nodes hang from it.
@@ -218,6 +233,35 @@ fn add_camera_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
     camera.fields = vec![native_field("view_height", Type::Float)];
     camera.constructor = Some(native_constructor(&[("name", Type::String)]));
     classes.add(camera)
+}
+
+/// `Sound`: a sound file of the asset folder, loaded with `Sound.load`
+/// (there is no `init`). Each `play` starts it once more, at its `volume`,
+/// looping if `looping`; `stop` stops every playing it started.
+fn add_sound_class(classes: &mut ClassTable) -> ClassId {
+    let mut sound = ClassInfo::new(SOUND_CLASS.to_owned(), ClassOrigin::Native);
+    sound.fields = vec![
+        native_field("volume", Type::Float),
+        native_field("looping", Type::Bool),
+    ];
+    sound.constructor = Some(ConstructorInfo {
+        parameters: Vec::new(),
+        is_private: true,
+        span: Span::new(0, 0),
+    });
+    let id = classes.add(sound);
+    classes.class_mut(id).methods = vec![
+        native_method(
+            "load",
+            &[("path", Type::String)],
+            Type::Class(id).nullable(),
+            true,
+        ),
+        native_method("play", &[], Type::Void, false),
+        native_method("stop", &[], Type::Void, false),
+        native_method("is_playing", &[], Type::Bool, false),
+    ];
+    id
 }
 
 /// A public field of an engine class; the engine gives it its first value.

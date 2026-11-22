@@ -21,6 +21,8 @@ use star_script::{GameSettings, InputAction};
 const GAME: &str = "
 class CountingGame extends Game {
     var frames = 0
+    // The test's game has no sounds: it stays null, with a warning.
+    var beep = Sound.load(\"sounds/beep.wav\")
 
     override func start() {
         Debug.print(\"start\")
@@ -36,6 +38,8 @@ class CountingGame extends Game {
         if Input.has_pointer() && Input.pointer_x() + Input.pointer_y() > 1000000.0 {
             Debug.print(\"far away\")
         }
+        beep?.play()
+        Audio.set_volume(Audio.volume())
         if frames == 3 {
             quit()
         }

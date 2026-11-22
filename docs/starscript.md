@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
+| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes) and sounds (`Sound`, `Audio`) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
 
@@ -364,6 +364,8 @@ The engine provides them; their names cannot be used for other classes.
 | `Camera` (extends `Node`) | `init(name: string)`; field `view_height: float` (2.0) |
 | `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
 | `Scene` | `static load(path: string) -> Node?` |
+| `Sound` | no `init`: `static load(path: string) -> Sound?`; fields `volume: float` (1.0), `looping: bool` (`false`); `play()`, `stop()`, `is_playing() -> bool` |
+| `Audio` | `static volume() -> float`, `static set_volume(volume: float)` |
 | `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool`, `static strength(action: string) -> float`, `static axis(negative: string, positive: string) -> float`, `static pointer_x() -> float`, `static pointer_y() -> float`, `static has_pointer() -> bool` |
 
 **A game is a class that extends `Game`**:
@@ -474,6 +476,45 @@ if level != null {
     add_child(level)
 }
 ```
+
+**Sounds** are files of the asset folder (WAV, OGG Vorbis, MP3 or FLAC),
+loaded with `Sound.load`:
+
+```
+class Shooter extends Game {
+    var shot = Sound.load("sounds/shot.wav")
+    var music = Sound.load("music/theme.ogg")
+
+    override func start() {
+        if music != null {
+            music.looping = true
+            music.volume = 0.6
+            music.play()
+        }
+    }
+
+    override func update(delta: float) {
+        if Input.just_pressed("shoot") { shot?.play() }
+    }
+}
+```
+
+- `Sound.load` gives `null` if the file cannot be loaded, and the reason is
+  written once to the error output. Each file is read once: loading it
+  again (another enemy's shot) gives a new `Sound`, with its own `volume`
+  and `looping`, that shares the samples. Console programs have no asset
+  folder: for them it is always `null`.
+- `play()` starts the sound once more, so quick shots overlap. `volume` (1
+  as recorded, 0 silent, above 1 louder) and `looping` are read when
+  `play()` is called: a sound already playing keeps how it started (stop it
+  and play it again to change it). `stop()` stops every playing that this
+  `Sound` started; `is_playing()` says whether one still sounds.
+- `Audio.set_volume(0.5)` scales every sound at once, also those playing;
+  `Audio.volume()` reads it (1 at the start).
+- Sounds load from the moment the game object is created (fields included),
+  but are only heard from `start` on. Without an audio device the game runs
+  silent: `play` is accepted and `is_playing()` is always `false`.
+- `Sound` cannot be extended, and has no `init`: `Sound()` is an error.
 
 **Input works with actions**, declared in the project, not in the scripts.
 The game asks for an action by name, so the same code works with keyboard,

@@ -16,6 +16,22 @@ pub const MAX_VOICES: usize = 128;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct VoiceId(u64);
 
+impl VoiceId {
+    /// The id as a number, for code that cannot hold engine types (the
+    /// support code of StarScript).
+    #[must_use]
+    pub const fn to_bits(self) -> u64 {
+        self.0
+    }
+
+    /// The id a number from [`VoiceId::to_bits`] stands for. A number that
+    /// never came from it names no sound: it is never playing.
+    #[must_use]
+    pub const fn from_bits(bits: u64) -> Self {
+        Self(bits)
+    }
+}
+
 /// Plays many sounds at once: each is read at the output's rate and
 /// channels, scaled by its volume and the master volume, and added up.
 #[derive(Debug)]
@@ -220,6 +236,16 @@ mod tests {
         }
 
         assert_eq!(mixed(&mut mixer, 2), [1.0, -1.0]);
+    }
+
+    #[test]
+    fn ids_survive_as_numbers() {
+        let mut mixer = mixer();
+        let id = mixer
+            .play(sound(vec![0.5; 2]), PlaySettings::default())
+            .unwrap();
+
+        assert!(mixer.is_playing(VoiceId::from_bits(id.to_bits())));
     }
 
     #[test]

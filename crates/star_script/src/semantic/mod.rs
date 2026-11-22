@@ -26,8 +26,8 @@ pub use classes::{
 };
 pub use error::{SemanticError, SemanticErrorKind};
 pub use natives::{
-    BuiltinMethod, CAMERA_CLASS, COLOR_CLASS, GAME_CLASS, INPUT_CLASS, NODE_CLASS, SCENE_CLASS,
-    SPRITE_CLASS,
+    AUDIO_CLASS, BuiltinMethod, CAMERA_CLASS, COLOR_CLASS, GAME_CLASS, INPUT_CLASS, NODE_CLASS,
+    SCENE_CLASS, SOUND_CLASS, SPRITE_CLASS,
 };
 pub use scene_classes::SceneClassError;
 pub use types::Type;

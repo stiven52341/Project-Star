@@ -12,7 +12,7 @@ use crate::Span;
 use crate::ast::{ClassDecl, ConstructorDecl, Expr, MemberKind, MethodDecl, VariableKind};
 use crate::semantic::{
     CAMERA_CLASS, COLOR_CLASS, ClassId, ClassOrigin, GAME_CLASS, MethodInfo, NODE_CLASS,
-    ParameterInfo, SPRITE_CLASS, SceneClassError, Type,
+    ParameterInfo, SOUND_CLASS, SPRITE_CLASS, SceneClassError, Type,
 };
 
 /// The engine classes that scripts can extend.
@@ -20,12 +20,13 @@ const EXTENDABLE_NATIVE_CLASSES: [&str; 4] = [GAME_CLASS, NODE_CLASS, SPRITE_CLA
 
 /// The engine classes that have objects, and so a module and a conversion
 /// in `AnyObject`.
-const NATIVE_OBJECT_CLASSES: [&str; 5] = [
+const NATIVE_OBJECT_CLASSES: [&str; 6] = [
     GAME_CLASS,
     COLOR_CLASS,
     NODE_CLASS,
     SPRITE_CLASS,
     CAMERA_CLASS,
+    SOUND_CLASS,
 ];
 
 /// Lints that generated code does not follow: it favors simple, uniform
