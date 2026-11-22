@@ -72,6 +72,7 @@ pub(super) static ENGLISH: Texts = Texts {
     game_build_failed: "The game did not build: Cargo's output above says why.",
     play_blocked: "The game is not played while the project has problems: see “Problems”.",
     nothing_to_play: "Nothing to play: the project has no scripts or blueprints.",
+    no_game_to_play: "Nothing to play: no class extends `Game`. Add a script or a blueprint that extends `Game` and adds the nodes to show.",
     scene_tab: "Scene",
     close_tab: "Close",
     open_blueprint_hint: "Double-click to open",

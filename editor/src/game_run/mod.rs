@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 
-use star_script::codegen::GeneratedProgram;
+use star_script::codegen::{EntryPoint, GeneratedProgram};
 use star_script::package::Package;
 
 use self::process::{Ended, Events};
@@ -163,6 +163,11 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
     let engine = Path::new(ENGINE_CRATES);
     if !engine.join(ENGINE_CRATE).is_dir() {
         return RunEnd::Failed(texts::current().engine_not_found(engine));
+    }
+    // Without a game or a `main` the crate has no `fn main`, and Cargo's
+    // error would not say what is missing.
+    if request.program.entry_point == EntryPoint::None {
+        return RunEnd::Failed(texts::current().no_game_to_play.to_owned());
     }
     events.send(RunEvent::Phase(RunPhase::Building));
     let name = package_name(&request.name);
@@ -333,6 +338,28 @@ mod tests {
                 success: true,
                 code: Some(0)
             })))
+        );
+    }
+
+    #[test]
+    fn programs_without_a_game_are_not_built() {
+        let program = star_script::compile_source(
+            "class Rock extends Node {\n init() { super.init(\"Rock\") }\n}\n",
+        )
+        .expect("valid program");
+        let request = PlayRequest {
+            name: "Editor test no game".to_owned(),
+            directory: std::env::temp_dir(),
+            program,
+        };
+
+        let run = GameRun::start(request, || {}).expect("thread started");
+
+        assert_eq!(
+            run.receiver.recv_timeout(TIMEOUT),
+            Ok(RunEvent::Phase(RunPhase::Finished(RunEnd::Failed(
+                texts::current().no_game_to_play.to_owned()
+            ))))
         );
     }
 

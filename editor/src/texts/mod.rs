@@ -145,6 +145,7 @@ pub(crate) struct Texts {
     pub(crate) game_build_failed: &'static str,
     pub(crate) play_blocked: &'static str,
     pub(crate) nothing_to_play: &'static str,
+    pub(crate) no_game_to_play: &'static str,
     pub(crate) scene_tab: &'static str,
     pub(crate) close_tab: &'static str,
     pub(crate) open_blueprint_hint: &'static str,
