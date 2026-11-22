@@ -1,152 +1,152 @@
-# ProjectStar — Normas del proyecto
+# ProjectStar — Project rules
 
-> Este archivo contiene las **normas inviolables** del proyecto. Toda contribución
-> (humana o de Claude) debe cumplirlas. Si una norma necesita cambiar, se cambia
-> aquí primero, de forma explícita y acordada con el dueño del proyecto.
+> This file contains the **inviolable rules** of the project. Every contribution
+> (human or Claude's) must follow them. If a rule needs to change, it is changed
+> here first, explicitly and in agreement with the project owner.
 
-## 1. Visión
+## 1. Vision
 
-ProjectStar es un **motor de videojuegos multiplataforma** para juegos **2D y 3D**,
-inspirado en la experiencia de uso de **Unity** y **Godot** (escenas, nodos/entidades,
-componentes, editor visual, flujo de trabajo amigable).
+ProjectStar is a **cross-platform game engine** for **2D and 3D** games,
+inspired by the user experience of **Unity** and **Godot** (scenes,
+nodes/entities, components, visual editor, friendly workflow).
 
-- Inspiración ≠ copia: **nunca** se copia código, assets ni documentación de Unity,
-  Godot u otros motores. Solo se toman ideas de diseño.
-- El desarrollo es **incremental**: se construye parte por parte, poco a poco.
-  Cada paso debe dejar el proyecto compilando y con los tests en verde.
+- Inspiration ≠ copying: code, assets or documentation from Unity, Godot or
+  other engines are **never** copied. Only design ideas are taken.
+- Development is **incremental**: the engine is built part by part, little by
+  little. Every step must leave the project compiling with its tests green.
 
-## 2. Plataformas objetivo
+## 2. Target platforms
 
-| Plataforma | Estado |
-|------------|--------|
-| Windows    | Objetivo principal |
-| macOS      | Objetivo principal |
-| Linux      | Objetivo principal |
-| Android    | Objetivo principal |
-| iOS        | Objetivo principal |
-| PlayStation / Xbox | Futuro (requieren SDK bajo NDA; irán en módulos aislados) |
+| Platform | Status |
+|----------|--------|
+| Windows  | Main target |
+| macOS    | Main target |
+| Linux    | Main target |
+| Android  | Main target |
+| iOS      | Main target |
+| PlayStation / Xbox | Future (their SDKs are under NDA; they will live in isolated modules) |
 
-Reglas:
-- Todo código dependiente de plataforma vive **solo** en `star_platform`
-  (o en crates de backend explícitos). El resto del motor es agnóstico a la plataforma.
-- Usar `#[cfg(...)]` únicamente en las capas de plataforma, nunca disperso por el motor.
-- Ninguna API pública puede asumir teclado/ratón: también existen táctil y mandos.
+Rules:
+- All platform-dependent code lives **only** in `star_platform` (or in
+  explicit backend crates). The rest of the engine is platform-agnostic.
+- Use `#[cfg(...)]` only in the platform layers, never scattered across the engine.
+- No public API may assume keyboard/mouse: touch and gamepads exist too.
 
-## 3. Normas inviolables
+## 3. Inviolable rules
 
-### 3.1 Lenguaje
-- El motor se escribe en **Rust** (edición 2024, toolchain `stable`).
-- **`unsafe` está prohibido** por defecto (`unsafe_code = "deny"`). Solo se permite en
-  capas FFI/plataforma, con `#![allow(unsafe_code)]` justificado a nivel de crate y un
-  comentario `// SAFETY:` explicando cada bloque.
+### 3.1 Language
+- The engine is written in **Rust** (edition 2024, `stable` toolchain).
+- **`unsafe` is forbidden** by default (`unsafe_code = "deny"`). It is only
+  allowed in FFI/platform layers, with a justified crate-level
+  `#![allow(unsafe_code)]` and a `// SAFETY:` comment explaining each block.
 
 ### 3.2 Clean Code
-- Nombres claros y descriptivos; nada de abreviaturas crípticas.
-- Funciones pequeñas que hacen **una sola cosa**. Si necesita un comentario para
-  explicar *qué* hace, probablemente debe dividirse.
-- Principios **SOLID**, **DRY**, **KISS** y **YAGNI**.
-- Sin números mágicos: usar constantes con nombre.
-- Sin código muerto ni código comentado. Sin `TODO` sin contexto.
-- Los comentarios explican el *porqué*, no el *qué*.
-- Archivos y módulos cohesionados: un concepto por módulo.
+- Clear, descriptive names; no cryptic abbreviations.
+- Small functions that do **one thing**. If one needs a comment to explain
+  *what* it does, it should probably be split.
+- **SOLID**, **DRY**, **KISS** and **YAGNI** principles.
+- No magic numbers: use named constants.
+- No dead or commented-out code. No `TODO` without context.
+- Comments explain *why*, not *what*.
+- Cohesive files and modules: one concept per module.
 
-### 3.3 Buenas prácticas de Rust
-- El código debe pasar **sin advertencias**:
+### 3.3 Rust good practices
+- Code must pass **without warnings**:
   - `cargo fmt --all -- --check`
   - `cargo clippy --workspace --all-targets -- -D warnings`
   - `cargo test --workspace`
-- **Nada de `unwrap()` / `expect()` / `panic!()`** en código del motor. Los errores se
-  propagan con `Result` (`EngineResult<T>`). Solo se permiten en tests.
-  - **Única excepción acordada**: `star_script_runtime::fault`, el punto único
-    que detiene un juego ante un error de StarScript que solo puede ocurrir al
-    jugar (índice fuera de rango, división entera entre cero).
-- Toda API pública lleva documentación `///` (`missing_docs` activado).
-  Los nombres propios en CamelCase (p. ej. `ProjectStar`, `PlayStation`) se
-  registran en `doc-valid-idents` de `clippy.toml`, sin desactivar el lint.
-- Preferir composición sobre herencia; traits pequeños y enfocados.
-- Tipos con invariantes: campos privados + constructores/validación.
-- `#[must_use]` en funciones puras y builders.
-- Evitar asignaciones de memoria en el bucle de juego (hot path) siempre que sea posible.
+- **No `unwrap()` / `expect()` / `panic!()`** in engine code. Errors are
+  propagated with `Result` (`EngineResult<T>`). They are only allowed in tests.
+  - **Only agreed exception**: `star_script_runtime::fault`, the single point
+    that stops a game on a StarScript error that can only happen while
+    playing (index out of range, integer division by zero).
+- Every public API has `///` documentation (`missing_docs` is enabled).
+  CamelCase proper names (e.g. `ProjectStar`, `PlayStation`) are registered
+  in `doc-valid-idents` in `clippy.toml`, without disabling the lint.
+- Prefer composition over inheritance; small, focused traits.
+- Types with invariants: private fields + constructors/validation.
+- `#[must_use]` on pure functions and builders.
+- Avoid memory allocations in the game loop (hot path) whenever possible.
 
 ### 3.4 Tests
-- Toda lógica nueva incluye tests unitarios (`#[cfg(test)] mod tests`).
-- Los bugs corregidos llevan un test de regresión.
+- All new logic includes unit tests (`#[cfg(test)] mod tests`).
+- Fixed bugs get a regression test.
 
-### 3.5 Dependencias
-- Cada dependencia externa debe estar justificada (mantenida, soporte
-  multiplataforma y licencia **compatible con GPL-3.0**: MIT, Apache-2.0, BSD,
-  Zlib, ISC, BSL-1.0, MPL-2.0, LGPL o GPL-3.0). Nunca GPL-2.0-only, AGPL ni
-  licencias propietarias o «no comerciales». Si una dependencia ofrece varias
-  licencias, basta con que una sea compatible.
-- Las versiones se declaran **una sola vez** en `[workspace.dependencies]` del
-  `Cargo.toml` raíz.
-- Las dependencias externas se encapsulan detrás de APIs propias del motor, para
-  poder reemplazarlas sin romper a los usuarios.
-  - **Única excepción acordada**: `star_render::interop` (feature `interop`,
-    desactivada por defecto) expone tipos de `wgpu` para que el **editor** comparta
-    la GPU con su interfaz. Ningún juego ni crate del motor puede activarla.
+### 3.5 Dependencies
+- Every external dependency must be justified (maintained, cross-platform and
+  with a **GPL-3.0-compatible** license: MIT, Apache-2.0, BSD, Zlib, ISC,
+  BSL-1.0, MPL-2.0, LGPL or GPL-3.0). Never GPL-2.0-only, AGPL, proprietary or
+  "non-commercial" licenses. If a dependency offers several licenses, one
+  compatible license is enough.
+- Versions are declared **only once**, in `[workspace.dependencies]` of the
+  root `Cargo.toml`.
+- External dependencies are wrapped behind the engine's own APIs, so they can
+  be replaced without breaking users.
+  - **Only agreed exception**: `star_render::interop` (feature `interop`,
+    disabled by default) exposes `wgpu` types so the **editor** can share the
+    GPU with its interface. No game or engine crate may enable it.
 
-### 3.6 Licencia
-- ProjectStar es **GPL-3.0-or-later** (`LICENSE`), con la **excepción para
-  juegos** de `LICENSE-GAME-EXCEPTION.md`: los juegos hechos con el motor
-  (incluido el código generado desde StarScript y blueprints) pueden usar
-  cualquier licencia, incluso cerrada. El motor modificado sigue siendo GPL.
-- Toda contribución se publica bajo esas mismas condiciones.
-- No se copia código de proyectos con licencias incompatibles (ver 1: tampoco
-  de Unity ni Godot, sea cual sea su licencia).
-- El código generado por las herramientas del motor no debe incluir avisos de
-  licencia GPL: pertenece al autor del juego.
+### 3.6 License
+- ProjectStar is **GPL-3.0-or-later** (`LICENSE`), with the **game exception**
+  in `LICENSE-GAME-EXCEPTION.md`: games made with the engine (including code
+  generated from StarScript and blueprints) may use any license, even a closed
+  one. A modified engine is still GPL.
+- Every contribution is published under those same terms.
+- No code is copied from projects with incompatible licenses (see 1: nor from
+  Unity or Godot, whatever their license).
+- Code generated by the engine's tools must not include GPL license notices:
+  it belongs to the game's author.
 
-## 4. Arquitectura
+## 4. Architecture
 
-Workspace de Cargo con crates modulares (prefijo `star_`). Las dependencias van
-**solo hacia abajo** en las capas; nunca hacia arriba ni circulares.
+Cargo workspace with modular crates (prefix `star_`). Dependencies only go
+**downwards** through the layers; never upwards, never circular.
 
 ```
-Capa 5  editor/, examples/, juegos          (usuarios del motor)
-Capa 4  star_engine                          (fachada pública, App, prelude)
-Capa 3  star_scene                           (escenas, jerarquía de nodos)
-Capa 2  star_render, star_audio, star_physics, star_input, star_assets
-Capa 1  star_ecs, star_platform
-Capa 0  star_core, star_math                 (sin dependencias de otras capas)
-Herram. star_script                          (compilador de StarScript; sin dependencias)
-        star_script_runtime                  (soporte del Rust generado; sin dependencias)
+Layer 5  editor/, examples/, games          (users of the engine)
+Layer 4  star_engine                         (public facade, App, prelude)
+Layer 3  star_scene                          (scenes, node hierarchy)
+Layer 2  star_render, star_audio, star_physics, star_input, star_assets
+Layer 1  star_ecs, star_platform
+Layer 0  star_core, star_math                (no dependencies on other layers)
+Tools    star_script                         (StarScript compiler; no dependencies)
+         star_script_runtime                 (support for the generated Rust; no dependencies)
 ```
 
-| Crate | Responsabilidad |
-|-------|-----------------|
-| `star_core` | Errores, tiempo, versión, utilidades base |
-| `star_math` | Vectores, matrices, cuaterniones, transformaciones |
-| `star_ecs` | Entidades, componentes, sistemas |
-| `star_platform` | Ventanas y eventos del SO (winit), detección de plataforma, carpetas del usuario |
-| `star_input` | Teclado, ratón, táctil, mandos (acciones abstractas) |
-| `star_assets` | Carga, caché y hot-reload de recursos |
-| `star_render` | Renderizado 2D y 3D sobre wgpu (DX12, Vulkan, Metal, OpenGL) |
-| `star_audio` | Reproducción de sonido y música |
-| `star_physics` | Física 2D y 3D |
-| `star_scene` | Escenas y árbol de nodos estilo Godot/Unity |
-| `star_engine` | Punto de entrada público que integra todo |
-| `star_script` | Compilador de StarScript (`.star` → Rust). Especificación en `docs/starscript.md` |
-| `star_script_runtime` | Soporte del Rust generado: listas compartidas, campos, igualdad, errores en ejecución |
-| `editor` | Editor visual (egui): gestor de proyectos y ventana principal |
+| Crate | Responsibility |
+|-------|----------------|
+| `star_core` | Errors, time, version, basic utilities |
+| `star_math` | Vectors, matrices, quaternions, transforms |
+| `star_ecs` | Entities, components, systems |
+| `star_platform` | OS windows and events (winit), platform detection, user folders |
+| `star_input` | Keyboard, mouse, touch, gamepads (abstract actions) |
+| `star_assets` | Loading, caching and hot-reload of resources |
+| `star_render` | 2D and 3D rendering on wgpu (DX12, Vulkan, Metal, OpenGL) |
+| `star_audio` | Sound and music playback |
+| `star_physics` | 2D and 3D physics |
+| `star_scene` | Scenes and Godot/Unity-style node tree |
+| `star_engine` | Public entry point that integrates everything |
+| `star_script` | StarScript compiler (`.star` → Rust). Specification in `docs/starscript.md` |
+| `star_script_runtime` | Support for the generated Rust: shared lists, fields, equality, runtime errors |
+| `editor` | Visual editor (egui): project manager and main window |
 
-Más detalle en `docs/architecture.md`. Hoja de ruta en `docs/roadmap.md`.
+More detail in `docs/architecture.md`. Roadmap in `docs/roadmap.md`.
 
-## 5. Convenciones
+## 5. Conventions
 
-- **Idioma**: identificadores, comentarios de código y documentación `///` en
-  **inglés** (estándar del ecosistema Rust). El `README.md` también en **inglés**,
-  porque es la portada pública del repositorio. Documentos del proyecto
-  (`CLAUDE.md`, `docs/`) y conversación en **español**.
-- Nombres: `snake_case` funciones/módulos, `PascalCase` tipos, `SCREAMING_SNAKE_CASE`
-  constantes.
-- Commits con **Conventional Commits** (`feat:`, `fix:`, `refactor:`, `docs:`,
-  `test:`, `chore:`), en inglés, cortos y en imperativo.
+- **Language**: identifiers, code comments, `///` documentation, `README.md`
+  and project documents (`CLAUDE.md`, `docs/`) in **English** (the standard
+  of the Rust ecosystem, and the public face of the repository). The
+  conversation with the owner is in **Spanish**.
+- Names: `snake_case` for functions/modules, `PascalCase` for types,
+  `SCREAMING_SNAKE_CASE` for constants.
+- Commits follow **Conventional Commits** (`feat:`, `fix:`, `refactor:`,
+  `docs:`, `test:`, `chore:`), in English, short and in the imperative mood.
 
-## 6. Flujo de trabajo con Claude
+## 6. Workflow with Claude
 
-1. Antes de implementar algo, revisar este archivo y `docs/`.
-2. Trabajar en pasos pequeños y verificables; explicar el diseño antes de cambios grandes.
-3. Tras cada cambio: `cargo fmt`, `cargo clippy` y `cargo test` deben pasar.
-4. Actualizar `docs/` y este archivo cuando cambie la arquitectura o una decisión.
-5. No añadir dependencias, crates ni funcionalidades fuera de lo pedido sin consultarlo.
+1. Before implementing anything, review this file and `docs/`.
+2. Work in small, verifiable steps; explain the design before big changes.
+3. After every change, `cargo fmt`, `cargo clippy` and `cargo test` must pass.
+4. Update `docs/` and this file when the architecture or a decision changes.
+5. Do not add dependencies, crates or features beyond what was asked without asking first.

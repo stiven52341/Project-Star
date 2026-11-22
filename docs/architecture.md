@@ -1,131 +1,132 @@
-# Arquitectura de ProjectStar
+# ProjectStar architecture
 
-## Principios
+## Principles
 
-1. **Modularidad**: cada subsistema es un crate independiente con una única
-   responsabilidad. Se puede compilar, testear y reemplazar por separado.
-2. **Dependencias hacia abajo**: un crate solo depende de capas inferiores.
-3. **Agnóstico a la plataforma**: el código específico de SO vive en `star_platform`.
-4. **APIs propias**: las librerías externas se envuelven para no filtrarse en la API pública.
-5. **2D y 3D de primera clase**: ninguna de las dos es un caso especial de la otra
-   a nivel de API de usuario, aunque compartan infraestructura.
+1. **Modularity**: each subsystem is an independent crate with a single
+   responsibility. It can be built, tested and replaced on its own.
+2. **Dependencies go downwards**: a crate only depends on lower layers.
+3. **Platform-agnostic**: OS-specific code lives in `star_platform`.
+4. **Own APIs**: external libraries are wrapped so they do not leak into the public API.
+5. **First-class 2D and 3D**: neither is a special case of the other in the
+   user API, although they share infrastructure.
 
-## Capas
-
-```
-Capa 5  editor/, examples/, juegos
-           │
-Capa 4  star_engine ─────────────── fachada: App, prelude, re-exports
-           │
-Capa 3  star_scene ──────────────── árbol de nodos + componentes
-           │
-Capa 2  star_render  star_audio  star_physics  star_input  star_assets
-           │
-Capa 1  star_ecs  star_platform
-           │
-Capa 0  star_core  star_math
-
-Herramientas: star_script ── compilador StarScript → Rust (sin dependencias;
-                             lo usarán el editor y la línea de comandos)
-              star_script_runtime ── soporte del Rust generado (sin
-                             dependencias; lo usan los juegos)
-```
-
-## Modelo de juego (objetivo)
-
-- **Escenas** como árbol de **nodos** (al estilo Godot), guardables e instanciables.
-- Cada nodo está respaldado por una **entidad** del ECS, con **componentes**
-  que aportan comportamiento (al estilo Unity).
-- **Sistemas** recorren componentes cada frame en un orden de etapas definido
-  (input → lógica → física → render).
-
-## Decisiones registradas
-
-| # | Decisión | Motivo |
-|---|----------|--------|
-| 1 | Rust edición 2024, stable | Seguridad de memoria sin GC; ecosistema multiplataforma |
-| 2 | Workspace de Cargo con crates `star_*` | Compilación incremental y límites claros entre módulos |
-| 3 | `unsafe` denegado por defecto | Solo permitido en FFI/plataforma con justificación |
-| 4 | Errores vía `EngineResult<T>` | Sin pánicos en el motor; el juego decide cómo reaccionar |
-| 5 | Matemáticas propias (`star_math`) | Fachada estable; la implementación puede usar SIMD o una librería externa |
-| 6 | Render sobre **wgpu** (no implementación propia) | Una API para DX12, Vulkan, Metal y OpenGL; traduce shaders (naga). Escribir 4 backends propios costaría años |
-| 7 | Ventanas con **winit** | Estándar de Rust para ventanas/eventos en escritorio y móvil; es el que usa wgpu |
-| 8 | wgpu y winit no aparecen en la API pública | Solo `star_render` conoce wgpu y solo `star_platform` conoce winit. Permite añadir backends de consola (no soportados por wgpu) sin romper juegos. Excepción: decisión 15 |
-| 9 | Render en modo inmediato vía `Frame` | El juego describe cada frame (`Frame::draw(malla, transform)`); el renderer lo convierte en trabajo de GPU. Simple ahora; la escena alimentará el `Frame` más adelante |
-| 10 | Matrices column-major, mano derecha, profundidad `0..1` | Es lo que esperan WGSL y las APIs modernas; +Y arriba, la cámara mira hacia -Z |
-| 11 | Interfaz del editor con **egui** (vía `eframe`) | UI inmediata muy usada en herramientas de Rust; usa nuestras mismas versiones de wgpu y winit (sin compilar dos copias). Solo la usa `editor/`; el motor no depende de ella. Exige Rust 1.95, así que solo el editor declara ese `rust-version` |
-| 12 | Archivos del editor en TOML con `serde` + `toml` | `project.toml` y la lista de recientes se leen y escriben con serde: sin escapes manuales y con errores claros si un archivo está corrupto |
-| 13 | Diálogos nativos con **rfd** | Selector de carpetas del propio sistema (portal XDG en Linux, nativo en Windows/macOS), solo en el editor |
-| 14 | Rutas del usuario en `star_platform::user_directories` | Carpeta personal y de configuración dependen del SO; ese código (`cfg!`) vive en la capa de plataforma |
-| 15 | `star_render::interop` (feature `interop`) para el editor | La vista del editor renderiza con el motor en una textura del **mismo dispositivo wgpu** que egui: sin copias por CPU. Expone tipos wgpu, por eso está tras una feature que solo activa el editor. Alternativa descartada: copiar cada frame a la CPU (lento) |
-| 16 | Lenguaje propio **StarScript** compilado a Rust (`star_script`) | Oculta lifetimes y préstamos tras un lenguaje orientado a objetos con tipos estáticos, sin perder el rendimiento de Rust. Flujo: blueprints → StarScript → Rust → máquina. Lexer y parser escritos a mano, sin generadores (`logos`, `pest`): control total de los mensajes de error y cero dependencias. Ver `docs/starscript.md` |
-| 17 | StarScript **null-safe** y con tipos estáticos | `T` nunca es `null`; solo `T?`, con `?.`, `??` y estrechamiento tras comprobar (solo sobre lo inmutable, para que sea sólido). Construcción en dos fases como Swift: `self` no existe hasta que el objeto está completo. Así un juego no puede fallar por un `null` ni por un objeto a medio construir, y el Rust generado usa `Option<T>` sin `unwrap` |
-| 18 | Licencia **GPL-3.0-or-later + excepción para juegos** | El motor y el editor son software libre y sus mejoras deben compartirse, pero los juegos pueden tener cualquier licencia (como la excepción de GCC). Sin la excepción, todo juego enlazado con el motor tendría que ser GPL. Ver `LICENSE-GAME-EXCEPTION.md` |
-| 19 | Objetos de StarScript con **conteo de referencias** (`Rc`) y runtime propio | Liberación automática y accesos que nunca fallan, sin un almacén global ni comprobaciones en cada campo (alternativa descartada: handles con generación, más lentos y con accesos que pueden fallar). Herencia con traits que se extienden; construcción en dos fases mediante una función que crea el objeto. Los errores que solo aparecen al jugar (índice fuera de rango, división entre cero) detienen el juego con un mensaje claro, desde un único punto: `star_script_runtime::fault` (excepción a la decisión 4). Ver `docs/starscript.md`, sección 4 |
-| 20 | Los juegos de StarScript **extienden la clase del motor `Game`** | El motor llama a `start` y `update(delta)` mediante un adaptador generado que implementa el trait `Game` de `star_engine`; `quit()` marca un campo interno que el bucle consulta (`Game::is_finished`). Solo los juegos dependen de `star_engine`: los programas de consola (`static func main()`) siguen sin depender de wgpu. La API de StarScript para input y nodos se hará junto con las fases 2 y 6, para no inventarla dos veces |
-
-## Render
+## Layers
 
 ```
-juego → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Metal | OpenGl)
+Layer 5  editor/, examples/, games
             │
-            ├── star_platform: Window + bucle de eventos (winit)
-            └── star_render:   Renderer (wgpu) → DX12 / Vulkan / Metal / OpenGL
-                                     └── (futuro) backend de consola
+Layer 4  star_engine ─────────────── facade: App, prelude, re-exports
+            │
+Layer 3  star_scene ──────────────── node tree + components
+            │
+Layer 2  star_render  star_audio  star_physics  star_input  star_assets
+            │
+Layer 1  star_ecs  star_platform
+            │
+Layer 0  star_core  star_math
+
+Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
+                        editor and the command line will use it)
+         star_script_runtime ── support for the generated Rust (no
+                        dependencies; games use it)
 ```
 
-- `Auto` deja que wgpu elija la mejor GPU; un backend explícito falla con un error
-  claro si no existe en la plataforma (p. ej. DirectX 12 en Linux).
-- Si el adaptador elegido es un renderizador por software (CPU), se emite un aviso.
-- Ciclo de un frame: `Game::update(&Time)` → `Game::draw(&mut Frame)` →
-  `Renderer::render(&Frame)`. Las mallas se crean en `Game::start` con
-  `GameContext::create_mesh` y se identifican con `MeshId`.
-- `SceneRenderer` (interno) dibuja un `Frame` en cualquier destino; lo usan
-  `Renderer` (ventana) y `interop::OffscreenRenderer` (textura, para el editor).
-- Mallas de triángulos (`create_mesh`) y de líneas (`create_lines`).
-- Cada draw tiene su transform (proyección·vista·modelo) en una ranura de un
-  único uniform buffer con offset dinámico: funciona en todos los backends,
-  OpenGL incluido, y sube todas las matrices del frame en una sola copia.
-- `Camera::new_2d` (ortográfica, ancho según el aspect ratio para no deformar)
-  y `Camera::new_3d` (perspectiva de 60°).
-- `Color` se expresa en espacio sRGB (como los selectores de color) y se convierte
-  a lineal cuando el render target es sRGB.
+## Game model (goal)
+
+- **Scenes** as a tree of **nodes** (Godot style), that can be saved and instanced.
+- Each node is backed by an ECS **entity**, with **components** that provide
+  behavior (Unity style).
+- **Systems** go through components every frame in a defined order of stages
+  (input → logic → physics → render).
+
+## Recorded decisions
+
+| # | Decision | Reason |
+|---|----------|--------|
+| 1 | Rust edition 2024, stable | Memory safety without GC; cross-platform ecosystem |
+| 2 | Cargo workspace with `star_*` crates | Incremental builds and clear boundaries between modules |
+| 3 | `unsafe` denied by default | Only allowed in FFI/platform code, with a justification |
+| 4 | Errors through `EngineResult<T>` | No panics in the engine; the game decides how to react |
+| 5 | Own math (`star_math`) | Stable facade; the implementation may use SIMD or an external library |
+| 6 | Rendering on **wgpu** (not an own implementation) | One API for DX12, Vulkan, Metal and OpenGL; it translates shaders (naga). Writing 4 own backends would take years |
+| 7 | Windows with **winit** | The Rust standard for windows/events on desktop and mobile; it is what wgpu uses |
+| 8 | wgpu and winit do not appear in the public API | Only `star_render` knows wgpu and only `star_platform` knows winit. This allows adding console backends (not supported by wgpu) without breaking games. Exception: decision 15 |
+| 9 | Immediate-mode rendering through `Frame` | The game describes each frame (`Frame::draw(mesh, transform)`); the renderer turns it into GPU work. Simple for now; the scene will feed the `Frame` later |
+| 10 | Column-major matrices, right-handed, depth `0..1` | It is what WGSL and modern APIs expect; +Y up, the camera looks towards -Z |
+| 11 | Editor interface with **egui** (through `eframe`) | Immediate-mode UI widely used in Rust tools; it uses our same wgpu and winit versions (no two copies to build). Only `editor/` uses it; the engine does not depend on it. It requires Rust 1.95, so only the editor declares that `rust-version` |
+| 12 | Editor files in TOML with `serde` + `toml` | `project.toml` and the recent projects list are read and written with serde: no manual escaping, and clear errors if a file is corrupt |
+| 13 | Native dialogs with **rfd** | The system's own folder picker (XDG portal on Linux, native on Windows/macOS), only in the editor |
+| 14 | User paths in `star_platform::user_directories` | The home and configuration folders depend on the OS; that code (`cfg!`) lives in the platform layer |
+| 15 | `star_render::interop` (feature `interop`) for the editor | The editor's view renders with the engine into a texture of the **same wgpu device** as egui: no CPU copies. It exposes wgpu types, which is why it is behind a feature that only the editor enables. Rejected alternative: copying every frame to the CPU (slow) |
+| 16 | Own language **StarScript** compiled to Rust (`star_script`) | It hides lifetimes and borrowing behind an object-oriented, statically typed language, without losing Rust's performance. Flow: blueprints → StarScript → Rust → machine code. Hand-written lexer and parser, without generators (`logos`, `pest`): full control of error messages and zero dependencies. See `docs/starscript.md` |
+| 17 | **Null-safe**, statically typed StarScript | `T` is never `null`; only `T?` can be, with `?.`, `??` and narrowing after a check (only on what cannot change, so it is sound). Two-phase construction as in Swift: `self` does not exist until the object is complete. So a game cannot fail because of a `null` or a half-built object, and the generated Rust uses `Option<T>` without `unwrap` |
+| 18 | **GPL-3.0-or-later + game exception** license | The engine and the editor are free software and their improvements must be shared, but games may have any license (like GCC's exception). Without the exception, every game linked with the engine would have to be GPL. See `LICENSE-GAME-EXCEPTION.md` |
+| 19 | StarScript objects with **reference counting** (`Rc`) and an own runtime | Automatic release and accesses that never fail, without a global store or checks on every field (rejected alternative: generational handles, slower and with accesses that can fail). Inheritance through traits that extend each other; two-phase construction through a function that creates the object. Errors that only appear while playing (index out of range, division by zero) stop the game with a clear message, from a single point: `star_script_runtime::fault` (exception to decision 4). See `docs/starscript.md`, section 4 |
+| 20 | StarScript games **extend the engine class `Game`** | The engine calls `start` and `update(delta)` through a generated adapter that implements the `Game` trait of `star_engine`; `quit()` sets an internal field that the loop checks (`Game::is_finished`). Only games depend on `star_engine`: console programs (`static func main()`) still do not depend on wgpu. The StarScript API for input and nodes will be made together with phases 2 and 6, so it is not invented twice |
+
+## Rendering
+
+```
+game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Metal | OpenGl)
+            │
+            ├── star_platform: Window + event loop (winit)
+            └── star_render:   Renderer (wgpu) → DX12 / Vulkan / Metal / OpenGL
+                                     └── (future) console backend
+```
+
+- `Auto` lets wgpu choose the best GPU; an explicit backend fails with a clear
+  error if it does not exist on the platform (e.g. DirectX 12 on Linux).
+- If the chosen adapter is a software (CPU) renderer, a warning is logged.
+- A frame's cycle: `Game::update(&Time)` → `Game::draw(&mut Frame)` →
+  `Renderer::render(&Frame)`. Meshes are created in `Game::start` with
+  `GameContext::create_mesh` and identified by a `MeshId`.
+- `SceneRenderer` (internal) draws a `Frame` into any target; `Renderer`
+  (window) and `interop::OffscreenRenderer` (texture, for the editor) use it.
+- Triangle meshes (`create_mesh`) and line meshes (`create_lines`).
+- Each draw has its transform (projection·view·model) in a slot of a single
+  uniform buffer with a dynamic offset: it works on every backend, OpenGL
+  included, and uploads all the matrices of the frame in a single copy.
+- `Camera::new_2d` (orthographic, its width follows the aspect ratio so
+  nothing is stretched) and `Camera::new_3d` (60° perspective).
+- `Color` is expressed in sRGB space (like color pickers) and converted to
+  linear when the render target is sRGB.
 
 ## Editor
 
-Una sola ventana nativa con dos pantallas:
+A single native window with two screens. Its texts are in Spanish for now
+(all of them in `texts.rs`, ready to be translated):
 
-1. **Gestor de proyectos** (`launcher/`): a la izquierda, proyectos recientes
-   (botón «Abrir»; los que ya no existen aparecen como «No disponible» con
-   «Quitar») y «Abrir otro proyecto…» (selector de carpeta). A la derecha,
-   **Nuevo proyecto**: nombre, ubicación (con «Examinar…»), tipo 2D o 3D
-   (exclusivo) y plataformas (checks). «Crear y abrir» crea
-   `<ubicación>/<nombre>/` con `project.toml` y `assets/` (nunca sobrescribe)
-   y abre el editor.
-2. **Editor** (`workspace/`), maximizado: menú (Archivo → Cerrar proyecto /
-   Salir; Ayuda → Acerca de), panel **Escena** (jerarquía, vacía hasta que
-   exista `star_scene`), **vista** central renderizada por el motor
-   (cuadrícula de referencia; arrastrar = desplazar en 2D / orbitar en 3D,
-   rueda = zoom), **Inspector** (propiedades del proyecto),
-   **Archivos** (árbol de `assets/`, con «Actualizar») y barra de estado.
+1. **Project manager** (`launcher/`): on the left, recent projects (an
+   «Abrir» button; those that no longer exist appear as «No disponible», with
+   «Quitar») and «Abrir otro proyecto…» (folder picker). On the right, **new
+   project**: name, location (with «Examinar…»), 2D or 3D type (exclusive)
+   and platforms (checkboxes). «Crear y abrir» creates
+   `<location>/<name>/` with `project.toml` and `assets/` (it never
+   overwrites) and opens the editor.
+2. **Editor** (`workspace/`), maximized: menu («Archivo» → «Cerrar
+   proyecto» / «Salir»; «Ayuda» → «Acerca de»), **Scene** panel (hierarchy, empty until `star_scene`
+   exists), central **view** rendered by the engine (reference grid; drag =
+   pan in 2D / orbit in 3D, wheel = zoom), **Inspector** (project
+   properties), **Files** (tree of `assets/`, with «Actualizar») and a
+   status bar.
 
-La vista usa `OffscreenRenderer` sobre el dispositivo wgpu de egui y registra
-su textura en `egui_wgpu` (se re-registra al cambiar de tamaño). La textura es
-`Rgba8Unorm` con colores ya codificados en sRGB, porque egui muestrea las
-texturas como valores gamma.
+The view uses `OffscreenRenderer` on egui's wgpu device and registers its
+texture in `egui_wgpu` (it is registered again when its size changes). The
+texture is `Rgba8Unorm` with colors already encoded in sRGB, because egui
+samples textures as gamma values.
 
-Módulos: `project/` (modelo validado, creación y apertura, sin UI y con tests),
-`recent_projects.rs` (lista de recientes, máx. 10, en
+Modules: `project/` (validated model, creation and opening, no UI and with
+tests), `recent_projects.rs` (recent projects list, at most 10, in
 `<config>/ProjectStar/recent_projects.toml`), `folder_dialog.rs` (rfd),
-`texts.rs` (todos los textos visibles, para traducirlos más adelante) y
-`style.rs` (constantes visuales compartidas).
+`texts.rs` (every visible text, to translate them later) and `style.rs`
+(shared visual constants).
 
-Ejemplo de `project.toml`:
+Example of `project.toml`:
 
 ```toml
 # ProjectStar project file.
 [project]
-name = "Mi Juego Espacial"
+name = "My Space Game"
 engine_version = "0.1.0"
 dimension = "3d"
 platforms = ["windows", "linux", "android"]

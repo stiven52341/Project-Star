@@ -54,14 +54,12 @@ docs/        Architecture, roadmap and StarScript specification
 
 ## Documentation
 
-The project documents are written in Spanish:
-
 - [`CLAUDE.md`](CLAUDE.md): project rules (code quality, architecture, conventions).
 - [`docs/architecture.md`](docs/architecture.md): architecture and recorded decisions.
 - [`docs/roadmap.md`](docs/roadmap.md): roadmap.
 - [`docs/starscript.md`](docs/starscript.md): StarScript language specification.
 
-Code, comments and API documentation are in English.
+Code, comments, API documentation and project documents are all in English.
 
 ## License
 
