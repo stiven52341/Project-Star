@@ -24,7 +24,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         clearing the screen with a color; recovery from a lost surface.
   - [x] Shader pipeline (WGSL), triangle meshes with per-vertex color,
         orthographic 2D camera, depth buffer (examples `triangle_2d`/`triangle_3d`).
-  - [ ] Textures and sprites, sprite batching.
+  - [x] Textures (from pixels in memory, smooth or pixelated filtering),
+        sprites (tint, rotation, anchor, layers, sprite sheet cells) and
+        sprite batching (example `sprites_2d`).
+  - [ ] Loading PNG images from files.
 - [ ] **Phase 4 — Full ECS**: components, queries, systems and stages.
 - [ ] **Phase 5 — Assets**: loading textures/sounds, handles, hot-reload.
 - [ ] **Phase 6 — Scenes**: node tree, serialization.

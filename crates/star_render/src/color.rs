@@ -56,6 +56,16 @@ impl Color {
         )
     }
 
+    /// The color as a render target of `format` expects it: linear for sRGB
+    /// targets (the GPU encodes it again), unchanged for the others.
+    pub(crate) fn in_target_space(self, format: wgpu::TextureFormat) -> Self {
+        if format.is_srgb() {
+            self.to_linear()
+        } else {
+            self
+        }
+    }
+
     pub(crate) fn to_wgpu(self) -> wgpu::Color {
         wgpu::Color {
             r: f64::from(self.r),

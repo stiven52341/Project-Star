@@ -25,39 +25,13 @@ impl Topology {
 ///
 /// Only valid for the renderer that created it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct MeshId(usize);
-
-#[cfg(test)]
-impl MeshId {
-    pub(crate) const fn from_index(index: usize) -> Self {
-        Self(index)
-    }
-}
+pub struct MeshId(pub(crate) usize);
 
 /// Vertex buffer of a mesh, ready to be drawn.
 pub(crate) struct GpuMesh {
     pub(crate) vertex_buffer: wgpu::Buffer,
     pub(crate) vertex_count: u32,
     pub(crate) topology: Topology,
-}
-
-/// Owns every mesh created by a renderer.
-#[derive(Default)]
-pub(crate) struct MeshStore {
-    meshes: Vec<GpuMesh>,
-}
-
-impl MeshStore {
-    pub(crate) fn insert(&mut self, mesh: GpuMesh) -> MeshId {
-        self.meshes.push(mesh);
-        MeshId(self.meshes.len() - 1)
-    }
-
-    pub(crate) fn get(&self, id: MeshId) -> EngineResult<&GpuMesh> {
-        self.meshes
-            .get(id.0)
-            .ok_or_else(|| EngineError::Rendering(format!("unknown mesh {id:?}")))
-    }
 }
 
 /// Checks that `vertex_count` describes whole primitives of `topology` and

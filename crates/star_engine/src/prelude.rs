@@ -10,4 +10,7 @@ pub use star_input::{
 };
 pub use star_math::{Mat4, Vec2, Vec3};
 pub use star_platform::TargetPlatform;
-pub use star_render::{Camera, Color, Frame, GraphicsBackend, MeshId, Projection, Vertex};
+pub use star_render::{
+    Camera, Color, Frame, GraphicsBackend, Image, MeshId, Projection, Sprite, TextureFilter,
+    TextureId, TextureRegion, Vertex,
+};

@@ -14,12 +14,20 @@ mod color;
 mod depth;
 mod frame;
 mod gpu_info;
+#[cfg(test)]
+mod gpu_tests;
+mod image;
 #[cfg(feature = "interop")]
 pub mod interop;
 mod mesh;
 mod mesh_pipeline;
 mod renderer;
 mod scene_renderer;
+mod sprite;
+mod sprite_batch;
+mod sprite_pipeline;
+mod store;
+mod texture;
 mod vertex;
 
 pub use backend::{GraphicsBackend, UnknownBackendError};
@@ -27,6 +35,9 @@ pub use camera::{Camera, Projection};
 pub use color::Color;
 pub use frame::Frame;
 pub use gpu_info::GpuInfo;
+pub use image::Image;
 pub use mesh::MeshId;
 pub use renderer::{Renderer, RendererConfig};
+pub use sprite::{Sprite, TextureRegion};
+pub use texture::{TextureFilter, TextureId};
 pub use vertex::Vertex;

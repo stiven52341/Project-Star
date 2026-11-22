@@ -12,7 +12,7 @@ pub use wgpu;
 
 use crate::mesh::Topology;
 use crate::scene_renderer::SceneRenderer;
-use crate::{Frame, MeshId, Vertex};
+use crate::{Frame, Image, MeshId, TextureFilter, TextureId, Vertex};
 
 /// Non-sRGB storage holding sRGB-encoded values: UI toolkits such as egui
 /// sample textures expecting gamma-encoded colors, and an `...Srgb` format
@@ -79,6 +79,20 @@ impl OffscreenRenderer {
     /// Returns an error if `vertices` is empty or odd.
     pub fn create_lines(&mut self, vertices: &[Vertex]) -> EngineResult<MeshId> {
         self.scene.create_mesh(vertices, Topology::Lines)
+    }
+
+    /// Uploads `image` to the GPU, to be drawn with `filter`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Rendering`](star_core::EngineError::Rendering)
+    /// if the GPU does not support textures that big.
+    pub fn create_texture(
+        &mut self,
+        image: &Image,
+        filter: TextureFilter,
+    ) -> EngineResult<TextureId> {
+        self.scene.create_texture(image, filter)
     }
 
     /// Draws `frame` into the color texture and submits the work to the queue.

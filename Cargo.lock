@@ -2556,6 +2556,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sprites_2d"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "log",
+ "star_engine",
+]
+
+[[package]]
 name = "star_assets"
 version = "0.1.0"
 

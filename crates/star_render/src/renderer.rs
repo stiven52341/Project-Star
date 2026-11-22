@@ -5,7 +5,7 @@ use star_platform::{Window, WindowSize};
 
 use crate::mesh::Topology;
 use crate::scene_renderer::SceneRenderer;
-use crate::{Frame, GpuInfo, GraphicsBackend, MeshId, Vertex};
+use crate::{Frame, GpuInfo, GraphicsBackend, Image, MeshId, TextureFilter, TextureId, Vertex};
 
 /// Settings that control how the renderer is created.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,6 +97,20 @@ impl Renderer {
     /// Returns [`EngineError::Rendering`] if `vertices` is empty or odd.
     pub fn create_lines(&mut self, vertices: &[Vertex]) -> EngineResult<MeshId> {
         self.scene.create_mesh(vertices, Topology::Lines)
+    }
+
+    /// Uploads `image` to the GPU, to be drawn with `filter`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Rendering`](star_core::EngineError::Rendering)
+    /// if the GPU does not support textures that big.
+    pub fn create_texture(
+        &mut self,
+        image: &Image,
+        filter: TextureFilter,
+    ) -> EngineResult<TextureId> {
+        self.scene.create_texture(image, filter)
     }
 
     /// Adapts the render target to a new window size.

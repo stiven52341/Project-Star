@@ -2,7 +2,7 @@
 
 use star_core::{EngineResult, Time};
 use star_input::Input;
-use star_render::{Frame, MeshId, Renderer, Vertex};
+use star_render::{Frame, Image, MeshId, Renderer, TextureFilter, TextureId, Vertex};
 
 /// Logic of a game, called by the engine at fixed points of the game loop.
 ///
@@ -58,6 +58,19 @@ impl<'a> GameContext<'a> {
     /// Returns an error if `vertices` is empty or odd.
     pub fn create_lines(&mut self, vertices: &[Vertex]) -> EngineResult<MeshId> {
         self.renderer.create_lines(vertices)
+    }
+
+    /// Uploads `image` to the GPU, to be drawn with `filter`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GPU does not support textures that big.
+    pub fn create_texture(
+        &mut self,
+        image: &Image,
+        filter: TextureFilter,
+    ) -> EngineResult<TextureId> {
+        self.renderer.create_texture(image, filter)
     }
 }
 

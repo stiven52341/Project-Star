@@ -2,7 +2,7 @@
 
 use star_math::Mat4;
 
-use crate::{Camera, Color, MeshId};
+use crate::{Camera, Color, MeshId, Sprite};
 
 /// One mesh to draw, placed in the world by `transform`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -11,7 +11,7 @@ pub(crate) struct DrawCommand {
     pub(crate) transform: Mat4,
 }
 
-/// Everything to draw in a frame: background, camera and meshes.
+/// Everything to draw in a frame: background, camera, meshes and sprites.
 ///
 /// Games fill it every frame; the renderer turns it into GPU work.
 /// Its storage is reused between frames to avoid allocations.
@@ -20,6 +20,7 @@ pub struct Frame {
     clear_color: Color,
     camera: Camera,
     draws: Vec<DrawCommand>,
+    sprites: Vec<Sprite>,
 }
 
 impl Frame {
@@ -30,10 +31,11 @@ impl Frame {
     }
 
     /// Starts a new frame filled with `clear_color`, discarding the previous
-    /// draw commands. The camera is kept.
+    /// meshes and sprites. The camera is kept.
     pub fn begin(&mut self, clear_color: Color) {
         self.clear_color = clear_color;
         self.draws.clear();
+        self.sprites.clear();
     }
 
     /// Sets the point of view used to draw the frame.
@@ -44,6 +46,14 @@ impl Frame {
     /// Draws `mesh` placed in the world by `transform` (position, rotation, scale).
     pub fn draw(&mut self, mesh: MeshId, transform: Mat4) {
         self.draws.push(DrawCommand { mesh, transform });
+    }
+
+    /// Draws `sprite`. Sprites are drawn after the meshes, by layer and, in
+    /// each layer, in the order they were added. Sprites in a row with the
+    /// same texture are drawn together, so keeping sprites that share a
+    /// texture together (for instance in a sprite sheet) draws faster.
+    pub fn draw_sprite(&mut self, sprite: Sprite) {
+        self.sprites.push(sprite);
     }
 
     /// Color the frame is filled with before drawing.
@@ -64,8 +74,18 @@ impl Frame {
         self.draws.len()
     }
 
+    /// Number of sprites drawn in this frame.
+    #[must_use]
+    pub fn sprite_count(&self) -> usize {
+        self.sprites.len()
+    }
+
     pub(crate) fn draws(&self) -> &[DrawCommand] {
         &self.draws
+    }
+
+    pub(crate) fn sprites(&self) -> &[Sprite] {
+        &self.sprites
     }
 }
 
@@ -74,7 +94,15 @@ mod tests {
     use super::*;
 
     fn any_mesh_id() -> MeshId {
-        MeshId::from_index(0)
+        MeshId(0)
+    }
+
+    fn any_sprite() -> Sprite {
+        Sprite::new(
+            crate::TextureId(0),
+            star_math::Vec2::ZERO,
+            star_math::Vec2::ONE,
+        )
     }
 
     #[test]
@@ -87,13 +115,24 @@ mod tests {
     }
 
     #[test]
+    fn draw_sprite_records_a_sprite() {
+        let mut frame = Frame::new();
+
+        frame.draw_sprite(any_sprite());
+
+        assert_eq!(frame.sprite_count(), 1);
+    }
+
+    #[test]
     fn begin_discards_previous_draws_and_sets_background() {
         let mut frame = Frame::new();
         frame.draw(any_mesh_id(), Mat4::IDENTITY);
+        frame.draw_sprite(any_sprite());
 
         frame.begin(Color::WHITE);
 
         assert_eq!(frame.draw_count(), 0);
+        assert_eq!(frame.sprite_count(), 0);
         assert_eq!(frame.clear_color(), Color::WHITE);
     }
 }

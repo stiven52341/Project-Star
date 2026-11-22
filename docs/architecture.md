@@ -67,6 +67,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 22 | Actions **identified by name** (`"jump"`) | It is what StarScript and the editor will use (names in project settings and scripts), and the lookup does not allocate. Action names are unique and non-empty, checked when the `ActionMap` is built (`EngineError::Input`). Rejected for now: typed action ids, which would add a second way to do the same thing |
 | 23 | Gamepads with **gilrs** (MIT/Apache-2.0) | Maintained and pure Rust, with backends for Windows (WGI/XInput), macOS (IOKit) and Linux (evdev), SDL-style mappings and dead zones. Only `star_platform` knows it. On Linux it needs the libudev headers to build (`libudev-dev`). Rejected: writing our own backends per OS (a lot of platform code for little gain) |
 | 24 | StarScript input: actions in **`project.toml`**, read through `star_script_runtime::input` | Actions are project settings (`[input.actions]`), as an editor panel will show them, so scripts stay clean and the compiler can reject misspelled action names (it receives them in `GameSettings`). `Input.is_down("jump")` is a static call with no object to read the engine's input from, so the generated game copies each action's state into a per-thread table of the runtime once per frame (no allocations; the runtime stays without dependencies) and the calls read it by name. Rejected: declaring actions in scripts (typos in key names only fail while playing) |
+| 25 | Sprites **batched by texture**, in an immediate `Frame` | The game adds sprites every frame (like meshes, decision 9); the renderer groups consecutive sprites that share a texture into one draw call. The order is explicit (layers, then order of addition), so translucent sprites always blend correctly without sorting by depth. Rejected for now: texture arrays or bindless textures (not available on OpenGL ES and older GPUs) and automatic atlases (they belong to the asset pipeline, Phase 5) |
 
 ## Input
 
@@ -131,6 +132,25 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
   nothing is stretched) and `Camera::new_3d` (60° perspective).
 - `Color` is expressed in sRGB space (like color pickers) and converted to
   linear when the render target is sRGB.
+- Textures are created from an `Image` (RGBA8 pixels in sRGB, validated
+  when built) with `GameContext::create_texture(&image, TextureFilter)` and
+  identified by a `TextureId`. `Smooth` filtering blends pixels, `Pixelated`
+  keeps them sharp (pixel art). Texture coordinates are clamped, so cells of a
+  sprite sheet never bleed into their neighbors. sRGB targets get sRGB
+  textures; other targets (the editor's) get the values unchanged, as with colors.
+- Sprites (`Frame::draw_sprite(Sprite)`) are textured rectangles on the
+  `z = 0` plane: position, size (negative mirrors), rotation around an
+  anchor, tint, a `TextureRegion` (`TextureRegion::cell` for sprite sheets)
+  and a layer. They are drawn after meshes, by layer and then in the order
+  they were added; meshes in front hide them, but they do not hide each other
+  through depth.
+- **Sprite batching**: every frame, the sprites are sorted (unstable sort by
+  layer and position: no allocation), their 4 corners written to one shared
+  vertex buffer, and consecutive sprites with the same texture drawn by a
+  single indexed call. Buffers are reused and only grow (doubling) when a
+  frame has more sprites than any before.
+- GPU tests (`star_render/src/gpu_tests.rs`, ignored by default) draw without
+  a window and read the pixels back: `cargo test -p star_render -- --ignored`.
 
 ## Editor
 
