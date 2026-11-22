@@ -9,7 +9,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] Logging (`log`; binaries choose the implementation).
   - [x] `Time` integrated in the loop (`Game::update` receives the frame time).
   - [ ] Lifecycle on Android/iOS (suspend/resume, mobile entry point).
-- [ ] **Phase 2 — Input**:
+- [x] **Phase 2 — Input**:
   - [x] 2a Keyboard (physical keys) and mouse (buttons, cursor, wheel), with
         per-frame state; `Game::update` receives the `Input`.
   - [x] 2b Action map (`"jump"` → keys and mouse buttons), the API games use;
