@@ -2,7 +2,8 @@
 //! blueprints, the input actions they use and the classes its scenes name.
 //!
 //! It is what “Compile” runs: everything the StarScript compiler can tell
-//! before Cargo builds the generated Rust.
+//! before Cargo builds the generated Rust. When it finds nothing wrong, it
+//! keeps that Rust, for “Play” to build.
 
 mod input_actions;
 mod job;
@@ -13,7 +14,7 @@ mod scenes;
 use std::fs;
 use std::path::Path;
 
-use star_script::codegen;
+use star_script::codegen::{self, GeneratedProgram};
 use star_script::{CompileError, GameSettings, check_program_with};
 
 pub(crate) use self::job::{CheckJob, CheckStatus};
@@ -32,6 +33,8 @@ pub(crate) struct ProjectCheck {
     /// Every mistake found: in `project.toml` first, then in the scripts and
     /// blueprints, then in the scenes.
     pub(crate) problems: Vec<Problem>,
+    /// The Rust code of the game, if there are scripts and no problems.
+    pub(crate) program: Option<GeneratedProgram>,
 }
 
 /// Checks the project in `directory`.
@@ -46,8 +49,8 @@ pub(crate) fn check_project(directory: &Path) -> ProjectCheck {
     let assets = list_assets(directory, &mut problems);
     let program = read_program(directory, &assets, &mut problems);
     let scripts = assets.iter().filter(|path| is_program_file(path)).count();
-    let checked = if program.sources().is_empty() || !program.is_complete() {
-        None
+    let (checked, generated) = if program.sources().is_empty() || !program.is_complete() {
+        (None, None)
     } else {
         check_program(&program, &settings, &mut problems)
     };
@@ -59,7 +62,12 @@ pub(crate) fn check_project(directory: &Path) -> ProjectCheck {
             }
         }
     }
-    ProjectCheck { scripts, problems }
+    let program = generated.filter(|_| problems.is_empty());
+    ProjectCheck {
+        scripts,
+        problems,
+        program,
+    }
 }
 
 /// The input actions of `project.toml`; none if it cannot be read.
@@ -119,12 +127,12 @@ fn asset_name(path: &str) -> String {
     format!("{ASSETS_DIRECTORY}/{path}")
 }
 
-/// Checks the program, and that it can be translated to Rust.
+/// Checks the program, and translates it to Rust.
 fn check_program(
     program: &Program,
     settings: &GameSettings,
     problems: &mut Vec<Problem>,
-) -> Option<star_script::CheckedSource> {
+) -> (Option<star_script::CheckedSource>, Option<GeneratedProgram>) {
     let report = |errors: Vec<CompileError>| {
         errors
             .iter()
@@ -132,15 +140,16 @@ fn check_program(
             .collect::<Vec<_>>()
     };
     match check_program_with(program.sources(), settings) {
-        Ok(checked) => {
-            if let Err(error) = codegen::generate(&checked.syntax, &checked.analysis) {
+        Ok(checked) => match codegen::generate(&checked.syntax, &checked.analysis) {
+            Ok(generated) => (Some(checked), Some(generated)),
+            Err(error) => {
                 problems.extend(report(vec![CompileError::Codegen(error)]));
+                (Some(checked), None)
             }
-            Some(checked)
-        }
+        },
         Err(errors) => {
             problems.extend(report(errors));
-            None
+            (None, None)
         }
     }
 }

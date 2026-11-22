@@ -5,6 +5,7 @@ mod blueprint_editor;
 mod config_file;
 mod file_tree;
 mod folder_dialog;
+mod game_run;
 mod language_menu;
 mod launcher;
 mod preferences;

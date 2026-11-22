@@ -103,8 +103,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           in the status bar, checked off the UI thread. (13.6b and 13.6c
           went in together: the editor is a binary, so a check without its
           panel would be dead code.)
-    - Next, on top of it: building the generated Rust with Cargo and
-      running the game from the editor.
+    - [x] 13.6d “Play”: the checked game is built with Cargo and run in
+          its own window, with an “Output” tab for what Cargo and the game
+          write, and “Stop”. It needs the editor run from the repository.
   - [x] 13.7 Blueprint model and translation to StarScript (`star_blueprint`):
     - [x] 13.7a Model: classes as node graphs, pins of each node, the rules
           (`validate`) and `.blueprint` files (TOML).

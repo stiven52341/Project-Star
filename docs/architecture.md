@@ -84,10 +84,11 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 37 | StarScript `Color` is an **object**, and the camera is a **node** | StarScript has no value types yet, so `Color` follows the language's one rule for classes (shared references): two sprites given the same color change together, which is documented. A `Camera` node follows its parents for free (child of the ship = follows the ship) and `Game.camera` says which one is used; its world position comes from the mirrored node's global transform, its rotation is ignored so the view never tilts, and views are never thinner than 0.001 units so a wrong height cannot hide the frame. Rejected: loose `red`/`green`/… and `camera_x`/`camera_y` fields (verbose, and following a node would need code in every game) |
 | 38 | StarScript scenes are read **through a loader the game registers** in the runtime | The generated `Scene` class only uses `star_script_runtime`, so console programs still do not depend on the engine. The generated game registers, before the game object is created, a loader that reads `SceneOutline`s from the app's asset folder and turns them into the runtime's plain `SceneNode` list; `Scene.load` builds `Node`/`Sprite` objects from it. Results are kept per path (failures too, so a missing file warns once). A scene that cannot be loaded gives `null`, not a stopped game, so the error rule of decision 4 holds without a new `fault` case. Rejected: reading files in the generated `Node` module (console programs would need the engine) and `Game.load_scene` (nodes could not load scenes) |
 | 39 | Scene nodes name StarScript classes **by name, resolved by generated code** | A `.scene` file is data, so the class is a text (`class = "Rock"`). The compiler writes `new_scene_object_`, a `match` over the program's classes: the node classes created without arguments are built with `new()`, and the others give the reason they cannot (needs arguments, private `init`, not a node). The object is created as its `init` leaves it and the scene's values are applied on top (name always; transform and image only when the file writes them), as an instance overrides its prefab. Any problem rejects the whole scene (`null`, one warning naming the node), so a typo is never half-loaded. The format version stays 1: the field is optional and old files read the same. Rejected for now: checking the project's scenes at compile time (it fits the editor's build, step 13.6) and passing arguments to `init` from the scene |
-| 40 | The editor **checks** projects with `star_script` as a library | “Compile” gives every mistake the compiler can find (scripts, input actions, scene classes) in a fraction of a second, without Cargo, so it can run often. Scripts live anywhere in `assets/`, next to the scenes and images they use, and all of them form one program: each file is tokenized and parsed on its own (an unclosed `{` stays in its file) and their classes are checked together, with spans placed in one range of offsets that `SourceSet` maps back to file, line and column. The check runs on a thread so big projects never freeze the editor. Rejected for now: building with Cargo from the editor (needs a way to find the engine's crates outside the repository) and a `scripts/` folder apart from the assets |
+| 40 | The editor **checks** projects with `star_script` as a library | “Compile” gives every mistake the compiler can find (scripts, input actions, scene classes) in a fraction of a second, without Cargo, so it can run often. Scripts live anywhere in `assets/`, next to the scenes and images they use, and all of them form one program: each file is tokenized and parsed on its own (an unclosed `{` stays in its file) and their classes are checked together, with spans placed in one range of offsets that `SourceSet` maps back to file, line and column. The check runs on a thread so big projects never freeze the editor. Rejected: building with Cargo as part of “Compile” (minutes instead of a fraction of a second; “Play” does it, see 44) and a `scripts/` folder apart from the assets |
 | 41 | Blueprints are **node graphs whose execution is a tree**, in their own crate `star_blueprint` | Each execution pin takes at most one wire, so every graph reads as structured StarScript (`if`/`else`) without jumps; paths that would join again are written as functions. Values flow through data wires and pure nodes run where their value is used. The model is plain data with public fields, like the syntax tree, because the visual editor must hold graphs that are still being built; `validate` lists what is wrong, and types are left to the StarScript compiler, whose errors are placed back on nodes. The files are TOML, like scenes, read with serde, so `star_script` keeps having no dependencies. Rejected: free execution graphs with joins and loops of wires (they need gotos or a structuring pass), and a block editor in the style of Scratch (less familiar for engine users) |
 | 42 | The blueprint editor is **drawn by the editor** with egui's painter, in tabs of the central area | No node-editor library: the canvas is a few hundred lines on top of `star_blueprint` (pins, rules, files), which already says what a node is, so there is no second model to keep in step, and no dependency that must follow each egui version. Blueprints open as tabs next to the scene view, so several can be open and the inspector shows what is selected in the tab shown. Rejected: `egui-snarl` and similar crates (their own graph model and egui version), and floating windows (they cover the other panels) |
 | 43 | The editor's texts are **plain Rust values, one per language**, chosen through a global current language | The editor shows a few hundred short texts, so a `Texts` struct with one field per text, filled once per language, is enough: a missing translation does not compile, there is nothing to parse at start-up and no dependency. Texts with values are methods that pick the language's wording, so plurals and word order stay natural in each one. The language lives in an atomic, because every panel draws texts and passing it everywhere would touch every function for no gain; tests use a language's `Texts` directly and never change it. English is the default, and a file written with an unknown language falls back to it. Rejected for now: Fluent or gettext catalogs (a dependency and a runtime format, worth it with many languages or translators who do not read Rust) and following the system's language (it needs one more dependency to read it on every platform) |
+| 44 | “Play” **builds the game with the system's Cargo**, from the engine's crates of the repository | The game a project makes is the same Rust a shipped game will be, built the same way, so what is played is what ships; no interpreter to keep in step with the compiler. The build runs off the UI thread and shares one target folder, so only the first “Play” builds the engine. It needs Rust installed and the editor run from the repository (a compile-time path to `crates/`): enough while the engine is developed. Rejected for now: shipping prebuilt engine libraries with the editor (comes with packaging), and running the game inside the editor's window (a game is its own process, so a crash or `quit()` never takes the editor with it) |
 
 ## ECS
 
@@ -318,17 +319,18 @@ of the StarScript compiler and of the project check stay in English:
    `<location>/<name>/` with `project.toml` and `assets/` (it never
    overwrites) and opens the editor.
 2. **Editor** (`workspace/`), maximized: menu (“File” → “Save” /
-   “Close project” / “Language” / “Quit”; “Project” → “Compile”; “Help” → “About”) and
-   a “Compile” button next to it, **Scene** panel (hierarchy, empty until `star_scene`
+   “Close project” / “Language” / “Quit”; “Project” → “Compile” / “Play” /
+   “Stop”; “Help” → “About”) and the same three buttons next to it, **Scene** panel (hierarchy, empty until `star_scene`
    exists), a central area with **tabs**: “Scene”, the **view** rendered by
    the engine (reference grid; drag = pan in 2D / orbit in 3D, wheel =
    zoom), always there, and one tab per open **blueprint** (see below),
-   **Inspector** (project properties), a bottom panel with two tabs,
+   **Inspector** (project properties), a bottom panel with three tabs,
    **Assets** (tree of `assets/`, with “Refresh”; a double click on a
    `.blueprint` opens it) and **Problems** (what the last
    “Compile” found, as `file:line:column` and a message; it opens by itself
-   when there are problems), and a status bar (with the result of the last
-   “Compile”).
+   when there are problems) and **Output** (what Cargo and the game write
+   while playing), and a status bar (with the result of the last
+   “Compile” and whether the game is building or running).
 
 The view uses `OffscreenRenderer` on egui's wgpu device and registers its
 texture in `egui_wgpu` (it is registered again when its size changes). The
@@ -405,14 +407,32 @@ comments written by hand in it are not kept.
   has scripts, that the classes its nodes name can build them
   (`ClassTable::scene_class`, the same rule the generated code follows).
 
-Building the generated Rust with Cargo and running the game are not part of
-“Compile” yet.
+When it finds no problems, the check keeps the program's Rust
+(`ProjectCheck::program`).
+
+“Play” saves the open blueprints and runs “Compile”; if the check finds
+problems, the game is not played and “Problems” is shown. Otherwise
+`game_run/` (no UI, with tests), on a thread of its own (`GameRun`):
+
+1. writes the program as a Cargo package (`star_script::package`) in
+   `target/star_editor_games/<project>/` of the repository, using the
+   engine's crates of the same repository;
+2. builds it with `cargo build` (the Cargo that started the editor, or the
+   one in the `PATH`), with one `CARGO_TARGET_DIR` for every project, so
+   the engine is built once;
+3. runs the game with the project's folder as its working directory, so it
+   finds `assets/` as a shipped game does.
+
+Every line Cargo and the game write reaches “Output” as it comes (at most
+5000 are kept). “Stop” kills the build or the game; closing the project or
+the editor stops it too. Console programs (`static func main`) are played
+the same way, and their output is shown.
 
 Modules: `project/` (validated model, creation and opening, no UI and with
 tests), `project_check/` (see above), `file_tree.rs` (snapshot of a folder,
 for the Files tab and the checks), `recent_projects.rs` (recent projects list, at most 10, in
 `<config>/ProjectStar/recent_projects.toml`), `folder_dialog.rs` (rfd),
-`texts/` (every visible text, in English and Spanish) and `style.rs`
+`game_run/` (see above), `texts/` (every visible text, in English and Spanish) and `style.rs`
 (shared visual constants).
 
 Example of `project.toml`:

@@ -14,17 +14,30 @@ pub(crate) enum MenuAction {
     Save,
     CloseProject,
     Compile,
+    Play,
+    Stop,
     ShowAbout,
     ChangeLanguage(Language),
 }
 
-/// The menu; “Save” is enabled if there is something to `save`, and
-/// “Compile” is disabled while `compiling`.
-pub(crate) fn show_menu_bar(
-    ui: &mut egui::Ui,
-    can_save: bool,
-    compiling: bool,
-) -> Option<MenuAction> {
+/// What the menu's entries can do now.
+#[derive(Clone, Copy)]
+pub(crate) struct MenuState {
+    /// There is something to save.
+    pub(crate) can_save: bool,
+    /// A check is running: “Compile” and “Play” wait for it.
+    pub(crate) compiling: bool,
+    /// The game is being built or played: “Stop” stops it.
+    pub(crate) playing: bool,
+}
+
+/// The menu, with its entries enabled as `state` allows.
+pub(crate) fn show_menu_bar(ui: &mut egui::Ui, state: MenuState) -> Option<MenuAction> {
+    let MenuState {
+        can_save,
+        compiling,
+        playing,
+    } = state;
     let mut action = None;
     egui::MenuBar::new().ui(ui, |ui| {
         ui.menu_button(texts::current().menu_file, |ui| {
@@ -46,8 +59,8 @@ pub(crate) fn show_menu_bar(
             }
         });
         ui.menu_button(texts::current().menu_project, |ui| {
-            if compile_button(ui, compiling) {
-                action = Some(MenuAction::Compile);
+            if let Some(chosen) = project_buttons(ui, compiling, playing) {
+                action = Some(chosen);
             }
         });
         ui.menu_button(texts::current().menu_help, |ui| {
@@ -56,17 +69,38 @@ pub(crate) fn show_menu_bar(
             }
         });
         ui.separator();
-        if compile_button(ui, compiling) {
-            action = Some(MenuAction::Compile);
+        if let Some(chosen) = project_buttons(ui, compiling, playing) {
+            action = Some(chosen);
         }
     });
     action
 }
 
-/// “Compile”, as a menu entry or in the bar itself. Returns whether it was
-/// clicked.
-fn compile_button(ui: &mut egui::Ui, compiling: bool) -> bool {
-    ui.add_enabled(!compiling, egui::Button::new(texts::current().compile))
-        .on_hover_text(texts::current().compile_hint)
+/// “Compile”, “Play” and “Stop”, as menu entries or in the bar itself.
+/// Returns the one clicked.
+fn project_buttons(ui: &mut egui::Ui, compiling: bool, playing: bool) -> Option<MenuAction> {
+    let texts = texts::current();
+    let mut action = None;
+    if ui
+        .add_enabled(!compiling, egui::Button::new(texts.compile))
+        .on_hover_text(texts.compile_hint)
         .clicked()
+    {
+        action = Some(MenuAction::Compile);
+    }
+    if ui
+        .add_enabled(!compiling && !playing, egui::Button::new(texts.play))
+        .on_hover_text(texts.play_hint)
+        .clicked()
+    {
+        action = Some(MenuAction::Play);
+    }
+    if ui
+        .add_enabled(playing, egui::Button::new(texts.stop))
+        .on_hover_text(texts.stop_hint)
+        .clicked()
+    {
+        action = Some(MenuAction::Stop);
+    }
+    action
 }

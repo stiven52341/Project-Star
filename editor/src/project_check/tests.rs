@@ -47,6 +47,8 @@ fn a_correct_game_of_several_files_has_no_problems() {
 
     assert_eq!(check.scripts, 2);
     assert!(check.problems.is_empty(), "{:?}", messages(&check));
+    let program = check.program.expect("the game's Rust");
+    assert!(program.uses_engine());
 }
 
 #[test]
@@ -110,6 +112,7 @@ fn scenes_that_name_unknown_classes_are_problems() {
         messages(&check),
         ["assets/one.scene: node \"Big rock\": there is no class \"Rock\""]
     );
+    assert_eq!(check.program, None, "a game with problems is not played");
 }
 
 #[test]
@@ -123,6 +126,7 @@ fn projects_without_scripts_do_not_check_scene_classes() {
 
     assert_eq!(check.scripts, 0);
     assert!(check.problems.is_empty(), "{:?}", messages(&check));
+    assert_eq!(check.program, None);
 }
 
 #[test]

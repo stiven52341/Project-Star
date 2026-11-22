@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use eframe::egui;
+use star_script::codegen::GeneratedProgram;
 
 use crate::project_check::{CheckJob, CheckStatus, Problem, ProjectCheck};
 use crate::style::{ERROR_COLOR, SUCCESS_COLOR};
@@ -14,6 +15,15 @@ const PLACE_SPACING: f32 = 8.0;
 /// The checks of the project and their result.
 pub(crate) struct ProblemsPanel {
     state: CompileState,
+}
+
+/// How a check that has just finished went.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CheckEnd {
+    /// No problems.
+    Clean,
+    /// Problems were found, or the check gave no answer.
+    WithProblems,
 }
 
 enum CompileState {
@@ -49,23 +59,35 @@ impl ProblemsPanel {
         };
     }
 
-    /// Takes the result of the running check if it arrived. Returns whether
-    /// a check has just finished with problems, so they can be shown.
-    pub(crate) fn update(&mut self) -> bool {
+    /// Takes the result of the running check if it arrived. Returns how a
+    /// check that has just finished went, so its problems can be shown.
+    pub(crate) fn update(&mut self) -> Option<CheckEnd> {
         let CompileState::Running(job) = &self.state else {
-            return false;
+            return None;
         };
         match job.status() {
-            CheckStatus::Running => false,
+            CheckStatus::Running => None,
             CheckStatus::Finished(check) => {
-                let has_problems = !check.problems.is_empty();
+                let end = if check.problems.is_empty() {
+                    CheckEnd::Clean
+                } else {
+                    CheckEnd::WithProblems
+                };
                 self.state = CompileState::Finished(check);
-                has_problems
+                Some(end)
             }
             CheckStatus::Lost => {
                 self.state = CompileState::Failed(texts::current().check_lost.to_owned());
-                true
+                Some(CheckEnd::WithProblems)
             }
+        }
+    }
+
+    /// The game's Rust code, if the last check found no problems.
+    pub(crate) fn program(&self) -> Option<&GeneratedProgram> {
+        match &self.state {
+            CompileState::Finished(check) => check.program.as_ref(),
+            _ => None,
         }
     }
 

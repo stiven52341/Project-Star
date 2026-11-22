@@ -222,6 +222,67 @@ impl Texts {
         }
     }
 
+    pub(crate) fn engine_not_found(&self, folder: &std::path::Path) -> String {
+        let folder = folder.display();
+        match self.language {
+            Language::English => format!(
+                "The engine's crates are not in {folder}: “Play” needs the editor run from the ProjectStar repository."
+            ),
+            Language::Spanish => format!(
+                "Los crates del motor no están en {folder}: «Jugar» necesita el editor ejecutado desde el repositorio de ProjectStar."
+            ),
+        }
+    }
+
+    pub(crate) fn game_not_written(&self, error: &std::io::Error) -> String {
+        match self.language {
+            Language::English => format!("Could not write the game's Rust code: {error}"),
+            Language::Spanish => format!("No se pudo escribir el código Rust del juego: {error}"),
+        }
+    }
+
+    pub(crate) fn cargo_not_started(&self, error: &std::io::Error) -> String {
+        match self.language {
+            Language::English => format!("Could not run Cargo (is Rust installed?): {error}"),
+            Language::Spanish => {
+                format!("No se pudo ejecutar Cargo (¿está Rust instalado?): {error}")
+            }
+        }
+    }
+
+    pub(crate) fn game_not_started(&self, error: &std::io::Error) -> String {
+        match self.language {
+            Language::English => format!("Could not start the game: {error}"),
+            Language::Spanish => format!("No se pudo iniciar el juego: {error}"),
+        }
+    }
+
+    pub(crate) fn play_not_started(&self, error: &std::io::Error) -> String {
+        match self.language {
+            Language::English => format!("Could not start playing: {error}"),
+            Language::Spanish => format!("No se pudo empezar a jugar: {error}"),
+        }
+    }
+
+    /// How the game closed: on its own, or with an error code.
+    pub(crate) fn game_closed(&self, success: bool, code: Option<i32>) -> String {
+        match (success, code, self.language) {
+            (true, _, _) => self.pick("The game closed", "El juego se cerró").to_owned(),
+            (false, Some(code), Language::English) => {
+                format!("The game stopped with an error (code {code})")
+            }
+            (false, Some(code), Language::Spanish) => {
+                format!("El juego se detuvo con un error (código {code})")
+            }
+            (false, None, _) => self
+                .pick(
+                    "The game stopped with an error",
+                    "El juego se detuvo con un error",
+                )
+                .to_owned(),
+        }
+    }
+
     pub(crate) fn assets_unreadable(&self, error: &std::io::Error) -> String {
         match self.language {
             Language::English => format!("Could not read the assets folder: {error}"),

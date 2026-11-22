@@ -6,6 +6,7 @@ mod editor_camera;
 mod grid;
 mod inspector_panel;
 mod menu_bar;
+mod output_panel;
 mod problems_panel;
 mod unsaved_dialog;
 mod viewport;
@@ -16,10 +17,12 @@ use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
 use self::assets_panel::AssetsPanel;
 use self::documents::{ActiveDocument, Documents};
 use self::inspector_panel::show_inspector;
-use self::menu_bar::{MenuAction, SAVE_SHORTCUT, show_menu_bar};
-use self::problems_panel::ProblemsPanel;
+use self::menu_bar::{MenuAction, MenuState, SAVE_SHORTCUT, show_menu_bar};
+use self::output_panel::OutputPanel;
+use self::problems_panel::{CheckEnd, ProblemsPanel};
 use self::unsaved_dialog::{UnsavedChoice, show_unsaved_dialog};
 use self::viewport::SceneViewport;
+use crate::game_run::PlayRequest;
 use crate::project::{ASSETS_DIRECTORY, Project};
 use crate::project_check::Problem;
 use crate::style::ERROR_COLOR;
@@ -53,6 +56,7 @@ enum Leaving {
 enum BottomTab {
     Assets,
     Problems,
+    Output,
 }
 
 /// Editor for one open project.
@@ -60,6 +64,9 @@ pub(crate) struct EditorWindow {
     project: Project,
     assets: AssetsPanel,
     problems: ProblemsPanel,
+    output: OutputPanel,
+    /// “Play” waits for its check: the game is played if it finds nothing.
+    play_after_check: bool,
     bottom_tab: BottomTab,
     documents: Documents,
     /// What is waiting for the answer about unsaved changes.
@@ -88,6 +95,8 @@ impl EditorWindow {
             project,
             assets,
             problems: ProblemsPanel::new(),
+            output: OutputPanel::new(),
+            play_after_check: false,
             bottom_tab: BottomTab::Assets,
             documents: Documents::new(),
             leaving: None,
@@ -104,17 +113,19 @@ impl EditorWindow {
 
     pub(crate) fn show(&mut self, ui: &mut egui::Ui) -> Option<EditorAction> {
         let mut action = None;
-        if self.problems.update() {
-            self.bottom_tab = BottomTab::Problems;
-        }
+        self.follow_check(ui.ctx());
+        self.output.update();
         self.handle_quit_request(ui.ctx());
         if ui.input_mut(|input| input.consume_shortcut(&SAVE_SHORTCUT)) {
             self.documents.save_active();
         }
-        let compiling = self.problems.is_compiling();
-        let can_save = self.documents.active_is_unsaved();
+        let state = MenuState {
+            can_save: self.documents.active_is_unsaved(),
+            compiling: self.problems.is_compiling(),
+            playing: self.output.is_playing(),
+        };
         egui::Panel::top("menu_bar").show(ui, |ui| {
-            match show_menu_bar(ui, can_save, compiling) {
+            match show_menu_bar(ui, state) {
                 Some(MenuAction::Save) => self.documents.save_active(),
                 Some(MenuAction::CloseProject) => action = self.leave(Leaving::CloseProject),
                 Some(MenuAction::Compile) => {
@@ -123,6 +134,14 @@ impl EditorWindow {
                     self.documents.save_all();
                     self.problems.compile(self.project.directory(), ui.ctx());
                 }
+                Some(MenuAction::Play) => {
+                    // The game is built from what is shown, once checked.
+                    self.documents.save_all();
+                    self.problems.compile(self.project.directory(), ui.ctx());
+                    self.play_after_check = true;
+                    self.bottom_tab = BottomTab::Output;
+                }
+                Some(MenuAction::Stop) => self.output.stop(),
                 Some(MenuAction::ShowAbout) => self.about_open = true,
                 Some(MenuAction::ChangeLanguage(language)) => {
                     action = Some(EditorAction::ChangeLanguage(language));
@@ -159,6 +178,39 @@ impl EditorWindow {
         }
         self.show_about(ui.ctx());
         action
+    }
+
+    /// Takes the result of a check that has just finished: its problems are
+    /// shown, and “Play” plays the game if there are none.
+    fn follow_check(&mut self, context: &egui::Context) {
+        let Some(end) = self.problems.update() else {
+            return;
+        };
+        let play = std::mem::take(&mut self.play_after_check);
+        match (end, play) {
+            (CheckEnd::WithProblems, true) => {
+                self.output.refuse(texts::current().play_blocked);
+                self.bottom_tab = BottomTab::Problems;
+            }
+            (CheckEnd::WithProblems, false) => self.bottom_tab = BottomTab::Problems,
+            (CheckEnd::Clean, true) => self.play(context),
+            (CheckEnd::Clean, false) => {}
+        }
+    }
+
+    /// Plays the game the last check translated.
+    fn play(&mut self, context: &egui::Context) {
+        match self.problems.program() {
+            Some(program) => self.output.play(
+                PlayRequest {
+                    name: self.project.settings().name().to_owned(),
+                    directory: self.project.directory().to_path_buf(),
+                    program: program.clone(),
+                },
+                context,
+            ),
+            None => self.output.refuse(texts::current().nothing_to_play),
+        }
     }
 
     /// Closing the window waits for an answer if blueprints are unsaved.
@@ -254,6 +306,11 @@ impl EditorWindow {
                 BottomTab::Problems,
                 self.problems.title(),
             );
+            ui.selectable_value(
+                &mut self.bottom_tab,
+                BottomTab::Output,
+                texts::current().output,
+            );
         });
         ui.separator();
         match self.bottom_tab {
@@ -267,6 +324,7 @@ impl EditorWindow {
                     self.show_problem_in_blueprint(&problem);
                 }
             }
+            BottomTab::Output => self.output.show(ui),
         }
     }
 
@@ -298,6 +356,7 @@ impl EditorWindow {
                 ui.weak(format!("{ENGINE_NAME} {ENGINE_VERSION}"));
                 ui.separator();
                 self.problems.show_summary(ui);
+                self.output.show_summary(ui);
             });
         });
     }
