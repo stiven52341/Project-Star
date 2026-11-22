@@ -42,8 +42,15 @@ pub const SCENE_CLASS: &str = "Scene";
 /// Name of the engine class of colors: of sprites and of the background.
 pub const COLOR_CLASS: &str = "Color";
 
-/// The methods of `Input`: each one takes the name of an action.
-pub(super) const INPUT_METHODS: [&str; 3] = ["is_down", "just_pressed", "just_released"];
+/// The methods of `Input` that take the name of an action.
+pub(super) const INPUT_ACTION_METHODS: [&str; 3] = ["is_down", "just_pressed", "just_released"];
+
+/// The methods of `Input` that say where the player points, without arguments.
+pub(super) const INPUT_POINTER_METHODS: [(&str, Type); 3] = [
+    ("pointer_x", Type::Float),
+    ("pointer_y", Type::Float),
+    ("has_pointer", Type::Bool),
+];
 
 /// Adds the classes implemented by the engine.
 pub(super) fn add_native_classes(classes: &mut ClassTable) {
@@ -56,15 +63,21 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     ));
     classes.add(debug);
 
-    // The game's input actions, declared in the project settings.
+    // The game's input actions, declared in the project settings, and where
+    // the player points.
     let mut input = ClassInfo::new(INPUT_CLASS.to_owned(), ClassOrigin::Native);
-    for name in INPUT_METHODS {
+    for name in INPUT_ACTION_METHODS {
         input.methods.push(native_method(
             name,
             &[("action", Type::String)],
             Type::Bool,
             true,
         ));
+    }
+    for (name, return_type) in INPUT_POINTER_METHODS {
+        input
+            .methods
+            .push(native_method(name, &[], return_type, true));
     }
     classes.add(input);
 

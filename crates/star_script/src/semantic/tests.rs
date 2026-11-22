@@ -833,6 +833,14 @@ fn without_settings_no_action_is_declared() {
 }
 
 #[test]
+fn input_says_where_the_player_points() {
+    assert_valid_body(
+        "const x: float = Input.pointer_x()\n const y: float = Input.pointer_y()\n \
+         const pointing: bool = Input.has_pointer()",
+    );
+}
+
+#[test]
 fn input_takes_an_action_name() {
     assert_eq!(
         errors_with_jump_action("class G { func f() { const x = Input.is_down(3) } }"),

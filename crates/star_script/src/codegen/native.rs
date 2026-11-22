@@ -623,6 +623,7 @@ impl ::star_engine::game::Game for EngineGame_ {{
         use ::star_engine::EngineWorld as _;
         if let ::std::option::Option::Some(input) = world.input() {{
             share_actions_(input.actions());
+            share_pointer_(&input, &self.view_(world), world.window_size());
         }}
         let delta_ = world.time().delta_seconds();
         crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.game), delta_);
@@ -634,16 +635,33 @@ impl ::star_engine::game::Game for EngineGame_ {{
     fn draw(&self, world: &::star_engine::star_ecs::World, frame: &mut ::star_engine::star_render::Frame) {{
         let fields_ = crate::classes::Game::HasFields::fields(&*self.game);
         frame.set_clear_color(fields_.background.read(|color_| engine_color_(&**color_)));
-        let camera_ = fields_.camera.read(|camera_| match camera_ {{
-            ::std::option::Option::Some(camera_) => self.mirror.camera(world, &script_camera_(&**camera_)),
-            ::std::option::Option::None => ::star_engine::star_render::Camera::default(),
-        }});
-        frame.set_camera(camera_);
+        frame.set_camera(self.view_(world));
     }}
 
     fn is_finished(&self) -> bool {{
         crate::classes::Game::HasFields::fields(&*self.game).{QUIT_FIELD}.get()
     }}
+}}
+
+impl EngineGame_ {{
+    /// The engine's camera that shows the game from its `camera`.
+    fn view_(&self, world: &::star_engine::star_ecs::World) -> ::star_engine::star_render::Camera {{
+        crate::classes::Game::HasFields::fields(&*self.game).camera.read(|camera_| match camera_ {{
+            ::std::option::Option::Some(camera_) => self.mirror.camera(world, &script_camera_(&**camera_)),
+            ::std::option::Option::None => ::star_engine::star_render::Camera::default(),
+        }})
+    }}
+}}
+
+/// Copies where the player points, in world units, where `Input` reads it.
+/// The camera is the one the last frame was drawn from: what the player saw.
+fn share_pointer_(
+    input_: &::star_engine::star_input::Input,
+    view_: &::star_engine::star_render::Camera,
+    window_: ::star_engine::star_platform::WindowSize,
+) {{
+    let position_ = input_.pointer().and_then(|pixel_| view_.screen_to_world_2d(pixel_, window_));
+    {RUNTIME}::input::set_pointer(position_.map(|point_| (point_.x, point_.y)));
 }}
 
 /// Copies the state of each action where `Input` reads it.

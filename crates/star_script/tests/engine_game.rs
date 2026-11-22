@@ -32,6 +32,10 @@ class CountingGame extends Game {
         if Input.is_down(\"jump\") || Input.just_pressed(\"jump\") {
             Debug.print(\"jump\")
         }
+        // Where the mouse is depends on the desktop: only read it.
+        if Input.has_pointer() && Input.pointer_x() + Input.pointer_y() > 1000000.0 {
+            Debug.print(\"far away\")
+        }
         if frames == 3 {
             quit()
         }

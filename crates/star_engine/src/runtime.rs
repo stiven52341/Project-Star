@@ -20,7 +20,8 @@ pub(crate) struct Runtime<G: Game> {
     clear_color: Color,
     renderer: Option<Renderer>,
     frame: Frame,
-    /// Holds the game's entities and the engine's resources: [`Time`] and [`Input`].
+    /// Holds the game's entities and the engine's resources: [`Time`],
+    /// [`Input`] and the [`WindowSize`].
     world: World,
     schedule: Schedule,
     transforms: TransformPropagation,
@@ -92,6 +93,7 @@ impl<G: Game> Runtime<G> {
 impl<G: Game> WindowEventHandler for Runtime<G> {
     fn on_window_created(&mut self, window: Window) -> EngineResult<()> {
         let mut renderer = Renderer::new(&window, self.renderer_config)?;
+        self.world.insert_resource(window.size());
         let gpu_info = renderer.gpu_info();
         log::info!("Rendering with {gpu_info}");
         if gpu_info.is_software {
@@ -107,6 +109,7 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
     }
 
     fn on_resized(&mut self, size: WindowSize) {
+        self.world.insert_resource(size);
         if let Some(renderer) = &mut self.renderer {
             renderer.resize(size);
         }
@@ -213,6 +216,15 @@ mod tests {
 
         assert!(runtime.world.has_resource::<Time>());
         assert!(runtime.world.input().is_some());
+    }
+
+    #[test]
+    fn the_world_knows_the_window_size() {
+        let mut runtime = runtime(EmptyGame, Input::new(), Schedule::new());
+
+        runtime.on_resized(WindowSize::new(800, 600));
+
+        assert_eq!(runtime.world.window_size(), WindowSize::new(800, 600));
     }
 
     #[test]

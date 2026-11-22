@@ -182,8 +182,12 @@ impl Body<'_> {
     /// `Input.is_down(action)` reads the field `is_down` of the action's
     /// state; the same for `just_pressed` and `just_released`. Action names
     /// written as text are passed as they are: the game loop never allocates
-    /// memory to ask for an action.
-    fn input_call(&self, callee: &Expr, state: &str, arguments: &[Expr]) -> Result<String> {
+    /// memory to ask for an action. The pointer's methods read a field of
+    /// the pointer's state.
+    fn input_call(&self, callee: &Expr, method: &str, arguments: &[Expr]) -> Result<String> {
+        if let Some(field) = pointer_field(method) {
+            return Ok(format!("{RUNTIME}::input::pointer().{field}"));
+        }
         let name = match arguments {
             [argument] => match &argument.kind {
                 ExprKind::Literal(Literal::String(text)) => format!("{text:?}"),
@@ -191,7 +195,7 @@ impl Body<'_> {
             },
             _ => return Err(internal("`Input` takes one action", callee.span)),
         };
-        Ok(format!("{RUNTIME}::input::action_state({name}).{state}"))
+        Ok(format!("{RUNTIME}::input::action_state({name}).{method}"))
     }
 }
 
@@ -209,6 +213,17 @@ fn native_call(class: &str, method: &str, arguments: &str) -> Option<String> {
     match (class, method) {
         ("Debug", "print") => Some(format!("{RUNTIME}::print(&({arguments}))")),
         ("Scene", "load") => Some(format!("crate::classes::Scene::load({arguments})")),
+        _ => None,
+    }
+}
+
+/// The field of the runtime's pointer state that the `Input` method
+/// `method` reads, if it is one of the pointer's.
+fn pointer_field(method: &str) -> Option<&'static str> {
+    match method {
+        "pointer_x" => Some("x"),
+        "pointer_y" => Some("y"),
+        "has_pointer" => Some("is_present"),
         _ => None,
     }
 }

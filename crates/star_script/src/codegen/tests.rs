@@ -222,7 +222,19 @@ fn games_are_drawn_from_their_camera() {
 
     assert!(code.contains("pub mod Camera {"));
     assert!(code.contains("self.mirror.camera(world, &script_camera_(&**camera_))"));
-    assert!(code.contains("frame.set_camera(camera_);"));
+    assert!(code.contains("frame.set_camera(self.view_(world));"));
+}
+
+#[test]
+fn games_share_the_pointer_seen_from_their_camera() {
+    let code = rust(
+        "class G extends Game {\n override func update(delta: float) {\n \
+         if Input.has_pointer() { Debug.print(Input.pointer_x().to_string()) }\n }\n}",
+    );
+
+    assert!(code.contains("share_pointer_(&input, &self.view_(world), world.window_size());"));
+    assert!(code.contains("::star_script_runtime::input::pointer().is_present"));
+    assert!(code.contains("::star_script_runtime::input::pointer().x"));
 }
 
 #[test]

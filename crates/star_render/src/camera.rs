@@ -2,7 +2,8 @@
 
 use std::f32::consts::FRAC_PI_3;
 
-use star_math::{Mat4, Vec3};
+use star_math::{Mat4, Vec2, Vec3};
+use star_platform::WindowSize;
 
 /// Closest distance to the camera that is still drawn.
 const NEAR_PLANE: f32 = 0.1;
@@ -76,6 +77,30 @@ impl Camera {
         Some(self.projection_matrix(aspect_ratio) * view)
     }
 
+    /// The point of the `z = 0` plane seen at `pixel` of a window of size
+    /// `window` (physical pixels from its top-left corner, Y downwards), for
+    /// a 2D camera: orthographic and looking straight along -Z, as
+    /// [`Camera::new_2d`] makes them. `None` for perspective cameras and
+    /// empty windows.
+    #[must_use]
+    // Pixel dimensions are far below 2^24, so converting them to `f32` is exact.
+    #[allow(clippy::cast_precision_loss)]
+    pub fn screen_to_world_2d(&self, pixel: Vec2, window: WindowSize) -> Option<Vec2> {
+        let Projection::Orthographic { view_height } = self.projection else {
+            return None;
+        };
+        if window.is_empty() {
+            return None;
+        }
+        let width = window.width as f32;
+        let height = window.height as f32;
+        let units_per_pixel = view_height / height;
+        Some(Vec2::new(
+            self.position.x + (pixel.x - width / 2.0) * units_per_pixel,
+            self.position.y - (pixel.y - height / 2.0) * units_per_pixel,
+        ))
+    }
+
     fn projection_matrix(&self, aspect_ratio: f32) -> Mat4 {
         match self.projection {
             Projection::Orthographic { view_height } => {
@@ -139,6 +164,35 @@ mod tests {
         let center = matrix.transform_point(Vec3::ZERO);
 
         assert!(center.x.abs() < EPSILON && center.y.abs() < EPSILON);
+    }
+
+    #[test]
+    fn screen_points_are_found_in_the_2d_world() {
+        let mut camera = Camera::new_2d(2.0);
+        camera.position.x = 5.0;
+        camera.target.x = 5.0;
+        let window = WindowSize::new(200, 100);
+
+        let center = camera.screen_to_world_2d(Vec2::new(100.0, 50.0), window);
+        let top_left = camera.screen_to_world_2d(Vec2::ZERO, window);
+
+        assert_eq!(center, Some(Vec2::new(5.0, 0.0)));
+        assert_eq!(top_left, Some(Vec2::new(3.0, 1.0)));
+    }
+
+    #[test]
+    fn only_2d_cameras_on_a_window_find_screen_points() {
+        let perspective = Camera::new_3d(Vec3::new(0.0, 0.0, 5.0), Vec3::ZERO);
+        let flat = Camera::new_2d(2.0);
+
+        assert_eq!(
+            perspective.screen_to_world_2d(Vec2::ZERO, WindowSize::new(10, 10)),
+            None
+        );
+        assert_eq!(
+            flat.screen_to_world_2d(Vec2::ZERO, WindowSize::new(10, 0)),
+            None
+        );
     }
 
     #[test]

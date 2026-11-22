@@ -68,7 +68,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 21 | Raw input events defined in `star_platform`, input state in `star_input` | `star_platform` (layer 1) is the only crate that knows winit, so it translates OS events into its own vocabulary (`InputEvent`, `Key`, `MouseButton`); `star_input` (layer 2) builds the per-frame state from them, without knowing winit. Keys are identified by their **physical position** (US QWERTY names), so WASD works on any layout. State lives in fixed-size arrays: updating it never allocates in the game loop |
 | 22 | Actions **identified by name** (`"jump"`) | It is what StarScript and the editor will use (names in project settings and scripts), and the lookup does not allocate. Action names are unique and non-empty, checked when the `ActionMap` is built (`EngineError::Input`). Rejected for now: typed action ids, which would add a second way to do the same thing |
 | 23 | Gamepads with **gilrs** (MIT/Apache-2.0) | Maintained and pure Rust, with backends for Windows (WGI/XInput), macOS (IOKit) and Linux (evdev), SDL-style mappings and dead zones. Only `star_platform` knows it. On Linux it needs the libudev headers to build (`libudev-dev`). Rejected: writing our own backends per OS (a lot of platform code for little gain) |
-| 24 | StarScript input: actions in **`project.toml`**, read through `star_script_runtime::input` | Actions are project settings (`[input.actions]`), as an editor panel will show them, so scripts stay clean and the compiler can reject misspelled action names (it receives them in `GameSettings`). `Input.is_down("jump")` is a static call with no object to read the engine's input from, so the generated game copies each action's state into a per-thread table of the runtime once per frame (no allocations; the runtime stays without dependencies) and the calls read it by name. Rejected: declaring actions in scripts (typos in key names only fail while playing) |
+| 24 | StarScript input: actions in **`project.toml`**, read through `star_script_runtime::input` | Actions are project settings (`[input.actions]`), as an editor panel will show them, so scripts stay clean and the compiler can reject misspelled action names (it receives them in `GameSettings`). `Input.is_down("jump")` is a static call with no object to read the engine's input from, so the generated game copies each action's state into a per-thread table of the runtime once per frame (no allocations; the runtime stays without dependencies) and the calls read it by name. The pointer is copied the same way, already in world units: it is converted with the camera the previous frame was drawn from, which is what the player saw when they pointed. Rejected: declaring actions in scripts (typos in key names only fail while playing) |
 | 25 | Sprites **batched by texture**, in an immediate `Frame` | The game adds sprites every frame (like meshes, decision 9); the renderer groups consecutive sprites that share a texture into one draw call. The order is explicit (layers, then order of addition), so translucent sprites always blend correctly without sorting by depth. Rejected for now: texture arrays or bindless textures (not available on OpenGL ES and older GPUs) and automatic atlases (they belong to the asset pipeline, Phase 5) |
 | 26 | PNG decoding with **png** (MIT/Apache-2.0), in `star_assets` | The image-rs project's decoder: maintained, pure Rust (it builds for every platform, mobile included) and light. PNG is lossless with transparency, the usual format for 2D game art. Only `star_assets` knows it. Rejected: the `image` crate (many formats, but much heavier to build; JPEG came in Phase 5, decision 30) |
 | 27 | ECS with **sparse sets** and closure queries, without `unsafe` | Adding and removing components is O(1) and never moves other components, which suits a node tree where objects change often; going through one type reads contiguous memory. Per-type `RefCell`s let one query change some types while reading others, checked at run time instead of with `unsafe`. Queries take a closure (`World::each`) instead of returning an iterator, since an iterator that lends `&mut` components cannot be written in safe Rust. Rejected: archetype tables (faster iteration over many types, but adding a component moves the whole entity, and they need `unsafe` to be fast) and external ECS crates (decision 5 spirit: own facade, and the scene system will shape it) |
@@ -113,10 +113,11 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   stage — `First`, `Update`, `Physics`, `Last` — and, within a stage, in the
   order they were added. The first failing system stops the frame with its
   error. Systems get `&mut World`, so they can spawn and despawn directly.
-- The engine owns the game's `World` and a `Schedule`. `Time` and `Input`
-  are resources of the world (`EngineWorld` adds the shortcuts
-  `world.time()` and `world.input()`), so the `Game` trait and the systems
-  see the same data. Systems are registered with
+- The engine owns the game's `World` and a `Schedule`. `Time`, `Input`
+  and the window's `WindowSize` are resources of the world (`EngineWorld`
+  adds the shortcuts `world.time()`, `world.input()` and
+  `world.window_size()`), so the `Game` trait and the systems see the same
+  data. Systems are registered with
   `App::with_system(Stage::Update, system)`; the game's own `update` runs
   right after `Stage::First`. `GameContext::world()` gives the world in
   `Game::start`, to spawn the first entities.
@@ -208,6 +209,10 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   every key and button is released, so none stays "stuck".
 - The cursor is in physical pixels from the top-left corner (`None` outside
   the window); the wheel is in lines (touchpad pixels are converted).
+- `Input::pointer` is where the player points, for games that aim or drag
+  with mouse and fingers alike: the first listed finger (on the screen, or
+  leaving it this frame) wins over the cursor. `Camera::screen_to_world_2d`
+  turns such a pixel into a point of the 2D world.
 - **Touch**: `Touches` keeps up to `MAX_TOUCHES` (10) fingers in a fixed
   array, each with its id, position, start position, `is_down`,
   `just_started` and `just_ended`. A finger that leaves the screen stays
@@ -400,7 +405,7 @@ Modules: `project/` (validated model, creation and opening, no UI and with
 tests), `project_check/` (see above), `file_tree.rs` (snapshot of a folder,
 for the Files tab and the checks), `recent_projects.rs` (recent projects list, at most 10, in
 `<config>/ProjectStar/recent_projects.toml`), `folder_dialog.rs` (rfd),
-`texts.rs` (every visible text, to translate them later) and `style.rs`
+`texts/` (every visible text, in English and Spanish) and `style.rs`
 (shared visual constants).
 
 Example of `project.toml`:

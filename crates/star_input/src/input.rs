@@ -9,7 +9,7 @@ use crate::binding::Binding;
 use crate::gamepads::Gamepads;
 use crate::keyboard::Keyboard;
 use crate::mouse::Mouse;
-use crate::touches::Touches;
+use crate::touches::{Touch, Touches};
 
 /// Everything the player is doing with their input devices this frame.
 ///
@@ -74,6 +74,20 @@ impl Input {
     #[must_use]
     pub const fn gamepads(&self) -> &Gamepads {
         &self.gamepads
+    }
+
+    /// Where the player points, in physical pixels from the window's top-left
+    /// corner (Y grows downwards): a finger on the screen (the first one
+    /// listed in [`Touches`]), or one that left it during this frame, wins
+    /// over the mouse cursor. `None` with no finger and the cursor outside
+    /// the window.
+    #[must_use]
+    pub fn pointer(&self) -> Option<Vec2> {
+        self.touches
+            .iter()
+            .next()
+            .map(Touch::position)
+            .or_else(|| self.mouse.position())
     }
 
     /// Updates the state with something the user did.
@@ -404,5 +418,33 @@ mod tests {
 
         assert!(input.keyboard().is_down(Key::D));
         assert!(!input.keyboard().just_pressed(Key::D));
+    }
+
+    #[test]
+    fn the_pointer_is_the_mouse_cursor_without_fingers() {
+        let mut input = Input::new();
+
+        assert_eq!(input.pointer(), None);
+
+        input.apply(InputEvent::CursorMoved { x: 3.0, y: 4.0 });
+
+        assert_eq!(input.pointer(), Some(Vec2::new(3.0, 4.0)));
+    }
+
+    #[test]
+    fn fingers_win_over_the_mouse_until_the_frame_they_leave_ends() {
+        let mut input = Input::new();
+        input.apply(InputEvent::CursorMoved { x: 3.0, y: 4.0 });
+        input.apply(touch(1, TouchPhase::Started));
+
+        assert_eq!(input.pointer(), Some(Vec2::new(1.0, 2.0)));
+
+        input.apply(touch(1, TouchPhase::Ended));
+
+        assert_eq!(input.pointer(), Some(Vec2::new(1.0, 2.0)));
+
+        input.end_frame();
+
+        assert_eq!(input.pointer(), Some(Vec2::new(3.0, 4.0)));
     }
 }

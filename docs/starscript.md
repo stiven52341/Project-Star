@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
+| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
 
@@ -364,7 +364,7 @@ The engine provides them; their names cannot be used for other classes.
 | `Camera` (extends `Node`) | `init(name: string)`; field `view_height: float` (2.0) |
 | `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
 | `Scene` | `static load(path: string) -> Node?` |
-| `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool` |
+| `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool`, `static pointer_x() -> float`, `static pointer_y() -> float`, `static has_pointer() -> bool` |
 
 **A game is a class that extends `Game`**:
 
@@ -506,6 +506,22 @@ override func update(delta: float) {
   that does not exist is never held.
 - A misspelled binding name in `project.toml` stops the game when it starts,
   with an error that names it.
+- **Where the player points**: `Input.pointer_x()` and `Input.pointer_y()`
+  are the point of the world under the mouse cursor or a finger, in the
+  same units as `x` and `y` of nodes, seen from the game's `camera`. A
+  finger on the screen (or one that leaves it in this frame) wins over the
+  mouse. `Input.has_pointer()` is false while there is no finger and the
+  cursor is outside the window; the position is then where the player last
+  pointed (`(0, 0)` if they never did). Pointing is not pressing: a click or
+  a tap is an action bound to `"MouseLeft"` or `"Touch"`.
+
+```
+override func update(delta: float) {
+    if Input.just_pressed("shoot") && Input.has_pointer() {
+        shoot_at(Input.pointer_x(), Input.pointer_y())
+    }
+}
+```
 
 ## 4. Translation to Rust (final)
 
