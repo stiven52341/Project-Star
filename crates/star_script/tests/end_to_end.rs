@@ -100,8 +100,13 @@ fn file_stem(path: &Path) -> String {
         .to_owned()
 }
 
+/// The expected output (or fault) of `program`, with `\n` line ends: Git
+/// may check the files out with `\r\n` on Windows, but programs print `\n`
+/// on every system.
 fn read_expected(program: &Path, extension: &str) -> Option<String> {
-    fs::read_to_string(program.with_extension(extension)).ok()
+    fs::read_to_string(program.with_extension(extension))
+        .ok()
+        .map(|text| text.replace("\r\n", "\n"))
 }
 
 fn run(directory: &Path, expectation: &Expectation) -> Result<(), String> {
