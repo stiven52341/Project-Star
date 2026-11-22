@@ -107,7 +107,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         central area):
     - [x] 13.8a Open blueprints from «Archivos» in a tab and see their
           graphs: nodes, pins and wires, with pan and zoom.
-    - [ ] 13.8b Edit graphs: move nodes, connect and remove wires, add and
+    - [x] 13.8b Edit graphs: move nodes, connect and remove wires, add and
           delete nodes, change their properties, and save.
     - [ ] 13.8c Edit the class (variables, graphs and their signature),
           create new blueprints, and mark on their nodes the mistakes

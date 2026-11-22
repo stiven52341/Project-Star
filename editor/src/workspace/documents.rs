@@ -43,9 +43,9 @@ impl Documents {
         self.blueprints.iter().position(|tab| tab.path() == path)
     }
 
-    /// Closes the blueprint at `index`; the tab shown stays shown, or the
-    /// scene is shown if it was that one.
-    fn close(&mut self, index: usize) {
+    /// Closes the blueprint at `index`, saved or not; the tab shown stays
+    /// shown, or the scene is shown if it was that one.
+    pub(crate) fn close(&mut self, index: usize) {
         if index >= self.blueprints.len() {
             return;
         }
@@ -57,6 +57,48 @@ impl Documents {
         };
     }
 
+    /// Whether the blueprint at `index` has unsaved changes.
+    pub(crate) fn is_unsaved(&self, index: usize) -> bool {
+        self.blueprints
+            .get(index)
+            .is_some_and(BlueprintTab::is_unsaved)
+    }
+
+    /// Whether any blueprint has unsaved changes.
+    pub(crate) fn any_unsaved(&self) -> bool {
+        self.blueprints.iter().any(BlueprintTab::is_unsaved)
+    }
+
+    /// Whether the tab shown is a blueprint with unsaved changes.
+    pub(crate) fn active_is_unsaved(&self) -> bool {
+        self.active.is_some_and(|index| self.is_unsaved(index))
+    }
+
+    /// Saves the blueprint at `index`. Returns whether it is saved now.
+    pub(crate) fn save(&mut self, index: usize) -> bool {
+        self.blueprints
+            .get_mut(index)
+            .is_none_or(BlueprintTab::save)
+    }
+
+    /// Saves the blueprint shown, if one is.
+    pub(crate) fn save_active(&mut self) {
+        if let Some(index) = self.active {
+            self.save(index);
+        }
+    }
+
+    /// Saves every blueprint. Returns whether all of them are saved now;
+    /// the tabs of those that are not say why.
+    pub(crate) fn save_all(&mut self) -> bool {
+        // Every tab is saved, even after one fails.
+        let mut all_saved = true;
+        for tab in &mut self.blueprints {
+            all_saved &= tab.save();
+        }
+        all_saved
+    }
+
     /// The tab shown.
     pub(crate) fn active(&mut self) -> ActiveDocument<'_> {
         match self.active.and_then(|index| self.blueprints.get_mut(index)) {
@@ -65,9 +107,10 @@ impl Documents {
         }
     }
 
-    /// The row of tabs, each blueprint with a button to close it.
-    pub(crate) fn show_tabs(&mut self, ui: &mut egui::Ui) {
-        let mut closed = None;
+    /// The row of tabs, each blueprint with a button to close it. Returns
+    /// the blueprint the user asked to close.
+    pub(crate) fn show_tabs(&mut self, ui: &mut egui::Ui) -> Option<usize> {
+        let mut close = None;
         ui.horizontal(|ui| {
             ui.selectable_value(&mut self.active, None, texts::SCENE_TAB);
             for (index, tab) in self.blueprints.iter().enumerate() {
@@ -79,13 +122,11 @@ impl Documents {
                     .on_hover_text(texts::CLOSE_TAB)
                     .clicked()
                 {
-                    closed = Some(index);
+                    close = Some(index);
                 }
             }
         });
-        if let Some(index) = closed {
-            self.close(index);
-        }
+        close
     }
 }
 
@@ -108,6 +149,14 @@ mod tests {
             documents.open_blueprint(assets.path(), (*path).to_owned());
         }
         (assets, documents)
+    }
+
+    #[test]
+    fn blueprints_open_saved() {
+        let (_assets, documents) = documents_with(&["a.blueprint"]);
+
+        assert!(!documents.any_unsaved());
+        assert!(!documents.active_is_unsaved());
     }
 
     #[test]

@@ -221,6 +221,25 @@ pub enum Operator {
 }
 
 impl Operator {
+    /// Every operator, in the order an editor lists them.
+    pub const ALL: [Self; 15] = [
+        Self::Add,
+        Self::Subtract,
+        Self::Multiply,
+        Self::Divide,
+        Self::Remainder,
+        Self::Negate,
+        Self::Equal,
+        Self::NotEqual,
+        Self::Less,
+        Self::LessOrEqual,
+        Self::Greater,
+        Self::GreaterOrEqual,
+        Self::And,
+        Self::Or,
+        Self::Not,
+    ];
+
     /// How it is written in StarScript.
     #[must_use]
     pub const fn symbol(self) -> &'static str {
@@ -294,4 +313,19 @@ impl Graph {
 )]
 fn is_false(value: &bool) -> bool {
     !*value
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_operator_is_listed_once() {
+        for (index, operator) in Operator::ALL.iter().enumerate() {
+            assert!(
+                !Operator::ALL[..index].contains(operator),
+                "{operator:?} is listed twice"
+            );
+        }
+    }
 }

@@ -323,8 +323,33 @@ outputs down the right one, in the order of `Node::pins`; execution pins
 are triangles and data pins circles, and wires are curves between them.
 Dragging the background moves the view and the wheel zooms around the
 pointer (`CanvasView`, between ×0.25 and ×2). Where each node and pin is
-comes from `layout.rs` (graph units, with tests), so drawing and, later,
-picking pins with the mouse use the same geometry.
+comes from `layout.rs` (graph units, with tests), so drawing and picking
+pins with the mouse use the same geometry.
+
+Editing (`canvas.rs` for the mouse, `edit.rs` for the changes, with tests):
+clicking a node selects it and dragging moves it; dragging from a pin to
+another joins them, whichever is the output; the right button opens a menu
+to add a node where it was opened (values, variables of the blueprint,
+calls to its own methods or to any other, operators, «Si», «Devolver»), to
+delete the node under it or to remove a pin's wires; `Delete` deletes the
+selected node. The entry cannot be deleted. The editor keeps only wires it
+can draw: from an output to an input of the same kind, on two nodes, and a
+pin that takes one wire (every input, and execution outputs) keeps the
+newest one. Everything else (unreachable nodes, cycles, inputs without a
+wire) is allowed while building and reported by «Compilar».
+
+While a blueprint is shown, the **Inspector** gives the selected node's
+fields (`properties.rs`): a value's type and value, a variable's name
+(typed or picked from the blueprint), what a call calls, its method, its
+arguments (renaming one keeps its wire), whether it returns a value and
+whether it is pure, and an operator. A change that takes pins away also
+takes their wires.
+
+Blueprints are saved with `Ctrl+S` or «Archivo» → «Guardar», and all of
+them before «Compilar», which reads the files. Tabs with unsaved changes
+show `●`; closing one, the project or the window asks first («Guardar»,
+«No guardar», «Cancelar»). Saving writes the file again from the model, so
+comments written by hand in it are not kept.
 
 «Compilar» runs `project_check/` (no UI, with tests) on a thread of its own
 (`CheckJob`), which asks egui to redraw when it finishes. It checks:

@@ -4,18 +4,33 @@ use eframe::egui;
 
 use crate::texts;
 
+/// Saves the blueprint shown.
+pub(crate) const SAVE_SHORTCUT: egui::KeyboardShortcut =
+    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::S);
+
 /// Menu entries that need the editor to react.
 pub(crate) enum MenuAction {
+    Save,
     CloseProject,
     Compile,
     ShowAbout,
 }
 
-/// The menu; «Compilar» is disabled while `compiling`.
-pub(crate) fn show_menu_bar(ui: &mut egui::Ui, compiling: bool) -> Option<MenuAction> {
+/// The menu; «Guardar» is enabled if there is something to `save`, and
+/// «Compilar» is disabled while `compiling`.
+pub(crate) fn show_menu_bar(
+    ui: &mut egui::Ui,
+    can_save: bool,
+    compiling: bool,
+) -> Option<MenuAction> {
     let mut action = None;
     egui::MenuBar::new().ui(ui, |ui| {
         ui.menu_button(texts::MENU_FILE, |ui| {
+            let save = egui::Button::new(texts::SAVE)
+                .shortcut_text(ui.ctx().format_shortcut(&SAVE_SHORTCUT));
+            if ui.add_enabled(can_save, save).clicked() {
+                action = Some(MenuAction::Save);
+            }
             if ui.button(texts::CLOSE_PROJECT).clicked() {
                 action = Some(MenuAction::CloseProject);
             }

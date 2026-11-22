@@ -57,9 +57,14 @@ impl eframe::App for EditorApp {
                 .show(ui, |ui| launcher.show(ui))
                 .inner
                 .map(|project| Self::open_editor(&context, frame.wgpu_render_state(), project)),
-            Screen::Editor(editor) => editor
-                .show(ui)
-                .map(|EditorAction::CloseProject| Self::open_launcher(&context)),
+            Screen::Editor(editor) => match editor.show(ui) {
+                Some(EditorAction::CloseProject) => Some(Self::open_launcher(&context)),
+                Some(EditorAction::Quit) => {
+                    context.send_viewport_cmd(egui::ViewportCommand::Close);
+                    None
+                }
+                None => None,
+            },
         };
         if let Some(screen) = next_screen {
             self.screen = screen;

@@ -4,7 +4,7 @@ use std::path::Path;
 
 use star_blueprint::{
     BRANCH_FALSE, BRANCH_TRUE, Blueprint, CONDITION, CallTarget, EXECUTION_INPUT, EXECUTION_OUTPUT,
-    LEFT, Literal, NodeKind, RESULT, RIGHT, TARGET, VALUE,
+    LEFT, Literal, NodeKind, Operator, RESULT, RIGHT, TARGET, VALUE,
 };
 
 use crate::project::{
@@ -77,7 +77,51 @@ pub(crate) const SCENE_TAB: &str = "Escena";
 pub(crate) const CLOSE_TAB: &str = "Cerrar";
 pub(crate) const OPEN_BLUEPRINT_HINT: &str = "Doble clic para abrir";
 
+// Saving.
+pub(crate) const SAVE: &str = "Guardar";
+pub(crate) const UNSAVED_CHANGES: &str = "Cambios sin guardar";
+pub(crate) const UNSAVED_BLUEPRINT_QUESTION: &str =
+    "Este blueprint tiene cambios sin guardar. ¿Guardarlos antes de cerrarlo?";
+pub(crate) const UNSAVED_BLUEPRINTS_QUESTION: &str =
+    "Hay blueprints con cambios sin guardar. ¿Guardarlos antes de cerrar?";
+pub(crate) const DISCARD_CHANGES: &str = "No guardar";
+pub(crate) const CANCEL: &str = "Cancelar";
+
 // Blueprint editor.
+pub(crate) const SELECT_A_NODE: &str = "Selecciona un nodo para ver sus propiedades.";
+pub(crate) const ADD_NODE: &str = "Añadir nodo";
+pub(crate) const MENU_VALUE: &str = "Valor";
+pub(crate) const MENU_GET_VARIABLE: &str = "Leer variable";
+pub(crate) const MENU_SET_VARIABLE: &str = "Asignar variable";
+pub(crate) const MENU_CALL: &str = "Llamar";
+pub(crate) const MENU_OPERATOR: &str = "Operador";
+pub(crate) const NODE_BRANCH: &str = "Si";
+pub(crate) const NODE_RETURN: &str = "Devolver";
+pub(crate) const OTHER_NAME: &str = "Otra…";
+pub(crate) const CALL_OWN_METHOD: &str = "Método de este objeto…";
+pub(crate) const CALL_METHOD_OF_VALUE: &str = "Método de otro objeto…";
+pub(crate) const CALL_CLASS_FUNCTION: &str = "Función de una clase…";
+pub(crate) const DELETE_NODE: &str = "Borrar nodo";
+pub(crate) const ENTRY_CANNOT_BE_DELETED: &str = "Todo gráfico necesita su nodo de inicio.";
+pub(crate) const DISCONNECT_PIN: &str = "Quitar cables";
+pub(crate) const BOOL_KIND: &str = "Booleano";
+pub(crate) const INT_KIND: &str = "Entero";
+pub(crate) const FLOAT_KIND: &str = "Decimal";
+pub(crate) const STRING_KIND: &str = "Texto";
+pub(crate) const LITERAL_KIND: &str = "Tipo";
+pub(crate) const LITERAL_VALUE: &str = "Valor";
+pub(crate) const VARIABLE: &str = "Variable";
+pub(crate) const CALL_TARGET: &str = "Llama a";
+pub(crate) const CLASS: &str = "Clase";
+pub(crate) const METHOD: &str = "Método";
+pub(crate) const ARGUMENTS: &str = "Argumentos";
+pub(crate) const ADD_ARGUMENT: &str = "Añadir argumento";
+pub(crate) const REMOVE: &str = "Quitar";
+pub(crate) const RETURNS_VALUE: &str = "Devuelve un valor";
+pub(crate) const PURE_CALL: &str = "Pura";
+pub(crate) const PURE_CALL_HINT: &str =
+    "Solo calcula un valor: no tiene pines de ejecución y se ejecuta donde se usa su resultado.";
+pub(crate) const ENTRY_HINT: &str = "Da los parámetros del método.";
 pub(crate) const NO_GRAPHS: &str = "El blueprint no tiene gráficos.";
 pub(crate) const CANVAS_CONTROLS: &str =
     "Arrastra el fondo para desplazar · Rueda para acercar o alejar";
@@ -100,6 +144,15 @@ pub(crate) fn viewport_error(error: &str) -> String {
 
 pub(crate) fn blueprint_unreadable(reason: &str) -> String {
     format!("No se pudo abrir el blueprint: {reason}")
+}
+
+pub(crate) fn blueprint_not_saved(reason: &str) -> String {
+    format!("No se pudo guardar el blueprint: {reason}")
+}
+
+/// The name of a tab with unsaved changes.
+pub(crate) fn unsaved_title(name: &str) -> String {
+    format!("{name} ●")
 }
 
 /// `Player : Sprite`, or only the class if it extends nothing.
@@ -125,6 +178,53 @@ pub(crate) fn node_title(kind: &NodeKind) -> String {
         NodeKind::Operator { operator } => operator.symbol().to_owned(),
         NodeKind::Branch => "Si".to_owned(),
         NodeKind::Return => "Devolver".to_owned(),
+    }
+}
+
+/// What kind of node it is, for the inspector.
+pub(crate) const fn node_kind_name(kind: &NodeKind) -> &'static str {
+    match kind {
+        NodeKind::Entry => "Inicio",
+        NodeKind::Literal { .. } => MENU_VALUE,
+        NodeKind::GetVariable { .. } => MENU_GET_VARIABLE,
+        NodeKind::SetVariable { .. } => MENU_SET_VARIABLE,
+        NodeKind::Call(_) => "Llamada",
+        NodeKind::Operator { .. } => MENU_OPERATOR,
+        NodeKind::Branch => NODE_BRANCH,
+        NodeKind::Return => NODE_RETURN,
+    }
+}
+
+pub(crate) fn node_number(id: u32) -> String {
+    format!("nodo {id}")
+}
+
+pub(crate) const fn call_target_name(target: &CallTarget) -> &'static str {
+    match target {
+        CallTarget::OwnObject => "Este objeto",
+        CallTarget::Value => "Otro objeto (pin «objeto»)",
+        CallTarget::Class(_) => "Una clase",
+    }
+}
+
+/// An operator's name in the editor, with its symbol.
+pub(crate) const fn operator_name(operator: Operator) -> &'static str {
+    match operator {
+        Operator::Add => "Sumar (+)",
+        Operator::Subtract => "Restar (-)",
+        Operator::Multiply => "Multiplicar (*)",
+        Operator::Divide => "Dividir (/)",
+        Operator::Remainder => "Resto (%)",
+        Operator::Negate => "Cambiar signo (-)",
+        Operator::Equal => "Igual (==)",
+        Operator::NotEqual => "Distinto (!=)",
+        Operator::Less => "Menor (<)",
+        Operator::LessOrEqual => "Menor o igual (<=)",
+        Operator::Greater => "Mayor (>)",
+        Operator::GreaterOrEqual => "Mayor o igual (>=)",
+        Operator::And => "Y (&&)",
+        Operator::Or => "O (||)",
+        Operator::Not => "No (!)",
     }
 }
 
@@ -251,7 +351,7 @@ fn name_error_text(error: ProjectNameError) -> String {
 
 #[cfg(test)]
 mod tests {
-    use star_blueprint::{Call, Operator};
+    use star_blueprint::Call;
 
     use super::*;
 
