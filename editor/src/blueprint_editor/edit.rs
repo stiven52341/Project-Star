@@ -7,7 +7,9 @@
 //! [`validate`](star_blueprint::validate), as with any half-built graph.
 
 use eframe::egui::{Pos2, Vec2};
-use star_blueprint::{Direction, Graph, Link, Node, NodeId, NodeKind, Pin, PinKind, PinRef};
+use star_blueprint::{
+    Blueprint, CallTarget, Direction, Graph, Link, Node, NodeId, NodeKind, Pin, PinKind, PinRef,
+};
 
 /// Adds a node of `kind` at `position`; returns its identifier.
 pub(super) fn add_node(graph: &mut Graph, kind: NodeKind, position: Pos2) -> NodeId {
@@ -109,6 +111,78 @@ pub(super) fn remove_broken_links(graph: &mut Graph) {
         .cloned()
         .collect();
     graph.links = kept;
+}
+
+/// `prefix1`, or the first `prefixN` that is not `taken`. Among one more
+/// number than there are names taken, one is always free.
+pub(super) fn unused_name(prefix: &str, taken: &[&str]) -> String {
+    (1..=taken.len() + 1)
+        .map(|number| format!("{prefix}{number}"))
+        .find(|name| !taken.contains(&name.as_str()))
+        .unwrap_or_default()
+}
+
+/// A method called `name`, with nothing but its entry node.
+pub(super) fn new_graph(name: String) -> Graph {
+    let mut graph = Graph {
+        name,
+        parameters: Vec::new(),
+        returns: None,
+        is_override: false,
+        private: false,
+        nodes: Vec::new(),
+        links: Vec::new(),
+    };
+    add_node(&mut graph, NodeKind::Entry, Pos2::ZERO);
+    graph
+}
+
+/// Makes the nodes that read or write the variable `old` use `new`, after
+/// it was renamed.
+pub(super) fn rename_variable(blueprint: &mut Blueprint, old: &str, new: &str) {
+    for node in blueprint
+        .graphs
+        .iter_mut()
+        .flat_map(|graph| &mut graph.nodes)
+    {
+        if let NodeKind::GetVariable { variable } | NodeKind::SetVariable { variable } =
+            &mut node.kind
+            && variable == old
+        {
+            new.clone_into(variable);
+        }
+    }
+}
+
+/// Makes the calls of the blueprint to its own method `old` call `new`,
+/// after its graph was renamed.
+pub(super) fn rename_method(blueprint: &mut Blueprint, old: &str, new: &str) {
+    for node in blueprint
+        .graphs
+        .iter_mut()
+        .flat_map(|graph| &mut graph.nodes)
+    {
+        if let NodeKind::Call(call) = &mut node.kind
+            && call.target == CallTarget::OwnObject
+            && call.method == old
+        {
+            new.clone_into(&mut call.method);
+        }
+    }
+}
+
+/// Gives the wires of the entry's pin `old` to `new`, after a parameter
+/// was renamed.
+pub(super) fn rename_parameter(graph: &mut Graph, old: &str, new: &str) {
+    let entries: Vec<NodeId> = graph
+        .nodes
+        .iter()
+        .filter(|node| matches!(node.kind, NodeKind::Entry))
+        .map(|node| node.id)
+        .collect();
+    for entry in entries {
+        rename_pin(graph, entry, old, new);
+    }
 }
 
 fn pin(graph: &Graph, end: &PinRef) -> Option<Pin> {
@@ -295,6 +369,103 @@ mod tests {
         connect(&mut graph, &pin(1, "fast"), &pin(2, CONDITION));
 
         rename_pin(&mut graph, NodeId(1), "fast", "quick");
+
+        assert_eq!(links(&graph), [(1, "quick", 2, CONDITION)]);
+    }
+
+    #[test]
+    fn unused_names_skip_the_names_taken() {
+        assert_eq!(unused_name("arg", &[]), "arg1");
+        assert_eq!(unused_name("arg", &["arg1", "arg3"]), "arg2");
+        assert_eq!(unused_name("arg", &["arg1", "arg2"]), "arg3");
+    }
+
+    #[test]
+    fn new_graphs_start_with_their_entry() {
+        let graph = new_graph("jump".to_owned());
+
+        assert_eq!(graph.name, "jump");
+        assert!(matches!(
+            graph.nodes[..],
+            [Node {
+                kind: NodeKind::Entry,
+                ..
+            }]
+        ));
+    }
+
+    fn blueprint_using(name: &str) -> Blueprint {
+        let mut graph = new_graph("update".to_owned());
+        let variable = name.to_owned();
+        add_node(
+            &mut graph,
+            NodeKind::GetVariable {
+                variable: variable.clone(),
+            },
+            Pos2::ZERO,
+        );
+        add_node(&mut graph, NodeKind::SetVariable { variable }, Pos2::ZERO);
+        let call = |target| {
+            NodeKind::Call(star_blueprint::Call {
+                target,
+                method: name.to_owned(),
+                arguments: Vec::new(),
+                returns_value: false,
+                pure: false,
+            })
+        };
+        add_node(&mut graph, call(CallTarget::OwnObject), Pos2::ZERO);
+        add_node(&mut graph, call(CallTarget::Value), Pos2::ZERO);
+        Blueprint {
+            class: "Ship".to_owned(),
+            extends: None,
+            base_arguments: Vec::new(),
+            variables: Vec::new(),
+            graphs: vec![graph],
+        }
+    }
+
+    fn titles(blueprint: &Blueprint) -> Vec<String> {
+        blueprint.graphs[0]
+            .nodes
+            .iter()
+            .skip(1)
+            .map(|node| match &node.kind {
+                NodeKind::GetVariable { variable } | NodeKind::SetVariable { variable } => {
+                    variable.clone()
+                }
+                NodeKind::Call(call) => call.method.clone(),
+                _ => String::new(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn renamed_variables_are_renamed_in_their_nodes() {
+        let mut blueprint = blueprint_using("speed");
+
+        rename_variable(&mut blueprint, "speed", "pace");
+
+        assert_eq!(titles(&blueprint), ["pace", "pace", "speed", "speed"]);
+    }
+
+    #[test]
+    fn renamed_methods_are_renamed_in_their_own_calls() {
+        let mut blueprint = blueprint_using("jump");
+
+        rename_method(&mut blueprint, "jump", "leap");
+
+        assert_eq!(titles(&blueprint), ["jump", "jump", "leap", "jump"]);
+    }
+
+    #[test]
+    fn renamed_parameters_keep_their_wires() {
+        let mut graph = graph();
+        connect(&mut graph, &pin(1, "fast"), &pin(2, CONDITION));
+        graph.parameters[0].name = "quick".to_owned();
+
+        rename_parameter(&mut graph, "fast", "quick");
+        remove_broken_links(&mut graph);
 
         assert_eq!(links(&graph), [(1, "quick", 2, CONDITION)]);
     }

@@ -31,4 +31,4 @@ pub use pins::{
     PinKind, RESULT, RIGHT, TARGET, VALUE,
 };
 pub use translation::{Origin, Translation, translate};
-pub use validation::{BlueprintError, BlueprintErrorKind, validate};
+pub use validation::{BlueprintError, BlueprintErrorKind, is_valid_name, validate};

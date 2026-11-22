@@ -86,6 +86,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 39 | Scene nodes name StarScript classes **by name, resolved by generated code** | A `.scene` file is data, so the class is a text (`class = "Rock"`). The compiler writes `new_scene_object_`, a `match` over the program's classes: the node classes created without arguments are built with `new()`, and the others give the reason they cannot (needs arguments, private `init`, not a node). The object is created as its `init` leaves it and the scene's values are applied on top (name always; transform and image only when the file writes them), as an instance overrides its prefab. Any problem rejects the whole scene (`null`, one warning naming the node), so a typo is never half-loaded. The format version stays 1: the field is optional and old files read the same. Rejected for now: checking the project's scenes at compile time (it fits the editor's build, step 13.6) and passing arguments to `init` from the scene |
 | 40 | The editor **checks** projects with `star_script` as a library | «Compilar» gives every mistake the compiler can find (scripts, input actions, scene classes) in a fraction of a second, without Cargo, so it can run often. Scripts live anywhere in `assets/`, next to the scenes and images they use, and all of them form one program: each file is tokenized and parsed on its own (an unclosed `{` stays in its file) and their classes are checked together, with spans placed in one range of offsets that `SourceSet` maps back to file, line and column. The check runs on a thread so big projects never freeze the editor. Rejected for now: building with Cargo from the editor (needs a way to find the engine's crates outside the repository) and a `scripts/` folder apart from the assets |
 | 41 | Blueprints are **node graphs whose execution is a tree**, in their own crate `star_blueprint` | Each execution pin takes at most one wire, so every graph reads as structured StarScript (`if`/`else`) without jumps; paths that would join again are written as functions. Values flow through data wires and pure nodes run where their value is used. The model is plain data with public fields, like the syntax tree, because the visual editor must hold graphs that are still being built; `validate` lists what is wrong, and types are left to the StarScript compiler, whose errors are placed back on nodes. The files are TOML, like scenes, read with serde, so `star_script` keeps having no dependencies. Rejected: free execution graphs with joins and loops of wires (they need gotos or a structuring pass), and a block editor in the style of Scratch (less familiar for engine users) |
+| 42 | The blueprint editor is **drawn by the editor** with egui's painter, in tabs of the central area | No node-editor library: the canvas is a few hundred lines on top of `star_blueprint` (pins, rules, files), which already says what a node is, so there is no second model to keep in step, and no dependency that must follow each egui version. Blueprints open as tabs next to the scene view, so several can be open and the inspector shows what is selected in the tab shown. Rejected: `egui-snarl` and similar crates (their own graph model and egui version), and floating windows (they cover the other panels) |
 
 ## ECS
 
@@ -344,6 +345,24 @@ fields (`properties.rs`): a value's type and value, a variable's name
 arguments (renaming one keeps its wire), whether it returns a value and
 whether it is pure, and an operator. A change that takes pins away also
 takes their wires.
+
+With no node selected, the Inspector edits the **class** (name, base,
+`base_arguments`, variables with their type, starting value and privacy)
+and the **signature** of the graph shown (name, parameters, return type,
+`override`, privacy) (`class_properties.rs`). Renaming a variable, a method
+or a parameter renames it in the nodes that use it (`edit.rs`), and a
+change that takes pins away takes their wires. «Gráficos» in the tab adds a
+graph (with its entry) or deletes the one shown. «Nuevo blueprint…» in
+«Archivos» asks for a class name and writes `assets/<Class>.blueprint`
+(`creation.rs`, never overwriting): a `Node` that redefines `start` and
+`update`, empty, which compiles as it is.
+
+The mistakes of the last «Compilar» are shown in their blueprint: each
+`Problem` of a blueprint keeps its `Origin` (graph and node, graph, or
+class), so nodes with mistakes get a red border and show them under the
+pointer and in the inspector, and the others are listed above the canvas.
+Clicking the place of such a problem in «Problemas» opens the blueprint on
+its graph, with the node selected in the middle of the canvas.
 
 Blueprints are saved with `Ctrl+S` or «Archivo» → «Guardar», and all of
 them before «Compilar», which reads the files. Tabs with unsaved changes

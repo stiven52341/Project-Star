@@ -51,6 +51,11 @@ impl CanvasView {
         ((screen_point - canvas_origin - self.pan) / self.zoom).to_pos2()
     }
 
+    /// Moves the graph so `point` is at the middle of a canvas of `size`.
+    pub(super) fn look_at(&mut self, point: Pos2, size: Vec2) {
+        self.pan = size / 2.0 - point.to_vec2() * self.zoom;
+    }
+
     /// Moves the graph by `delta` screen points.
     pub(super) fn pan_by(&mut self, delta: Vec2) {
         self.pan += delta;
@@ -101,6 +106,19 @@ mod tests {
         view.zoom_around(ORIGIN, pointer, 1.8);
 
         assert!((view.to_screen(ORIGIN, under_pointer) - pointer).length() < 1e-3);
+    }
+
+    #[test]
+    fn looking_at_a_point_puts_it_in_the_middle() {
+        let mut view = CanvasView::default();
+        view.zoom_around(ORIGIN, ORIGIN, 1.5);
+        let point = pos2(300.0, -80.0);
+        let size = vec2(800.0, 600.0);
+
+        view.look_at(point, size);
+
+        let middle = ORIGIN + size / 2.0;
+        assert!((view.to_screen(ORIGIN, point) - middle).length() < 1e-3);
     }
 
     #[test]

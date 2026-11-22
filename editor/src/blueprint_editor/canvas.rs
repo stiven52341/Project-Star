@@ -5,6 +5,11 @@
 //! - dragging from a pin to another one joins them with a wire;
 //! - the right button opens a menu to add nodes, delete them or remove
 //!   wires; `Delete` deletes the selected node.
+//!
+//! Nodes with mistakes found by «Compilar» have a red border, and the
+//! pointer over them shows the mistakes.
+
+use std::collections::HashMap;
 
 use eframe::egui::{self, Key, Pos2, Response, Sense};
 use star_blueprint::{Graph, NodeId, NodeKind, PinRef};
@@ -28,7 +33,12 @@ pub(super) struct CanvasState {
     drag: Option<Drag>,
     /// What the open menu of the right button is about.
     menu: Option<MenuTarget>,
+    /// A node to bring to the middle of the canvas, once its size is known.
+    focus: Option<NodeId>,
 }
+
+/// The mistakes of each node of the graph shown.
+pub(super) type NodeMistakes<'problems> = HashMap<NodeId, Vec<&'problems str>>;
 
 /// What a drag that is going on does.
 enum Drag {
@@ -42,6 +52,12 @@ impl CanvasState {
     pub(super) fn show_other_graph(&mut self) {
         *self = Self::default();
     }
+
+    /// Selects the node `id` and brings it to the middle of the canvas.
+    pub(super) fn focus_on(&mut self, id: NodeId) {
+        self.selected = Some(id);
+        self.focus = Some(id);
+    }
 }
 
 /// Draws `graph` filling the space left in `ui` and applies what the mouse
@@ -51,8 +67,15 @@ pub(super) fn show_graph(
     graph: &mut Graph,
     state: &mut CanvasState,
     names: &BlueprintNames,
+    mistakes: &NodeMistakes<'_>,
 ) -> bool {
     let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
+    if let Some(id) = state.focus.take()
+        && let Some(node) = graph.node(id)
+    {
+        let center = super::layout::NodeLayout::new(node, graph).rect.center();
+        state.view.look_at(center, rect.size());
+    }
     if state.selected.is_some_and(|id| graph.node(id).is_none()) {
         state.selected = None;
     }
@@ -68,8 +91,29 @@ pub(super) fn show_graph(
         // The inspector, drawn before the canvas, shows the new selection.
         ui.ctx().request_repaint();
     }
-    paint(ui, graph, state, &response, rect);
+    paint(ui, graph, state, &response, rect, mistakes);
+    show_mistakes_under_pointer(graph, state, &response, rect.min, mistakes);
     changed
+}
+
+/// The mistakes of the node under the pointer, next to it.
+fn show_mistakes_under_pointer(
+    graph: &Graph,
+    state: &CanvasState,
+    response: &Response,
+    origin: Pos2,
+    mistakes: &NodeMistakes<'_>,
+) {
+    let Some(pointer) = response.hover_pos() else {
+        return;
+    };
+    let layouts = graph_layout(graph);
+    let point = state.view.to_graph(origin, pointer);
+    if let Some(messages) = node_at(graph, &layouts, point).and_then(|id| mistakes.get(&id)) {
+        response
+            .clone()
+            .on_hover_text_at_pointer(messages.join("\n"));
+    }
 }
 
 /// Moves the view, nodes and wires with the mouse. Returns whether the
@@ -165,7 +209,14 @@ fn delete_selected_on_key(ui: &egui::Ui, graph: &mut Graph, state: &mut CanvasSt
     true
 }
 
-fn paint(ui: &egui::Ui, graph: &Graph, state: &CanvasState, response: &Response, rect: egui::Rect) {
+fn paint(
+    ui: &egui::Ui,
+    graph: &Graph,
+    state: &CanvasState,
+    response: &Response,
+    rect: egui::Rect,
+    mistakes: &NodeMistakes<'_>,
+) {
     let painting = Painting {
         painter: ui.painter_at(rect),
         rect,
@@ -185,7 +236,12 @@ fn paint(ui: &egui::Ui, graph: &Graph, state: &CanvasState, response: &Response,
     }
     for node in &graph.nodes {
         if let Some(layout) = layouts.get(&node.id) {
-            painting.paint_node(node, layout, state.selected == Some(node.id));
+            painting.paint_node(
+                node,
+                layout,
+                state.selected == Some(node.id),
+                mistakes.contains_key(&node.id),
+            );
         }
     }
 }

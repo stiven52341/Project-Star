@@ -1,10 +1,14 @@
 //! The blueprint editor: a blueprint of the assets folder, open in a tab of
-//! the central area, with its graphs drawn as nodes and wires to edit, and
-//! the selected node's properties in the inspector.
+//! the central area, with its graphs drawn as nodes and wires to edit; the
+//! inspector shows the selected node, or the class and the graph shown.
+//! The mistakes the last «Compilar» found in it are shown on its nodes.
 
 mod canvas;
+mod class_properties;
+mod creation;
 mod edit;
 mod layout;
+mod literal_field;
 mod menus;
 mod names;
 mod painting;
@@ -15,12 +19,18 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use eframe::egui;
-use star_blueprint::Blueprint;
+use star_blueprint::{Blueprint, Origin};
 
-use self::canvas::CanvasState;
+use self::canvas::{CanvasState, NodeMistakes};
+pub(crate) use self::creation::{NewBlueprintError, create_blueprint};
 use self::names::BlueprintNames;
+use crate::project::ASSETS_DIRECTORY;
+use crate::project_check::Problem;
 use crate::style::ERROR_COLOR;
 use crate::texts;
+
+/// Names `Nuevo gráfico` gives: `method1`, `method2`…
+const NEW_GRAPH_PREFIX: &str = "method";
 
 /// A blueprint open in the editor.
 pub(crate) struct BlueprintTab {
@@ -103,7 +113,55 @@ impl BlueprintTab {
         }
     }
 
-    pub(crate) fn show(&mut self, ui: &mut egui::Ui) {
+    /// Shows the blueprint's part `origin`: the node selected in the middle
+    /// of its graph, or the inspector of its class and that graph.
+    pub(crate) fn reveal(&mut self, origin: &Origin) {
+        let Ok(blueprint) = &self.content else {
+            return;
+        };
+        let graph_named = |name: &str| blueprint.graphs.iter().position(|graph| graph.name == name);
+        match origin {
+            Origin::Node { graph, node } => {
+                if let Some(index) = graph_named(graph) {
+                    self.show_graph(index);
+                    self.canvas.focus_on(*node);
+                }
+            }
+            Origin::Graph(graph) => {
+                if let Some(index) = graph_named(graph) {
+                    self.show_graph(index);
+                }
+            }
+            Origin::Class | Origin::Variable(_) => self.canvas.selected = None,
+        }
+    }
+
+    fn show_graph(&mut self, index: usize) {
+        if index != self.graph {
+            self.graph = index;
+            self.canvas.show_other_graph();
+        }
+        self.canvas.selected = None;
+    }
+
+    /// How «Compilar» names its file.
+    fn problem_file(&self) -> String {
+        format!("{ASSETS_DIRECTORY}/{}", self.path)
+    }
+
+    /// The `problems` of the last «Compilar» in this blueprint.
+    fn own_problems<'problems>(
+        &self,
+        problems: &'problems [Problem],
+    ) -> impl Iterator<Item = &'problems Problem> {
+        let file = self.problem_file();
+        problems.iter().filter(move |problem| problem.file == file)
+    }
+
+    /// The tab: its class, the graph shown and the mistakes of the last
+    /// «Compilar» (`problems`) that are not on a node of it.
+    pub(crate) fn show(&mut self, ui: &mut egui::Ui, problems: &[Problem]) {
+        let own_problems: Vec<&Problem> = self.own_problems(problems).collect();
         let blueprint = match &mut self.content {
             Ok(blueprint) => blueprint,
             Err(error) => {
@@ -116,17 +174,36 @@ impl BlueprintTab {
         }
         ui.horizontal(|ui| {
             ui.strong(texts::class_heading(blueprint));
+            ui.separator();
             if !blueprint.graphs.is_empty() {
-                ui.separator();
                 show_graph_selector(ui, blueprint, &mut self.graph, &mut self.canvas);
-                ui.separator();
-                ui.weak(texts::CANVAS_CONTROLS);
             }
+            if show_graphs_menu(ui, blueprint, &mut self.graph, &mut self.canvas) {
+                self.unsaved = true;
+            }
+            ui.separator();
+            ui.weak(texts::CANVAS_CONTROLS);
         });
+        let current_graph = blueprint
+            .graphs
+            .get(self.graph)
+            .map(|graph| graph.name.clone());
+        let mut mistakes = NodeMistakes::new();
+        for problem in own_problems {
+            match &problem.origin {
+                Some(Origin::Node { graph, node }) if Some(graph) == current_graph.as_ref() => {
+                    mistakes.entry(*node).or_default().push(&problem.message);
+                }
+                Some(Origin::Node { .. }) => {}
+                _ => {
+                    ui.colored_label(ERROR_COLOR, &problem.message);
+                }
+            }
+        }
         let names = BlueprintNames::of(blueprint);
         match blueprint.graphs.get_mut(self.graph) {
             Some(graph) => {
-                self.unsaved |= canvas::show_graph(ui, graph, &mut self.canvas, &names);
+                self.unsaved |= canvas::show_graph(ui, graph, &mut self.canvas, &names, &mistakes);
             }
             None => {
                 ui.weak(texts::NO_GRAPHS);
@@ -135,19 +212,35 @@ impl BlueprintTab {
     }
 
     /// The inspector while this tab is shown: the selected node's
-    /// properties.
-    pub(crate) fn show_inspector(&mut self, ui: &mut egui::Ui) {
+    /// properties and mistakes, or the class's and the graph's.
+    pub(crate) fn show_inspector(&mut self, ui: &mut egui::Ui, problems: &[Problem]) {
+        let own_problems: Vec<&Problem> = self.own_problems(problems).collect();
         let Ok(blueprint) = &mut self.content else {
             return;
         };
         let names = BlueprintNames::of(blueprint);
-        let selected = self.canvas.selected;
-        match (blueprint.graphs.get_mut(self.graph), selected) {
-            (Some(graph), Some(id)) => {
-                self.unsaved |= properties::show_node_properties(ui, graph, id, &names);
+        let current_graph = blueprint
+            .graphs
+            .get(self.graph)
+            .map(|graph| graph.name.clone());
+        match (self.canvas.selected, current_graph) {
+            (Some(id), Some(graph_name)) => {
+                for problem in &own_problems {
+                    if problem.origin.as_ref()
+                        == Some(&Origin::Node {
+                            graph: graph_name.clone(),
+                            node: id,
+                        })
+                    {
+                        ui.colored_label(ERROR_COLOR, &problem.message);
+                    }
+                }
+                if let Some(graph) = blueprint.graphs.get_mut(self.graph) {
+                    self.unsaved |= properties::show_node_properties(ui, graph, id, &names);
+                }
             }
             _ => {
-                ui.weak(texts::SELECT_A_NODE);
+                self.unsaved |= class_properties::show_class_properties(ui, blueprint, self.graph);
             }
         }
     }
@@ -177,6 +270,42 @@ fn show_graph_selector(
                 }
             }
         });
+}
+
+/// «Nuevo gráfico» and «Borrar este gráfico». Returns whether the
+/// blueprint changed.
+fn show_graphs_menu(
+    ui: &mut egui::Ui,
+    blueprint: &mut Blueprint,
+    selected: &mut usize,
+    canvas: &mut CanvasState,
+) -> bool {
+    let mut changed = false;
+    ui.menu_button(texts::GRAPHS_MENU, |ui| {
+        if ui.button(texts::NEW_GRAPH).clicked() {
+            let taken: Vec<&str> = blueprint
+                .graphs
+                .iter()
+                .map(|graph| graph.name.as_str())
+                .collect();
+            let name = edit::unused_name(NEW_GRAPH_PREFIX, &taken);
+            blueprint.graphs.push(edit::new_graph(name));
+            *selected = blueprint.graphs.len() - 1;
+            canvas.show_other_graph();
+            changed = true;
+        }
+        let can_delete = *selected < blueprint.graphs.len();
+        if ui
+            .add_enabled(can_delete, egui::Button::new(texts::DELETE_GRAPH))
+            .clicked()
+        {
+            blueprint.graphs.remove(*selected);
+            *selected = selected.saturating_sub(1);
+            canvas.show_other_graph();
+            changed = true;
+        }
+    });
+    changed
 }
 
 #[cfg(test)]

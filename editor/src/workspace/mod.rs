@@ -20,7 +20,8 @@ use self::menu_bar::{MenuAction, SAVE_SHORTCUT, show_menu_bar};
 use self::problems_panel::ProblemsPanel;
 use self::unsaved_dialog::{UnsavedChoice, show_unsaved_dialog};
 use self::viewport::SceneViewport;
-use crate::project::Project;
+use crate::project::{ASSETS_DIRECTORY, Project};
+use crate::project_check::Problem;
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -139,7 +140,7 @@ impl EditorWindow {
                 ActiveDocument::Blueprint(tab) => {
                     ui.strong(texts::INSPECTOR);
                     ui.separator();
-                    tab.show_inspector(ui);
+                    tab.show_inspector(ui, self.problems.problems());
                 }
             });
         egui::Panel::bottom("bottom_panel")
@@ -232,7 +233,7 @@ impl EditorWindow {
                     ui.colored_label(ERROR_COLOR, texts::viewport_error(error));
                 }
             },
-            ActiveDocument::Blueprint(tab) => tab.show(ui),
+            ActiveDocument::Blueprint(tab) => tab.show(ui, self.problems.problems()),
         }
     }
 
@@ -252,7 +253,29 @@ impl EditorWindow {
                     self.documents.open_blueprint(self.assets.directory(), path);
                 }
             }
-            BottomTab::Problems => self.problems.show(ui),
+            BottomTab::Problems => {
+                if let Some(problem) = self.problems.show(ui) {
+                    self.show_problem_in_blueprint(&problem);
+                }
+            }
+        }
+    }
+
+    /// Opens the blueprint of `problem` where the problem is.
+    fn show_problem_in_blueprint(&mut self, problem: &Problem) {
+        let (Some(origin), Some(path)) = (
+            &problem.origin,
+            problem
+                .file
+                .strip_prefix(ASSETS_DIRECTORY)
+                .and_then(|path| path.strip_prefix('/')),
+        ) else {
+            return;
+        };
+        self.documents
+            .open_blueprint(self.assets.directory(), path.to_owned());
+        if let ActiveDocument::Blueprint(tab) = self.documents.active() {
+            tab.reveal(origin);
         }
     }
 

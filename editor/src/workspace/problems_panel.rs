@@ -99,7 +99,18 @@ impl ProblemsPanel {
         }
     }
 
-    pub(crate) fn show(&self, ui: &mut egui::Ui) {
+    /// What the last check found; nothing if none finished.
+    pub(crate) fn problems(&self) -> &[Problem] {
+        match &self.state {
+            CompileState::Finished(check) => &check.problems,
+            _ => &[],
+        }
+    }
+
+    /// Lists the problems. Returns the one in a blueprint the user clicked,
+    /// to show it there.
+    pub(crate) fn show(&self, ui: &mut egui::Ui) -> Option<Problem> {
+        let mut clicked = None;
         egui::ScrollArea::vertical()
             .auto_shrink(false)
             .show(ui, |ui| match &self.state {
@@ -117,24 +128,39 @@ impl ProblemsPanel {
                 }
                 CompileState::Finished(check) => {
                     for problem in &check.problems {
-                        show_problem(ui, problem);
+                        if show_problem(ui, problem) {
+                            clicked = Some(problem.clone());
+                        }
                     }
                 }
                 CompileState::Failed(reason) => {
                     ui.colored_label(ERROR_COLOR, reason);
                 }
             });
+        clicked
     }
 }
 
-fn show_problem(ui: &mut egui::Ui, problem: &Problem) {
+/// One problem; the place of those in blueprints can be clicked. Returns
+/// whether it was.
+fn show_problem(ui: &mut egui::Ui, problem: &Problem) -> bool {
     let place = problem.position.map_or_else(
         || problem.file.clone(),
         |position| format!("{}:{}:{}", problem.file, position.line, position.column),
     );
     ui.horizontal_wrapped(|ui| {
-        ui.colored_label(ERROR_COLOR, egui::RichText::new(place).monospace());
+        let place = egui::RichText::new(place).monospace().color(ERROR_COLOR);
+        let clicked = if problem.origin.is_some() {
+            ui.add(egui::Link::new(place))
+                .on_hover_text(texts::SHOW_IN_BLUEPRINT)
+                .clicked()
+        } else {
+            ui.label(place);
+            false
+        };
         ui.add_space(PLACE_SPACING);
         ui.label(&problem.message);
-    });
+        clicked
+    })
+    .inner
 }

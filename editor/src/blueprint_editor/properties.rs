@@ -5,12 +5,11 @@ use eframe::egui;
 use star_blueprint::{Call, CallTarget, Graph, Literal, NodeId, NodeKind, Operator};
 
 use super::edit;
-use super::names::{BlueprintNames, LiteralKind};
+use super::literal_field::literal_field;
+use super::names::BlueprintNames;
 use crate::texts;
 
 const PROPERTY_SPACING: [f32; 2] = [12.0, 8.0];
-/// How much a decimal changes per point dragged.
-const DECIMAL_DRAG_SPEED: f64 = 0.1;
 /// The first name `+` gives to an argument is `arg1`, then `arg2`…
 const NEW_ARGUMENT_PREFIX: &str = "arg";
 
@@ -33,7 +32,7 @@ pub(super) fn show_node_properties(
         .num_columns(2)
         .spacing(PROPERTY_SPACING)
         .show(ui, |ui| match &mut node.kind {
-            NodeKind::Literal { value } => literal_fields(ui, value),
+            NodeKind::Literal { value } => literal_row(ui, value),
             NodeKind::GetVariable { variable } | NodeKind::SetVariable { variable } => {
                 variable_field(ui, variable, names)
             }
@@ -54,31 +53,11 @@ pub(super) fn show_node_properties(
     changed
 }
 
-fn literal_fields(ui: &mut egui::Ui, value: &mut Literal) -> bool {
-    ui.weak(texts::LITERAL_KIND);
-    let current = LiteralKind::of(value);
-    let mut kind = current;
-    egui::ComboBox::from_id_salt("literal_kind")
-        .selected_text(kind.name())
-        .show_ui(ui, |ui| {
-            for option in LiteralKind::ALL {
-                ui.selectable_value(&mut kind, option, option.name());
-            }
-        });
-    ui.end_row();
-    if kind != current {
-        *value = kind.default_value();
-        return true;
-    }
+fn literal_row(ui: &mut egui::Ui, value: &mut Literal) -> bool {
     ui.weak(texts::LITERAL_VALUE);
-    let response = match value {
-        Literal::Bool(value) => ui.checkbox(value, ""),
-        Literal::Int(value) => ui.add(egui::DragValue::new(value)),
-        Literal::Float(value) => ui.add(egui::DragValue::new(value).speed(DECIMAL_DRAG_SPEED)),
-        Literal::String(text) => ui.text_edit_singleline(text),
-    };
+    let changed = literal_field(ui, "node_literal", value);
     ui.end_row();
-    response.changed()
+    changed
 }
 
 /// The variable's name, typed or picked from the blueprint's.
@@ -186,7 +165,8 @@ fn arguments_field(
             .on_hover_text(texts::ADD_ARGUMENT)
             .clicked()
         {
-            let name = new_argument_name(arguments);
+            let taken: Vec<&str> = arguments.iter().map(String::as_str).collect();
+            let name = edit::unused_name(NEW_ARGUMENT_PREFIX, &taken);
             arguments.push(name);
             changed = true;
         }
@@ -196,15 +176,6 @@ fn arguments_field(
         changed = true;
     }
     changed
-}
-
-/// `arg1`, or the first `argN` no argument has. Among one more number than
-/// there are arguments, one is always free.
-fn new_argument_name(arguments: &[String]) -> String {
-    (1..=arguments.len() + 1)
-        .map(|number| format!("{NEW_ARGUMENT_PREFIX}{number}"))
-        .find(|name| !arguments.contains(name))
-        .unwrap_or_default()
 }
 
 fn operator_field(ui: &mut egui::Ui, operator: &mut Operator) -> bool {
@@ -221,18 +192,4 @@ fn operator_field(ui: &mut egui::Ui, operator: &mut Operator) -> bool {
         });
     ui.end_row();
     changed
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn new_arguments_get_a_name_no_other_has() {
-        assert_eq!(new_argument_name(&[]), "arg1");
-        assert_eq!(
-            new_argument_name(&["arg1".to_owned(), "arg3".to_owned()]),
-            "arg2"
-        );
-    }
 }

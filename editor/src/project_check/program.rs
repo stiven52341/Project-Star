@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use star_blueprint::{Blueprint, Translation, translate};
+use star_blueprint::{Blueprint, BlueprintError, Origin, Translation, translate};
 use star_script::{CompileError, SourceSet};
 
 use super::Problem;
@@ -63,7 +63,10 @@ impl Program {
                 self.incomplete = true;
                 errors
                     .iter()
-                    .map(|error| Problem::in_file(name.clone(), error.to_string()))
+                    .map(|error| {
+                        Problem::in_file(name.clone(), error.to_string())
+                            .placed_on(error_origin(error))
+                    })
                     .collect()
             }
         }
@@ -78,13 +81,23 @@ impl Program {
         };
         match self.translations.get(location.file) {
             Some(translation) => {
-                let message = match translation.origin(location.offset) {
+                let origin = translation.origin(location.offset);
+                let message = match origin {
                     Some(origin) => format!("{origin}: {message}"),
                     None => message,
                 };
-                Problem::in_file(location.file, message)
+                Problem::in_file(location.file, message).placed_on(origin.cloned())
             }
             None => Problem::at(location.file, location.position, message),
         }
     }
+}
+
+/// The part of its blueprint a broken rule is in.
+fn error_origin(error: &BlueprintError) -> Option<Origin> {
+    let graph = error.graph.clone()?;
+    Some(match error.node {
+        Some(node) => Origin::Node { graph, node },
+        None => Origin::Graph(graph),
+    })
 }

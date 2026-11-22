@@ -7,6 +7,7 @@ use star_blueprint::{
     LEFT, Literal, NodeKind, Operator, RESULT, RIGHT, TARGET, VALUE,
 };
 
+use crate::blueprint_editor::NewBlueprintError;
 use crate::project::{
     CreateProjectError, OpenProjectError, ProjectDimension, ProjectNameError, ProjectSettingsError,
 };
@@ -88,7 +89,6 @@ pub(crate) const DISCARD_CHANGES: &str = "No guardar";
 pub(crate) const CANCEL: &str = "Cancelar";
 
 // Blueprint editor.
-pub(crate) const SELECT_A_NODE: &str = "Selecciona un nodo para ver sus propiedades.";
 pub(crate) const ADD_NODE: &str = "Añadir nodo";
 pub(crate) const MENU_VALUE: &str = "Valor";
 pub(crate) const MENU_GET_VARIABLE: &str = "Leer variable";
@@ -108,7 +108,6 @@ pub(crate) const BOOL_KIND: &str = "Booleano";
 pub(crate) const INT_KIND: &str = "Entero";
 pub(crate) const FLOAT_KIND: &str = "Decimal";
 pub(crate) const STRING_KIND: &str = "Texto";
-pub(crate) const LITERAL_KIND: &str = "Tipo";
 pub(crate) const LITERAL_VALUE: &str = "Valor";
 pub(crate) const VARIABLE: &str = "Variable";
 pub(crate) const CALL_TARGET: &str = "Llama a";
@@ -122,6 +121,31 @@ pub(crate) const PURE_CALL: &str = "Pura";
 pub(crate) const PURE_CALL_HINT: &str =
     "Solo calcula un valor: no tiene pines de ejecución y se ejecuta donde se usa su resultado.";
 pub(crate) const ENTRY_HINT: &str = "Da los parámetros del método.";
+pub(crate) const GRAPHS_MENU: &str = "Gráficos";
+pub(crate) const NEW_GRAPH: &str = "Nuevo gráfico";
+pub(crate) const DELETE_GRAPH: &str = "Borrar este gráfico";
+pub(crate) const VARIABLES: &str = "Variables";
+pub(crate) const NAME: &str = "Nombre";
+pub(crate) const EXTENDS: &str = "Extiende";
+pub(crate) const BASE_ARGUMENTS: &str = "Argumentos de la base";
+pub(crate) const BASE_ARGUMENTS_HINT: &str = "Los valores que recibe el init de la clase base: un Node, su nombre; un Sprite, también su imagen.";
+pub(crate) const TYPE: &str = "Tipo";
+pub(crate) const VARIABLE_TYPE_HINT: &str =
+    "Tipo de StarScript (float, int, [int], Node?…). Vacío: el del valor inicial.";
+pub(crate) const DEFAULT_VALUE: &str = "Valor inicial";
+pub(crate) const PRIVATE: &str = "Privado";
+pub(crate) const ADD_VARIABLE: &str = "Añadir variable";
+pub(crate) const REMOVE_VARIABLE: &str = "Quitar variable";
+pub(crate) const PARAMETERS: &str = "Parámetros";
+pub(crate) const ADD_PARAMETER: &str = "Añadir parámetro";
+pub(crate) const RETURNS: &str = "Devuelve";
+pub(crate) const OVERRIDE: &str = "Redefine";
+pub(crate) const OVERRIDE_HINT: &str =
+    "Redefine un método de la clase base, como los eventos start y update.";
+pub(crate) const NEW_BLUEPRINT: &str = "Nuevo blueprint…";
+pub(crate) const CLASS_NAME_HINT: &str = "Nombre de la clase";
+pub(crate) const CREATE: &str = "Crear";
+pub(crate) const SHOW_IN_BLUEPRINT: &str = "Mostrar en el blueprint";
 pub(crate) const NO_GRAPHS: &str = "El blueprint no tiene gráficos.";
 pub(crate) const CANVAS_CONTROLS: &str =
     "Arrastra el fondo para desplazar · Rueda para acercar o alejar";
@@ -144,6 +168,16 @@ pub(crate) fn viewport_error(error: &str) -> String {
 
 pub(crate) fn blueprint_unreadable(reason: &str) -> String {
     format!("No se pudo abrir el blueprint: {reason}")
+}
+
+pub(crate) fn new_blueprint_error(error: &NewBlueprintError) -> String {
+    match error {
+        NewBlueprintError::InvalidName => {
+            "El nombre debe empezar por una letra o _ y tener solo letras, números y _.".to_owned()
+        }
+        NewBlueprintError::AlreadyExists(path) => format!("Ya existe {path}."),
+        NewBlueprintError::Io(error) => format!("No se pudo crear el blueprint: {error}"),
+    }
 }
 
 pub(crate) fn blueprint_not_saved(reason: &str) -> String {

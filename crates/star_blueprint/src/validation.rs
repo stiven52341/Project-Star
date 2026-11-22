@@ -144,13 +144,13 @@ fn class_error(kind: BlueprintErrorKind) -> BlueprintError {
 
 fn check_class(blueprint: &Blueprint, errors: &mut Vec<BlueprintError>) {
     let names = std::iter::once(&blueprint.class).chain(&blueprint.extends);
-    for name in names.filter(|name| !is_identifier(name)) {
+    for name in names.filter(|name| !is_valid_name(name)) {
         errors.push(class_error(BlueprintErrorKind::InvalidName(name.clone())));
     }
     let mut variables = HashSet::new();
     for variable in &blueprint.variables {
         let name = &variable.name;
-        if !is_identifier(name) {
+        if !is_valid_name(name) {
             errors.push(class_error(BlueprintErrorKind::InvalidName(name.clone())));
         }
         if !variables.insert(name) {
@@ -203,7 +203,7 @@ impl<'check> GraphCheck<'check> {
     }
 
     fn check_signature(&mut self) {
-        if !is_identifier(&self.graph.name) {
+        if !is_valid_name(&self.graph.name) {
             self.error(
                 None,
                 BlueprintErrorKind::InvalidName(self.graph.name.clone()),
@@ -215,7 +215,7 @@ impl<'check> GraphCheck<'check> {
 
     /// `names` are valid StarScript names.
     fn check_names(&mut self, node: Option<NodeId>, names: &[&String]) {
-        for name in names.iter().filter(|name| !is_identifier(name)) {
+        for name in names.iter().filter(|name| !is_valid_name(name)) {
             self.error(node, BlueprintErrorKind::InvalidName((*name).clone()));
         }
     }
@@ -426,7 +426,10 @@ fn visit_inputs(
 
 /// Whether StarScript accepts `name` as a name: an ASCII letter or `_`,
 /// then letters, digits or `_`. Keywords are left to the compiler.
-fn is_identifier(name: &str) -> bool {
+/// Whether StarScript accepts `name` for a class, variable, method,
+/// parameter or argument: a letter or `_`, then letters, digits or `_`.
+#[must_use]
+pub fn is_valid_name(name: &str) -> bool {
     let mut characters = name.chars();
     characters
         .next()

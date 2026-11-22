@@ -1,5 +1,7 @@
 use std::fs;
 
+use star_blueprint::{NodeId, Origin};
+
 use super::*;
 use crate::project::TestDirectory;
 
@@ -216,6 +218,13 @@ fn compiler_mistakes_in_blueprints_name_their_node() {
         messages[0].starts_with("assets/rock.blueprint: graph `update`, node 3: "),
         "{messages:?}"
     );
+    assert_eq!(
+        check.problems[0].origin,
+        Some(Origin::Node {
+            graph: "update".to_owned(),
+            node: NodeId(3),
+        })
+    );
 }
 
 #[test]
@@ -238,6 +247,14 @@ fn broken_blueprints_are_reported_alone() {
             .problems
             .iter()
             .all(|problem| problem.file == "assets/rock.blueprint"),
+        "{:?}",
+        messages(&check)
+    );
+    assert!(
+        check
+            .problems
+            .iter()
+            .any(|problem| matches!(problem.origin, Some(Origin::Node { .. }))),
         "{:?}",
         messages(&check)
     );

@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+use star_blueprint::Origin;
 use star_script::Position;
 
 /// A mistake, and the file (and place in it, when known) where it is.
@@ -13,6 +14,8 @@ pub(crate) struct Problem {
     pub(crate) position: Option<Position>,
     /// What is wrong.
     pub(crate) message: String,
+    /// For mistakes in blueprints, the part of the blueprint they are in.
+    pub(crate) origin: Option<Origin>,
 }
 
 impl Problem {
@@ -22,6 +25,7 @@ impl Problem {
             file: file.into(),
             position: Some(position),
             message,
+            origin: None,
         }
     }
 
@@ -31,7 +35,14 @@ impl Problem {
             file: file.into(),
             position: None,
             message,
+            origin: None,
         }
+    }
+
+    /// The same mistake, placed on `origin` of its blueprint.
+    pub(crate) fn placed_on(mut self, origin: Option<Origin>) -> Self {
+        self.origin = origin;
+        self
     }
 }
 

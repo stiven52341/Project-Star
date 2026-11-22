@@ -9,6 +9,7 @@ use star_blueprint::{Direction, Link, Node, NodeId, NodeKind, PinKind};
 
 use super::layout::{HEADER_HEIGHT, NodeLayout, PlacedPin};
 use super::view::CanvasView;
+use crate::style::ERROR_COLOR;
 use crate::texts;
 
 const BACKGROUND: Color32 = Color32::from_rgb(30, 30, 34);
@@ -46,8 +47,8 @@ const WIRE_WIDTH: f32 = 2.5;
 /// zoom 1.
 const MIN_WIRE_BEND: f32 = 40.0;
 const SELECTED_BORDER: Color32 = Color32::from_rgb(240, 190, 80);
-/// Width of the border of the selected node.
-const SELECTED_BORDER_WIDTH: f32 = 2.0;
+/// Width of the border of the selected node, and of nodes with mistakes.
+const MARKED_BORDER_WIDTH: f32 = 2.0;
 
 /// What a frame of the canvas is drawn with.
 pub(super) struct Painting {
@@ -129,7 +130,14 @@ impl Painting {
             ));
     }
 
-    pub(super) fn paint_node(&self, node: &Node, layout: &NodeLayout, selected: bool) {
+    /// Draws `node`; its border says if it is `selected` or `has_mistakes`.
+    pub(super) fn paint_node(
+        &self,
+        node: &Node,
+        layout: &NodeLayout,
+        selected: bool,
+        has_mistakes: bool,
+    ) {
         let rect = self.view.rect_to_screen(self.rect.min, layout.rect);
         self.painter
             .rect_filled(rect, CornerRadius::same(NODE_ROUNDING), NODE_BODY);
@@ -146,7 +154,9 @@ impl Painting {
             rect,
             CornerRadius::same(NODE_ROUNDING),
             if selected {
-                Stroke::new(SELECTED_BORDER_WIDTH, SELECTED_BORDER)
+                Stroke::new(MARKED_BORDER_WIDTH, SELECTED_BORDER)
+            } else if has_mistakes {
+                Stroke::new(MARKED_BORDER_WIDTH, ERROR_COLOR)
             } else {
                 Stroke::new(1.0, NODE_BORDER)
             },
