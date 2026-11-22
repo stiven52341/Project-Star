@@ -11,6 +11,7 @@ repository.workspace = true
 [dependencies]
 star_core.workspace = true
 star_ecs.workspace = true
+star_math.workspace = true
 
 [lints]
 workspace = true

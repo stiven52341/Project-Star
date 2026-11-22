@@ -10,10 +10,10 @@ pub use star_input::{
     ActionMap, Actions, Binding, Gamepad, GamepadAxis, GamepadButton, GamepadId, Gamepads, Input,
     Key, Keyboard, Mouse, MouseButton, Touch, TouchId, Touches,
 };
-pub use star_math::{Mat4, Vec2, Vec3};
+pub use star_math::{Affine2, Mat4, Vec2, Vec3};
 pub use star_platform::TargetPlatform;
 pub use star_render::{
     Camera, Color, Frame, GraphicsBackend, Image, MeshId, Projection, Sprite, TextureFilter,
     TextureId, TextureRegion, Vertex,
 };
-pub use star_scene::{Children, Hierarchy, Name, Parent};
+pub use star_scene::{Children, GlobalTransform2D, Hierarchy, Name, Parent, Transform2D};

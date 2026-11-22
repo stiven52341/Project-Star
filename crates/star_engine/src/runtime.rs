@@ -7,6 +7,7 @@ use star_ecs::{Schedule, Stage, World};
 use star_input::Input;
 use star_platform::{InputEvent, Window, WindowEventHandler, WindowSize};
 use star_render::{Color, Frame, Renderer, RendererConfig};
+use star_scene::TransformPropagation;
 
 use crate::EngineWorld as _;
 use crate::game::{Game, GameContext};
@@ -22,6 +23,7 @@ pub(crate) struct Runtime<G: Game> {
     /// Holds the game's entities and the engine's resources: [`Time`] and [`Input`].
     world: World,
     schedule: Schedule,
+    transforms: TransformPropagation,
     assets: GameAssets,
     last_frame_start: Option<Instant>,
 }
@@ -46,6 +48,7 @@ impl<G: Game> Runtime<G> {
             frame: Frame::new(),
             world,
             schedule,
+            transforms: TransformPropagation::new(),
             assets,
             last_frame_start: None,
         }
@@ -70,13 +73,15 @@ impl<G: Game> Runtime<G> {
     }
 
     /// One step of the simulation: the systems by stage, with the game's
-    /// update right after the first stage.
+    /// update right after the first stage, and then the global transforms
+    /// of the nodes, ready to draw.
     fn simulate(&mut self) -> EngineResult<()> {
         self.schedule.run_stage(Stage::First, &mut self.world)?;
         self.game.update(&mut self.world);
         for stage in [Stage::Update, Stage::Physics, Stage::Last] {
             self.schedule.run_stage(stage, &mut self.world)?;
         }
+        self.transforms.run(&mut self.world)?;
         if let Some(mut input) = self.world.resource_mut::<Input>() {
             input.end_frame();
         }
@@ -138,6 +143,8 @@ mod tests {
     use star_assets::AssetFolder;
     use star_core::EngineError;
     use star_input::{ActionMap, ButtonState, Key};
+    use star_math::Vec2;
+    use star_scene::{GlobalTransform2D, Hierarchy, Transform2D};
 
     use super::*;
     use crate::game::EmptyGame;
@@ -247,6 +254,22 @@ mod tests {
 
         let log = runtime.world.resource::<Log>().unwrap();
         assert_eq!(log.0, ["first", "game", "update", "last"]);
+    }
+
+    #[test]
+    fn global_transforms_are_ready_after_the_systems_moved_the_nodes() {
+        let mut schedule = Schedule::new();
+        schedule.add_system(Stage::Last, |world| {
+            world.each::<&mut Transform2D>(|_, transform| transform.position.x += 1.0)
+        });
+        let mut runtime = runtime(EmptyGame, Input::new(), schedule);
+        let hero = runtime.world.spawn_node("Hero", None).unwrap();
+        runtime.world.insert(hero, Transform2D::IDENTITY).unwrap();
+
+        runtime.simulate().unwrap();
+
+        let global = *runtime.world.get::<GlobalTransform2D>(hero).unwrap();
+        assert_eq!(global.position(), Vec2::new(1.0, 0.0));
     }
 
     #[test]

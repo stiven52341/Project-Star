@@ -2664,6 +2664,7 @@ version = "0.1.0"
 dependencies = [
  "star_core",
  "star_ecs",
+ "star_math",
 ]
 
 [[package]]
