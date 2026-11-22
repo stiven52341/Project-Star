@@ -12,7 +12,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
 - [ ] **Phase 2 — Input**:
   - [x] 2a Keyboard (physical keys) and mouse (buttons, cursor, wheel), with
         per-frame state; `Game::update` receives the `Input`.
-  - [ ] 2b Action map (`"jump"` → key, button or touch), the API games use.
+  - [x] 2b Action map (`"jump"` → keys and mouse buttons), the API games use;
+        `App::with_actions`. Touch and gamepad bindings come with 2c and 2d.
   - [ ] 2c Touch screens.
   - [ ] 2d Gamepads.
 - [ ] **Phase 3 — 2D rendering**:

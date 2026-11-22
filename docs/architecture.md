@@ -64,6 +64,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 19 | StarScript objects with **reference counting** (`Rc`) and an own runtime | Automatic release and accesses that never fail, without a global store or checks on every field (rejected alternative: generational handles, slower and with accesses that can fail). Inheritance through traits that extend each other; two-phase construction through a function that creates the object. Errors that only appear while playing (index out of range, division by zero) stop the game with a clear message, from a single point: `star_script_runtime::fault` (exception to decision 4). See `docs/starscript.md`, section 4 |
 | 20 | StarScript games **extend the engine class `Game`** | The engine calls `start` and `update(delta)` through a generated adapter that implements the `Game` trait of `star_engine`; `quit()` sets an internal field that the loop checks (`Game::is_finished`). Only games depend on `star_engine`: console programs (`static func main()`) still do not depend on wgpu. The StarScript API for input and nodes will be made together with phases 2 and 6, so it is not invented twice |
 | 21 | Raw input events defined in `star_platform`, input state in `star_input` | `star_platform` (layer 1) is the only crate that knows winit, so it translates OS events into its own vocabulary (`InputEvent`, `Key`, `MouseButton`); `star_input` (layer 2) builds the per-frame state from them, without knowing winit. Keys are identified by their **physical position** (US QWERTY names), so WASD works on any layout. State lives in fixed-size arrays: updating it never allocates in the game loop |
+| 22 | Actions **identified by name** (`"jump"`) | It is what StarScript and the editor will use (names in project settings and scripts), and the lookup does not allocate. Action names are unique and non-empty, checked when the `ActionMap` is built (`EngineError::Input`). Rejected for now: typed action ids, which would add a second way to do the same thing |
 
 ## Input
 
@@ -80,8 +81,13 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input �
   every key and button is released, so none stays "stuck".
 - The cursor is in physical pixels from the top-left corner (`None` outside
   the window); the wheel is in lines (touchpad pixels are converted).
-- Raw keyboard and mouse are the base layer: games will normally use the
-  action map (step 2b), which also covers touch and gamepads.
+- Raw keyboard and mouse are the base layer: games normally use **actions**.
+  An `ActionMap` (given to `App::with_actions`) binds each action name to
+  one or more `Binding`s (a key or a mouse button; touch and gamepads will be
+  added as new kinds). An action is held while **any** of its bindings is
+  held: it keeps a count of held bindings, so pressing a second binding of a
+  held action is not a new press. Actions are asked for by name
+  (`input.actions().just_pressed("jump")`); an unknown name answers `false`.
 
 ## Rendering
 

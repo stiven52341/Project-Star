@@ -9,6 +9,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+star_core.workspace = true
 star_math.workspace = true
 star_platform.workspace = true
 

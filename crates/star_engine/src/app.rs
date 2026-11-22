@@ -1,6 +1,7 @@
 //! Application builder: the starting point of every game.
 
 use star_core::{EngineError, EngineResult};
+use star_input::{ActionMap, Input};
 use star_platform::{TargetPlatform, WindowConfig, WindowSize, run_event_loop};
 use star_render::{Color, GraphicsBackend, RendererConfig};
 
@@ -14,6 +15,7 @@ pub struct App {
     window_config: WindowConfig,
     renderer_config: RendererConfig,
     clear_color: Color,
+    actions: ActionMap,
     platform: TargetPlatform,
 }
 
@@ -25,6 +27,7 @@ impl App {
             window_config: WindowConfig::default(),
             renderer_config: RendererConfig::default(),
             clear_color: Color::BLACK,
+            actions: ActionMap::new(),
             platform: TargetPlatform::current(),
         }
     }
@@ -61,6 +64,13 @@ impl App {
     #[must_use]
     pub fn with_clear_color(mut self, color: Color) -> Self {
         self.clear_color = color;
+        self
+    }
+
+    /// Sets the actions the game asks for, e.g. `"jump"`, and their bindings.
+    #[must_use]
+    pub fn with_actions(mut self, actions: ActionMap) -> Self {
+        self.actions = actions;
         self
     }
 
@@ -102,7 +112,8 @@ impl App {
         if !self.platform.is_supported() {
             return Err(EngineError::UnsupportedPlatform(self.platform.to_string()));
         }
-        let mut runtime = Runtime::new(game, self.renderer_config, self.clear_color);
+        let input = Input::with_actions(self.actions);
+        let mut runtime = Runtime::new(game, self.renderer_config, self.clear_color, input);
         run_event_loop(self.window_config, &mut runtime)
     }
 }

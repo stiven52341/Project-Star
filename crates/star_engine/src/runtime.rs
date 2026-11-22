@@ -22,7 +22,12 @@ pub(crate) struct Runtime<G: Game> {
 }
 
 impl<G: Game> Runtime<G> {
-    pub(crate) fn new(game: G, renderer_config: RendererConfig, clear_color: Color) -> Self {
+    pub(crate) fn new(
+        game: G,
+        renderer_config: RendererConfig,
+        clear_color: Color,
+        input: Input,
+    ) -> Self {
         Self {
             game,
             renderer_config,
@@ -30,7 +35,7 @@ impl<G: Game> Runtime<G> {
             renderer: None,
             frame: Frame::new(),
             time: Time::new(),
-            input: Input::new(),
+            input,
             last_frame_start: None,
         }
     }
@@ -91,6 +96,7 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::EmptyGame;
 
     /// A game that has already finished.
     struct FinishedGame;
@@ -105,16 +111,20 @@ mod tests {
     fn the_loop_stops_when_the_game_finishes() {
         let config = RendererConfig::default();
 
-        assert!(Runtime::new(FinishedGame, config, Color::BLACK).should_exit());
-        assert!(!Runtime::new(crate::game::EmptyGame, config, Color::BLACK).should_exit());
+        let finished = Runtime::new(FinishedGame, config, Color::BLACK, Input::new());
+        let running = Runtime::new(EmptyGame, config, Color::BLACK, Input::new());
+
+        assert!(finished.should_exit());
+        assert!(!running.should_exit());
     }
 
     #[test]
     fn input_events_update_the_input_given_to_the_game() {
         let mut runtime = Runtime::new(
-            crate::game::EmptyGame,
+            EmptyGame,
             RendererConfig::default(),
             Color::BLACK,
+            Input::new(),
         );
 
         runtime.on_input(InputEvent::Key {
@@ -123,5 +133,22 @@ mod tests {
         });
 
         assert!(runtime.input.keyboard().is_down(star_input::Key::Space));
+    }
+
+    #[test]
+    fn input_events_reach_the_game_actions() {
+        let mut actions = star_input::ActionMap::new();
+        actions
+            .add("jump", &[star_input::Key::Space.into()])
+            .unwrap();
+        let input = Input::with_actions(actions);
+        let mut runtime = Runtime::new(EmptyGame, RendererConfig::default(), Color::BLACK, input);
+
+        runtime.on_input(InputEvent::Key {
+            key: star_input::Key::Space,
+            state: star_input::ButtonState::Pressed,
+        });
+
+        assert!(runtime.input.actions().just_pressed("jump"));
     }
 }

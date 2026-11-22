@@ -22,22 +22,23 @@ impl Keyboard {
     /// Whether `key` is held.
     #[must_use]
     pub const fn is_down(&self, key: Key) -> bool {
-        self.keys.is_down(key.index())
+        self.keys.get(key.index()).is_down()
     }
 
     /// Whether `key` went down during the current frame.
     #[must_use]
     pub const fn just_pressed(&self, key: Key) -> bool {
-        self.keys.just_pressed(key.index())
+        self.keys.get(key.index()).just_pressed()
     }
 
     /// Whether `key` went up during the current frame.
     #[must_use]
     pub const fn just_released(&self, key: Key) -> bool {
-        self.keys.just_released(key.index())
+        self.keys.get(key.index()).just_released()
     }
 
-    pub(crate) fn set(&mut self, key: Key, state: ButtonState) {
+    /// Returns whether the key actually changed (it was not already in `state`).
+    pub(crate) fn set(&mut self, key: Key, state: ButtonState) -> bool {
         match state {
             ButtonState::Pressed => self.keys.press(key.index()),
             ButtonState::Released => self.keys.release(key.index()),

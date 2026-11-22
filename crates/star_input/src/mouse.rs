@@ -27,19 +27,19 @@ impl Mouse {
     /// Whether `button` is held.
     #[must_use]
     pub const fn is_down(&self, button: MouseButton) -> bool {
-        self.buttons.is_down(button.index())
+        self.buttons.get(button.index()).is_down()
     }
 
     /// Whether `button` went down during the current frame.
     #[must_use]
     pub const fn just_pressed(&self, button: MouseButton) -> bool {
-        self.buttons.just_pressed(button.index())
+        self.buttons.get(button.index()).just_pressed()
     }
 
     /// Whether `button` went up during the current frame.
     #[must_use]
     pub const fn just_released(&self, button: MouseButton) -> bool {
-        self.buttons.just_released(button.index())
+        self.buttons.get(button.index()).just_released()
     }
 
     /// Cursor position in physical pixels from the window's top-left corner
@@ -56,7 +56,8 @@ impl Mouse {
         self.wheel
     }
 
-    pub(crate) fn set_button(&mut self, button: MouseButton, state: ButtonState) {
+    /// Returns whether the button actually changed (it was not already in `state`).
+    pub(crate) fn set_button(&mut self, button: MouseButton, state: ButtonState) -> bool {
         match state {
             ButtonState::Pressed => self.buttons.press(button.index()),
             ButtonState::Released => self.buttons.release(button.index()),

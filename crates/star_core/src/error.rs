@@ -23,6 +23,8 @@ pub enum EngineError {
     Platform(String),
     /// The GPU or the rendering backend reported an error.
     Rendering(String),
+    /// An input setting is not valid, e.g. two actions with the same name.
+    Input(String),
     /// A fixed-capacity resource has no room left.
     CapacityExceeded {
         /// Name of the exhausted resource.
@@ -41,6 +43,7 @@ impl fmt::Display for EngineError {
             }
             Self::Platform(reason) => write!(formatter, "platform error: {reason}"),
             Self::Rendering(reason) => write!(formatter, "rendering error: {reason}"),
+            Self::Input(reason) => write!(formatter, "input error: {reason}"),
             Self::CapacityExceeded { resource } => {
                 write!(formatter, "capacity exceeded for {resource}")
             }
@@ -64,6 +67,16 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "failed to initialize renderer: no GPU found"
+        );
+    }
+
+    #[test]
+    fn input_errors_explain_the_reason() {
+        let error = EngineError::Input("the action \"jump\" already exists".to_owned());
+
+        assert_eq!(
+            error.to_string(),
+            "input error: the action \"jump\" already exists"
         );
     }
 }

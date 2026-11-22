@@ -2516,6 +2516,7 @@ dependencies = [
 name = "star_input"
 version = "0.1.0"
 dependencies = [
+ "star_core",
  "star_math",
  "star_platform",
 ]
