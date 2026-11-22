@@ -1,5 +1,8 @@
 //! Application builder: the starting point of every game.
 
+use std::path::PathBuf;
+
+use star_assets::AssetFolder;
 use star_core::{EngineError, EngineResult};
 use star_ecs::{Schedule, Stage, World};
 use star_input::{ActionMap, Input};
@@ -18,6 +21,7 @@ pub struct App {
     clear_color: Color,
     actions: ActionMap,
     schedule: Schedule,
+    assets: AssetFolder,
     platform: TargetPlatform,
 }
 
@@ -31,6 +35,7 @@ impl App {
             clear_color: Color::BLACK,
             actions: ActionMap::new(),
             schedule: Schedule::new(),
+            assets: AssetFolder::find_default(),
             platform: TargetPlatform::current(),
         }
     }
@@ -90,6 +95,20 @@ impl App {
         self
     }
 
+    /// Reads the game's assets from the folder at `root`, instead of the
+    /// default one (see [`AssetFolder::find_default`]).
+    #[must_use]
+    pub fn with_asset_folder(mut self, root: impl Into<PathBuf>) -> Self {
+        self.assets = AssetFolder::new(root);
+        self
+    }
+
+    /// The folder the game's assets are read from.
+    #[must_use]
+    pub fn asset_folder(&self) -> &AssetFolder {
+        &self.assets
+    }
+
     /// Window title.
     #[must_use]
     pub fn title(&self) -> &str {
@@ -135,6 +154,7 @@ impl App {
             self.clear_color,
             input,
             self.schedule,
+            self.assets,
         );
         run_event_loop(self.window_config, &mut runtime)
     }
@@ -172,6 +192,16 @@ mod tests {
 
         assert_eq!(app.schedule.system_count(Stage::Update), 1);
         assert_eq!(app.schedule.system_count(Stage::First), 0);
+    }
+
+    #[test]
+    fn builder_sets_the_asset_folder() {
+        let app = App::new().with_asset_folder("my_game/assets");
+
+        assert_eq!(
+            app.asset_folder().root(),
+            std::path::Path::new("my_game/assets")
+        );
     }
 
     #[test]

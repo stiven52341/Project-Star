@@ -2,6 +2,7 @@
 
 use std::time::{Duration, Instant};
 
+use star_assets::AssetFolder;
 use star_core::{EngineResult, Time};
 use star_ecs::{Schedule, Stage, World};
 use star_input::Input;
@@ -20,6 +21,7 @@ pub(crate) struct Runtime<G: Game> {
     /// Holds the game's entities and the engine's resources: [`Time`] and [`Input`].
     world: World,
     schedule: Schedule,
+    assets: AssetFolder,
     last_frame_start: Option<Instant>,
 }
 
@@ -30,6 +32,7 @@ impl<G: Game> Runtime<G> {
         clear_color: Color,
         input: Input,
         schedule: Schedule,
+        assets: AssetFolder,
     ) -> Self {
         let mut world = World::new();
         world.insert_resource(Time::new());
@@ -42,6 +45,7 @@ impl<G: Game> Runtime<G> {
             frame: Frame::new(),
             world,
             schedule,
+            assets,
             last_frame_start: None,
         }
     }
@@ -80,8 +84,11 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
         if gpu_info.is_software {
             log::warn!("Rendering on the CPU: performance will be poor. Try another backend.");
         }
-        self.game
-            .start(&mut GameContext::new(&mut renderer, &mut self.world))?;
+        self.game.start(&mut GameContext::new(
+            &mut renderer,
+            &mut self.world,
+            &self.assets,
+        ))?;
         self.renderer = Some(renderer);
         Ok(())
     }
@@ -161,6 +168,7 @@ mod tests {
             Color::BLACK,
             input,
             schedule,
+            AssetFolder::new("assets"),
         )
     }
 

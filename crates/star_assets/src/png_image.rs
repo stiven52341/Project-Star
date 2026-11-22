@@ -1,28 +1,12 @@
 //! PNG images, decoded to RGBA8 pixels.
 
 use std::io::Cursor;
-use std::path::Path;
 
 use png::{ColorType, Decoder, Transformations};
 use star_core::{EngineError, EngineResult, Image};
 
 /// Opacity of the pixels of images without an alpha channel.
 const OPAQUE: u8 = u8::MAX;
-
-/// Reads and decodes the PNG file at `path`.
-///
-/// # Errors
-///
-/// Returns [`EngineError::Asset`] if the file cannot be read or is not a
-/// valid PNG image.
-pub fn load_png(path: impl AsRef<Path>) -> EngineResult<Image> {
-    let path = path.as_ref();
-    let bytes = std::fs::read(path).map_err(|error| {
-        EngineError::Asset(format!("cannot read \"{}\": {error}", path.display()))
-    })?;
-    decode_png(&bytes)
-        .map_err(|error| EngineError::Asset(format!("\"{}\": {error}", path.display())))
-}
 
 /// Decodes a PNG image from its bytes. Every kind of PNG is accepted
 /// (grayscale, color, palette, with or without transparency, 8 or 16 bits);
@@ -74,6 +58,23 @@ fn to_rgba(samples: &[u8], color_type: ColorType) -> EngineResult<Vec<u8>> {
         }
     };
     Ok(pixels)
+}
+
+#[cfg(test)]
+pub(crate) mod test_support {
+    use png::{BitDepth, ColorType, Encoder};
+
+    /// A PNG image of a single pixel of color `rgba`.
+    pub(crate) fn one_pixel_png(rgba: [u8; 4]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        let mut encoder = Encoder::new(&mut bytes, 1, 1);
+        encoder.set_color(ColorType::Rgba);
+        encoder.set_depth(BitDepth::Eight);
+        let mut writer = encoder.write_header().unwrap();
+        writer.write_image_data(&rgba).unwrap();
+        writer.finish().unwrap();
+        bytes
+    }
 }
 
 #[cfg(test)]
@@ -162,15 +163,5 @@ mod tests {
         let error = decode_png(b"not a png").unwrap_err();
 
         assert!(matches!(error, EngineError::Asset(_)), "{error}");
-    }
-
-    #[test]
-    fn missing_files_name_the_path() {
-        let error = load_png("there/is/no/such/image.png").unwrap_err();
-
-        assert!(
-            error.to_string().contains("there/is/no/such/image.png"),
-            "{error}"
-        );
     }
 }

@@ -1,7 +1,6 @@
 //! The behavior a game plugs into the engine.
 
-use std::path::Path;
-
+use star_assets::{AssetFolder, AssetPath};
 use star_core::EngineResult;
 use star_ecs::World;
 use star_render::{Frame, Image, MeshId, Renderer, TextureFilter, TextureId, Vertex};
@@ -40,11 +39,26 @@ pub trait Game {
 pub struct GameContext<'a> {
     renderer: &'a mut Renderer,
     world: &'a mut World,
+    assets: &'a AssetFolder,
 }
 
 impl<'a> GameContext<'a> {
-    pub(crate) fn new(renderer: &'a mut Renderer, world: &'a mut World) -> Self {
-        Self { renderer, world }
+    pub(crate) fn new(
+        renderer: &'a mut Renderer,
+        world: &'a mut World,
+        assets: &'a AssetFolder,
+    ) -> Self {
+        Self {
+            renderer,
+            world,
+            assets,
+        }
+    }
+
+    /// The folder the game's assets are read from.
+    #[must_use]
+    pub fn assets(&self) -> &AssetFolder {
+        self.assets
     }
 
     /// The entities, components and resources of the game.
@@ -83,19 +97,15 @@ impl<'a> GameContext<'a> {
         self.renderer.create_texture(image, filter)
     }
 
-    /// Loads the PNG image at `path` (relative to the working directory) and
-    /// uploads it to the GPU, to be drawn with `filter`.
+    /// Loads the image at `path` in the asset folder, e.g. `"sprites/hero.png"`,
+    /// and uploads it to the GPU.
     ///
     /// # Errors
     ///
-    /// Returns an error if the file cannot be read, is not a valid PNG image
-    /// or is too big for the GPU.
-    pub fn load_texture(
-        &mut self,
-        path: impl AsRef<Path>,
-        filter: TextureFilter,
-    ) -> EngineResult<TextureId> {
-        let image = star_assets::load_png(path)?;
+    /// Returns an error if `path` is not a valid [`AssetPath`], the file
+    /// cannot be read or decoded, or the GPU cannot hold the image.
+    pub fn load_texture(&mut self, path: &str, filter: TextureFilter) -> EngineResult<TextureId> {
+        let image = self.assets.load_image(&AssetPath::new(path)?)?;
         self.create_texture(&image, filter)
     }
 }

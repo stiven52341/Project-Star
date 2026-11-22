@@ -43,8 +43,9 @@ const BALL_OPACITY: f32 = 0.7;
 /// Fixed seed: every run looks the same.
 const SEED: u32 = 0x5EED;
 
-/// Found from the example's folder, wherever it is run from.
-const STAR_IMAGE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/star.png");
+/// The example's assets, found wherever it is run from.
+const ASSET_FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets");
+const STAR_IMAGE: &str = "star.png";
 const STAR_COUNT: u8 = 8;
 /// Distance of the stars from the center, in world units.
 const STAR_CIRCLE_RADIUS: f32 = 3.0;
@@ -397,6 +398,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     App::new()
         .with_title(format!("Sprites 2D — {backend}"))
         .with_actions(actions)
+        .with_asset_folder(ASSET_FOLDER)
         .with_system(Stage::Update, move_and_bounce)
         .with_graphics_backend(backend)
         .with_clear_color(BACKGROUND)

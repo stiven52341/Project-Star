@@ -3,6 +3,7 @@
 pub use crate::EngineWorld;
 pub use crate::app::App;
 pub use crate::game::{Game, GameContext};
+pub use star_assets::{AssetFolder, AssetPath};
 pub use star_core::{ENGINE_NAME, ENGINE_VERSION, EngineError, EngineResult, Time};
 pub use star_ecs::{Entity, Schedule, Stage, World};
 pub use star_input::{
