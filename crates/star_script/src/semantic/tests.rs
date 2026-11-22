@@ -889,6 +889,24 @@ fn nodes_need_their_name_and_sprites_their_image() {
 }
 
 #[test]
+fn sprites_and_the_background_have_colors() {
+    assert_valid(
+        "class G extends Game {\n override func start() {\n \
+         background = Color(0.0, 0.0, 0.2, 1.0)\n \
+         const ship = Sprite(\"Ship\", \"ship.png\")\n \
+         ship.color = Color(1.0, 0.5, 0.5, 1.0)\n ship.color.a = 0.5\n \
+         add_child(ship)\n }\n}",
+    );
+    assert_eq!(
+        body_errors("const red = Color(1.0, 0.0, 0.0)"),
+        [Kind::WrongArgumentCount {
+            expected: 4,
+            found: 3
+        }]
+    );
+}
+
+#[test]
 fn only_nodes_can_join_the_tree() {
     assert_eq!(
         errors("class G extends Game {\n override func start() { add_child(Enemy()) }\n}"),

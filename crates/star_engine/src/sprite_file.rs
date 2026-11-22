@@ -3,7 +3,7 @@
 use star_assets::AssetPath;
 use star_core::EngineResult;
 use star_math::Vec2;
-use star_render::{TextureFilter, TextureId};
+use star_render::{Color, TextureFilter, TextureId};
 
 /// Shows an image of the asset folder at a 2D node, like a
 /// [`SpriteNode`](star_scene::SpriteNode), but named by its file: the engine
@@ -20,6 +20,8 @@ pub struct SpriteFile {
     pub size: Vec2,
     /// Sprites in higher layers are drawn on top of lower ones.
     pub layer: i32,
+    /// Multiplied by the image's colors.
+    pub color: Color,
     loaded: Option<LoadedImage>,
 }
 
@@ -34,7 +36,8 @@ struct LoadedImage {
 }
 
 impl SpriteFile {
-    /// The image at `path`, `size` world units big, smooth, in layer 0.
+    /// The image at `path`, `size` world units big, smooth, with its own
+    /// colors, in layer 0.
     #[must_use]
     pub const fn new(path: AssetPath, size: Vec2) -> Self {
         Self {
@@ -42,6 +45,7 @@ impl SpriteFile {
             filter: TextureFilter::Smooth,
             size,
             layer: 0,
+            color: Color::WHITE,
             loaded: None,
         }
     }
@@ -57,6 +61,13 @@ impl SpriteFile {
     #[must_use]
     pub fn with_layer(mut self, layer: i32) -> Self {
         self.layer = layer;
+        self
+    }
+
+    /// The same sprite tinted with `color`.
+    #[must_use]
+    pub fn with_color(mut self, color: Color) -> Self {
+        self.color = color;
         self
     }
 

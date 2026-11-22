@@ -72,7 +72,9 @@ impl GameAssets {
                 |error| log::warn!("{error}"),
             );
             if let Some(texture) = texture {
-                let sprite = SpriteNode::new(texture, file.size).with_layer(file.layer);
+                let sprite = SpriteNode::new(texture, file.size)
+                    .with_layer(file.layer)
+                    .with_color(file.color);
                 frame.draw_sprite(sprite.to_sprite(*global));
             }
         })

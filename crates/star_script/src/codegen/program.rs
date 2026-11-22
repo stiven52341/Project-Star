@@ -11,11 +11,16 @@ use super::{
 use crate::Span;
 use crate::ast::{ClassDecl, ConstructorDecl, Expr, MemberKind, MethodDecl, VariableKind};
 use crate::semantic::{
-    ClassId, ClassOrigin, GAME_CLASS, MethodInfo, NODE_CLASS, ParameterInfo, SPRITE_CLASS, Type,
+    COLOR_CLASS, ClassId, ClassOrigin, GAME_CLASS, MethodInfo, NODE_CLASS, ParameterInfo,
+    SPRITE_CLASS, Type,
 };
 
-/// The engine classes with a module that scripts can extend.
+/// The engine classes that scripts can extend.
 const EXTENDABLE_NATIVE_CLASSES: [&str; 3] = [GAME_CLASS, NODE_CLASS, SPRITE_CLASS];
+
+/// The engine classes that have objects, and so a module and a conversion
+/// in `AnyObject`.
+const NATIVE_OBJECT_CLASSES: [&str; 4] = [GAME_CLASS, COLOR_CLASS, NODE_CLASS, SPRITE_CLASS];
 
 /// Lints that generated code does not follow: it favors simple, uniform
 /// translations over idiomatic Rust (`(a).wrapping_add(b)`, unused `mut`,
@@ -57,7 +62,7 @@ pub(super) fn generate(context: Context<'_>) -> Result<GeneratedProgram> {
         .classes()
         .find(GAME_CLASS)
         .ok_or_else(|| internal("engine class `Game` missing", Span::new(0, 0)))?;
-    let natives = EXTENDABLE_NATIVE_CLASSES
+    let natives = NATIVE_OBJECT_CLASSES
         .iter()
         .map(|name| {
             context

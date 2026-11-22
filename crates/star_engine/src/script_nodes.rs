@@ -14,7 +14,7 @@ use star_assets::AssetPath;
 use star_core::EngineResult;
 use star_ecs::{Entity, World};
 use star_math::Vec2;
-use star_render::TextureFilter;
+use star_render::{Color, TextureFilter};
 use star_scene::{Hierarchy, Name, Transform2D};
 
 use crate::SpriteFile;
@@ -45,6 +45,8 @@ pub struct ScriptSprite<'a> {
     pub layer: i32,
     /// Keeps the pixels sharp, for pixel art.
     pub pixelated: bool,
+    /// Multiplied by the image's colors.
+    pub color: Color,
 }
 
 /// The world node that mirrors each script node.
@@ -157,6 +159,7 @@ impl ScriptNodes {
                 file.filter = filter;
                 file.size = sprite.size;
                 file.layer = sprite.layer;
+                file.color = sprite.color;
             }
             same_image
         });
@@ -167,7 +170,8 @@ impl ScriptNodes {
             Ok(path) => {
                 let file = SpriteFile::new(path, sprite.size)
                     .with_filter(filter)
-                    .with_layer(sprite.layer);
+                    .with_layer(sprite.layer)
+                    .with_color(sprite.color);
                 world.insert(entity, file)?;
             }
             Err(error) => {
@@ -230,6 +234,7 @@ mod tests {
             size: Vec2::new(2.0, 1.0),
             layer: 3,
             pixelated: true,
+            color: Color::rgb(1.0, 0.5, 0.0),
         }
     }
 
@@ -328,6 +333,13 @@ mod tests {
         assert_eq!(file.path.as_str(), "sprites/hero.png");
         assert_eq!(file.filter, TextureFilter::Pixelated);
         assert_eq!((file.size, file.layer), (Vec2::new(2.0, 1.0), 3));
+        assert_eq!(file.color, Color::rgb(1.0, 0.5, 0.0));
+
+        let mut faded = sprite("sprites/hero.png");
+        faded.color = Color::rgba(1.0, 1.0, 1.0, 0.5);
+        hero.sprite = Some(faded);
+        frame(&mut mirror, &mut world, &[hero]);
+        assert_eq!(world.get::<SpriteFile>(entity).unwrap().color, faded.color);
 
         hero.sprite = Some(sprite("sprites/knight.png"));
         frame(&mut mirror, &mut world, &[hero]);

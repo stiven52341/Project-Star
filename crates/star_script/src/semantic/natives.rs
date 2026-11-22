@@ -33,6 +33,9 @@ pub const NODE_CLASS: &str = "Node";
 /// Name of the engine class of the nodes that show an image.
 pub const SPRITE_CLASS: &str = "Sprite";
 
+/// Name of the engine class of colors: of sprites and of the background.
+pub const COLOR_CLASS: &str = "Color";
+
 /// The methods of `Input`: each one takes the name of an action.
 pub(super) const INPUT_METHODS: [&str; 3] = ["is_down", "just_pressed", "just_released"];
 
@@ -59,12 +62,14 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     }
     classes.add(input);
 
+    let color = add_color_class(classes);
     let node = add_node_class(classes);
-    add_sprite_class(classes, node);
+    add_sprite_class(classes, node, color);
 
     // A game: the engine calls `start` once and `update` every frame, until
     // `quit` is called or the window is closed. Its nodes hang from it.
     let mut game = ClassInfo::new(GAME_CLASS.to_owned(), ClassOrigin::Native);
+    game.fields = vec![native_field("background", Type::Class(color))];
     game.methods
         .push(native_method("start", &[], Type::Void, false));
     game.methods.push(native_method(
@@ -82,6 +87,24 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
         false,
     ));
     classes.add(game);
+}
+
+/// `Color`: red, green, blue and opacity, from `0.0` to `1.0`, as image
+/// editors show them (sRGB).
+fn add_color_class(classes: &mut ClassTable) -> ClassId {
+    let mut color = ClassInfo::new(COLOR_CLASS.to_owned(), ClassOrigin::Native);
+    let channels = [
+        ("r", Type::Float),
+        ("g", Type::Float),
+        ("b", Type::Float),
+        ("a", Type::Float),
+    ];
+    color.fields = channels
+        .iter()
+        .map(|(name, ty)| native_field(name, ty.clone()))
+        .collect();
+    color.constructor = Some(native_constructor(&channels));
+    classes.add(color)
 }
 
 /// `Node`: an object of the scene tree, placed relative to its parent. The
@@ -123,7 +146,7 @@ fn add_node_class(classes: &mut ClassTable) -> ClassId {
 }
 
 /// `Sprite`: a node that shows an image of the asset folder.
-fn add_sprite_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
+fn add_sprite_class(classes: &mut ClassTable, node: ClassId, color: ClassId) -> ClassId {
     let mut sprite = ClassInfo::new(SPRITE_CLASS.to_owned(), ClassOrigin::Native);
     sprite.base = Some(node);
     sprite.fields = vec![
@@ -132,6 +155,7 @@ fn add_sprite_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
         native_field("height", Type::Float),
         native_field("layer", Type::Int),
         native_field("pixelated", Type::Bool),
+        native_field("color", Type::Class(color)),
     ];
     sprite.constructor = Some(native_constructor(&[
         ("name", Type::String),

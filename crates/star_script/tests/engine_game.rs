@@ -44,6 +44,7 @@ const NODE_GAME: &str = "
 class Ship extends Sprite {
     init() {
         super.init(\"Ship\", \"sprites/ship.png\")
+        color = Color(1.0, 0.5, 0.5, 1.0)
     }
 
     override func start() {
@@ -60,6 +61,7 @@ class NodeGame extends Game {
     var frames = 0
 
     override func start() {
+        background = Color(0.0, 0.0, 0.1, 1.0)
         add_child(Ship())
     }
 

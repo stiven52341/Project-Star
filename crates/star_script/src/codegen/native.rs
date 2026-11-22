@@ -24,9 +24,10 @@ pub mod Game {
     /// A reference to an object of this class or of a subclass.
     pub type Ref = ::std::rc::Rc<dyn Object>;
 
-    /// The fields of a game: whether it asked to close, and the root of its
-    /// tree of nodes.
+    /// The fields of a game: the public ones, whether it asked to close, and
+    /// the root of its tree of nodes.
     pub struct Fields {
+        pub background: ::star_script_runtime::Field<crate::classes::Color::Ref>,
         pub quit_requested_: ::star_script_runtime::Field<bool>,
         pub root_: crate::classes::Node::Ref,
     }
@@ -88,6 +89,7 @@ pub mod Game {
     /// Prepares an object of this class: `make_` builds it from its fields.
     pub fn init_<O: Object + 'static>(make_: impl FnOnce(Fields) -> ::std::rc::Rc<O>) -> ::std::rc::Rc<O> {
         make_(Fields {
+            background: ::star_script_runtime::Field::new(crate::classes::Color::new(0.0, 0.0, 0.0, 1.0)),
             quit_requested_: ::star_script_runtime::Field::new(false),
             root_: crate::classes::Node::new(::std::string::String::from(\"Game\")),
         })
@@ -99,12 +101,67 @@ pub mod Game {
     }
 }";
 
-/// The modules of the engine classes `Node` and `Sprite`.
+/// The modules of the engine classes `Color`, `Node` and `Sprite`.
 pub(super) fn node_modules(out: &mut Writer) {
-    for line in NODE_MODULE.lines().chain([""]).chain(SPRITE_MODULE.lines()) {
-        out.line(line);
+    let modules = [COLOR_MODULE, NODE_MODULE, SPRITE_MODULE];
+    for (index, module) in modules.iter().enumerate() {
+        if index > 0 {
+            out.line("");
+        }
+        for line in module.lines() {
+            out.line(line);
+        }
     }
 }
+
+const COLOR_MODULE: &str = "/// `class Color`, provided by the engine.
+pub mod Color {
+    /// A reference to an object of this class.
+    pub type Ref = ::std::rc::Rc<dyn Object>;
+
+    /// The fields of a color: its channels, from `0.0` to `1.0`.
+    pub struct Fields {
+        pub r: ::star_script_runtime::Field<f32>,
+        pub g: ::star_script_runtime::Field<f32>,
+        pub b: ::star_script_runtime::Field<f32>,
+        pub a: ::star_script_runtime::Field<f32>,
+    }
+
+    /// Gives access to the fields of this class.
+    pub trait HasFields {
+        fn fields(&self) -> &Fields;
+    }
+
+    /// A color has no methods.
+    pub trait Object: crate::AnyObject + HasFields {}
+
+    /// An object created as this class.
+    pub struct Instance {
+        pub Color: Fields,
+    }
+
+    impl HasFields for Instance {
+        fn fields(&self) -> &Fields { &self.Color }
+    }
+
+    impl crate::AnyObject for Instance {
+        fn Color(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref> { ::std::option::Option::Some(self) }
+    }
+
+    impl Object for Instance {}
+
+    /// Creates an object of this class.
+    pub fn new(r: f32, g: f32, b: f32, a: f32) -> Ref {
+        ::std::rc::Rc::new(Instance {
+            Color: Fields {
+                r: ::star_script_runtime::Field::new(r),
+                g: ::star_script_runtime::Field::new(g),
+                b: ::star_script_runtime::Field::new(b),
+                a: ::star_script_runtime::Field::new(a),
+            },
+        })
+    }
+}";
 
 const NODE_MODULE: &str = "/// `class Node`, provided by the engine.
 pub mod Node {
@@ -285,6 +342,7 @@ pub mod Sprite {
         pub height: ::star_script_runtime::Field<f32>,
         pub layer: ::star_script_runtime::Field<i64>,
         pub pixelated: ::star_script_runtime::Field<bool>,
+        pub color: ::star_script_runtime::Field<crate::classes::Color::Ref>,
     }
 
     /// Gives access to the fields of this class, in objects of any subclass.
@@ -342,6 +400,7 @@ pub mod Sprite {
             height: ::star_script_runtime::Field::new(1.0),
             layer: ::star_script_runtime::Field::new(0),
             pixelated: ::star_script_runtime::Field::new(false),
+            color: ::star_script_runtime::Field::new(crate::classes::Color::new(1.0, 1.0, 1.0, 1.0)),
         };
         crate::classes::Node::init_(name, move |base0_| make_(base0_, fields_))
     }
@@ -421,6 +480,11 @@ impl ::star_engine::game::Game for EngineGame_ {{
         mirror_nodes_(world, &mut self.mirror, &root_, &mut self.pending);
     }}
 
+    fn draw(&self, _world: &::star_engine::star_ecs::World, frame: &mut ::star_engine::star_render::Frame) {{
+        let fields_ = crate::classes::Game::HasFields::fields(&*self.game);
+        frame.set_clear_color(fields_.background.read(|color_| engine_color_(&**color_)));
+    }}
+
     fn is_finished(&self) -> bool {{
         crate::classes::Game::HasFields::fields(&*self.game).{QUIT_FIELD}.get()
     }}
@@ -472,6 +536,7 @@ fn mirror_nodes_(
                             size: ::star_engine::star_math::Vec2::new(look_.width.get(), look_.height.get()),
                             layer: layer_,
                             pixelated: look_.pixelated.get(),
+                            color: look_.color.read(|color_| engine_color_(&**color_)),
                         };
                         mirror_.mirror(world_, &script_node_(fields_, parent_, name_, transform_, ::std::option::Option::Some(shown_)));
                     });
@@ -484,6 +549,12 @@ fn mirror_nodes_(
         }
     }
     mirror_.finish_frame(world_);
+}
+
+/// The engine's value of a script `Color`.
+fn engine_color_(color_: &dyn crate::classes::Color::Object) -> ::star_engine::star_render::Color {
+    let channels_ = crate::classes::Color::HasFields::fields(color_);
+    ::star_engine::star_render::Color::rgba(channels_.r.get(), channels_.g.get(), channels_.b.get(), channels_.a.get())
 }
 
 /// What the engine needs to know about one node.

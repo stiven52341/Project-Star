@@ -201,7 +201,29 @@ fn games_run_the_code_of_their_nodes_and_mirror_them() {
 }
 
 #[test]
+fn games_show_the_colors_of_their_sprites_and_background() {
+    let code = rust(
+        "class G extends Game {\n override func start() {\n \
+         background = Color(0.0, 0.0, 0.2, 1.0)\n }\n}",
+    );
+
+    assert!(code.contains("pub mod Color {"));
+    assert!(code.contains("crate::classes::Color::new(0.0_f32, 0.0_f32, 0.2_f32, 1.0_f32)"));
+    assert!(code.contains("color: look_.color.read(|color_| engine_color_(&**color_)),"));
+    assert!(code.contains("frame.set_clear_color("));
+}
+
+#[test]
 fn other_engine_classes_cannot_be_extended() {
+    let errors = compile_source(
+        "class Paint extends Color {\n init() { super.init(1.0, 1.0, 1.0, 1.0) }\n}",
+    )
+    .expect_err("engine base");
+    assert_eq!(
+        errors[0].to_string(),
+        "classes cannot inherit from the engine class `Color` yet"
+    );
+
     let errors = compile_source("class Loud extends Debug {}").expect_err("engine base");
 
     assert_eq!(

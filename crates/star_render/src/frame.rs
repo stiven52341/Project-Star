@@ -38,6 +38,11 @@ impl Frame {
         self.sprites.clear();
     }
 
+    /// Changes the color the frame is filled with before drawing.
+    pub fn set_clear_color(&mut self, clear_color: Color) {
+        self.clear_color = clear_color;
+    }
+
     /// Sets the point of view used to draw the frame.
     pub fn set_camera(&mut self, camera: Camera) {
         self.camera = camera;
@@ -136,5 +141,17 @@ mod tests {
         assert_eq!(frame.draw_count(), 0);
         assert_eq!(frame.sprite_count(), 0);
         assert_eq!(frame.clear_color(), Color::WHITE);
+    }
+
+    #[test]
+    fn the_background_can_change_while_drawing() {
+        let mut frame = Frame::new();
+        frame.begin(Color::BLACK);
+        frame.draw_sprite(any_sprite());
+
+        frame.set_clear_color(Color::WHITE);
+
+        assert_eq!(frame.clear_color(), Color::WHITE);
+        assert_eq!(frame.sprite_count(), 1);
     }
 }

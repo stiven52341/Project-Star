@@ -50,5 +50,14 @@ class Main {
         player.x += 1.5
         player.scale_x = 2.0
         Debug.print(player.x.to_string() + " " + player.scale_x.to_string() + " " + player.y.to_string())
+
+        // Colors are objects: sprites that share one change together.
+        const shade = Color(1.0, 0.5, 0.25, 1.0)
+        player.color = shade
+        const bat = Sprite("Bat", "sprites/bat.png")
+        bat.color = shade
+        shade.a = 0.5
+        Debug.print(player.color.g.to_string() + " " + bat.color.a.to_string())
+        Debug.print(Sprite("Rock", "rock.png").color.r.to_string())
     }
 }

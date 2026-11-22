@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`) and nodes (`Node`, `Sprite`) done; scenes, camera and more next |
+| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`) done; camera, scenes and more next |
 | 6 | Editor integration | Pending |
 | 7–8 | Blueprints | Draft |
 
@@ -358,9 +358,10 @@ The engine provides them; their names cannot be used for other classes.
 | Class | Members |
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. |
-| `Game` | `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
+| `Game` | field `background: Color` (black); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
 | `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`; `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?` |
-| `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool` |
+| `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors) |
+| `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
 | `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool` |
 
 **A game is a class that extends `Game`**:
@@ -425,7 +426,13 @@ class Space extends Game {
   counterclockwise. The window shows 2 units from bottom to top for now,
   centered on `(0, 0)`.
 - `texture` is an asset path such as `"sprites/hero.png"` (PNG or JPEG). An
-  image that cannot be loaded is not shown; the engine warns once.
+  image that cannot be loaded is not shown; the engine warns once on the
+  error output.
+- A `Color` has red, green, blue and opacity (`a`) from `0.0` to `1.0`, as
+  image editors show them. A sprite's `color` multiplies its image: white
+  keeps it as it is, `Color(1.0, 1.0, 1.0, 0.5)` makes it half transparent.
+  `background` fills the window behind everything. Colors are objects:
+  sprites given the same `Color` change together when it changes.
 - Fields of the engine classes are not redeclared by subclasses, and their
   own fields with a default value are assigned after `super.init(…)`.
 - Scenes (`.scene` files) cannot be used from scripts yet.
