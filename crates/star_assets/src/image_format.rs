@@ -3,6 +3,7 @@
 use star_core::{EngineError, EngineResult, Image};
 
 use crate::AssetPath;
+use crate::jpeg_image::decode_jpeg;
 use crate::png_image::decode_png;
 
 /// A kind of image file, recognized by its extension.
@@ -11,6 +12,8 @@ use crate::png_image::decode_png;
 pub enum ImageFormat {
     /// Lossless, with transparency: `.png`.
     Png,
+    /// Lossy and opaque, small for photos and backgrounds: `.jpg` or `.jpeg`.
+    Jpeg,
 }
 
 impl ImageFormat {
@@ -22,11 +25,14 @@ impl ImageFormat {
     /// supported image format.
     pub fn of(path: &AssetPath) -> EngineResult<Self> {
         let extension = path.extension().unwrap_or_default();
-        if extension.eq_ignore_ascii_case("png") {
+        let is = |name: &str| extension.eq_ignore_ascii_case(name);
+        if is("png") {
             Ok(Self::Png)
+        } else if is("jpg") || is("jpeg") {
+            Ok(Self::Jpeg)
         } else {
             Err(EngineError::Asset(format!(
-                "\"{path}\" is not a supported image: use .png"
+                "\"{path}\" is not a supported image: use .png, .jpg or .jpeg"
             )))
         }
     }
@@ -39,6 +45,7 @@ impl ImageFormat {
     pub fn decode(self, bytes: &[u8]) -> EngineResult<Image> {
         match self {
             Self::Png => decode_png(bytes),
+            Self::Jpeg => decode_jpeg(bytes),
         }
     }
 }
@@ -55,6 +62,8 @@ mod tests {
     fn the_format_comes_from_the_extension_in_any_case() {
         assert_eq!(format_of("hero.png").unwrap(), ImageFormat::Png);
         assert_eq!(format_of("sprites/HERO.PNG").unwrap(), ImageFormat::Png);
+        assert_eq!(format_of("sky.jpg").unwrap(), ImageFormat::Jpeg);
+        assert_eq!(format_of("sky.JPEG").unwrap(), ImageFormat::Jpeg);
     }
 
     #[test]
