@@ -3,6 +3,7 @@
 use std::time::{Duration, Instant};
 
 use star_core::{EngineResult, Time};
+use star_ecs::{Schedule, Stage, World};
 use star_input::Input;
 use star_platform::{InputEvent, Window, WindowEventHandler, WindowSize};
 use star_render::{Color, Frame, Renderer, RendererConfig};
@@ -16,8 +17,9 @@ pub(crate) struct Runtime<G: Game> {
     clear_color: Color,
     renderer: Option<Renderer>,
     frame: Frame,
-    time: Time,
-    input: Input,
+    /// Holds the game's entities and the engine's resources: [`Time`] and [`Input`].
+    world: World,
+    schedule: Schedule,
     last_frame_start: Option<Instant>,
 }
 
@@ -27,15 +29,19 @@ impl<G: Game> Runtime<G> {
         renderer_config: RendererConfig,
         clear_color: Color,
         input: Input,
+        schedule: Schedule,
     ) -> Self {
+        let mut world = World::new();
+        world.insert_resource(Time::new());
+        world.insert_resource(input);
         Self {
             game,
             renderer_config,
             clear_color,
             renderer: None,
             frame: Frame::new(),
-            time: Time::new(),
-            input,
+            world,
+            schedule,
             last_frame_start: None,
         }
     }
@@ -46,7 +52,23 @@ impl<G: Game> Runtime<G> {
             .last_frame_start
             .map_or(Duration::ZERO, |last| now.duration_since(last));
         self.last_frame_start = Some(now);
-        self.time.advance(delta);
+        if let Some(mut time) = self.world.resource_mut::<Time>() {
+            time.advance(delta);
+        }
+    }
+
+    /// One step of the simulation: the systems by stage, with the game's
+    /// update right after the first stage.
+    fn simulate(&mut self) -> EngineResult<()> {
+        self.schedule.run_stage(Stage::First, &mut self.world)?;
+        self.game.update(&mut self.world);
+        for stage in [Stage::Update, Stage::Physics, Stage::Last] {
+            self.schedule.run_stage(stage, &mut self.world)?;
+        }
+        if let Some(mut input) = self.world.resource_mut::<Input>() {
+            input.end_frame();
+        }
+        Ok(())
     }
 }
 
@@ -58,7 +80,8 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
         if gpu_info.is_software {
             log::warn!("Rendering on the CPU: performance will be poor. Try another backend.");
         }
-        self.game.start(&mut GameContext::new(&mut renderer))?;
+        self.game
+            .start(&mut GameContext::new(&mut renderer, &mut self.world))?;
         self.renderer = Some(renderer);
         Ok(())
     }
@@ -74,10 +97,9 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
             return Ok(());
         }
         self.advance_time();
-        self.game.update(&self.time, &self.input);
-        self.input.end_frame();
+        self.simulate()?;
         self.frame.begin(self.clear_color);
-        self.game.draw(&mut self.frame);
+        self.game.draw(&self.world, &mut self.frame);
         match &mut self.renderer {
             Some(renderer) => renderer.render(&self.frame),
             None => Ok(()),
@@ -85,7 +107,9 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
     }
 
     fn on_input(&mut self, event: InputEvent) {
-        self.input.apply(event);
+        if let Some(mut input) = self.world.resource_mut::<Input>() {
+            input.apply(event);
+        }
     }
 
     fn should_exit(&self) -> bool {
@@ -95,7 +119,11 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
 
 #[cfg(test)]
 mod tests {
+    use star_core::EngineError;
+    use star_input::{ActionMap, ButtonState, Key};
+
     use super::*;
+    use crate::EngineWorld as _;
     use crate::game::EmptyGame;
 
     /// A game that has already finished.
@@ -107,48 +135,123 @@ mod tests {
         }
     }
 
+    /// Who ran during a frame, in order.
+    #[derive(Default)]
+    struct Log(Vec<&'static str>);
+
+    fn log_as(world: &World, name: &'static str) {
+        if let Some(mut log) = world.resource_mut::<Log>() {
+            log.0.push(name);
+        }
+    }
+
+    /// A game that writes in the log when it updates.
+    struct LoggingGame;
+
+    impl Game for LoggingGame {
+        fn update(&mut self, world: &mut World) {
+            log_as(world, "game");
+        }
+    }
+
+    fn runtime<G: Game>(game: G, input: Input, schedule: Schedule) -> Runtime<G> {
+        Runtime::new(
+            game,
+            RendererConfig::default(),
+            Color::BLACK,
+            input,
+            schedule,
+        )
+    }
+
+    fn press_space<G: Game>(runtime: &mut Runtime<G>) {
+        runtime.on_input(InputEvent::Key {
+            key: Key::Space,
+            state: ButtonState::Pressed,
+        });
+    }
+
     #[test]
     fn the_loop_stops_when_the_game_finishes() {
-        let config = RendererConfig::default();
-
-        let finished = Runtime::new(FinishedGame, config, Color::BLACK, Input::new());
-        let running = Runtime::new(EmptyGame, config, Color::BLACK, Input::new());
+        let finished = runtime(FinishedGame, Input::new(), Schedule::new());
+        let running = runtime(EmptyGame, Input::new(), Schedule::new());
 
         assert!(finished.should_exit());
         assert!(!running.should_exit());
     }
 
     #[test]
-    fn input_events_update_the_input_given_to_the_game() {
-        let mut runtime = Runtime::new(
-            EmptyGame,
-            RendererConfig::default(),
-            Color::BLACK,
-            Input::new(),
-        );
+    fn the_world_holds_the_time_and_the_input() {
+        let runtime = runtime(EmptyGame, Input::new(), Schedule::new());
 
-        runtime.on_input(InputEvent::Key {
-            key: star_input::Key::Space,
-            state: star_input::ButtonState::Pressed,
-        });
+        assert!(runtime.world.has_resource::<Time>());
+        assert!(runtime.world.input().is_some());
+    }
 
-        assert!(runtime.input.keyboard().is_down(star_input::Key::Space));
+    #[test]
+    fn input_events_update_the_input_in_the_world() {
+        let mut runtime = runtime(EmptyGame, Input::new(), Schedule::new());
+
+        press_space(&mut runtime);
+
+        let input = runtime.world.input().unwrap();
+        assert!(input.keyboard().is_down(Key::Space));
     }
 
     #[test]
     fn input_events_reach_the_game_actions() {
-        let mut actions = star_input::ActionMap::new();
-        actions
-            .add("jump", &[star_input::Key::Space.into()])
-            .unwrap();
-        let input = Input::with_actions(actions);
-        let mut runtime = Runtime::new(EmptyGame, RendererConfig::default(), Color::BLACK, input);
+        let mut actions = ActionMap::new();
+        actions.add("jump", &[Key::Space.into()]).unwrap();
+        let mut runtime = runtime(EmptyGame, Input::with_actions(actions), Schedule::new());
 
-        runtime.on_input(InputEvent::Key {
-            key: star_input::Key::Space,
-            state: star_input::ButtonState::Pressed,
+        press_space(&mut runtime);
+
+        let input = runtime.world.input().unwrap();
+        assert!(input.actions().just_pressed("jump"));
+    }
+
+    #[test]
+    fn the_game_updates_after_the_first_stage_and_before_the_rest() {
+        let mut schedule = Schedule::new();
+        for (stage, name) in [
+            (Stage::Last, "last"),
+            (Stage::Update, "update"),
+            (Stage::First, "first"),
+        ] {
+            schedule.add_system(stage, move |world| {
+                log_as(world, name);
+                Ok(())
+            });
+        }
+        let mut runtime = runtime(LoggingGame, Input::new(), schedule);
+        runtime.world.insert_resource(Log::default());
+
+        runtime.simulate().unwrap();
+
+        let log = runtime.world.resource::<Log>().unwrap();
+        assert_eq!(log.0, ["first", "game", "update", "last"]);
+    }
+
+    #[test]
+    fn presses_last_one_frame() {
+        let mut runtime = runtime(EmptyGame, Input::new(), Schedule::new());
+        press_space(&mut runtime);
+
+        runtime.simulate().unwrap();
+
+        let input = runtime.world.input().unwrap();
+        assert!(input.keyboard().is_down(Key::Space));
+        assert!(!input.keyboard().just_pressed(Key::Space));
+    }
+
+    #[test]
+    fn a_failing_system_stops_the_frame() {
+        let mut schedule = Schedule::new();
+        schedule.add_system(Stage::Update, |_| {
+            Err(EngineError::Ecs("broken".to_owned()))
         });
+        let mut runtime = runtime(EmptyGame, Input::new(), schedule);
 
-        assert!(runtime.input.actions().just_pressed("jump"));
+        assert!(runtime.simulate().is_err());
     }
 }

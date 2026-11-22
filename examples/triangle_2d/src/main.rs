@@ -31,7 +31,7 @@ impl Game for Triangle2d {
         Ok(())
     }
 
-    fn draw(&self, frame: &mut Frame) {
+    fn draw(&self, _world: &World, frame: &mut Frame) {
         frame.set_camera(Camera::new_2d(VIEW_HEIGHT));
         if let Some(mesh) = self.mesh {
             frame.draw(mesh, Mat4::IDENTITY);

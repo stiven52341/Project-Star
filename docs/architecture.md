@@ -70,6 +70,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 25 | Sprites **batched by texture**, in an immediate `Frame` | The game adds sprites every frame (like meshes, decision 9); the renderer groups consecutive sprites that share a texture into one draw call. The order is explicit (layers, then order of addition), so translucent sprites always blend correctly without sorting by depth. Rejected for now: texture arrays or bindless textures (not available on OpenGL ES and older GPUs) and automatic atlases (they belong to the asset pipeline, Phase 5) |
 | 26 | PNG decoding with **png** (MIT/Apache-2.0), in `star_assets` | The image-rs project's decoder: maintained, pure Rust (it builds for every platform, mobile included) and light. PNG is lossless with transparency, the usual format for 2D game art. Only `star_assets` knows it. Rejected: the `image` crate (many formats, but much heavier to build; more formats can come in Phase 5) |
 | 27 | ECS with **sparse sets** and closure queries, without `unsafe` | Adding and removing components is O(1) and never moves other components, which suits a node tree where objects change often; going through one type reads contiguous memory. Per-type `RefCell`s let one query change some types while reading others, checked at run time instead of with `unsafe`. Queries take a closure (`World::each`) instead of returning an iterator, since an iterator that lends `&mut` components cannot be written in safe Rust. Rejected: archetype tables (faster iteration over many types, but adding a component moves the whole entity, and they need `unsafe` to be fast) and external ECS crates (decision 5 spirit: own facade, and the scene system will shape it) |
+| 28 | The engine owns the **`World`**; `Time` and `Input` are resources | One source of truth for the game and its systems: a system that moves things reads the same time as `Game::update`, without copying state into the world each frame. The `Game` trait stays as the simple entry point (`update(&mut World)`, `draw(&World, &mut Frame)`), and grows into ECS systems when the game needs them. Rejected: an ECS left to each game (every game would wire the same loop) and passing time and input apart from the world (systems would need another signature) |
 
 ## ECS
 
@@ -95,15 +96,22 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   stage — `First`, `Update`, `Physics`, `Last` — and, within a stage, in the
   order they were added. The first failing system stops the frame with its
   error. Systems get `&mut World`, so they can spawn and despawn directly.
+- The engine owns the game's `World` and a `Schedule`. `Time` and `Input`
+  are resources of the world (`EngineWorld` adds the shortcuts
+  `world.time()` and `world.input()`), so the `Game` trait and the systems
+  see the same data. Systems are registered with
+  `App::with_system(Stage::Update, system)`; the game's own `update` runs
+  right after `Stage::First`. `GameContext::world()` gives the world in
+  `Game::start`, to spawn the first entities.
 
 ## Input
 
 ```
-OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input ──▶ Game::update
+OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (world resource) ──▶ game and systems
 ```
 
 - Events arrive between frames and are applied to `Input` as they come.
-  After `Game::update`, `Input::end_frame` forgets what was *just* pressed,
+  After the game and every system ran, `Input::end_frame` forgets what was *just* pressed,
   released or scrolled; held keys stay held.
 - A press and a release within the same frame are both reported
   (`just_pressed` and `just_released`), so quick taps are never lost.
@@ -146,7 +154,8 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
 - `Auto` lets wgpu choose the best GPU; an explicit backend fails with a clear
   error if it does not exist on the platform (e.g. DirectX 12 on Linux).
 - If the chosen adapter is a software (CPU) renderer, a warning is logged.
-- A frame's cycle: `Game::update(&Time, &Input)` → `Game::draw(&mut Frame)` →
+- A frame's cycle: systems of `Stage::First` → `Game::update(&mut World)` →
+  systems of `Update`, `Physics` and `Last` → `Game::draw(&World, &mut Frame)` →
   `Renderer::render(&Frame)`. Meshes are created in `Game::start` with
   `GameContext::create_mesh` and identified by a `MeshId`.
 - `SceneRenderer` (internal) draws a `Frame` into any target; `Renderer`

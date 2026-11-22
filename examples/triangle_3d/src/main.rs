@@ -38,17 +38,21 @@ impl Game for Triangle3d {
         Ok(())
     }
 
-    fn update(&mut self, time: &Time, input: &Input) {
-        if input.actions().just_pressed(PAUSE) {
+    fn update(&mut self, world: &mut World) {
+        if world
+            .input()
+            .is_some_and(|input| input.actions().just_pressed(PAUSE))
+        {
             self.paused = !self.paused;
         }
         if self.paused {
             return;
         }
-        self.angle = (self.angle + ROTATION_SPEED * time.delta_seconds()) % std::f32::consts::TAU;
+        let seconds = world.time().delta_seconds();
+        self.angle = (self.angle + ROTATION_SPEED * seconds) % std::f32::consts::TAU;
     }
 
-    fn draw(&self, frame: &mut Frame) {
+    fn draw(&self, _world: &World, frame: &mut Frame) {
         frame.set_camera(Camera::new_3d(CAMERA_POSITION, Vec3::ZERO));
         if let Some(mesh) = self.mesh {
             frame.draw(mesh, Mat4::from_rotation_y(self.angle));

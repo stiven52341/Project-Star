@@ -1,7 +1,8 @@
 //! Rendering test: hundreds of sprites drawn in a few batches.
 //!
 //! A tiled floor (pixelated texture) lies under hundreds of tinted,
-//! translucent balls (smooth texture) that bounce around. On top, a hero
+//! translucent balls (smooth texture) that bounce around: each ball is an
+//! entity of the world, moved by a system. On top, a hero
 //! animated from a sprite sheet walks with the arrow keys, WASD or a
 //! gamepad's directional pad, and turns to face where it goes, among
 //! spinning stars loaded from a PNG file. The other textures are generated
@@ -73,9 +74,14 @@ struct Textures {
     hero: TextureId,
 }
 
+/// Where an entity is in the world.
+struct Position(Vec2);
+
+/// How fast an entity moves, in world units per second.
+struct Velocity(Vec2);
+
+/// How a ball looks.
 struct Ball {
-    position: Vec2,
-    velocity: Vec2,
     size: f32,
     color: Color,
 }
@@ -89,7 +95,6 @@ struct Hero {
 
 struct Sprites2d {
     textures: Option<Textures>,
-    balls: Vec<Ball>,
     /// Rotation of the stars, in radians.
     star_spin: f32,
     hero: Hero,
@@ -97,10 +102,8 @@ struct Sprites2d {
 
 impl Sprites2d {
     fn new() -> Self {
-        let mut random = Random(SEED);
         Self {
             textures: None,
-            balls: (0..BALL_COUNT).map(|_| Ball::random(&mut random)).collect(),
             star_spin: 0.0,
             hero: Hero {
                 position: Vec2::ZERO,
@@ -119,66 +122,77 @@ impl Game for Sprites2d {
             star: context.load_texture(STAR_IMAGE, TextureFilter::Smooth)?,
             hero: context.create_texture(&hero_sheet()?, TextureFilter::Pixelated)?,
         });
-        Ok(())
+        spawn_balls(context.world())
     }
 
-    fn update(&mut self, time: &Time, input: &Input) {
-        let seconds = time.delta_seconds();
-        for ball in &mut self.balls {
-            ball.advance(seconds);
-        }
+    fn update(&mut self, world: &mut World) {
+        let seconds = world.time().delta_seconds();
         self.star_spin = (self.star_spin + STAR_SPIN_SPEED * seconds) % TAU;
-        self.hero.walk(direction(input.actions()), seconds);
+        let direction = world
+            .input()
+            .map_or(Vec2::ZERO, |input| direction(input.actions()));
+        self.hero.walk(direction, seconds);
     }
 
-    fn draw(&self, frame: &mut Frame) {
+    fn draw(&self, world: &World, frame: &mut Frame) {
         frame.set_camera(Camera::new_2d(VIEW_HEIGHT));
         let Some(textures) = &self.textures else {
             return;
         };
         draw_floor(frame, textures.floor);
-        for ball in &self.balls {
+        let balls = world.each::<(&Position, &Ball)>(|_, (position, ball)| {
             frame.draw_sprite(
-                Sprite::new(
-                    textures.ball,
-                    ball.position,
-                    Vec2::new(ball.size, ball.size),
-                )
-                .with_color(ball.color)
-                .with_layer(BALL_LAYER),
+                Sprite::new(textures.ball, position.0, Vec2::new(ball.size, ball.size))
+                    .with_color(ball.color)
+                    .with_layer(BALL_LAYER),
             );
+        });
+        if let Err(error) = balls {
+            log::warn!("{error}");
         }
         draw_stars(frame, textures.star, self.star_spin);
         frame.draw_sprite(self.hero.sprite(textures.hero));
     }
 }
 
-impl Ball {
-    fn random(random: &mut Random) -> Self {
+/// Every ball is an entity with a position, a velocity and its looks.
+fn spawn_balls(world: &mut World) -> EngineResult<()> {
+    let mut random = Random(SEED);
+    for _ in 0..BALL_COUNT {
         let angle = random.next() * TAU;
         let speed = random.next() * BALL_MAX_SPEED;
-        Self {
-            position: Vec2::new(
-                random.between(-ARENA.x, ARENA.x),
-                random.between(-ARENA.y, ARENA.y),
-            ),
-            velocity: Vec2::new(angle.cos(), angle.sin()) * speed,
-            size: BALL_MIN_SIZE * (1.0 + random.next()),
-            color: Color::rgba(random.next(), random.next(), random.next(), BALL_OPACITY),
-        }
+        let position = Vec2::new(
+            random.between(-ARENA.x, ARENA.x),
+            random.between(-ARENA.y, ARENA.y),
+        );
+        let ball = world.spawn()?;
+        world.insert(ball, Position(position))?;
+        world.insert(ball, Velocity(Vec2::new(angle.cos(), angle.sin()) * speed))?;
+        world.insert(
+            ball,
+            Ball {
+                size: BALL_MIN_SIZE * (1.0 + random.next()),
+                color: Color::rgba(random.next(), random.next(), random.next(), BALL_OPACITY),
+            },
+        )?;
     }
+    Ok(())
+}
 
-    fn advance(&mut self, seconds: f32) {
-        self.position = self.position + self.velocity * seconds;
-        if self.position.x.abs() > ARENA.x {
-            self.velocity.x = -self.velocity.x;
-            self.position.x = self.position.x.clamp(-ARENA.x, ARENA.x);
+/// System: moves everything that has a velocity, bouncing on the arena's edges.
+fn move_and_bounce(world: &mut World) -> EngineResult<()> {
+    let seconds = world.time().delta_seconds();
+    world.each::<(&mut Position, &mut Velocity)>(|_, (Position(position), Velocity(velocity))| {
+        *position = *position + *velocity * seconds;
+        if position.x.abs() > ARENA.x {
+            velocity.x = -velocity.x;
+            position.x = position.x.clamp(-ARENA.x, ARENA.x);
         }
-        if self.position.y.abs() > ARENA.y {
-            self.velocity.y = -self.velocity.y;
-            self.position.y = self.position.y.clamp(-ARENA.y, ARENA.y);
+        if position.y.abs() > ARENA.y {
+            velocity.y = -velocity.y;
+            position.y = position.y.clamp(-ARENA.y, ARENA.y);
         }
-    }
+    })
 }
 
 impl Hero {
@@ -383,6 +397,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     App::new()
         .with_title(format!("Sprites 2D — {backend}"))
         .with_actions(actions)
+        .with_system(Stage::Update, move_and_bounce)
         .with_graphics_backend(backend)
         .with_clear_color(BACKGROUND)
         .run_game(Sprites2d::new())?;

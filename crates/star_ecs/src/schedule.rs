@@ -1,5 +1,7 @@
 //! Systems and the stages of a frame they run in.
 
+use std::fmt;
+
 use star_core::EngineResult;
 
 use crate::World;
@@ -70,12 +72,31 @@ impl Schedule {
     ///
     /// Stops at the first system that fails and returns its error.
     pub fn run(&mut self, world: &mut World) -> EngineResult<()> {
-        for systems in &mut self.stages {
-            for system in systems {
-                system(world)?;
-            }
+        Stage::ALL
+            .into_iter()
+            .try_for_each(|stage| self.run_stage(stage, world))
+    }
+
+    /// Runs the systems of `stage` once, in order. The engine uses it to run
+    /// its own work between stages.
+    ///
+    /// # Errors
+    ///
+    /// Stops at the first system that fails and returns its error.
+    pub fn run_stage(&mut self, stage: Stage, world: &mut World) -> EngineResult<()> {
+        self.stages[stage.index()]
+            .iter_mut()
+            .try_for_each(|system| system(world))
+    }
+}
+
+impl fmt::Debug for Schedule {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut list = formatter.debug_map();
+        for stage in Stage::ALL {
+            list.entry(&stage, &self.system_count(stage));
         }
-        Ok(())
+        list.finish()
     }
 }
 
@@ -155,6 +176,18 @@ mod tests {
         schedule.run(&mut world).unwrap();
 
         assert_eq!(world.entity_count(), 1);
+    }
+
+    #[test]
+    fn stages_can_run_one_at_a_time() {
+        let mut schedule = Schedule::new();
+        schedule.add_system(Stage::First, logging("first"));
+        schedule.add_system(Stage::Last, logging("last"));
+        let mut world = world_with_log();
+
+        schedule.run_stage(Stage::Last, &mut world).unwrap();
+
+        assert_eq!(log(&world), ["last"]);
     }
 
     #[test]

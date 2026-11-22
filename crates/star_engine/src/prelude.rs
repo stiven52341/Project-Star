@@ -1,9 +1,10 @@
 //! The most commonly used engine types, for glob import.
 
+pub use crate::EngineWorld;
 pub use crate::app::App;
 pub use crate::game::{Game, GameContext};
 pub use star_core::{ENGINE_NAME, ENGINE_VERSION, EngineError, EngineResult, Time};
-pub use star_ecs::Entity;
+pub use star_ecs::{Entity, Schedule, Stage, World};
 pub use star_input::{
     ActionMap, Actions, Binding, Gamepad, GamepadAxis, GamepadButton, GamepadId, Gamepads, Input,
     Key, Keyboard, Mouse, MouseButton, Touch, TouchId, Touches,

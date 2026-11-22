@@ -1,6 +1,7 @@
 //! Application builder: the starting point of every game.
 
 use star_core::{EngineError, EngineResult};
+use star_ecs::{Schedule, Stage, World};
 use star_input::{ActionMap, Input};
 use star_platform::{TargetPlatform, WindowConfig, WindowSize, run_event_loop};
 use star_render::{Color, GraphicsBackend, RendererConfig};
@@ -10,12 +11,13 @@ use crate::runtime::Runtime;
 
 /// A game application, configured with a builder and started with
 /// [`App::run_game`] (or [`App::run`] for an empty window).
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct App {
     window_config: WindowConfig,
     renderer_config: RendererConfig,
     clear_color: Color,
     actions: ActionMap,
+    schedule: Schedule,
     platform: TargetPlatform,
 }
 
@@ -28,6 +30,7 @@ impl App {
             renderer_config: RendererConfig::default(),
             clear_color: Color::BLACK,
             actions: ActionMap::new(),
+            schedule: Schedule::new(),
             platform: TargetPlatform::current(),
         }
     }
@@ -74,6 +77,19 @@ impl App {
         self
     }
 
+    /// Runs `system` every frame in `stage`, after the systems added before.
+    /// Systems see the world the game sees, with the engine's resources
+    /// (see [`EngineWorld`](crate::EngineWorld)).
+    #[must_use]
+    pub fn with_system(
+        mut self,
+        stage: Stage,
+        system: impl FnMut(&mut World) -> EngineResult<()> + 'static,
+    ) -> Self {
+        self.schedule.add_system(stage, system);
+        self
+    }
+
     /// Window title.
     #[must_use]
     pub fn title(&self) -> &str {
@@ -106,14 +122,20 @@ impl App {
     /// # Errors
     ///
     /// Returns an error if the platform is not supported, the window or the
-    /// renderer cannot be created, the game fails to start, or the GPU fails
-    /// while rendering.
+    /// renderer cannot be created, the game fails to start, a system fails,
+    /// or the GPU fails while rendering.
     pub fn run_game(self, game: impl Game) -> EngineResult<()> {
         if !self.platform.is_supported() {
             return Err(EngineError::UnsupportedPlatform(self.platform.to_string()));
         }
         let input = Input::with_actions(self.actions);
-        let mut runtime = Runtime::new(game, self.renderer_config, self.clear_color, input);
+        let mut runtime = Runtime::new(
+            game,
+            self.renderer_config,
+            self.clear_color,
+            input,
+            self.schedule,
+        );
         run_event_loop(self.window_config, &mut runtime)
     }
 }
@@ -140,6 +162,16 @@ mod tests {
         let app = App::new().with_graphics_backend(GraphicsBackend::Vulkan);
 
         assert_eq!(app.graphics_backend(), GraphicsBackend::Vulkan);
+    }
+
+    #[test]
+    fn builder_adds_systems_to_their_stage() {
+        let app = App::new()
+            .with_system(Stage::Update, |_| Ok(()))
+            .with_system(Stage::Last, |_| Ok(()));
+
+        assert_eq!(app.schedule.system_count(Stage::Update), 1);
+        assert_eq!(app.schedule.system_count(Stage::First), 0);
     }
 
     #[test]

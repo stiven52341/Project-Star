@@ -7,10 +7,12 @@
 //! ```
 
 pub mod app;
+mod engine_world;
 pub mod game;
 pub mod prelude;
 mod runtime;
 
+pub use engine_world::EngineWorld;
 pub use star_assets;
 pub use star_audio;
 pub use star_core;

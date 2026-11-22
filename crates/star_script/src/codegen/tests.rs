@@ -156,6 +156,7 @@ fn input_calls_read_the_shared_action_state() {
 
     assert!(code.contains("::star_script_runtime::input::action_state(\"jump\").just_pressed"));
     assert!(code.contains("share_actions_(input.actions());"));
+    assert!(code.contains("world.input()"));
 }
 
 #[test]

@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 /// Tracks how much time passes between frames and since the game started.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Time {
     delta: Duration,
     elapsed: Duration,

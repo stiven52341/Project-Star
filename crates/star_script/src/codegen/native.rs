@@ -131,13 +131,12 @@ impl ::star_engine::game::Game for EngineGame_ {{
         ::std::result::Result::Ok(())
     }}
 
-    fn update(
-        &mut self,
-        time: &::star_engine::star_core::Time,
-        input: &::star_engine::star_input::Input,
-    ) {{
-        share_actions_(input.actions());
-        crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.0), time.delta_seconds());
+    fn update(&mut self, world: &mut ::star_engine::star_ecs::World) {{
+        use ::star_engine::EngineWorld as _;
+        if let ::std::option::Option::Some(input) = world.input() {{
+            share_actions_(input.actions());
+        }}
+        crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.0), world.time().delta_seconds());
     }}
 
     fn is_finished(&self) -> bool {{

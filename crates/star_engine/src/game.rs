@@ -2,8 +2,8 @@
 
 use std::path::Path;
 
-use star_core::{EngineResult, Time};
-use star_input::Input;
+use star_core::EngineResult;
+use star_ecs::World;
 use star_render::{Frame, Image, MeshId, Renderer, TextureFilter, TextureId, Vertex};
 
 /// Logic of a game, called by the engine at fixed points of the game loop.
@@ -11,7 +11,7 @@ use star_render::{Frame, Image, MeshId, Renderer, TextureFilter, TextureId, Vert
 /// Every method has an empty default, so games only implement what they need.
 pub trait Game {
     /// Called once when the window and the GPU are ready.
-    /// Create meshes and other GPU resources here.
+    /// Create meshes, textures and the first entities here.
     ///
     /// # Errors
     ///
@@ -21,11 +21,13 @@ pub trait Game {
     }
 
     /// Advances the game simulation; called once per frame before drawing,
-    /// with the time since the last frame and what the player is doing.
-    fn update(&mut self, _time: &Time, _input: &Input) {}
+    /// after the systems of [`Stage::First`](star_ecs::Stage::First) and
+    /// before the others. The time since the last frame and what the player
+    /// is doing are resources of `world`: see [`EngineWorld`](crate::EngineWorld).
+    fn update(&mut self, _world: &mut World) {}
 
-    /// Describes what the current frame shows.
-    fn draw(&self, _frame: &mut Frame) {}
+    /// Describes what the current frame shows; called after every system ran.
+    fn draw(&self, _world: &World, _frame: &mut Frame) {}
 
     /// Whether the game wants to close; checked after each frame. By default
     /// the game runs until the user closes the window.
@@ -37,11 +39,17 @@ pub trait Game {
 /// Engine services available while a game starts.
 pub struct GameContext<'a> {
     renderer: &'a mut Renderer,
+    world: &'a mut World,
 }
 
 impl<'a> GameContext<'a> {
-    pub(crate) fn new(renderer: &'a mut Renderer) -> Self {
-        Self { renderer }
+    pub(crate) fn new(renderer: &'a mut Renderer, world: &'a mut World) -> Self {
+        Self { renderer, world }
+    }
+
+    /// The entities, components and resources of the game.
+    pub fn world(&mut self) -> &mut World {
+        self.world
     }
 
     /// Uploads a triangle list to the GPU: every 3 vertices form a triangle.
