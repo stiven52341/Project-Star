@@ -14,3 +14,7 @@ toml.workspace = true
 
 [lints]
 workspace = true
+
+# The translation tests check the code they produce with the StarScript compiler.
+[dev-dependencies]
+star_script.workspace = true

@@ -1,6 +1,7 @@
 format = 1
 class = "Player"
 extends = "Sprite"
+base_arguments = ["Player", "sprites/player.png"]   # super.init(…)
 
 [[variable]]
 name = "speed"

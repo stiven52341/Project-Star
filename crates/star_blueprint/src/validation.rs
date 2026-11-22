@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
 
-use crate::model::{Blueprint, CallTarget, Graph, Link, NodeId, NodeKind};
+use crate::model::{Blueprint, CallTarget, Graph, Link, Node, NodeId, NodeKind};
 use crate::pins::{Direction, EXECUTION_INPUT, PinKind};
 
 /// A rule of blueprints that is broken, and where.
@@ -33,8 +33,9 @@ pub enum BlueprintErrorKind {
     VariableWithoutType(String),
     /// Two graphs with the same name.
     DuplicateGraph(String),
-    /// Two parameters of a graph, or two arguments of a call, with the same name.
-    DuplicateParameter(String),
+    /// Two pins of a node with the same name, such as two parameters of a
+    /// graph or an argument of a call called like another of its pins.
+    DuplicatePin(String),
     /// Two nodes of a graph with the same identifier.
     DuplicateNode,
     /// A graph without an entry node.
@@ -59,6 +60,11 @@ pub enum BlueprintErrorKind {
     Unreachable,
     /// A value that depends on itself.
     DataCycle,
+    /// The result of a call that runs in order, used where that call has
+    /// not run: before it, or in another path of a branch.
+    ValueNotReady,
+    /// A number that is not finite, which StarScript cannot write.
+    UnwritableNumber,
 }
 
 impl fmt::Display for BlueprintErrorKind {
@@ -73,7 +79,7 @@ impl fmt::Display for BlueprintErrorKind {
                 "the variable `{name}` needs a type or a starting value"
             ),
             Self::DuplicateGraph(name) => write!(formatter, "there are two graphs called `{name}`"),
-            Self::DuplicateParameter(name) => write!(formatter, "`{name}` is used twice"),
+            Self::DuplicatePin(name) => write!(formatter, "two pins are called `{name}`"),
             Self::DuplicateNode => formatter.write_str("two nodes have this identifier"),
             Self::MissingEntry => formatter.write_str("the graph has no entry node"),
             Self::SeveralEntries => formatter.write_str("the graph has more than one entry node"),
@@ -88,6 +94,10 @@ impl fmt::Display for BlueprintErrorKind {
             Self::UnconnectedInput(pin) => write!(formatter, "the input `{pin}` has no link"),
             Self::Unreachable => formatter.write_str("the execution never reaches this node"),
             Self::DataCycle => formatter.write_str("this value depends on itself"),
+            Self::ValueNotReady => {
+                formatter.write_str("its result is used where the node has not run yet")
+            }
+            Self::UnwritableNumber => formatter.write_str("the number is not finite"),
         }
     }
 }
@@ -203,18 +213,21 @@ impl<'check> GraphCheck<'check> {
         self.check_names(None, &names);
     }
 
-    /// `names` are valid and different from each other.
+    /// `names` are valid StarScript names.
     fn check_names(&mut self, node: Option<NodeId>, names: &[&String]) {
+        for name in names.iter().filter(|name| !is_identifier(name)) {
+            self.error(node, BlueprintErrorKind::InvalidName((*name).clone()));
+        }
+    }
+
+    /// The pins of `node` have different names, so a link names only one.
+    fn check_pin_names(&mut self, node: &Node) {
         let mut seen = HashSet::new();
-        for name in names {
-            if !is_identifier(name) {
-                self.error(node, BlueprintErrorKind::InvalidName((*name).clone()));
-            }
-            if !seen.insert(*name) {
-                self.error(
-                    node,
-                    BlueprintErrorKind::DuplicateParameter((*name).clone()),
-                );
+        for pin in node.pins(self.graph) {
+            if seen.contains(&pin.name) {
+                self.error(Some(node.id), BlueprintErrorKind::DuplicatePin(pin.name));
+            } else {
+                seen.insert(pin.name);
             }
         }
     }
@@ -226,6 +239,7 @@ impl<'check> GraphCheck<'check> {
             if !ids.insert(node.id) {
                 self.error(Some(node.id), BlueprintErrorKind::DuplicateNode);
             }
+            self.check_pin_names(node);
             match &node.kind {
                 NodeKind::Entry => entries += 1,
                 NodeKind::GetVariable { variable } | NodeKind::SetVariable { variable } => {

@@ -39,7 +39,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 4 | Rust generation | **Final** |
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
 | 6 | Editor integration | In progress: «Compilar» checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
-| 7–8 | Blueprints | In progress: model, rules and files done; translation pending |
+| 7–8 | Blueprints | In progress: model, rules, files and translation to StarScript done; the editor pending |
 
 ## 1. Lexicon (final)
 
@@ -588,7 +588,10 @@ read, and debugged, as code. A blueprint is a class: it can inherit from
 another class and other classes can use it. They live in the `star_blueprint`
 crate.
 
-**Model**: a blueprint has a class name, an optional base class, variables
+**Model**: a blueprint has a class name, an optional base class (with the
+constant values its `init` needs, `base_arguments`: a node gives its name,
+a sprite also its image; the blueprint itself is created without
+arguments), variables
 (fields: a name, a type and/or a starting value, `private` or not) and
 graphs. Each **graph** is a method: an event of the base class
 (`override = true`, such as `update`) or one of its own, with its
@@ -640,6 +643,7 @@ the translated code.
 format = 1
 class = "Player"
 extends = "Sprite"
+base_arguments = ["Player", "sprites/player.png"]   # super.init(…)
 
 [[variable]]
 name = "speed"
@@ -686,6 +690,37 @@ to = { node = 3, pin = "right" }
 from = { node = 3, pin = "result" }
 to = { node = 2, pin = "value" }
 ```
+
+**Translation** (`translate`): each blueprint becomes one StarScript class,
+written to be read. The example above becomes:
+
+```
+// Translated from a blueprint: change the blueprint, not this code.
+class Player extends Sprite {
+    var speed = 2.0
+
+    init() {
+        super.init("Player", "sprites/player.png")
+    }
+
+    override func update(delta: float) {
+        speed = speed * delta
+    }
+}
+```
+
+- Statements follow the execution wires from the `entry`; a `branch` is an
+  `if`/`else` (or `if !condition` when only `false` is wired) and nothing
+  follows it, as the flow is a tree.
+- Values are written where they are used: literals, variables, operators and
+  pure calls. Operators inside other expressions get parentheses.
+- The result of a call that runs in order is kept in a constant named after
+  its method and node (`const roll_3 = roll()`), and only exists after it,
+  in its own path of a branch: using it elsewhere is an error.
+- Members are written without `self.` unless a parameter hides them.
+- Each piece of the code remembers its node, variable or graph
+  (`Translation::origin`), so the mistakes the StarScript compiler finds in
+  it are placed back on the blueprint.
 
 ## 6. Plain Rust
 

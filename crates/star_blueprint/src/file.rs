@@ -93,6 +93,7 @@ mod tests {
         Blueprint {
             class: "Player".to_owned(),
             extends: Some("Sprite".to_owned()),
+            base_arguments: vec![Literal::String("Player".to_owned())],
             variables: vec![
                 Variable {
                     name: "speed".to_owned(),

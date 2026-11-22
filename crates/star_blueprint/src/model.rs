@@ -15,6 +15,11 @@ pub struct Blueprint {
     /// Name of the class it extends, if any (`"Sprite"`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extends: Option<String>,
+    /// The values given to the `init` of the base class, if it needs any:
+    /// a node gives its name, and a sprite also its image. The blueprint is
+    /// created without arguments.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub base_arguments: Vec<Literal>,
     /// Its fields.
     #[serde(rename = "variable", default, skip_serializing_if = "Vec::is_empty")]
     pub variables: Vec<Variable>,

@@ -99,7 +99,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [ ] 13.7 Blueprint model and translation to StarScript (`star_blueprint`):
     - [x] 13.7a Model: classes as node graphs, pins of each node, the rules
           (`validate`) and `.blueprint` files (TOML).
-    - [ ] 13.7b Translation to StarScript, remembering which code comes from
+    - [x] 13.7b Translation to StarScript, remembering which code comes from
           which node.
     - [ ] 13.7c «Compilar» in the editor checks blueprints with the scripts,
           and their errors name the node.

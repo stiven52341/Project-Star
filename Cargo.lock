@@ -2591,6 +2591,7 @@ name = "star_blueprint"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "star_script",
  "toml",
 ]
 

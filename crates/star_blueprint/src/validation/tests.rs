@@ -53,6 +53,7 @@ fn blueprint(graphs: Vec<Graph>) -> Blueprint {
     Blueprint {
         class: "Player".to_owned(),
         extends: Some("Sprite".to_owned()),
+        base_arguments: vec![Literal::String("Player".to_owned())],
         variables: vec![Variable {
             name: "speed".to_owned(),
             ty: None,
@@ -302,9 +303,30 @@ fn names_must_be_valid_and_unique() {
         "{errors:?}"
     );
     assert!(
+        errors.contains(&(Some(2), BlueprintErrorKind::DuplicatePin("text".to_owned()))),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn arguments_cannot_take_the_name_of_another_pin() {
+    let call = Call {
+        target: CallTarget::OwnObject,
+        method: "jump".to_owned(),
+        arguments: vec![EXECUTION_INPUT.to_owned()],
+        returns_value: false,
+        pure: false,
+    };
+    let errors = GraphBuilder::new()
+        .node(1, NodeKind::Entry)
+        .node(2, NodeKind::Call(call))
+        .link((1, EXECUTION_OUTPUT), (2, EXECUTION_INPUT))
+        .errors();
+
+    assert!(
         errors.contains(&(
             Some(2),
-            BlueprintErrorKind::DuplicateParameter("text".to_owned())
+            BlueprintErrorKind::DuplicatePin(EXECUTION_INPUT.to_owned())
         )),
         "{errors:?}"
     );

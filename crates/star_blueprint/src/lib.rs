@@ -10,12 +10,15 @@
 //! - [`Node::pins`]: the pins of each kind of node.
 //! - [`validate`]: the rules a blueprint must follow.
 //! - [`Blueprint::from_text`] / [`Blueprint::to_text`]: `.blueprint` files.
+//! - [`translate`]: the StarScript code of a blueprint, and which node each
+//!   piece of it comes from.
 //!
 //! The format is described in `docs/starscript.md`, section 5.
 
 mod file;
 pub mod model;
 mod pins;
+mod translation;
 mod validation;
 
 pub use file::{BlueprintFileError, FORMAT_VERSION};
@@ -27,4 +30,5 @@ pub use pins::{
     BRANCH_FALSE, BRANCH_TRUE, CONDITION, Direction, EXECUTION_INPUT, EXECUTION_OUTPUT, LEFT, Pin,
     PinKind, RESULT, RIGHT, TARGET, VALUE,
 };
+pub use translation::{Origin, Translation, translate};
 pub use validation::{BlueprintError, BlueprintErrorKind, validate};
