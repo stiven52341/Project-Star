@@ -69,6 +69,27 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 24 | StarScript input: actions in **`project.toml`**, read through `star_script_runtime::input` | Actions are project settings (`[input.actions]`), as an editor panel will show them, so scripts stay clean and the compiler can reject misspelled action names (it receives them in `GameSettings`). `Input.is_down("jump")` is a static call with no object to read the engine's input from, so the generated game copies each action's state into a per-thread table of the runtime once per frame (no allocations; the runtime stays without dependencies) and the calls read it by name. Rejected: declaring actions in scripts (typos in key names only fail while playing) |
 | 25 | Sprites **batched by texture**, in an immediate `Frame` | The game adds sprites every frame (like meshes, decision 9); the renderer groups consecutive sprites that share a texture into one draw call. The order is explicit (layers, then order of addition), so translucent sprites always blend correctly without sorting by depth. Rejected for now: texture arrays or bindless textures (not available on OpenGL ES and older GPUs) and automatic atlases (they belong to the asset pipeline, Phase 5) |
 | 26 | PNG decoding with **png** (MIT/Apache-2.0), in `star_assets` | The image-rs project's decoder: maintained, pure Rust (it builds for every platform, mobile included) and light. PNG is lossless with transparency, the usual format for 2D game art. Only `star_assets` knows it. Rejected: the `image` crate (many formats, but much heavier to build; more formats can come in Phase 5) |
+| 27 | ECS with **sparse sets** and closure queries, without `unsafe` | Adding and removing components is O(1) and never moves other components, which suits a node tree where objects change often; going through one type reads contiguous memory. Per-type `RefCell`s let one query change some types while reading others, checked at run time instead of with `unsafe`. Queries take a closure (`World::each`) instead of returning an iterator, since an iterator that lends `&mut` components cannot be written in safe Rust. Rejected: archetype tables (faster iteration over many types, but adding a component moves the whole entity, and they need `unsafe` to be fast) and external ECS crates (decision 5 spirit: own facade, and the scene system will shape it) |
+
+## ECS
+
+- `World` (`star_ecs`) holds entities, components and resources. Any
+  `'static` type can be a component (at most one of each type per entity)
+  or a resource (one value for the whole world: the time, the input, a score).
+- Entities are handles with a generation (`Entity`): a destroyed entity's
+  index is reused, but old handles stop being alive.
+- Components of each type live in a **sparse set**: a dense array of values
+  (contiguous to go through), the entity of each value, and a sparse array
+  from entity index to position. Adding, removing and finding are O(1).
+- Each component type (and each resource) sits in its own `RefCell`, so
+  queries borrow several types at once without `unsafe`:
+  `world.each::<(&mut Position, &Velocity)>(|entity, (position, velocity)| …)`.
+  A query goes through the entities of its rarest component and looks up the
+  others; it allocates nothing. Asking for a type twice with a `&mut`, or
+  changing a type that a running query uses, is an `EngineError::Ecs`.
+- Structural changes (spawn, despawn, add or remove components) need
+  `&mut World`; reading and changing existing components only `&World`, so a
+  query can read other entities (`world.get`) while it runs.
 
 ## Input
 

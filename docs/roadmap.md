@@ -28,7 +28,12 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         sprites (tint, rotation, anchor, layers, sprite sheet cells) and
         sprite batching (example `sprites_2d`).
   - [x] Loading PNG images from files (`GameContext::load_texture`).
-- [ ] **Phase 4 — Full ECS**: components, queries, systems and stages.
+- [ ] **Phase 4 — Full ECS**:
+  - [x] 4a `World`: entities, components in sparse sets, queries
+        (`World::each`) and resources.
+  - [ ] 4b Systems and stages (`Schedule`).
+  - [ ] 4c The engine owns the `World`: `Time` and `Input` as resources,
+        systems registered in `App`.
 - [ ] **Phase 5 — Assets**: asset folders, handles and caching, sounds,
       hot-reload, more image formats. (PNG decoding already exists.)
 - [ ] **Phase 6 — Scenes**: node tree, serialization.

@@ -27,6 +27,9 @@ pub enum EngineError {
     Input(String),
     /// An asset cannot be used: a missing file, a corrupt image…
     Asset(String),
+    /// Entities, components or systems were misused, e.g. a component added
+    /// to a destroyed entity.
+    Ecs(String),
     /// A fixed-capacity resource has no room left.
     CapacityExceeded {
         /// Name of the exhausted resource.
@@ -47,6 +50,7 @@ impl fmt::Display for EngineError {
             Self::Rendering(reason) => write!(formatter, "rendering error: {reason}"),
             Self::Input(reason) => write!(formatter, "input error: {reason}"),
             Self::Asset(reason) => write!(formatter, "asset error: {reason}"),
+            Self::Ecs(reason) => write!(formatter, "ECS error: {reason}"),
             Self::CapacityExceeded { resource } => {
                 write!(formatter, "capacity exceeded for {resource}")
             }
