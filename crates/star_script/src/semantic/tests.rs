@@ -842,3 +842,56 @@ fn input_takes_an_action_name() {
         }]
     );
 }
+
+// --- Nodes ---
+
+#[test]
+fn scripts_extend_nodes_and_add_them_to_the_game() {
+    assert_valid(
+        "class Player extends Sprite {\n var speed = 4.0\n \
+         init() { super.init(\"Player\", \"sprites/hero.png\") }\n \
+         override func start() { width = 2.0\n layer = 1 }\n \
+         override func update(delta: float) {\n x += speed * delta\n rotation = 0.5\n \
+         if x > 10.0 { remove() }\n }\n}\n\
+         class MyGame extends Game {\n override func start() {\n \
+         const level = Node(\"Level\")\n level.add_child(Player())\n add_child(level)\n \
+         const found: Node? = level.find_child(\"Player\")\n \
+         const count = level.children().length()\n \
+         const top: Node? = level.parent()\n \
+         Debug.print(level.name + count.to_string())\n }\n}",
+    );
+}
+
+#[test]
+fn node_fields_cannot_be_declared_again() {
+    assert_eq!(
+        errors("class Ship extends Node {\n var x = 1.0\n init() { super.init(\"Ship\") }\n}"),
+        [Kind::MemberShadowsBase {
+            name: "x".into(),
+            base: "Node".into()
+        }]
+    );
+}
+
+#[test]
+fn nodes_need_their_name_and_sprites_their_image() {
+    assert_eq!(
+        errors("class Ship extends Sprite {\n init() { }\n}"),
+        [Kind::MissingSuperInit("Sprite".into())]
+    );
+    assert_eq!(
+        body_errors("const sprite = Sprite(\"Hero\")"),
+        [Kind::WrongArgumentCount {
+            expected: 2,
+            found: 1
+        }]
+    );
+}
+
+#[test]
+fn only_nodes_can_join_the_tree() {
+    assert_eq!(
+        errors("class G extends Game {\n override func start() { add_child(Enemy()) }\n}"),
+        [mismatch("Node", "Enemy")]
+    );
+}

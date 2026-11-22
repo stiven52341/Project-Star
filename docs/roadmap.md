@@ -44,8 +44,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] 6b 2D transforms relative to the parent, and their propagation.
   - [x] 6c Sprite nodes, drawn by the engine.
   - [x] 6d `.scene` files (TOML): loading, instancing, capturing and saving.
-  - Next, on top of it: nodes in StarScript (13.5c) and the real hierarchy
-    and inspector of the editor (Phase 12).
+  - Next, on top of it: the real hierarchy and inspector of the editor
+    (Phase 12), and scenes from StarScript.
 - [ ] **Phase 7 — Audio**: playback, and loading sounds from the asset folder.
 - [ ] **Phase 8 — 2D physics**.
 - [ ] **Phase 9 — 3D rendering**: materials, lights, indexed meshes. (`Mat4`
@@ -73,7 +73,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.5b Input in StarScript: class `Input` (`is_down`, `just_pressed`,
           `just_released`) over the actions of `project.toml`; misspelled
           action names are compile errors.
-    - [ ] 13.5c Nodes in StarScript, together with Phase 6.
+    - [x] 13.5c Nodes in StarScript: engine classes `Node` and `Sprite`,
+          which scripts extend with their own `start` and `update`; the
+          game's tree is mirrored into the engine's world.
   - [ ] 13.6 Editor integration: compiling and an error panel.
   - [ ] 13.7 Blueprint model and translation to StarScript.
   - [ ] 13.8 Visual blueprint editor.

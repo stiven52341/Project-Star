@@ -24,9 +24,11 @@ pub mod Game {
     /// A reference to an object of this class or of a subclass.
     pub type Ref = ::std::rc::Rc<dyn Object>;
 
-    /// The fields of a game: whether it asked to close.
+    /// The fields of a game: whether it asked to close, and the root of its
+    /// tree of nodes.
     pub struct Fields {
         pub quit_requested_: ::star_script_runtime::Field<bool>,
+        pub root_: crate::classes::Node::Ref,
     }
 
     /// Gives access to the fields of this class, in objects of any subclass.
@@ -39,6 +41,7 @@ pub mod Game {
         fn start(self: ::std::rc::Rc<Self>);
         fn update(self: ::std::rc::Rc<Self>, delta: f32);
         fn quit(self: ::std::rc::Rc<Self>);
+        fn add_child(self: ::std::rc::Rc<Self>, node: crate::classes::Node::Ref);
     }
 
     /// What games do unless they override it: nothing, until `quit`.
@@ -54,6 +57,11 @@ pub mod Game {
         /// `func quit`: closes the game after the current frame.
         pub fn quit(this_: &Ref) {
             HasFields::fields(&**this_).quit_requested_.set(true);
+        }
+
+        /// `func add_child`: puts `node` in the game's tree, at the top.
+        pub fn add_child(this_: &Ref, node: crate::classes::Node::Ref) {
+            crate::classes::Node::Methods::add_child(&HasFields::fields(&**this_).root_, node);
         }
     }
 
@@ -74,16 +82,273 @@ pub mod Game {
         fn start(self: ::std::rc::Rc<Self>) { Methods::start(&(self as Ref)) }
         fn update(self: ::std::rc::Rc<Self>, delta: f32) { Methods::update(&(self as Ref), delta) }
         fn quit(self: ::std::rc::Rc<Self>) { Methods::quit(&(self as Ref)) }
+        fn add_child(self: ::std::rc::Rc<Self>, node: crate::classes::Node::Ref) { Methods::add_child(&(self as Ref), node) }
     }
 
     /// Prepares an object of this class: `make_` builds it from its fields.
     pub fn init_<O: Object + 'static>(make_: impl FnOnce(Fields) -> ::std::rc::Rc<O>) -> ::std::rc::Rc<O> {
-        make_(Fields { quit_requested_: ::star_script_runtime::Field::new(false) })
+        make_(Fields {
+            quit_requested_: ::star_script_runtime::Field::new(false),
+            root_: crate::classes::Node::new(::std::string::String::from(\"Game\")),
+        })
     }
 
     /// Creates an object of this class.
     pub fn new() -> Ref {
         init_(|fields0_| ::std::rc::Rc::new(Instance { Game: fields0_ }))
+    }
+}";
+
+/// The modules of the engine classes `Node` and `Sprite`.
+pub(super) fn node_modules(out: &mut Writer) {
+    for line in NODE_MODULE.lines().chain([""]).chain(SPRITE_MODULE.lines()) {
+        out.line(line);
+    }
+}
+
+const NODE_MODULE: &str = "/// `class Node`, provided by the engine.
+pub mod Node {
+    /// A reference to an object of this class or of a subclass.
+    pub type Ref = ::std::rc::Rc<dyn Object>;
+
+    /// Gives every node its own number, which the engine knows it by.
+    static NEXT_ID_: ::std::sync::atomic::AtomicU64 = ::std::sync::atomic::AtomicU64::new(1);
+
+    /// The fields of a node: the public ones, and its place in the tree.
+    pub struct Fields {
+        pub name: ::star_script_runtime::Field<::std::string::String>,
+        pub x: ::star_script_runtime::Field<f32>,
+        pub y: ::star_script_runtime::Field<f32>,
+        pub rotation: ::star_script_runtime::Field<f32>,
+        pub scale_x: ::star_script_runtime::Field<f32>,
+        pub scale_y: ::star_script_runtime::Field<f32>,
+        pub id_: u64,
+        pub parent_: ::std::cell::RefCell<::std::option::Option<::std::rc::Weak<dyn Object>>>,
+        pub children_: ::std::cell::RefCell<::std::vec::Vec<Ref>>,
+        pub started_: ::std::cell::Cell<bool>,
+    }
+
+    /// Gives access to the fields of this class, in objects of any subclass.
+    pub trait HasFields {
+        fn fields(&self) -> &Fields;
+    }
+
+    /// What the engine calls and what subclasses may run their own version of.
+    pub trait Object: crate::AnyObject + HasFields {
+        fn start(self: ::std::rc::Rc<Self>);
+        fn update(self: ::std::rc::Rc<Self>, delta: f32);
+        fn add_child(self: ::std::rc::Rc<Self>, child: Ref);
+        fn remove(self: ::std::rc::Rc<Self>);
+        fn parent(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref>;
+        fn children(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<Ref>;
+        fn find_child(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<Ref>;
+    }
+
+    /// What nodes do unless a subclass overrides it.
+    pub struct Methods;
+
+    impl Methods {
+        /// `func start`
+        pub fn start(this_: &Ref) {}
+
+        /// `func update`
+        pub fn update(this_: &Ref, delta: f32) {}
+
+        /// `func add_child`: moves `child`, with its own children, under this node.
+        pub fn add_child(this_: &Ref, child: Ref) {
+            if is_same_or_ancestor_(&child, this_) {
+                ::std::eprintln!(\"StarScript warning: a node cannot be added under itself or one of its children\");
+                return;
+            }
+            Self::remove(&child);
+            *HasFields::fields(&*child).parent_.borrow_mut() = ::std::option::Option::Some(::std::rc::Rc::downgrade(this_));
+            HasFields::fields(&**this_).children_.borrow_mut().push(child);
+        }
+
+        /// `func remove`: takes the node, with its children, out of the tree.
+        pub fn remove(this_: &Ref) {
+            let parent_ = HasFields::fields(&**this_).parent_.borrow_mut().take();
+            if let ::std::option::Option::Some(parent_) = parent_.and_then(|parent_| parent_.upgrade()) {
+                HasFields::fields(&*parent_).children_.borrow_mut().retain(|child_| !::std::rc::Rc::ptr_eq(child_, this_));
+            }
+        }
+
+        /// `func parent`
+        pub fn parent(this_: &Ref) -> ::std::option::Option<Ref> {
+            HasFields::fields(&**this_).parent_.borrow().as_ref().and_then(::std::rc::Weak::upgrade)
+        }
+
+        /// `func children`: a new list, so changing it does not change the tree.
+        pub fn children(this_: &Ref) -> ::star_script_runtime::List<Ref> {
+            ::star_script_runtime::List::from_vec(HasFields::fields(&**this_).children_.borrow().clone())
+        }
+
+        /// `func find_child`
+        pub fn find_child(this_: &Ref, name: ::std::string::String) -> ::std::option::Option<Ref> {
+            HasFields::fields(&**this_).children_.borrow().iter()
+                .find(|child_| HasFields::fields(&***child_).name.read(|child_name_| *child_name_ == name))
+                .cloned()
+        }
+    }
+
+    /// Whether `node` is `other` or one of its ancestors.
+    fn is_same_or_ancestor_(node: &Ref, other: &Ref) -> bool {
+        let mut current_ = ::std::option::Option::Some(::std::rc::Rc::clone(other));
+        while let ::std::option::Option::Some(candidate_) = current_ {
+            if ::std::rc::Rc::ptr_eq(&candidate_, node) {
+                return true;
+            }
+            current_ = Methods::parent(&candidate_);
+        }
+        false
+    }
+
+    /// Runs `start` (the first time) and `update` of every node of the tree
+    /// of `root`, parents first. Nodes added during the frame start in the
+    /// next one; nodes removed during it are skipped. `nodes_` is a reused
+    /// list, left empty.
+    pub fn process_tree_(root: &Ref, delta: f32, nodes_: &mut ::std::vec::Vec<Ref>) {
+        nodes_.push(::std::rc::Rc::clone(root));
+        let mut next_ = 0;
+        while let ::std::option::Option::Some(node_) = nodes_.get(next_).cloned() {
+            nodes_.extend(HasFields::fields(&*node_).children_.borrow().iter().cloned());
+            next_ += 1;
+        }
+        for node_ in nodes_.iter() {
+            if !is_same_or_ancestor_(root, node_) {
+                continue;
+            }
+            let fields_ = HasFields::fields(&**node_);
+            if !fields_.started_.get() {
+                fields_.started_.set(true);
+                Object::start(::std::rc::Rc::clone(node_));
+            }
+            Object::update(::std::rc::Rc::clone(node_), delta);
+        }
+        nodes_.clear();
+    }
+
+    /// An object created as this class (not as a subclass).
+    pub struct Instance {
+        pub Node: Fields,
+    }
+
+    impl HasFields for Instance {
+        fn fields(&self) -> &Fields { &self.Node }
+    }
+
+    impl crate::AnyObject for Instance {
+        fn Node(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref> { ::std::option::Option::Some(self) }
+    }
+
+    impl Object for Instance {
+        fn start(self: ::std::rc::Rc<Self>) { Methods::start(&(self as Ref)) }
+        fn update(self: ::std::rc::Rc<Self>, delta: f32) { Methods::update(&(self as Ref), delta) }
+        fn add_child(self: ::std::rc::Rc<Self>, child: Ref) { Methods::add_child(&(self as Ref), child) }
+        fn remove(self: ::std::rc::Rc<Self>) { Methods::remove(&(self as Ref)) }
+        fn parent(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref> { Methods::parent(&(self as Ref)) }
+        fn children(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<Ref> { Methods::children(&(self as Ref)) }
+        fn find_child(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<Ref> { Methods::find_child(&(self as Ref), name) }
+    }
+
+    /// Prepares an object of this class: `make_` builds it from its fields.
+    pub fn init_<O: Object + 'static>(name: ::std::string::String, make_: impl FnOnce(Fields) -> ::std::rc::Rc<O>) -> ::std::rc::Rc<O> {
+        make_(Fields {
+            name: ::star_script_runtime::Field::new(name),
+            x: ::star_script_runtime::Field::new(0.0),
+            y: ::star_script_runtime::Field::new(0.0),
+            rotation: ::star_script_runtime::Field::new(0.0),
+            scale_x: ::star_script_runtime::Field::new(1.0),
+            scale_y: ::star_script_runtime::Field::new(1.0),
+            id_: NEXT_ID_.fetch_add(1, ::std::sync::atomic::Ordering::Relaxed),
+            parent_: ::std::cell::RefCell::new(::std::option::Option::None),
+            children_: ::std::cell::RefCell::new(::std::vec::Vec::new()),
+            started_: ::std::cell::Cell::new(false),
+        })
+    }
+
+    /// Creates an object of this class.
+    pub fn new(name: ::std::string::String) -> Ref {
+        init_(name, |fields0_| ::std::rc::Rc::new(Instance { Node: fields0_ }))
+    }
+}";
+
+const SPRITE_MODULE: &str = "/// `class Sprite`, provided by the engine.
+pub mod Sprite {
+    /// A reference to an object of this class or of a subclass.
+    pub type Ref = ::std::rc::Rc<dyn Object>;
+
+    /// The fields of a sprite: the image it shows and how.
+    pub struct Fields {
+        pub texture: ::star_script_runtime::Field<::std::string::String>,
+        pub width: ::star_script_runtime::Field<f32>,
+        pub height: ::star_script_runtime::Field<f32>,
+        pub layer: ::star_script_runtime::Field<i64>,
+        pub pixelated: ::star_script_runtime::Field<bool>,
+    }
+
+    /// Gives access to the fields of this class, in objects of any subclass.
+    pub trait HasFields {
+        fn fields(&self) -> &Fields;
+    }
+
+    /// A sprite adds no methods to those of a node.
+    pub trait Object: crate::classes::Node::Object + HasFields {}
+
+    /// A sprite adds no methods to those of a node.
+    pub struct Methods;
+
+    /// An object created as this class (not as a subclass).
+    pub struct Instance {
+        pub Node: crate::classes::Node::Fields,
+        pub Sprite: Fields,
+    }
+
+    impl crate::classes::Node::HasFields for Instance {
+        fn fields(&self) -> &crate::classes::Node::Fields { &self.Node }
+    }
+
+    impl HasFields for Instance {
+        fn fields(&self) -> &Fields { &self.Sprite }
+    }
+
+    impl crate::AnyObject for Instance {
+        fn Node(self: ::std::rc::Rc<Self>) -> ::std::option::Option<crate::classes::Node::Ref> { ::std::option::Option::Some(self) }
+        fn Sprite(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref> { ::std::option::Option::Some(self) }
+    }
+
+    impl crate::classes::Node::Object for Instance {
+        fn start(self: ::std::rc::Rc<Self>) { crate::classes::Node::Methods::start(&(self as crate::classes::Node::Ref)) }
+        fn update(self: ::std::rc::Rc<Self>, delta: f32) { crate::classes::Node::Methods::update(&(self as crate::classes::Node::Ref), delta) }
+        fn add_child(self: ::std::rc::Rc<Self>, child: crate::classes::Node::Ref) { crate::classes::Node::Methods::add_child(&(self as crate::classes::Node::Ref), child) }
+        fn remove(self: ::std::rc::Rc<Self>) { crate::classes::Node::Methods::remove(&(self as crate::classes::Node::Ref)) }
+        fn parent(self: ::std::rc::Rc<Self>) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::parent(&(self as crate::classes::Node::Ref)) }
+        fn children(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::children(&(self as crate::classes::Node::Ref)) }
+        fn find_child(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_child(&(self as crate::classes::Node::Ref), name) }
+    }
+
+    impl Object for Instance {}
+
+    /// Prepares an object of this class: `make_` builds it from the fields
+    /// of a node and of a sprite.
+    pub fn init_<O: Object + 'static>(
+        name: ::std::string::String,
+        texture: ::std::string::String,
+        make_: impl FnOnce(crate::classes::Node::Fields, Fields) -> ::std::rc::Rc<O>,
+    ) -> ::std::rc::Rc<O> {
+        let fields_ = Fields {
+            texture: ::star_script_runtime::Field::new(texture),
+            width: ::star_script_runtime::Field::new(1.0),
+            height: ::star_script_runtime::Field::new(1.0),
+            layer: ::star_script_runtime::Field::new(0),
+            pixelated: ::star_script_runtime::Field::new(false),
+        };
+        crate::classes::Node::init_(name, move |base0_| make_(base0_, fields_))
+    }
+
+    /// Creates an object of this class.
+    pub fn new(name: ::std::string::String, texture: ::std::string::String) -> Ref {
+        init_(name, texture, |fields0_, fields1_| ::std::rc::Rc::new(Instance { Node: fields0_, Sprite: fields1_ }))
     }
 }";
 
@@ -112,22 +377,35 @@ pub fn main() -> ::std::process::ExitCode {{
 fn run_() -> ::star_engine::star_core::EngineResult<()> {{
     let actions_ = action_map_()?;
     {RUNTIME}::input::declare_actions(&ACTION_NAMES_);
-    let game_: crate::classes::Game::Ref = {class_path}::new();
+    let game_ = EngineGame_ {{
+        game: {class_path}::new(),
+        nodes: ::std::vec::Vec::new(),
+        pending: ::std::vec::Vec::new(),
+        mirror: ::star_engine::script_nodes::ScriptNodes::new(),
+    }};
     ::star_engine::app::App::new()
         .with_title({title:?})
         .with_actions(actions_)
-        .run_game(EngineGame_(game_))
+        .run_game(game_)
 }}
 
 /// Connects the StarScript game with the engine's game loop.
-struct EngineGame_(crate::classes::Game::Ref);
+struct EngineGame_ {{
+    game: crate::classes::Game::Ref,
+    /// Reused list of the nodes whose code runs in a frame.
+    nodes: ::std::vec::Vec<crate::classes::Node::Ref>,
+    /// Reused list of the nodes still to mirror, with their parent's number.
+    pending: ::std::vec::Vec<(crate::classes::Node::Ref, ::std::option::Option<u64>)>,
+    /// The node of the engine's world that mirrors each node of the game.
+    mirror: ::star_engine::script_nodes::ScriptNodes,
+}}
 
 impl ::star_engine::game::Game for EngineGame_ {{
     fn start(
         &mut self,
         _context: &mut ::star_engine::game::GameContext<'_>,
     ) -> ::star_engine::star_core::EngineResult<()> {{
-        crate::classes::Game::Object::start(::std::rc::Rc::clone(&self.0));
+        crate::classes::Game::Object::start(::std::rc::Rc::clone(&self.game));
         ::std::result::Result::Ok(())
     }}
 
@@ -136,11 +414,15 @@ impl ::star_engine::game::Game for EngineGame_ {{
         if let ::std::option::Option::Some(input) = world.input() {{
             share_actions_(input.actions());
         }}
-        crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.0), world.time().delta_seconds());
+        let delta_ = world.time().delta_seconds();
+        crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.game), delta_);
+        let root_ = ::std::rc::Rc::clone(&crate::classes::Game::HasFields::fields(&*self.game).root_);
+        crate::classes::Node::process_tree_(&root_, delta_, &mut self.nodes);
+        mirror_nodes_(world, &mut self.mirror, &root_, &mut self.pending);
     }}
 
     fn is_finished(&self) -> bool {{
-        crate::classes::Game::HasFields::fields(&*self.0).{QUIT_FIELD}.get()
+        crate::classes::Game::HasFields::fields(&*self.game).{QUIT_FIELD}.get()
     }}
 }}
 
@@ -156,10 +438,70 @@ fn share_actions_(actions_: &::star_engine::star_input::Actions) {{
     }}
 }}"
     );
-    for line in main.lines() {
+    for line in main.lines().chain([""]).chain(MIRROR_NODES.lines()) {
         out.line(line);
     }
 }
+
+const MIRROR_NODES: &str = "/// Describes every node of the game's tree to the engine, parents first, so
+/// the world has a node in step with each one.
+fn mirror_nodes_(
+    world_: &mut ::star_engine::star_ecs::World,
+    mirror_: &mut ::star_engine::script_nodes::ScriptNodes,
+    root_: &crate::classes::Node::Ref,
+    pending_: &mut ::std::vec::Vec<(crate::classes::Node::Ref, ::std::option::Option<u64>)>,
+) {
+    mirror_.begin_frame();
+    pending_.push((::std::rc::Rc::clone(root_), ::std::option::Option::None));
+    while let ::std::option::Option::Some((node_, parent_)) = pending_.pop() {
+        let fields_ = crate::classes::Node::HasFields::fields(&*node_);
+        let transform_ = ::star_engine::star_scene::Transform2D {
+            position: ::star_engine::star_math::Vec2::new(fields_.x.get(), fields_.y.get()),
+            rotation: fields_.rotation.get(),
+            scale: ::star_engine::star_math::Vec2::new(fields_.scale_x.get(), fields_.scale_y.get()),
+        };
+        let sprite_ = crate::AnyObject::Sprite(::std::rc::Rc::clone(&node_));
+        fields_.name.read(|name_| {
+            match &sprite_ {
+                ::std::option::Option::Some(sprite_) => {
+                    let look_ = crate::classes::Sprite::HasFields::fields(&**sprite_);
+                    look_.texture.read(|texture_| {
+                        let layer_ = look_.layer.get().clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
+                        let shown_ = ::star_engine::script_nodes::ScriptSprite {
+                            texture: texture_,
+                            size: ::star_engine::star_math::Vec2::new(look_.width.get(), look_.height.get()),
+                            layer: layer_,
+                            pixelated: look_.pixelated.get(),
+                        };
+                        mirror_.mirror(world_, &script_node_(fields_, parent_, name_, transform_, ::std::option::Option::Some(shown_)));
+                    });
+                }
+                ::std::option::Option::None => mirror_.mirror(world_, &script_node_(fields_, parent_, name_, transform_, ::std::option::Option::None)),
+            }
+        });
+        for child_ in fields_.children_.borrow().iter().rev() {
+            pending_.push((::std::rc::Rc::clone(child_), ::std::option::Option::Some(fields_.id_)));
+        }
+    }
+    mirror_.finish_frame(world_);
+}
+
+/// What the engine needs to know about one node.
+fn script_node_<'a>(
+    fields_: &crate::classes::Node::Fields,
+    parent_: ::std::option::Option<u64>,
+    name_: &'a str,
+    transform_: ::star_engine::star_scene::Transform2D,
+    sprite_: ::std::option::Option<::star_engine::script_nodes::ScriptSprite<'a>>,
+) -> ::star_engine::script_nodes::ScriptNode<'a> {
+    ::star_engine::script_nodes::ScriptNode {
+        id: fields_.id_,
+        parent: parent_,
+        name: name_,
+        transform: transform_,
+        sprite: sprite_,
+    }
+}";
 
 /// The names of the actions and the function that builds their map. The
 /// engine checks the bindings' names when the game starts.

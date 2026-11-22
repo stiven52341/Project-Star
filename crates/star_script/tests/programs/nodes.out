@@ -1,0 +1,11 @@
+Player sprites/hero.png 2.0 3
+children: 2
+found the player
+true
+parent: Level
+level: 1
+enemies: 2
+true
+true
+enemies: 1
+1.5 2.0 0.0

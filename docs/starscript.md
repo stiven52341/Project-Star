@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`) and input (`Input`) done; nodes with engine phase 6 |
+| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`) and nodes (`Node`, `Sprite`) done; scenes, camera and more next |
 | 6 | Editor integration | Pending |
 | 7–8 | Blueprints | Draft |
 
@@ -358,7 +358,9 @@ The engine provides them; their names cannot be used for other classes.
 | Class | Members |
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. |
-| `Game` | `start()`, `update(delta: float)`, `quit()` |
+| `Game` | `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
+| `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`; `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?` |
+| `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool` |
 | `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool` |
 
 **A game is a class that extends `Game`**:
@@ -384,8 +386,49 @@ class MyGame extends Game {
 - `quit()` closes the game at the end of the frame. If it is not called, the
   game goes on until the user closes the window.
 - `start` and `update` do nothing unless they are overridden.
-- Nodes will come with phase 6 (scenes) of the engine: each piece of the
-  engine is born with its StarScript API.
+
+**Nodes** make up what the game shows. A `Node` is placed relative to its
+parent; a `Sprite` is a node that shows an image of the project's `assets`
+folder. Scripts extend them, as they extend `Game`:
+
+```
+class Ship extends Sprite {
+    init() {
+        super.init("Ship", "sprites/ship.png")
+        width = 0.2
+        height = 0.2
+    }
+
+    override func update(delta: float) {
+        if Input.is_down("right") { x += 0.9 * delta }
+    }
+}
+
+class Space extends Game {
+    override func start() {
+        add_child(Ship())
+    }
+}
+```
+
+- The game is the root of the tree: `add_child` of `Game` adds nodes at the
+  top, and `add_child` of a node puts a child under it. A child moves,
+  rotates and scales with its parent. Adding a node that already has a
+  parent moves it; adding a node under itself or one of its children does
+  nothing (and prints a warning).
+- While a node is in the game's tree, the engine calls its `start()` once,
+  at the start of the first frame it is there, and its `update(delta)`
+  every frame, after the game's `update` and parents before children.
+- `remove()` takes the node, with its children, out of the tree: they stop
+  running and are no longer shown. The object can be added again later.
+- `x`, `y`, `width` and `height` are in world units; `rotation` in radians,
+  counterclockwise. The window shows 2 units from bottom to top for now,
+  centered on `(0, 0)`.
+- `texture` is an asset path such as `"sprites/hero.png"` (PNG or JPEG). An
+  image that cannot be loaded is not shown; the engine warns once.
+- Fields of the engine classes are not redeclared by subclasses, and their
+  own fields with a default value are assigned after `super.init(…)`.
+- Scenes (`.scene` files) cannot be used from scripts yet.
 
 **Input works with actions**, declared in the project, not in the scripts.
 The game asks for an action by name, so the same code works with keyboard,
@@ -449,7 +492,8 @@ carries no license notices: it belongs to the game's author.
 **Objects**: shared references with reference counting (`Rc`): an object is
 released when nobody uses it, and accessing it never fails. Two objects that
 reference each other are not released; weak references will solve that.
-Engine nodes (phase 5) will be separate engine handles.
+Nodes are objects too: the engine keeps a node of its world in step with
+each one in the game's tree (see `star_engine::script_nodes`).
 
 **Each class** `Player` generates a module `classes::Player` with:
 

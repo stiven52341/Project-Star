@@ -175,3 +175,37 @@ fn games_without_actions_have_an_empty_map() {
 
     assert!(code.contains("const ACTION_NAMES_: [&str; 0] = [];"));
 }
+
+#[test]
+fn scripts_extend_the_engine_nodes() {
+    let code = rust(
+        "class Ship extends Sprite {\n init() { super.init(\"Ship\", \"ship.png\") }\n \
+         override func update(delta: float) { x += delta }\n}",
+    );
+
+    assert!(code.contains("pub mod Node {"));
+    assert!(code.contains("pub mod Sprite {"));
+    assert!(code.contains("pub trait Object: crate::classes::Sprite::Object + HasFields {"));
+    assert!(code.contains("crate::classes::Sprite::init_("));
+    assert!(code.contains("pub Node: crate::classes::Node::Fields,"));
+    assert!(code.contains("crate::classes::Node::HasFields::fields(&**this_).x"));
+}
+
+#[test]
+fn games_run_the_code_of_their_nodes_and_mirror_them() {
+    let code =
+        rust("class G extends Game {\n override func start() { add_child(Node(\"Level\")) }\n}");
+
+    assert!(code.contains("crate::classes::Node::process_tree_(&root_, delta_, &mut self.nodes);"));
+    assert!(code.contains("mirror_nodes_(world, &mut self.mirror, &root_, &mut self.pending);"));
+}
+
+#[test]
+fn other_engine_classes_cannot_be_extended() {
+    let errors = compile_source("class Loud extends Debug {}").expect_err("engine base");
+
+    assert_eq!(
+        errors[0].to_string(),
+        "classes cannot inherit from the engine class `Debug` yet"
+    );
+}

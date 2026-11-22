@@ -1,7 +1,11 @@
 //! What the language provides without declaring it: native classes and the
 //! methods of basic types and lists.
 
-use super::{ClassInfo, ClassOrigin, ClassTable, MethodInfo, ParameterInfo, Type};
+use super::{
+    ClassId, ClassInfo, ClassOrigin, ClassTable, ConstructorInfo, FieldInfo, MethodInfo,
+    ParameterInfo, Type,
+};
+use crate::Span;
 
 /// Names of the basic types; they cannot be used as class names.
 pub(super) const BASIC_TYPE_NAMES: [&str; 4] = ["int", "float", "bool", "string"];
@@ -22,6 +26,12 @@ pub const GAME_CLASS: &str = "Game";
 
 /// Name of the engine class that reads the game's input actions.
 pub const INPUT_CLASS: &str = "Input";
+
+/// Name of the engine class of the objects of a game's scene tree.
+pub const NODE_CLASS: &str = "Node";
+
+/// Name of the engine class of the nodes that show an image.
+pub const SPRITE_CLASS: &str = "Sprite";
 
 /// The methods of `Input`: each one takes the name of an action.
 pub(super) const INPUT_METHODS: [&str; 3] = ["is_down", "just_pressed", "just_released"];
@@ -49,8 +59,11 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     }
     classes.add(input);
 
+    let node = add_node_class(classes);
+    add_sprite_class(classes, node);
+
     // A game: the engine calls `start` once and `update` every frame, until
-    // `quit` is called or the window is closed.
+    // `quit` is called or the window is closed. Its nodes hang from it.
     let mut game = ClassInfo::new(GAME_CLASS.to_owned(), ClassOrigin::Native);
     game.methods
         .push(native_method("start", &[], Type::Void, false));
@@ -62,7 +75,99 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     ));
     game.methods
         .push(native_method("quit", &[], Type::Void, false));
+    game.methods.push(native_method(
+        "add_child",
+        &[("node", Type::Class(node))],
+        Type::Void,
+        false,
+    ));
     classes.add(game);
+}
+
+/// `Node`: an object of the scene tree, placed relative to its parent. The
+/// engine calls `start` once and `update` every frame while it is in the tree.
+fn add_node_class(classes: &mut ClassTable) -> ClassId {
+    let mut node = ClassInfo::new(NODE_CLASS.to_owned(), ClassOrigin::Native);
+    node.fields = vec![
+        native_field("name", Type::String),
+        native_field("x", Type::Float),
+        native_field("y", Type::Float),
+        native_field("rotation", Type::Float),
+        native_field("scale_x", Type::Float),
+        native_field("scale_y", Type::Float),
+    ];
+    node.constructor = Some(native_constructor(&[("name", Type::String)]));
+    let id = classes.add(node);
+    let node_type = Type::Class(id);
+    let methods = [
+        native_method("start", &[], Type::Void, false),
+        native_method("update", &[("delta", Type::Float)], Type::Void, false),
+        native_method(
+            "add_child",
+            &[("child", node_type.clone())],
+            Type::Void,
+            false,
+        ),
+        native_method("remove", &[], Type::Void, false),
+        native_method("parent", &[], node_type.clone().nullable(), false),
+        native_method("children", &[], Type::list(node_type.clone()), false),
+        native_method(
+            "find_child",
+            &[("name", Type::String)],
+            node_type.nullable(),
+            false,
+        ),
+    ];
+    classes.class_mut(id).methods = methods.into();
+    id
+}
+
+/// `Sprite`: a node that shows an image of the asset folder.
+fn add_sprite_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
+    let mut sprite = ClassInfo::new(SPRITE_CLASS.to_owned(), ClassOrigin::Native);
+    sprite.base = Some(node);
+    sprite.fields = vec![
+        native_field("texture", Type::String),
+        native_field("width", Type::Float),
+        native_field("height", Type::Float),
+        native_field("layer", Type::Int),
+        native_field("pixelated", Type::Bool),
+    ];
+    sprite.constructor = Some(native_constructor(&[
+        ("name", Type::String),
+        ("texture", Type::String),
+    ]));
+    classes.add(sprite)
+}
+
+/// A public field of an engine class; the engine gives it its first value.
+fn native_field(name: &str, ty: Type) -> FieldInfo {
+    FieldInfo {
+        name: name.to_owned(),
+        ty,
+        is_private: false,
+        has_initializer: true,
+        span: Span::new(0, 0),
+    }
+}
+
+/// The public `init` of an engine class.
+fn native_constructor(parameters: &[(&str, Type)]) -> ConstructorInfo {
+    ConstructorInfo {
+        parameters: parameters_of(parameters),
+        is_private: false,
+        span: Span::new(0, 0),
+    }
+}
+
+fn parameters_of(parameters: &[(&str, Type)]) -> Vec<ParameterInfo> {
+    parameters
+        .iter()
+        .map(|(name, ty)| ParameterInfo {
+            name: (*name).to_owned(),
+            ty: ty.clone(),
+        })
+        .collect()
 }
 
 /// A method of an engine class.
@@ -74,13 +179,7 @@ fn native_method(
 ) -> MethodInfo {
     MethodInfo {
         name: name.to_owned(),
-        parameters: parameters
-            .iter()
-            .map(|(name, ty)| ParameterInfo {
-                name: (*name).to_owned(),
-                ty: ty.clone(),
-            })
-            .collect(),
+        parameters: parameters_of(parameters),
         return_type,
         is_static,
         is_private: false,

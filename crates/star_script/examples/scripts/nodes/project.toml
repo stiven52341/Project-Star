@@ -1,0 +1,13 @@
+# ProjectStar project file.
+[project]
+name = "Nodes demo"
+engine_version = "0.1.0"
+dimension = "2d"
+platforms = ["linux", "windows", "macos"]
+
+[input.actions]
+left = ["ArrowLeft", "A", "GamepadDPadLeft"]
+right = ["ArrowRight", "D", "GamepadDPadRight"]
+up = ["ArrowUp", "W", "GamepadDPadUp"]
+down = ["ArrowDown", "S", "GamepadDPadDown"]
+quit = ["Escape", "GamepadStart"]

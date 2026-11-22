@@ -39,6 +39,40 @@ class CountingGame extends Game {
 }
 ";
 
+/// A sprite node that runs its own code every frame, in the game's tree.
+const NODE_GAME: &str = "
+class Ship extends Sprite {
+    init() {
+        super.init(\"Ship\", \"sprites/ship.png\")
+    }
+
+    override func start() {
+        Debug.print(\"ship start\")
+    }
+
+    override func update(delta: float) {
+        x += 1.0
+        Debug.print(\"ship x \" + x.to_string())
+    }
+}
+
+class NodeGame extends Game {
+    var frames = 0
+
+    override func start() {
+        add_child(Ship())
+    }
+
+    override func update(delta: float) {
+        frames += 1
+        Debug.print(\"game frame \" + frames.to_string())
+        if frames == 3 {
+            quit()
+        }
+    }
+}
+";
+
 fn settings(bindings: &[&str]) -> GameSettings {
     GameSettings {
         actions: vec![InputAction {
@@ -64,6 +98,9 @@ fn games_run_in_the_engine_until_they_quit() {
             compile_with("misspelled_game", GAME, &misspelled),
         )
         .expect("valid name");
+    package
+        .add_program("node_game", compile_with("node_game", NODE_GAME, &valid))
+        .expect("valid name");
     package.write(&directory).expect("package written");
 
     build(&directory);
@@ -75,6 +112,17 @@ fn games_run_in_the_engine_until_they_quit() {
     assert_eq!(
         String::from_utf8_lossy(&output.stdout),
         "start\nframe 1 true\nframe 2 true\nframe 3 true\n"
+    );
+
+    let output = Command::new(binary(&directory, "node_game"))
+        .output()
+        .expect("the game runs");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "the node game failed:\n{stderr}");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "game frame 1\nship start\nship x 1.0\ngame frame 2\nship x 2.0\n\
+         game frame 3\nship x 3.0\n"
     );
 
     let output = Command::new(binary(&directory, "misspelled_game"))

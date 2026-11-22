@@ -77,6 +77,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 32 | **Nodes are ECS entities** with `Parent` and `Children` components | One world holds everything, so systems query nodes like any entity and the tree costs nothing to objects outside it. Both directions are stored: children keep their order (drawing, editor) and the parent is found in O(1). Their fields are private and only `Hierarchy` changes them, so they never disagree. Rejected: a separate node tree with entities inside (two sources of truth) and only `Parent` (children would need a search of the world) |
 | 33 | **Global transforms computed once per frame**, before drawing | One walk of the tree from the roots, with a reused work list (no allocations once warm), instead of recomputing ancestors every time a global transform is read. `Affine2` keeps skew from non-uniform scales exact. Rejected for now: dirty flags (they pay off with large static trees; they can be added behind the same components) and 3D transforms (with Phase 9, which brings quaternions) |
 | 34 | `.scene` files in **TOML, a flat list of nodes** | Readable, diff-friendly in git and already used for projects (`serde` and `toml` are workspace dependencies). A flat list with parent positions avoids deep nesting, makes parents-before-children easy to check, and lets one scene file be read in one pass. Textures are named by asset path, so scenes do not depend on load order. Rejected: RON (another dependency) and nested tables (unreadable a few levels deep) |
+| 35 | StarScript nodes are **script objects mirrored into the world** | Script objects are reference-counted Rust values that the generated code owns, and the world can only be lent to the engine's code, never kept by script objects without `unsafe`. So the script's tree of `Node` objects is the source of truth while the game runs: after the scripts' code ran each frame, the generated game describes the tree (parents first, texts borrowed, no copies) and `ScriptNodes` updates a world node per script node, destroying those that left. Scripts keep the simple field syntax (`x += 1.0`), and console programs do not depend on the engine (the `Node` module only uses the runtime). Images are named by path (`SpriteFile`) and loaded by the engine when it draws them. Rejected: handles to entities with getters and setters through a global world (needs the world outside the call stack that lends it) and copying every node's state into the script each frame |
 
 ## ECS
 
@@ -142,6 +143,15 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   `anchor`, `color`, `layer`). Unknown fields are errors, so typos are not
   silently ignored. Scenes keep names, transforms and sprites; other
   components (and the StarScript classes of nodes) will join them later.
+- A `SpriteFile` names a sprite's image by its asset path instead of a
+  `TextureId`: the engine loads the texture the first time it draws it (and
+  again when the path or filter change), so code without the renderer, such
+  as systems and StarScript nodes, can give nodes images. An image that
+  cannot be loaded logs one warning and is not drawn.
+- StarScript nodes (`Node`, `Sprite`) live in the script; after the scripts
+  ran each frame, the generated game describes its tree to `ScriptNodes`
+  (`star_engine::script_nodes`), which keeps one world node per script node
+  (decision 35).
 
 ## Assets
 

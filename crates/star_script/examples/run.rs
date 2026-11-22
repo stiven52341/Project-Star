@@ -9,6 +9,8 @@
 //!
 //! With `--rust` it only prints the generated Rust code. If the script's
 //! folder has a `project.toml`, its `[input.actions]` are the game's actions.
+//! The program runs in the script's folder, so a game finds its images in
+//! the `assets` folder next to it, as in a project of the editor.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -67,7 +69,11 @@ fn main() -> ExitCode {
         print!("{}", program.code);
         return ExitCode::SUCCESS;
     }
-    match build_and_run(&program_name(&path), program) {
+    let folder = Path::new(&path)
+        .parent()
+        .filter(|folder| !folder.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    match build_and_run(&program_name(&path), program, folder) {
         Ok(code) => code,
         Err(error) => {
             eprintln!("{error}");
@@ -76,7 +82,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn build_and_run(name: &str, program: GeneratedProgram) -> Result<ExitCode, String> {
+fn build_and_run(name: &str, program: GeneratedProgram, folder: &Path) -> Result<ExitCode, String> {
     let output = Path::new(OUTPUT);
     let directory = output.join(name);
     let mut package = Package::new(name, Path::new(ENGINE_CRATES)).map_err(|e| e.to_string())?;
@@ -92,6 +98,7 @@ fn build_and_run(name: &str, program: GeneratedProgram) -> Result<ExitCode, Stri
         .arg(directory.join("Cargo.toml"))
         // Every program shares one build of the runtime.
         .env("CARGO_TARGET_DIR", output.join("target"))
+        .current_dir(folder)
         .status()
         .map_err(|error| format!("cannot run cargo: {error}"))?;
     Ok(if status.success() {
