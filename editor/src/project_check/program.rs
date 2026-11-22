@@ -8,11 +8,6 @@ use star_script::{CompileError, SourceSet};
 
 use super::Problem;
 
-/// Extension of StarScript files.
-pub(super) const SCRIPT_EXTENSION: &str = ".star";
-/// Extension of blueprint files.
-pub(super) const BLUEPRINT_EXTENSION: &str = ".blueprint";
-
 /// The files of a program, as the StarScript compiler reads them.
 pub(super) struct Program {
     sources: SourceSet,

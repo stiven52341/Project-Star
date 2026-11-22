@@ -299,10 +299,12 @@ A single native window with two screens. Its texts are in Spanish for now
 2. **Editor** (`workspace/`), maximized: menu («Archivo» → «Cerrar
    proyecto» / «Salir»; «Proyecto» → «Compilar»; «Ayuda» → «Acerca de») and
    a «Compilar» button next to it, **Scene** panel (hierarchy, empty until `star_scene`
-   exists), central **view** rendered by the engine (reference grid; drag =
-   pan in 2D / orbit in 3D, wheel = zoom), **Inspector** (project
-   properties), a bottom panel with two tabs, **Archivos** (tree of
-   `assets/`, with «Actualizar») and **Problemas** (what the last
+   exists), a central area with **tabs**: «Escena», the **view** rendered by
+   the engine (reference grid; drag = pan in 2D / orbit in 3D, wheel =
+   zoom), always there, and one tab per open **blueprint** (see below),
+   **Inspector** (project properties), a bottom panel with two tabs,
+   **Archivos** (tree of `assets/`, with «Actualizar»; a double click on a
+   `.blueprint` opens it) and **Problemas** (what the last
    «Compilar» found, as `file:line:column` and a message; it opens by itself
    when there are problems), and a status bar (with the result of the last
    «Compilar»).
@@ -311,6 +313,18 @@ The view uses `OffscreenRenderer` on egui's wgpu device and registers its
 texture in `egui_wgpu` (it is registered again when its size changes). The
 texture is `Rgba8Unorm` with colors already encoded in sRGB, because egui
 samples textures as gamma values.
+
+The **blueprint editor** (`blueprint_editor/`) draws a graph of the open
+blueprint on a canvas of its own, painted with egui's painter (no node
+editor library: the model, its pins and its rules are `star_blueprint`'s).
+A selector chooses the graph. Nodes are boxes with a colored title by family
+(entry, flow, variables, calls, values), inputs down the left side and
+outputs down the right one, in the order of `Node::pins`; execution pins
+are triangles and data pins circles, and wires are curves between them.
+Dragging the background moves the view and the wheel zooms around the
+pointer (`CanvasView`, between ×0.25 and ×2). Where each node and pin is
+comes from `layout.rs` (graph units, with tests), so drawing and, later,
+picking pins with the mouse use the same geometry.
 
 «Compilar» runs `project_check/` (no UI, with tests) on a thread of its own
 (`CheckJob`), which asks egui to redraw when it finishes. It checks:

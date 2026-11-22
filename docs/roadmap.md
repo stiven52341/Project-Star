@@ -103,5 +103,13 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           which node.
     - [x] 13.7c «Compilar» in the editor checks blueprints with the scripts,
           and their errors name the node.
-  - [ ] 13.8 Visual blueprint editor.
+  - [ ] 13.8 Visual blueprint editor (drawn with egui, in tabs of the
+        central area):
+    - [x] 13.8a Open blueprints from «Archivos» in a tab and see their
+          graphs: nodes, pins and wires, with pan and zoom.
+    - [ ] 13.8b Edit graphs: move nodes, connect and remove wires, add and
+          delete nodes, change their properties, and save.
+    - [ ] 13.8c Edit the class (variables, graphs and their signature),
+          create new blueprints, and mark on their nodes the mistakes
+          «Compilar» finds.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

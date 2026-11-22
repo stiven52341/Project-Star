@@ -1,6 +1,7 @@
 //! ProjectStar visual editor. Starts on the project manager.
 
 mod app;
+mod blueprint_editor;
 mod file_tree;
 mod folder_dialog;
 mod launcher;

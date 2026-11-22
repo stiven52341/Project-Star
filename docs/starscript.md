@@ -39,7 +39,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 4 | Rust generation | **Final** |
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
 | 6 | Editor integration | In progress: «Compilar» checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
-| 7–8 | Blueprints | In progress: model, rules, files, translation to StarScript and «Compilar» in the editor done; the visual editor pending |
+| 7–8 | Blueprints | In progress: model, rules, files, translation to StarScript and «Compilar» in the editor done; the visual editor shows graphs, editing them pending |
 
 ## 1. Lexicon (final)
 

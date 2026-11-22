@@ -2,6 +2,11 @@
 
 use std::path::Path;
 
+use star_blueprint::{
+    BRANCH_FALSE, BRANCH_TRUE, Blueprint, CONDITION, CallTarget, EXECUTION_INPUT, EXECUTION_OUTPUT,
+    LEFT, Literal, NodeKind, RESULT, RIGHT, TARGET, VALUE,
+};
+
 use crate::project::{
     CreateProjectError, OpenProjectError, ProjectDimension, ProjectNameError, ProjectSettingsError,
 };
@@ -68,6 +73,14 @@ pub(crate) const NOT_COMPILED: &str =
     "Pulsa «Compilar» para comprobar los scripts .star de la carpeta assets.";
 pub(crate) const CHECK_FAILED: &str = "No se pudo compilar";
 pub(crate) const CHECK_LOST: &str = "La compilación se detuvo sin dar un resultado.";
+pub(crate) const SCENE_TAB: &str = "Escena";
+pub(crate) const CLOSE_TAB: &str = "Cerrar";
+pub(crate) const OPEN_BLUEPRINT_HINT: &str = "Doble clic para abrir";
+
+// Blueprint editor.
+pub(crate) const NO_GRAPHS: &str = "El blueprint no tiene gráficos.";
+pub(crate) const CANVAS_CONTROLS: &str =
+    "Arrastra el fondo para desplazar · Rueda para acercar o alejar";
 pub(crate) const NO_GPU_FOR_VIEWPORT: &str = "la interfaz no se está dibujando con wgpu";
 
 pub(crate) fn viewport_title(dimension_label: &str) -> String {
@@ -83,6 +96,71 @@ pub(crate) fn viewport_controls(dimension: ProjectDimension) -> &'static str {
 
 pub(crate) fn viewport_error(error: &str) -> String {
     format!("No se pudo renderizar la escena: {error}")
+}
+
+pub(crate) fn blueprint_unreadable(reason: &str) -> String {
+    format!("No se pudo abrir el blueprint: {reason}")
+}
+
+/// `Player : Sprite`, or only the class if it extends nothing.
+pub(crate) fn class_heading(blueprint: &Blueprint) -> String {
+    match &blueprint.extends {
+        Some(base) => format!("{} : {base}", blueprint.class),
+        None => blueprint.class.clone(),
+    }
+}
+
+/// What a node of a blueprint shows in its title.
+pub(crate) fn node_title(kind: &NodeKind) -> String {
+    match kind {
+        NodeKind::Entry => "Inicio".to_owned(),
+        NodeKind::Literal { value } => literal_text(value),
+        NodeKind::GetVariable { variable } => variable.clone(),
+        NodeKind::SetVariable { variable } => format!("Asignar {variable}"),
+        NodeKind::Call(call) => match &call.target {
+            CallTarget::OwnObject => format!("{}()", call.method),
+            CallTarget::Value => format!(".{}()", call.method),
+            CallTarget::Class(class) => format!("{class}.{}()", call.method),
+        },
+        NodeKind::Operator { operator } => operator.symbol().to_owned(),
+        NodeKind::Branch => "Si".to_owned(),
+        NodeKind::Return => "Devolver".to_owned(),
+    }
+}
+
+/// A constant as StarScript would write it: `2.0`, `"jump"`.
+fn literal_text(value: &Literal) -> String {
+    match value {
+        Literal::Bool(value) => value.to_string(),
+        Literal::Int(value) => value.to_string(),
+        Literal::Float(value) => format!("{value:?}"),
+        Literal::String(text) => format!("{text:?}"),
+    }
+}
+
+/// The name a pin of a node of `kind` shows next to it. The pins every node
+/// of a kind has get a Spanish name, or none if its place tells what it is
+/// (the execution in and out, the sides of an operator); parameters and
+/// arguments show their own names.
+pub(crate) fn pin_label<'name>(kind: &NodeKind, name: &'name str) -> &'name str {
+    let named_by_user = match kind {
+        NodeKind::Entry => name != EXECUTION_OUTPUT,
+        NodeKind::Call(_) => !matches!(name, EXECUTION_INPUT | EXECUTION_OUTPUT | TARGET | RESULT),
+        _ => false,
+    };
+    if named_by_user {
+        return name;
+    }
+    match name {
+        EXECUTION_INPUT | EXECUTION_OUTPUT | LEFT | RIGHT => "",
+        BRANCH_TRUE => "sí",
+        BRANCH_FALSE => "no",
+        CONDITION => "condición",
+        VALUE => "valor",
+        RESULT => "resultado",
+        TARGET => "objeto",
+        other => other,
+    }
 }
 
 pub(crate) fn problems_title(count: usize) -> String {
@@ -168,5 +246,66 @@ fn name_error_text(error: ProjectNameError) -> String {
             "El nombre no puede contener «{character}». Usa letras, números, espacios, - o _."
         ),
         ProjectNameError::Reserved => "Ese nombre está reservado por el sistema.".to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use star_blueprint::{Call, Operator};
+
+    use super::*;
+
+    fn call(target: CallTarget, arguments: &[&str]) -> NodeKind {
+        NodeKind::Call(Call {
+            target,
+            method: "is_down".to_owned(),
+            arguments: arguments.iter().map(|name| (*name).to_owned()).collect(),
+            returns_value: true,
+            pure: true,
+        })
+    }
+
+    #[test]
+    fn nodes_are_titled_by_what_they_do() {
+        let literal = NodeKind::Literal {
+            value: Literal::String("jump".to_owned()),
+        };
+        let multiply = NodeKind::Operator {
+            operator: Operator::Multiply,
+        };
+        let set = NodeKind::SetVariable {
+            variable: "speed".to_owned(),
+        };
+
+        assert_eq!(node_title(&literal), "\"jump\"");
+        assert_eq!(
+            node_title(&NodeKind::Literal {
+                value: Literal::Float(2.0)
+            }),
+            "2.0"
+        );
+        assert_eq!(node_title(&multiply), "*");
+        assert_eq!(node_title(&set), "Asignar speed");
+        assert_eq!(
+            node_title(&call(CallTarget::Class("Input".to_owned()), &[])),
+            "Input.is_down()"
+        );
+        assert_eq!(node_title(&call(CallTarget::Value, &[])), ".is_down()");
+    }
+
+    #[test]
+    fn pins_of_every_node_of_a_kind_get_spanish_names() {
+        assert_eq!(pin_label(&NodeKind::Branch, BRANCH_TRUE), "sí");
+        assert_eq!(pin_label(&NodeKind::Branch, EXECUTION_INPUT), "");
+        assert_eq!(pin_label(&call(CallTarget::Value, &[]), TARGET), "objeto");
+    }
+
+    #[test]
+    fn arguments_and_parameters_keep_their_names() {
+        let call = call(CallTarget::OwnObject, &[VALUE]);
+
+        assert_eq!(pin_label(&call, VALUE), VALUE);
+        assert_eq!(pin_label(&NodeKind::Entry, "delta"), "delta");
+        assert_eq!(pin_label(&NodeKind::Entry, EXECUTION_OUTPUT), "");
     }
 }

@@ -18,12 +18,11 @@ use star_script::{CompileError, GameSettings, check_program_with};
 
 pub(crate) use self::job::{CheckJob, CheckStatus};
 pub(crate) use self::problem::Problem;
-use self::program::{BLUEPRINT_EXTENSION, Program, SCRIPT_EXTENSION};
+use self::program::Program;
 use crate::file_tree::{file_paths, scan_directory};
-use crate::project::{ASSETS_DIRECTORY, MANIFEST_FILE_NAME};
-
-/// Extension of scene files.
-const SCENE_EXTENSION: &str = ".scene";
+use crate::project::{
+    ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, MANIFEST_FILE_NAME, SCENE_EXTENSION, SCRIPT_EXTENSION,
+};
 
 /// What checking a project found.
 #[derive(Debug, Clone, PartialEq, Eq)]

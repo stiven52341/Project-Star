@@ -1,5 +1,6 @@
 //! Game projects: their settings and how they are created and opened.
 
+mod asset_kinds;
 mod creation;
 mod dimension;
 mod manifest;
@@ -9,6 +10,7 @@ mod settings;
 #[cfg(test)]
 mod test_support;
 
+pub(crate) use asset_kinds::{BLUEPRINT_EXTENSION, SCENE_EXTENSION, SCRIPT_EXTENSION};
 pub(crate) use creation::{
     ASSETS_DIRECTORY, CreateProjectError, create_project, default_projects_location,
     project_directory,

@@ -1,6 +1,7 @@
 //! Main editor window: menu, scene hierarchy, viewport, inspector and assets.
 
 mod assets_panel;
+mod documents;
 mod editor_camera;
 mod grid;
 mod inspector_panel;
@@ -12,6 +13,7 @@ use eframe::{egui, egui_wgpu};
 use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
 
 use self::assets_panel::AssetsPanel;
+use self::documents::{ActiveDocument, Documents};
 use self::inspector_panel::show_inspector;
 use self::menu_bar::{MenuAction, show_menu_bar};
 use self::problems_panel::ProblemsPanel;
@@ -43,6 +45,7 @@ pub(crate) struct EditorWindow {
     assets: AssetsPanel,
     problems: ProblemsPanel,
     bottom_tab: BottomTab,
+    documents: Documents,
     /// The engine view, or why it could not be created.
     viewport: Result<SceneViewport, String>,
     about_open: bool,
@@ -66,6 +69,7 @@ impl EditorWindow {
             assets,
             problems: ProblemsPanel::new(),
             bottom_tab: BottomTab::Assets,
+            documents: Documents::new(),
             viewport,
             about_open: false,
         }
@@ -106,14 +110,23 @@ impl EditorWindow {
             .default_size(BOTTOM_PANEL_HEIGHT)
             .min_size(BOTTOM_PANEL_MIN_HEIGHT)
             .show(ui, |ui| self.show_bottom_panel(ui));
-        egui::CentralPanel::no_frame().show(ui, |ui| match &mut self.viewport {
-            Ok(viewport) => viewport.show(ui),
-            Err(error) => {
-                ui.colored_label(ERROR_COLOR, texts::viewport_error(error));
-            }
-        });
+        egui::CentralPanel::default().show(ui, |ui| self.show_central_area(ui));
         self.show_about(ui.ctx());
         action
+    }
+
+    /// The tabs of the scene and the open blueprints, and the one shown.
+    fn show_central_area(&mut self, ui: &mut egui::Ui) {
+        self.documents.show_tabs(ui);
+        match self.documents.active() {
+            ActiveDocument::Scene => match &mut self.viewport {
+                Ok(viewport) => viewport.show(ui),
+                Err(error) => {
+                    ui.colored_label(ERROR_COLOR, texts::viewport_error(error));
+                }
+            },
+            ActiveDocument::Blueprint(tab) => tab.show(ui),
+        }
     }
 
     fn show_bottom_panel(&mut self, ui: &mut egui::Ui) {
@@ -127,7 +140,11 @@ impl EditorWindow {
         });
         ui.separator();
         match self.bottom_tab {
-            BottomTab::Assets => self.assets.show(ui),
+            BottomTab::Assets => {
+                if let Some(path) = self.assets.show(ui) {
+                    self.documents.open_blueprint(self.assets.directory(), path);
+                }
+            }
             BottomTab::Problems => self.problems.show(ui),
         }
     }
