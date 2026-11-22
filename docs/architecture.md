@@ -137,6 +137,10 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   keep it and instance it later from any system, without the renderer.
   `Scene::capture(&world, root)` takes a subtree of a world, and
   `Scene::to_text` writes it, naming each texture by the file it came from.
+- A **`SceneOutline`** is a scene file read and checked, with each image
+  named by its asset path instead of loaded (`SceneOutline::read(&folder,
+  &path)`). `Scene::from_text` is an outline whose images were loaded; code
+  that builds its own nodes, such as StarScript games, reads outlines.
 - **`.scene` files** are TOML: a format version and a flat list of
   `[[node]]` tables, each with its name, the position of its `parent` in the
   list (parents come first; the first node is the only root), an optional

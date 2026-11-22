@@ -7,6 +7,7 @@ use star_math::Vec2;
 use star_render::{Color, Sprite, TextureFilter, TextureId, TextureRegion};
 
 use crate::scene_file::{FORMAT_VERSION, FilterData, NodeData, SceneFile, SpriteData};
+use crate::scene_outline::{NodeOutline, SceneOutline};
 use crate::{Children, Hierarchy, Name, SpriteNode, Transform2D};
 
 /// A tree of nodes that can be added to a world as many times as needed:
@@ -45,12 +46,10 @@ impl Scene {
     /// parent, an invalid texture path) and the error of `load_texture` if a
     /// texture cannot be loaded.
     pub fn from_text(text: &str, mut load_texture: impl TextureLoader) -> EngineResult<Self> {
-        let file = SceneFile::parse(text)?;
-        validate_tree(&file.nodes)?;
-        let nodes = file
-            .nodes
+        let nodes = SceneOutline::from_text(text)?
+            .into_nodes()
             .into_iter()
-            .map(|node| read_node(node, &mut load_texture))
+            .map(|node| load_node(node, &mut load_texture))
             .collect::<EngineResult<_>>()?;
         Ok(Self { nodes })
     }
@@ -160,77 +159,34 @@ impl Scene {
     }
 }
 
-/// Checks that the first node is the only root and that parents come first,
-/// so the nodes form one tree.
-fn validate_tree(nodes: &[NodeData]) -> EngineResult<()> {
-    let invalid = |reason: String| EngineError::Scene(format!("invalid scene: {reason}"));
-    let Some(root) = nodes.first() else {
-        return Err(invalid("it has no nodes".to_owned()));
-    };
-    if root.parent.is_some() {
-        return Err(invalid(format!(
-            "the first node, \"{}\", is the root and cannot have a parent",
-            root.name
-        )));
-    }
-    for (index, node) in nodes.iter().enumerate().skip(1) {
-        match node.parent {
-            Some(parent) if parent < index => {}
-            Some(parent) => {
-                return Err(invalid(format!(
-                    "node {index} (\"{}\") must come after its parent, node {parent}",
-                    node.name
-                )));
-            }
-            None => {
-                return Err(invalid(format!(
-                    "node {index} (\"{}\") has no parent, but only the first node is the root",
-                    node.name
-                )));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn read_node(node: NodeData, load_texture: &mut impl TextureLoader) -> EngineResult<SceneNode> {
-    let has_transform = node.position.is_some() || node.rotation.is_some() || node.scale.is_some();
-    let transform = has_transform.then(|| Transform2D {
-        position: node.position.map_or(Vec2::ZERO, vec2),
-        rotation: node.rotation.unwrap_or_default(),
-        scale: node.scale.map_or(Vec2::ONE, vec2),
-    });
-    let sprite = node
+/// The node of `outline`, with its image loaded.
+fn load_node(
+    outline: NodeOutline,
+    load_texture: &mut impl TextureLoader,
+) -> EngineResult<SceneNode> {
+    let sprite = outline
         .sprite
-        .as_ref()
-        .map(|sprite| read_sprite(sprite, load_texture))
+        .map(|sprite| {
+            let texture = load_texture(&sprite.texture, sprite.filter)?;
+            Ok(SpriteNode {
+                texture,
+                region: sprite.region,
+                size: sprite.size,
+                anchor: sprite.anchor,
+                color: sprite.color,
+                layer: sprite.layer,
+            })
+        })
         .transpose()
-        .map_err(|error| EngineError::Scene(format!("node \"{}\": {error}", node.name)))?;
+        .map_err(|error: EngineError| {
+            EngineError::Scene(format!("node \"{}\": {error}", outline.name))
+        })?;
     Ok(SceneNode {
-        name: node.name,
-        parent: node.parent,
-        transform,
+        name: outline.name,
+        parent: outline.parent,
+        transform: outline.transform,
         sprite,
     })
-}
-
-fn read_sprite(
-    sprite: &SpriteData,
-    load_texture: &mut impl TextureLoader,
-) -> EngineResult<SpriteNode> {
-    let path = AssetPath::new(&sprite.texture)?;
-    let texture = load_texture(&path, sprite.filter.into())?;
-    let mut node = SpriteNode::new(texture, vec2(sprite.size)).with_layer(sprite.layer);
-    if let Some([min_x, min_y, max_x, max_y]) = sprite.region {
-        node.region = TextureRegion::new(Vec2::new(min_x, min_y), Vec2::new(max_x, max_y));
-    }
-    if let Some(anchor) = sprite.anchor {
-        node.anchor = vec2(anchor);
-    }
-    if let Some([r, g, b, a]) = sprite.color {
-        node.color = Color::rgba(r, g, b, a);
-    }
-    Ok(node)
 }
 
 fn write_node(
@@ -289,10 +245,6 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
         transform: world.get::<Transform2D>(entity).map(|transform| *transform),
         sprite: world.get::<SpriteNode>(entity).map(|sprite| *sprite),
     }
-}
-
-const fn vec2([x, y]: [f32; 2]) -> Vec2 {
-    Vec2::new(x, y)
 }
 
 const fn array(vector: Vec2) -> [f32; 2] {
