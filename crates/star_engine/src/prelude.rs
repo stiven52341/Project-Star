@@ -1,8 +1,8 @@
 //! The most commonly used engine types, for glob import.
 
-pub use crate::EngineWorld;
 pub use crate::app::App;
 pub use crate::game::{Game, GameContext};
+pub use crate::{EngineWorld, SpriteFile};
 pub use star_assets::{AssetFolder, AssetPath};
 pub use star_core::{ENGINE_NAME, ENGINE_VERSION, EngineError, EngineResult, Time};
 pub use star_ecs::{Entity, Schedule, Stage, World};

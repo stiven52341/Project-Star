@@ -34,6 +34,16 @@ impl<T: Clone> Field<T> {
         }
     }
 
+    /// Runs `action` on the current value without copying it, e.g. to look
+    /// at a text every frame without allocating. `action` must not use the
+    /// field again.
+    pub fn read<R>(&self, action: impl FnOnce(&T) -> R) -> R {
+        match self.value.try_borrow() {
+            Ok(value) => action(&value),
+            Err(_) => fault(OVERLAPPING_ACCESS),
+        }
+    }
+
     /// Replaces the value.
     pub fn set(&self, value: T) {
         match self.value.try_borrow_mut() {
@@ -59,5 +69,12 @@ mod tests {
         shared.set(shared.get() + 1);
 
         assert_eq!(field.get(), 2);
+    }
+
+    #[test]
+    fn values_can_be_read_without_copying_them() {
+        let field = Field::new("Hero".to_owned());
+
+        assert_eq!(field.read(String::len), 4);
     }
 }

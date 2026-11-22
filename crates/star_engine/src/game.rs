@@ -114,7 +114,8 @@ impl<'a> GameContext<'a> {
     /// [`AssetPath`](star_assets::AssetPath), the file
     /// cannot be read or decoded, or the GPU cannot hold the image.
     pub fn load_texture(&mut self, path: &str, filter: TextureFilter) -> EngineResult<TextureId> {
-        self.assets.load_texture(self.renderer, path, filter)
+        self.assets
+            .load_texture(self.renderer, star_assets::AssetPath::new(path)?, filter)
     }
 
     /// Reads the scene file at `path` in the asset folder, e.g.

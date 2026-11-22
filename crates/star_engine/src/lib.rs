@@ -12,9 +12,12 @@ pub mod game;
 mod game_assets;
 pub mod prelude;
 mod runtime;
+pub mod script_nodes;
+mod sprite_file;
 mod texture_library;
 
 pub use engine_world::EngineWorld;
+pub use sprite_file::SpriteFile;
 pub use star_assets;
 pub use star_audio;
 pub use star_core;

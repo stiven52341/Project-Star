@@ -121,11 +121,13 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
         self.simulate()?;
         self.frame.begin(self.clear_color);
         draw_sprite_nodes(&self.world, &mut self.frame)?;
+        let Some(renderer) = &mut self.renderer else {
+            return Ok(());
+        };
+        self.assets
+            .draw_sprite_files(&self.world, renderer, &mut self.frame)?;
         self.game.draw(&self.world, &mut self.frame);
-        match &mut self.renderer {
-            Some(renderer) => renderer.render(&self.frame),
-            None => Ok(()),
-        }
+        renderer.render(&self.frame)
     }
 
     fn on_input(&mut self, event: InputEvent) {

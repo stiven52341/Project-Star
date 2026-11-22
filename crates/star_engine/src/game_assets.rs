@@ -4,9 +4,11 @@ use std::time::Duration;
 
 use star_assets::{AssetFolder, AssetPath};
 use star_core::EngineResult;
-use star_render::{Renderer, TextureFilter, TextureId};
-use star_scene::Scene;
+use star_ecs::World;
+use star_render::{Frame, Renderer, TextureFilter, TextureId};
+use star_scene::{GlobalTransform2D, Scene, SpriteNode};
 
+use crate::sprite_file::SpriteFile;
 use crate::texture_library::TextureLibrary;
 
 /// The asset folder of a game and the textures loaded from it.
@@ -32,14 +34,13 @@ impl GameAssets {
     pub(crate) fn load_texture(
         &mut self,
         renderer: &mut Renderer,
-        path: &str,
+        path: AssetPath,
         filter: TextureFilter,
     ) -> EngineResult<TextureId> {
         let folder = &self.folder;
-        self.textures
-            .load(folder, AssetPath::new(path)?, filter, |path| {
-                renderer.create_texture(&folder.load_image(path)?, filter)
-            })
+        self.textures.load(folder, path, filter, |path| {
+            renderer.create_texture(&folder.load_image(path)?, filter)
+        })
     }
 
     /// Reads the scene file at `path`, loading the textures its sprites show.
@@ -51,9 +52,30 @@ impl GameAssets {
         let path = AssetPath::new(path)?;
         let text = self.folder.read_text(&path)?;
         Scene::from_text(&text, |texture: &AssetPath, filter| {
-            self.load_texture(renderer, texture.as_str(), filter)
+            self.load_texture(renderer, texture.clone(), filter)
         })
         .map_err(|error| star_core::EngineError::Scene(format!("\"{path}\": {error}")))
+    }
+
+    /// Adds to `frame` the sprite of every node with a [`SpriteFile`] and a
+    /// global transform, loading the images it needs. An image that cannot
+    /// be loaded logs a warning once, and its sprite is not drawn.
+    pub(crate) fn draw_sprite_files(
+        &mut self,
+        world: &World,
+        renderer: &mut Renderer,
+        frame: &mut Frame,
+    ) -> EngineResult<()> {
+        world.each::<(&GlobalTransform2D, &mut SpriteFile)>(|_, (global, file)| {
+            let texture = file.texture(
+                |path, filter| self.load_texture(renderer, path.clone(), filter),
+                |error| log::warn!("{error}"),
+            );
+            if let Some(texture) = texture {
+                let sprite = SpriteNode::new(texture, file.size).with_layer(file.layer);
+                frame.draw_sprite(sprite.to_sprite(*global));
+            }
+        })
     }
 
     /// Uploads again the textures whose files changed. A file that cannot be
