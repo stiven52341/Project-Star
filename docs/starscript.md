@@ -39,7 +39,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 4 | Rust generation | **Final** |
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
 | 6 | Editor integration | In progress: «Compilar» checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
-| 7–8 | Blueprints | Draft |
+| 7–8 | Blueprints | In progress: model, rules and files done; translation pending |
 
 ## 1. Lexicon (final)
 
@@ -580,12 +580,112 @@ each one in the game's tree (see `star_engine::script_nodes`).
 - The generated Rust is built with `cargo` like any other crate. The
   developer needs the Rust toolchain installed.
 
-## 5. Blueprints (draft)
+## 5. Blueprints (in progress)
 
 Node graphs (events, calls, variables, flow) saved in `.blueprint` files. The
 editor translates them to StarScript, so everything a blueprint does can be
 read, and debugged, as code. A blueprint is a class: it can inherit from
-another class and other classes can use it.
+another class and other classes can use it. They live in the `star_blueprint`
+crate.
+
+**Model**: a blueprint has a class name, an optional base class, variables
+(fields: a name, a type and/or a starting value, `private` or not) and
+graphs. Each **graph** is a method: an event of the base class
+(`override = true`, such as `update`) or one of its own, with its
+parameters, the type it returns and its nodes and links.
+
+**Pins**: nodes are joined by wires from an output pin to an input pin.
+**Execution** pins say in which order things happen; **data** pins carry
+values.
+
+| Node (`kind`) | Inputs | Outputs |
+|---------------|--------|---------|
+| `entry` (one per graph) | — | execution `then`; one value per parameter |
+| `literal` (`value`) | — | `value` |
+| `get_variable` (`variable`) | — | `value` |
+| `set_variable` (`variable`) | execution `in`, `value` | execution `then` |
+| `call` (`target`, `method`, `arguments`, `returns_value`, `pure`) | execution `in` (not if pure), `target` (if it calls a method of a value), one per argument | execution `then` (not if pure), `result` (if it returns a value) |
+| `operator` (`add`, `subtract`, `multiply`, `divide`, `remainder`, `equal`, `not_equal`, `less`, `less_or_equal`, `greater`, `greater_or_equal`, `and`, `or`, `not`, `negate`) | `left` and `right`, or `value` for `not` and `negate` | `result` |
+| `branch` (an `if`) | execution `in`, `condition` | execution `true`, `false` |
+| `return` | execution `in`, `value` (if the graph returns one) | — |
+
+A call's `target` is `"self"` (a method of the blueprint), `"value"` (a
+method of the object given to its `target` pin) or `{ class = "Input" }` (a
+static method). A **pure** call (`Input.is_down`) only computes a value: it
+has no execution pins and runs where its value is used, like literals,
+variables and operators.
+
+**Rules** (`validate`):
+
+- Names (class, variables, graphs, parameters, methods, arguments) are valid
+  StarScript names, and are not repeated where they would clash.
+- A variable has a type, a starting value or both.
+- Every graph has exactly one `entry`.
+- Links go from an output to an input of the same kind (execution or data),
+  between nodes and pins that exist.
+- **Each execution pin takes at most one wire**, so the order of a graph is
+  a tree and reads as structured code. Paths that would join again are
+  written as a function called from each one.
+- Each data input has exactly one wire; a data output feeds any number.
+- Every node with execution pins is reached from the `entry`.
+- No value depends on itself.
+
+Types are not checked by the rules: the StarScript compiler checks them in
+the translated code.
+
+**Files**: TOML with the version of their layout, written and read by
+`Blueprint::to_text` and `Blueprint::from_text`:
+
+```toml
+format = 1
+class = "Player"
+extends = "Sprite"
+
+[[variable]]
+name = "speed"
+default = 2.0
+
+[[graph]]
+name = "update"
+override = true
+parameters = [{ name = "delta", type = "float" }]
+
+[[graph.node]]
+id = 1
+kind = "entry"
+
+[[graph.node]]
+id = 2
+kind = "set_variable"
+variable = "speed"
+position = [240.0, 0.0]   # where the editor draws it
+
+[[graph.node]]
+id = 3
+kind = "operator"
+operator = "multiply"
+
+[[graph.node]]
+id = 4
+kind = "get_variable"
+variable = "speed"
+
+[[graph.link]]
+from = { node = 1, pin = "then" }
+to = { node = 2, pin = "in" }
+
+[[graph.link]]
+from = { node = 4, pin = "value" }
+to = { node = 3, pin = "left" }
+
+[[graph.link]]
+from = { node = 1, pin = "delta" }
+to = { node = 3, pin = "right" }
+
+[[graph.link]]
+from = { node = 3, pin = "result" }
+to = { node = 2, pin = "value" }
+```
 
 ## 6. Plain Rust
 

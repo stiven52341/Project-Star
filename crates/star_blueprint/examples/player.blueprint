@@ -1,0 +1,48 @@
+format = 1
+class = "Player"
+extends = "Sprite"
+
+[[variable]]
+name = "speed"
+default = 2.0
+
+[[graph]]
+name = "update"
+override = true
+parameters = [{ name = "delta", type = "float" }]
+
+[[graph.node]]
+id = 1
+kind = "entry"
+
+[[graph.node]]
+id = 2
+kind = "set_variable"
+variable = "speed"
+position = [240.0, 0.0]   # where the editor draws it
+
+[[graph.node]]
+id = 3
+kind = "operator"
+operator = "multiply"
+
+[[graph.node]]
+id = 4
+kind = "get_variable"
+variable = "speed"
+
+[[graph.link]]
+from = { node = 1, pin = "then" }
+to = { node = 2, pin = "in" }
+
+[[graph.link]]
+from = { node = 4, pin = "value" }
+to = { node = 3, pin = "left" }
+
+[[graph.link]]
+from = { node = 1, pin = "delta" }
+to = { node = 3, pin = "right" }
+
+[[graph.link]]
+from = { node = 3, pin = "result" }
+to = { node = 2, pin = "value" }

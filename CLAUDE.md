@@ -111,6 +111,7 @@ Layer 1  star_ecs, star_platform
 Layer 0  star_core, star_math                (no dependencies on other layers)
 Tools    star_script                         (StarScript compiler; no dependencies)
          star_script_runtime                 (support for the generated Rust; no dependencies)
+         star_blueprint                      (blueprints: node graphs translated to StarScript)
 ```
 
 | Crate | Responsibility |
@@ -128,6 +129,7 @@ Tools    star_script                         (StarScript compiler; no dependenci
 | `star_engine` | Public entry point that integrates everything |
 | `star_script` | StarScript compiler (`.star` → Rust). Specification in `docs/starscript.md` |
 | `star_script_runtime` | Support for the generated Rust: shared lists, fields, equality, input actions, runtime errors |
+| `star_blueprint` | Blueprints: classes as node graphs, their `.blueprint` files (TOML) and their translation to StarScript |
 | `editor` | Visual editor (egui): project manager, main window and «Compilar» (checks a project's StarScript with `star_script`) |
 
 More detail in `docs/architecture.md`. Roadmap in `docs/roadmap.md`.
