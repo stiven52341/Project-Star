@@ -113,7 +113,11 @@ impl ::star_engine::game::Game for EngineGame_ {{
         ::std::result::Result::Ok(())
     }}
 
-    fn update(&mut self, time: &::star_engine::star_core::Time) {{
+    fn update(
+        &mut self,
+        time: &::star_engine::star_core::Time,
+        _input: &::star_engine::star_input::Input,
+    ) {{
         crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.0), time.delta_seconds());
     }}
 

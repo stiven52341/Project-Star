@@ -34,7 +34,7 @@ impl Game for Triangle3d {
         Ok(())
     }
 
-    fn update(&mut self, time: &Time) {
+    fn update(&mut self, time: &Time, _input: &Input) {
         self.angle = (self.angle + ROTATION_SPEED * time.delta_seconds()) % std::f32::consts::TAU;
     }
 

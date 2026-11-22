@@ -7,7 +7,9 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
 
+use crate::input_event::InputEvent;
 use crate::window::{Window, WindowConfig, WindowSize};
+use crate::winit_input::translate_window_event;
 
 /// Receives the window events the engine cares about.
 pub trait WindowEventHandler {
@@ -27,6 +29,9 @@ pub trait WindowEventHandler {
     ///
     /// An error stops the event loop and is returned by [`run_event_loop`].
     fn on_redraw_requested(&mut self) -> EngineResult<()>;
+
+    /// Called for each input event, between frames. By default it is ignored.
+    fn on_input(&mut self, _event: InputEvent) {}
 
     /// Whether the application wants to close, checked after each frame.
     /// By default it only closes when the user closes the window.
@@ -128,7 +133,11 @@ impl<H: WindowEventHandler> ApplicationHandler for WinitAdapter<'_, H> {
                     self.stop_with_error(event_loop, error);
                 }
             }
-            _ => {}
+            other => {
+                if let Some(input) = translate_window_event(&other) {
+                    self.handler.on_input(input);
+                }
+            }
         }
     }
 

@@ -1,6 +1,7 @@
 //! The behavior a game plugs into the engine.
 
 use star_core::{EngineResult, Time};
+use star_input::Input;
 use star_render::{Frame, MeshId, Renderer, Vertex};
 
 /// Logic of a game, called by the engine at fixed points of the game loop.
@@ -17,8 +18,9 @@ pub trait Game {
         Ok(())
     }
 
-    /// Advances the game simulation; called once per frame before drawing.
-    fn update(&mut self, _time: &Time) {}
+    /// Advances the game simulation; called once per frame before drawing,
+    /// with the time since the last frame and what the player is doing.
+    fn update(&mut self, _time: &Time, _input: &Input) {}
 
     /// Describes what the current frame shows.
     fn draw(&self, _frame: &mut Frame) {}

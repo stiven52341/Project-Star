@@ -9,6 +9,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+star_math.workspace = true
+star_platform.workspace = true
 
 [lints]
 workspace = true

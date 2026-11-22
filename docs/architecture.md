@@ -63,6 +63,25 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 18 | **GPL-3.0-or-later + game exception** license | The engine and the editor are free software and their improvements must be shared, but games may have any license (like GCC's exception). Without the exception, every game linked with the engine would have to be GPL. See `LICENSE-GAME-EXCEPTION.md` |
 | 19 | StarScript objects with **reference counting** (`Rc`) and an own runtime | Automatic release and accesses that never fail, without a global store or checks on every field (rejected alternative: generational handles, slower and with accesses that can fail). Inheritance through traits that extend each other; two-phase construction through a function that creates the object. Errors that only appear while playing (index out of range, division by zero) stop the game with a clear message, from a single point: `star_script_runtime::fault` (exception to decision 4). See `docs/starscript.md`, section 4 |
 | 20 | StarScript games **extend the engine class `Game`** | The engine calls `start` and `update(delta)` through a generated adapter that implements the `Game` trait of `star_engine`; `quit()` sets an internal field that the loop checks (`Game::is_finished`). Only games depend on `star_engine`: console programs (`static func main()`) still do not depend on wgpu. The StarScript API for input and nodes will be made together with phases 2 and 6, so it is not invented twice |
+| 21 | Raw input events defined in `star_platform`, input state in `star_input` | `star_platform` (layer 1) is the only crate that knows winit, so it translates OS events into its own vocabulary (`InputEvent`, `Key`, `MouseButton`); `star_input` (layer 2) builds the per-frame state from them, without knowing winit. Keys are identified by their **physical position** (US QWERTY names), so WASD works on any layout. State lives in fixed-size arrays: updating it never allocates in the game loop |
+
+## Input
+
+```
+OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input ──▶ Game::update
+```
+
+- Events arrive between frames and are applied to `Input` as they come.
+  After `Game::update`, `Input::end_frame` forgets what was *just* pressed,
+  released or scrolled; held keys stay held.
+- A press and a release within the same frame are both reported
+  (`just_pressed` and `just_released`), so quick taps are never lost.
+- Key repeats and synthetic events are ignored. When the window loses focus
+  every key and button is released, so none stays "stuck".
+- The cursor is in physical pixels from the top-left corner (`None` outside
+  the window); the wheel is in lines (touchpad pixels are converted).
+- Raw keyboard and mouse are the base layer: games will normally use the
+  action map (step 2b), which also covers touch and gamepads.
 
 ## Rendering
 
@@ -77,7 +96,7 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
 - `Auto` lets wgpu choose the best GPU; an explicit backend fails with a clear
   error if it does not exist on the platform (e.g. DirectX 12 on Linux).
 - If the chosen adapter is a software (CPU) renderer, a warning is logged.
-- A frame's cycle: `Game::update(&Time)` → `Game::draw(&mut Frame)` →
+- A frame's cycle: `Game::update(&Time, &Input)` → `Game::draw(&mut Frame)` →
   `Renderer::render(&Frame)`. Meshes are created in `Game::start` with
   `GameContext::create_mesh` and identified by a `MeshId`.
 - `SceneRenderer` (internal) draws a `Frame` into any target; `Renderer`

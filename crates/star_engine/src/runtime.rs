@@ -3,7 +3,8 @@
 use std::time::{Duration, Instant};
 
 use star_core::{EngineResult, Time};
-use star_platform::{Window, WindowEventHandler, WindowSize};
+use star_input::Input;
+use star_platform::{InputEvent, Window, WindowEventHandler, WindowSize};
 use star_render::{Color, Frame, Renderer, RendererConfig};
 
 use crate::game::{Game, GameContext};
@@ -16,6 +17,7 @@ pub(crate) struct Runtime<G: Game> {
     renderer: Option<Renderer>,
     frame: Frame,
     time: Time,
+    input: Input,
     last_frame_start: Option<Instant>,
 }
 
@@ -28,6 +30,7 @@ impl<G: Game> Runtime<G> {
             renderer: None,
             frame: Frame::new(),
             time: Time::new(),
+            input: Input::new(),
             last_frame_start: None,
         }
     }
@@ -66,13 +69,18 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
             return Ok(());
         }
         self.advance_time();
-        self.game.update(&self.time);
+        self.game.update(&self.time, &self.input);
+        self.input.end_frame();
         self.frame.begin(self.clear_color);
         self.game.draw(&mut self.frame);
         match &mut self.renderer {
             Some(renderer) => renderer.render(&self.frame),
             None => Ok(()),
         }
+    }
+
+    fn on_input(&mut self, event: InputEvent) {
+        self.input.apply(event);
     }
 
     fn should_exit(&self) -> bool {
@@ -99,5 +107,21 @@ mod tests {
 
         assert!(Runtime::new(FinishedGame, config, Color::BLACK).should_exit());
         assert!(!Runtime::new(crate::game::EmptyGame, config, Color::BLACK).should_exit());
+    }
+
+    #[test]
+    fn input_events_update_the_input_given_to_the_game() {
+        let mut runtime = Runtime::new(
+            crate::game::EmptyGame,
+            RendererConfig::default(),
+            Color::BLACK,
+        );
+
+        runtime.on_input(InputEvent::Key {
+            key: star_input::Key::Space,
+            state: star_input::ButtonState::Pressed,
+        });
+
+        assert!(runtime.input.keyboard().is_down(star_input::Key::Space));
     }
 }

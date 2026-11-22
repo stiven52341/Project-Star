@@ -9,7 +9,12 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] Logging (`log`; binaries choose the implementation).
   - [x] `Time` integrated in the loop (`Game::update` receives the frame time).
   - [ ] Lifecycle on Android/iOS (suspend/resume, mobile entry point).
-- [ ] **Phase 2 — Input**: keyboard, mouse, touch, gamepads and action map.
+- [ ] **Phase 2 — Input**:
+  - [x] 2a Keyboard (physical keys) and mouse (buttons, cursor, wheel), with
+        per-frame state; `Game::update` receives the `Input`.
+  - [ ] 2b Action map (`"jump"` → key, button or touch), the API games use.
+  - [ ] 2c Touch screens.
+  - [ ] 2d Gamepads.
 - [ ] **Phase 3 — 2D rendering**:
   - [x] wgpu integration: DX12, Vulkan, Metal and OpenGL; backend selection;
         clearing the screen with a color; recovery from a lost surface.
