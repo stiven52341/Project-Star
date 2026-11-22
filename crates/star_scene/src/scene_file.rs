@@ -21,6 +21,9 @@ pub(crate) struct SceneFile {
 #[serde(deny_unknown_fields)]
 pub(crate) struct NodeData {
     pub(crate) name: String,
+    /// The StarScript class the node is built as, by games written in it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) class: Option<String>,
     /// Position of the parent in the list; only the root has none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) parent: Option<usize>,
@@ -135,6 +138,7 @@ mod tests {
             format: FORMAT_VERSION,
             nodes: vec![NodeData {
                 name: "Hero".to_owned(),
+                class: Some("Player".to_owned()),
                 parent: None,
                 position: Some([1.0, 2.0]),
                 rotation: Some(0.5),

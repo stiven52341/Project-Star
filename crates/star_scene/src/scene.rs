@@ -25,6 +25,9 @@ pub struct Scene {
 #[derive(Debug, Clone, PartialEq)]
 struct SceneNode {
     name: String,
+    /// Kept so a scene read and written again does not lose it; worlds
+    /// have no use for it.
+    class: Option<String>,
     parent: Option<usize>,
     transform: Option<Transform2D>,
     sprite: Option<SpriteNode>,
@@ -183,6 +186,7 @@ fn load_node(
         })?;
     Ok(SceneNode {
         name: outline.name,
+        class: outline.class,
         parent: outline.parent,
         transform: outline.transform,
         sprite,
@@ -200,6 +204,7 @@ fn write_node(
         .map_err(|error| EngineError::Scene(format!("node \"{}\": {error}", node.name)))?;
     Ok(NodeData {
         name: node.name.clone(),
+        class: node.class.clone(),
         parent: node.parent,
         position: node.transform.map(|transform| array(transform.position)),
         rotation: node.transform.map(|transform| transform.rotation),
@@ -241,6 +246,7 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
             .get::<Name>(entity)
             .map(|name| name.0.clone())
             .unwrap_or_default(),
+        class: None,
         parent,
         transform: world.get::<Transform2D>(entity).map(|transform| *transform),
         sprite: world.get::<SpriteNode>(entity).map(|sprite| *sprite),
@@ -415,6 +421,17 @@ mod tests {
         assert_eq!(read_back.node_count(), scene.node_count());
         assert!(text.contains("texture = \"sprites/hero.png\""), "{text}");
         assert!(!text.contains("region"), "{text}");
+    }
+
+    #[test]
+    fn script_classes_survive_reading_and_writing() {
+        let text = "format = 1\n[[node]]\nname = \"Rock\"\nclass = \"Rock\"\n";
+        let scene =
+            Scene::from_text(text, |_: &AssetPath, _| Ok(TextureId::from_index(0))).unwrap();
+
+        let written = scene.to_text(|_| None).unwrap();
+
+        assert!(written.contains("class = \"Rock\""), "{written}");
     }
 
     #[test]

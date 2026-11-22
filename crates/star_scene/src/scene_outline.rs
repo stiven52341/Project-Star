@@ -22,6 +22,9 @@ pub struct SceneOutline {
 pub struct NodeOutline {
     /// Its name.
     pub name: String,
+    /// The StarScript class it is built as, if the file names one. Games
+    /// written in Rust build every node the same way and ignore it.
+    pub class: Option<String>,
     /// Position of its parent in [`SceneOutline::nodes`]; only the root,
     /// the first node, has none.
     pub parent: Option<usize>,
@@ -143,8 +146,19 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         .map(read_sprite)
         .transpose()
         .map_err(|error| EngineError::Scene(format!("node \"{}\": {error}", node.name)))?;
+    if node
+        .class
+        .as_deref()
+        .is_some_and(|class| class.trim().is_empty())
+    {
+        return Err(EngineError::Scene(format!(
+            "node \"{}\": its class has no name",
+            node.name
+        )));
+    }
     Ok(NodeOutline {
         name: node.name,
+        class: node.class,
         parent: node.parent,
         transform,
         sprite,
@@ -189,6 +203,7 @@ mod tests {
 
             [[node]]
             name = "Hero"
+            class = "Player"
             parent = 0
             position = [2.0, 0.5]
 
@@ -206,6 +221,10 @@ mod tests {
         };
         assert_eq!((level.parent, level.transform), (None, None));
         assert_eq!(hero.parent, Some(0));
+        assert_eq!(
+            (level.class.as_deref(), hero.class.as_deref()),
+            (None, Some("Player"))
+        );
         let transform = hero.transform.unwrap();
         assert_eq!(transform.position, Vec2::new(2.0, 0.5));
         assert_eq!(transform.scale, Vec2::ONE);
@@ -248,6 +267,7 @@ mod tests {
             "format = 1\n[[node]]\nname = \"A\"\nparent = 0",
             "format = 1\n[[node]]\nname = \"A\"\n[[node]]\nname = \"B\"",
             "format = 1\n[[node]]\nname = \"A\"\n[[node]]\nname = \"B\"\nparent = 1",
+            "format = 1\n[[node]]\nname = \"A\"\nclass = \" \"",
         ] {
             assert!(SceneOutline::from_text(text).is_err(), "{text}");
         }

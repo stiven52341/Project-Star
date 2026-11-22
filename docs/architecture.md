@@ -143,13 +143,15 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   &path)`). `Scene::from_text` is an outline whose images were loaded; code
   that builds its own nodes, such as StarScript games, reads outlines.
 - **`.scene` files** are TOML: a format version and a flat list of
-  `[[node]]` tables, each with its name, the position of its `parent` in the
+  `[[node]]` tables, each with its name, an optional StarScript `class`
+  (the script class it is built as; Rust games ignore it, but scenes keep
+  it when written again), the position of its `parent` in the
   list (parents come first; the first node is the only root), an optional
   transform (`position`, `rotation`, `scale`) and an optional
   `[node.sprite]` (`texture` as an asset path, `filter`, `size`, `region`,
   `anchor`, `color`, `layer`). Unknown fields are errors, so typos are not
-  silently ignored. Scenes keep names, transforms and sprites; other
-  components (and the StarScript classes of nodes) will join them later.
+  silently ignored. Scenes keep names, classes, transforms and sprites;
+  other components will join them later.
 - A `SpriteFile` names a sprite's image by its asset path instead of a
   `TextureId`: the engine loads the texture the first time it draws it (and
   again when the path or filter change), so code without the renderer, such
