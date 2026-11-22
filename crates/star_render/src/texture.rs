@@ -6,7 +6,7 @@ use wgpu::util::DeviceExt as _;
 use crate::Image;
 
 /// How a texture is sampled when it is drawn bigger or smaller than its pixels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum TextureFilter {
     /// Blends neighboring pixels: soft results for painted art and photos.
     #[default]

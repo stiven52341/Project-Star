@@ -11,6 +11,7 @@ mod engine_world;
 pub mod game;
 pub mod prelude;
 mod runtime;
+mod texture_library;
 
 pub use engine_world::EngineWorld;
 pub use star_assets;

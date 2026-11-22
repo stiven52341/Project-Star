@@ -10,6 +10,7 @@ use star_platform::{InputEvent, Window, WindowEventHandler, WindowSize};
 use star_render::{Color, Frame, Renderer, RendererConfig};
 
 use crate::game::{Game, GameContext};
+use crate::texture_library::TextureLibrary;
 
 /// Engine state while the game is running.
 pub(crate) struct Runtime<G: Game> {
@@ -22,6 +23,7 @@ pub(crate) struct Runtime<G: Game> {
     world: World,
     schedule: Schedule,
     assets: AssetFolder,
+    textures: TextureLibrary,
     last_frame_start: Option<Instant>,
 }
 
@@ -46,6 +48,7 @@ impl<G: Game> Runtime<G> {
             world,
             schedule,
             assets,
+            textures: TextureLibrary::new(),
             last_frame_start: None,
         }
     }
@@ -88,6 +91,7 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
             &mut renderer,
             &mut self.world,
             &self.assets,
+            &mut self.textures,
         ))?;
         self.renderer = Some(renderer);
         Ok(())
