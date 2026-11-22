@@ -103,9 +103,16 @@ pub mod Game {
     }
 }";
 
-/// The modules of the engine classes `Color`, `Node`, `Sprite` and `Camera`.
+/// The modules of the engine classes `Color`, `Node`, `Sprite`, `Camera`
+/// and `Scene`.
 pub(super) fn node_modules(out: &mut Writer) {
-    let modules = [COLOR_MODULE, NODE_MODULE, SPRITE_MODULE, CAMERA_MODULE];
+    let modules = [
+        COLOR_MODULE,
+        NODE_MODULE,
+        SPRITE_MODULE,
+        CAMERA_MODULE,
+        SCENE_MODULE,
+    ];
     for (index, module) in modules.iter().enumerate() {
         if index > 0 {
             out.line("");
@@ -483,6 +490,51 @@ pub mod Camera {
     }
 }";
 
+const SCENE_MODULE: &str = "/// `class Scene`, provided by the engine.
+pub mod Scene {
+    /// `static func load`: a new tree with the nodes of the scene at `path`,
+    /// out of the game until it is added; `None` if it cannot be loaded.
+    pub fn load(path: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> {
+        let nodes_ = ::star_script_runtime::scenes::load(&path)?;
+        let mut built_: ::std::vec::Vec<crate::classes::Node::Ref> = ::std::vec::Vec::with_capacity(nodes_.len());
+        for node_ in nodes_.iter() {
+            let object_ = build_node_(node_);
+            if let ::std::option::Option::Some(parent_) = node_.parent.and_then(|index_| built_.get(index_)) {
+                crate::classes::Node::Methods::add_child(parent_, ::std::rc::Rc::clone(&object_));
+            }
+            built_.push(object_);
+        }
+        built_.into_iter().next()
+    }
+
+    /// A `Sprite` for a node with an image, a `Node` for the others.
+    fn build_node_(node_: &::star_script_runtime::scenes::SceneNode) -> crate::classes::Node::Ref {
+        let object_: crate::classes::Node::Ref = match &node_.sprite {
+            ::std::option::Option::Some(image_) => {
+                let sprite_ = crate::classes::Sprite::init_(node_.name.clone(), image_.texture.clone(), |node_fields_, sprite_fields_| {
+                    ::std::rc::Rc::new(crate::classes::Sprite::Instance { Node: node_fields_, Sprite: sprite_fields_ })
+                });
+                let look_ = &sprite_.Sprite;
+                look_.width.set(image_.width);
+                look_.height.set(image_.height);
+                look_.layer.set(image_.layer);
+                look_.pixelated.set(image_.pixelated);
+                let [r_, g_, b_, a_] = image_.color;
+                look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
+                sprite_
+            }
+            ::std::option::Option::None => crate::classes::Node::new(node_.name.clone()),
+        };
+        let fields_ = crate::classes::Node::HasFields::fields(&*object_);
+        fields_.x.set(node_.x);
+        fields_.y.set(node_.y);
+        fields_.rotation.set(node_.rotation);
+        fields_.scale_x.set(node_.scale_x);
+        fields_.scale_y.set(node_.scale_y);
+        object_
+    }
+}";
+
 /// `fn main` that runs the game `class_path` in a window of the engine, with
 /// the input `actions` of the project.
 pub(super) fn game_entry_point(
@@ -508,16 +560,19 @@ pub fn main() -> ::std::process::ExitCode {{
 fn run_() -> ::star_engine::star_core::EngineResult<()> {{
     let actions_ = action_map_()?;
     {RUNTIME}::input::declare_actions(&ACTION_NAMES_);
+    let app_ = ::star_engine::app::App::new()
+        .with_title({title:?})
+        .with_actions(actions_);
+    let folder_ = ::std::clone::Clone::clone(app_.asset_folder());
+    {RUNTIME}::scenes::set_loader(move |path_| read_scene_(&folder_, path_));
+    // Created after the loader is set, so its `init` can load scenes too.
     let game_ = EngineGame_ {{
         game: {class_path}::new(),
         nodes: ::std::vec::Vec::new(),
         pending: ::std::vec::Vec::new(),
         mirror: ::star_engine::script_nodes::ScriptNodes::new(),
     }};
-    ::star_engine::app::App::new()
-        .with_title({title:?})
-        .with_actions(actions_)
-        .run_game(game_)
+    app_.run_game(game_)
 }}
 
 /// Connects the StarScript game with the engine's game loop.
@@ -579,7 +634,12 @@ fn share_actions_(actions_: &::star_engine::star_input::Actions) {{
     }}
 }}"
     );
-    for line in main.lines().chain([""]).chain(MIRROR_NODES.lines()) {
+    let support = [MIRROR_NODES, READ_SCENE];
+    for line in main.lines().chain(
+        support
+            .iter()
+            .flat_map(|code| [""].into_iter().chain(code.lines())),
+    ) {
         out.line(line);
     }
 }
@@ -659,6 +719,40 @@ fn script_node_<'a>(
         transform: transform_,
         sprite: sprite_,
     }
+}";
+
+const READ_SCENE: &str = "/// Reads a scene of the game's asset folder for `Scene.load`. Parts of a
+/// scene that scripts have no field for yet (a sprite's region and anchor)
+/// are left out.
+fn read_scene_(
+    folder_: &::star_engine::star_assets::AssetFolder,
+    path_: &str,
+) -> ::std::result::Result<::std::vec::Vec<::star_script_runtime::scenes::SceneNode>, ::std::string::String> {
+    let outline_ = ::star_engine::star_assets::AssetPath::new(path_)
+        .and_then(|path_| folder_.read_text(&path_))
+        .and_then(|text_| ::star_engine::star_scene::SceneOutline::from_text(&text_))
+        .map_err(|error_| error_.to_string())?;
+    let nodes_ = outline_.into_nodes().into_iter().map(|node_| {
+        let transform_ = node_.transform.unwrap_or(::star_engine::star_scene::Transform2D::IDENTITY);
+        ::star_script_runtime::scenes::SceneNode {
+            name: node_.name,
+            parent: node_.parent,
+            x: transform_.position.x,
+            y: transform_.position.y,
+            rotation: transform_.rotation,
+            scale_x: transform_.scale.x,
+            scale_y: transform_.scale.y,
+            sprite: node_.sprite.map(|image_| ::star_script_runtime::scenes::SceneSprite {
+                texture: image_.texture.as_str().to_owned(),
+                width: image_.size.x,
+                height: image_.size.y,
+                layer: i64::from(image_.layer),
+                pixelated: image_.filter == ::star_engine::star_render::TextureFilter::Pixelated,
+                color: [image_.color.r, image_.color.g, image_.color.b, image_.color.a],
+            }),
+        }
+    });
+    ::std::result::Result::Ok(nodes_.collect())
 }";
 
 /// The names of the actions and the function that builds their map. The

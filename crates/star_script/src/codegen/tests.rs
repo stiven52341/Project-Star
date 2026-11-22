@@ -226,6 +226,18 @@ fn games_are_drawn_from_their_camera() {
 }
 
 #[test]
+fn games_read_scenes_through_the_engine() {
+    let code = rust(
+        "class G extends Game {\n override func start() {\n \
+         const level = Scene.load(\"one.scene\")\n }\n}",
+    );
+
+    assert!(code.contains("pub mod Scene {"));
+    assert!(code.contains("crate::classes::Scene::load("));
+    assert!(code.contains("scenes::set_loader(move |path_| read_scene_(&folder_, path_));"));
+}
+
+#[test]
 fn other_engine_classes_cannot_be_extended() {
     let errors = compile_source(
         "class Paint extends Color {\n init() { super.init(1.0, 1.0, 1.0, 1.0) }\n}",

@@ -62,6 +62,16 @@ class NodeGame extends Game {
 
     override func start() {
         background = Color(0.0, 0.0, 0.1, 1.0)
+        const fleet = Scene.load(\"levels/fleet.scene\")
+        if fleet != null {
+            add_child(fleet)
+            Debug.print(fleet.name + \" \" + fleet.children().length().to_string())
+            const leader = fleet.find_child(\"Leader\")
+            if leader is Sprite {
+                Debug.print(leader.texture + \" \" + leader.x.to_string() + \" \" + leader.color.g.to_string())
+            }
+        }
+        Debug.print((Scene.load(\"levels/missing.scene\") == null).to_string())
         const ship = Ship()
         add_child(ship)
         const eye = Camera(\"Eye\")
@@ -78,6 +88,29 @@ class NodeGame extends Game {
     }
 }
 ";
+
+/// The scene the node game loads, from the `assets` folder of its working
+/// directory.
+const FLEET_SCENE: &str = r#"
+format = 1
+
+[[node]]
+name = "Fleet"
+
+[[node]]
+name = "Leader"
+parent = 0
+position = [1.5, 0.0]
+
+[node.sprite]
+texture = "sprites/leader.png"
+size = [1.0, 1.0]
+color = [1.0, 0.5, 0.5, 1.0]
+
+[[node]]
+name = "Wingman"
+parent = 0
+"#;
 
 fn settings(bindings: &[&str]) -> GameSettings {
     GameSettings {
@@ -120,14 +153,19 @@ fn games_run_in_the_engine_until_they_quit() {
         "start\nframe 1 true\nframe 2 true\nframe 3 true\n"
     );
 
+    let levels = directory.join("assets/levels");
+    std::fs::create_dir_all(&levels).expect("asset folder created");
+    std::fs::write(levels.join("fleet.scene"), FLEET_SCENE).expect("scene written");
     let output = Command::new(binary(&directory, "node_game"))
+        .current_dir(&directory)
         .output()
         .expect("the game runs");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "the node game failed:\n{stderr}");
     assert_eq!(
         String::from_utf8_lossy(&output.stdout),
-        "game frame 1\nship start\nship x 1.0\ngame frame 2\nship x 2.0\n\
+        "Fleet 2\nsprites/leader.png 1.5 0.5\ntrue\n\
+         game frame 1\nship start\nship x 1.0\ngame frame 2\nship x 2.0\n\
          game frame 3\nship x 3.0\n"
     );
 

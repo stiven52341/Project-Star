@@ -923,6 +923,22 @@ fn games_are_seen_from_their_camera() {
 }
 
 #[test]
+fn scenes_load_trees_that_may_be_missing() {
+    assert_valid(
+        "class G extends Game {\n override func start() {\n \
+         const level = Scene.load(\"levels/one.scene\")\n \
+         if level != null { add_child(level) }\n }\n}",
+    );
+    assert_eq!(
+        errors(
+            "class G extends Game {\n override func start() {\n \
+             add_child(Scene.load(\"levels/one.scene\"))\n }\n}"
+        ),
+        [mismatch("Node", "Node?")]
+    );
+}
+
+#[test]
 fn only_nodes_can_join_the_tree() {
     assert_eq!(
         errors("class G extends Game {\n override func start() { add_child(Enemy()) }\n}"),

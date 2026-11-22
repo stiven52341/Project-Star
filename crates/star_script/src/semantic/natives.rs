@@ -36,6 +36,9 @@ pub const SPRITE_CLASS: &str = "Sprite";
 /// Name of the engine class of the nodes the game is seen from.
 pub const CAMERA_CLASS: &str = "Camera";
 
+/// Name of the engine class that loads `.scene` files.
+pub const SCENE_CLASS: &str = "Scene";
+
 /// Name of the engine class of colors: of sprites and of the background.
 pub const COLOR_CLASS: &str = "Color";
 
@@ -69,6 +72,16 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     let node = add_node_class(classes);
     add_sprite_class(classes, node, color);
     let camera = add_camera_class(classes, node);
+
+    // Builds the nodes of a `.scene` file, or gives `null` if it cannot.
+    let mut scene = ClassInfo::new(SCENE_CLASS.to_owned(), ClassOrigin::Native);
+    scene.methods.push(native_method(
+        "load",
+        &[("path", Type::String)],
+        Type::Class(node).nullable(),
+        true,
+    ));
+    classes.add(scene);
 
     // A game: the engine calls `start` once and `update` every frame, until
     // `quit` is called or the window is closed. Its nodes hang from it.

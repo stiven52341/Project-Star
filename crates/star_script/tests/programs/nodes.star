@@ -60,6 +60,9 @@ class Main {
         Debug.print(player.color.g.to_string() + " " + bat.color.a.to_string())
         Debug.print(Sprite("Rock", "rock.png").color.r.to_string())
 
+        // Scenes are read by the engine: a program without a game has none.
+        Debug.print((Scene.load("levels/one.scene") == null).to_string())
+
         // Cameras are nodes too.
         const eye = Camera("Eye")
         player.add_child(eye)

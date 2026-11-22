@@ -1,6 +1,6 @@
 // Nodes in a game: sprites with their own code, children that move with
-// their parent, nodes that are added and removed while playing, colors and
-// a camera that follows the ship.
+// their parent, nodes that are added and removed while playing, colors, a
+// camera that follows the ship and a sky loaded from a scene file.
 // `cargo run -p star_script --example run -- crates/star_script/examples/scripts/nodes/space.star`
 // The images are in the `assets` folder next to this file.
 
@@ -100,6 +100,10 @@ class Space extends Game {
     override func start() {
         Debug.print("Muévete con las flechas, WASD o la cruceta; sal con Escape")
         background = Color(0.02, 0.02, 0.08, 1.0)
+        const sky = Scene.load("scenes/sky.scene")
+        if sky != null {
+            add_child(sky)
+        }
         const ship = Ship()
         add_child(ship)
         const eye = FollowCamera(ship)

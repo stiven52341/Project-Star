@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`) and the camera (`Camera`) done; scenes and more next |
+| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`) done; script classes in scenes next |
 | 6 | Editor integration | Pending |
 | 7–8 | Blueprints | Draft |
 
@@ -363,6 +363,7 @@ The engine provides them; their names cannot be used for other classes.
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors) |
 | `Camera` (extends `Node`) | `init(name: string)`; field `view_height: float` (2.0) |
 | `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
+| `Scene` | `static load(path: string) -> Node?` |
 | `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool` |
 
 **A game is a class that extends `Game`**:
@@ -440,7 +441,22 @@ class Space extends Game {
   sprites given the same `Color` change together when it changes.
 - Fields of the engine classes are not redeclared by subclasses, and their
   own fields with a default value are assigned after `super.init(…)`.
-- Scenes (`.scene` files) cannot be used from scripts yet.
+- `Scene.load("levels/one.scene")` builds the nodes of a `.scene` file of
+  the asset folder: a new tree, out of the game until it is added, whose
+  root is returned. Nodes with an image become `Sprite` objects (with their
+  size, layer, color and filter), the others `Node` objects; a sprite's
+  `region` and `anchor` are not used yet. Each file is read once, so loading
+  the same scene again (a bullet, an enemy) only builds new objects. If the
+  scene cannot be loaded, `load` gives `null` and the reason is written once
+  to the error output. Console programs have no asset folder: for them it
+  is always `null`. Scene nodes cannot name script classes yet.
+
+```
+const level = Scene.load("levels/one.scene")
+if level != null {
+    add_child(level)
+}
+```
 
 **Input works with actions**, declared in the project, not in the scripts.
 The game asks for an action by name, so the same code works with keyboard,

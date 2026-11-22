@@ -208,6 +208,7 @@ fn with_receiver(receiver: String, arguments: &str) -> String {
 fn native_call(class: &str, method: &str, arguments: &str) -> Option<String> {
     match (class, method) {
         ("Debug", "print") => Some(format!("{RUNTIME}::print(&({arguments}))")),
+        ("Scene", "load") => Some(format!("crate::classes::Scene::load({arguments})")),
         _ => None,
     }
 }
