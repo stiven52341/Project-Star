@@ -1,0 +1,18 @@
+[package]
+name = "triangle_3d"
+description = "Draws a single colored triangle spinning in 3D."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+star_engine.workspace = true
+env_logger.workspace = true
+log.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,17 @@
+[package]
+name = "star_platform"
+description = "Platform detection, windowing and OS integration."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+star_core.workspace = true
+winit.workspace = true
+raw-window-handle.workspace = true
+
+[lints]
+workspace = true

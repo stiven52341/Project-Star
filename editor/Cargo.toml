@@ -1,0 +1,24 @@
+[package]
+name = "star_editor"
+description = "Visual editor for ProjectStar (work in progress)."
+version.workspace = true
+edition.workspace = true
+# egui 0.37 needs a newer compiler than the engine crates (1.85).
+rust-version = "1.95"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+star_engine.workspace = true
+star_render = { workspace = true, features = ["interop"] }
+eframe.workspace = true
+rfd.workspace = true
+serde.workspace = true
+toml.workspace = true
+env_logger.workspace = true
+log.workspace = true
+
+[lints]
+workspace = true

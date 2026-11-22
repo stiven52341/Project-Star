@@ -1,0 +1,67 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "editor", "examples/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["ProjectStar contributors"]
+# GPL-3.0-or-later plus the additional permission in LICENSE-GAME-EXCEPTION.md,
+# which lets games made with the engine use any license.
+license = "GPL-3.0-or-later"
+repository = "https://github.com/stiven52341/Project-Star"
+
+# Internal crates. External dependencies are also declared here, once.
+[workspace.dependencies]
+star_core = { path = "crates/star_core" }
+star_math = { path = "crates/star_math" }
+star_ecs = { path = "crates/star_ecs" }
+star_platform = { path = "crates/star_platform" }
+star_input = { path = "crates/star_input" }
+star_assets = { path = "crates/star_assets" }
+star_render = { path = "crates/star_render" }
+star_audio = { path = "crates/star_audio" }
+star_physics = { path = "crates/star_physics" }
+star_scene = { path = "crates/star_scene" }
+star_engine = { path = "crates/star_engine" }
+
+# External dependencies. Each one is wrapped by an engine crate (see CLAUDE.md 3.5).
+wgpu = "30.0"              # GPU abstraction: DX12, Vulkan, Metal, OpenGL
+winit = "0.30"             # Cross-platform windows and OS events
+raw-window-handle = "0.6"  # Window handle interop between winit and wgpu
+pollster = "1.0"           # Blocks on wgpu's async initialization
+log = "0.4"                # Logging facade
+env_logger = "0.11"        # Logger implementation, only for binaries
+eframe = { version = "0.37", default-features = false, features = [
+    "wgpu", "default_fonts", "x11", "wayland",
+] }                        # Editor UI (egui) on our same wgpu + winit versions
+rfd = "0.18"               # Native file dialogs for the editor
+serde = { version = "1.0", features = ["derive"] }  # (De)serialization of editor files
+toml = "1"                 # Format of project and editor settings files
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+dbg_macro = "warn"
+module_name_repetitions = "allow"
+
+[profile.dev]
+opt-level = 1
+
+# Dependencies are optimized even in debug builds so games stay playable.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

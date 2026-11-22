@@ -1,0 +1,25 @@
+[package]
+name = "star_engine"
+description = "Public facade of the ProjectStar engine."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+star_core.workspace = true
+star_math.workspace = true
+star_ecs.workspace = true
+star_platform.workspace = true
+star_input.workspace = true
+star_assets.workspace = true
+star_render.workspace = true
+star_audio.workspace = true
+star_physics.workspace = true
+star_scene.workspace = true
+log.workspace = true
+
+[lints]
+workspace = true
