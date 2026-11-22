@@ -49,7 +49,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
 - [ ] **Phase 7 — Audio** (decision 45):
   - [x] 7a Decoding sounds (`SoundFormat`, symphonia): WAV, OGG Vorbis,
         MP3 and FLAC into a `Sound` in memory (`star_core`).
-  - [ ] 7b Mixer (`star_audio`): voices that play `Sound`s with volume,
+  - [x] 7b Mixer (`star_audio`): voices that play `Sound`s with volume,
         loops and stop, converted to the output's rate and channels; tested
         without an audio device.
   - [ ] 7c Audio output (cpal) owned by the engine, and loading sounds from

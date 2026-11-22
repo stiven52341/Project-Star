@@ -2613,6 +2613,9 @@ dependencies = [
 [[package]]
 name = "star_audio"
 version = "0.1.0"
+dependencies = [
+ "star_core",
+]
 
 [[package]]
 name = "star_blueprint"

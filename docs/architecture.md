@@ -252,6 +252,28 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   directions how far the stick leans that way. Holding (`is_down`) stays a
   yes or no, so code written for keys works with sticks unchanged.
 
+## Audio
+
+- `star_audio` plays `Sound`s (decoded by `star_assets`, see
+  [Assets](#assets)) through its own **mixer** (decision 45). A `Mixer` is
+  made for an `OutputFormat` (channels and sample rate of the output) and
+  `Mixer::mix` fills a buffer of interleaved `f32` samples with the next
+  samples of every sound playing; the output device (Phase 7c) only asks
+  for those buffers, so the mixer is tested without one.
+- `Mixer::play(Arc<Sound>, PlaySettings)` starts a **voice** and gives its
+  `VoiceId` (never reused) to stop it or change its volume. `PlaySettings`
+  holds the volume (1 as recorded; negative or not-a-number is silent) and
+  whether it loops. Voices that end are forgotten. Sounds are shared with
+  `Arc`, since the mixer will run on the audio thread.
+- Each voice is read at the output's rate with **linear interpolation**
+  between the sound's frames. Channels: a mono sound goes to every channel,
+  a mono output hears the average of every channel, and otherwise each
+  channel goes to its own (extra output channels are silent). Every voice
+  is scaled by its volume and the master volume, added, and clipped to
+  -1..1.
+- At most `MAX_VOICES` (128) sounds play at once, reserved up front so
+  starting one never allocates; more is `EngineError::CapacityExceeded`.
+
 ## Rendering
 
 ```
