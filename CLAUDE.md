@@ -130,8 +130,9 @@ Más detalle en `docs/architecture.md`. Hoja de ruta en `docs/roadmap.md`.
 ## 5. Convenciones
 
 - **Idioma**: identificadores, comentarios de código y documentación `///` en
-  **inglés** (estándar del ecosistema Rust). Documentos del proyecto (`CLAUDE.md`,
-  `docs/`) y conversación en **español**.
+  **inglés** (estándar del ecosistema Rust). El `README.md` también en **inglés**,
+  porque es la portada pública del repositorio. Documentos del proyecto
+  (`CLAUDE.md`, `docs/`) y conversación en **español**.
 - Nombres: `snake_case` funciones/módulos, `PascalCase` tipos, `SCREAMING_SNAKE_CASE`
   constantes.
 - Commits con **Conventional Commits** (`feat:`, `fix:`, `refactor:`, `docs:`,

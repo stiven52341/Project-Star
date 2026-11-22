@@ -1,56 +1,75 @@
 # ProjectStar
 
-Motor de videojuegos **2D y 3D** multiplataforma escrito en **Rust**, inspirado en
-la experiencia de Unity y Godot.
+A cross-platform **2D and 3D** game engine written in **Rust**, inspired by the
+workflow of Unity and Godot.
 
-**Plataformas:** Windows · macOS · Linux · Android · iOS (consolas en el futuro).
+**Platforms:** Windows · macOS · Linux · Android · iOS (consoles in the future).
 
-## Requisitos
+> **Status:** early development. The engine, the editor and the StarScript
+> language are being built step by step; see the [roadmap](docs/roadmap.md).
 
-- [Rust](https://rustup.rs) estable (≥ 1.85 para el motor, ≥ 1.95 para el editor). El archivo `rust-toolchain.toml`
-  selecciona la versión automáticamente.
+## Highlights
 
-## Comandos
+- **Rendering on wgpu**: DirectX 12, Vulkan, Metal and OpenGL from a single API.
+- **Visual editor** (egui): project manager and main window, with the engine
+  rendering live inside the viewport.
+- **StarScript**: an object-oriented, statically typed and **null-safe**
+  language that compiles to Rust, so games get Rust's performance without its
+  complexity. Visual blueprints will compile to StarScript, and plain Rust is
+  always available too: `blueprints → StarScript → Rust → machine code`.
+
+## Requirements
+
+- Stable [Rust](https://rustup.rs) (≥ 1.85 for the engine, ≥ 1.95 for the
+  editor). The `rust-toolchain.toml` file selects the version automatically.
+
+## Commands
 
 ```bash
-cargo build --workspace                                   # compilar todo
-cargo test --workspace                                    # tests
+cargo build --workspace                                   # build everything
+cargo test --workspace                                    # run the tests
 cargo clippy --workspace --all-targets -- -D warnings     # lints
-cargo fmt --all                                           # formato
-cargo run -p hello_star                                   # ejemplo mínimo (abre una ventana)
-cargo run -p hello_star -- vulkan                         # forzar backend: vulkan|dx12|metal|opengl
-cargo run -p triangle_2d                                  # prueba de render: triángulo 2D
-cargo run -p triangle_3d                                  # prueba de render: triángulo girando en 3D
-cargo run -p star_editor                                  # editor: crear un nuevo proyecto
-cargo run -p star_script --example tokenize -- f.star     # StarScript: ver los tokens de un archivo
-cargo run -p star_script --example parse -- f.star        # StarScript: ver el árbol sintáctico
-cargo run -p star_script --example check -- f.star        # StarScript: comprobar tipos y errores
+cargo fmt --all                                           # format the code
+cargo run -p hello_star                                   # minimal example (opens a window)
+cargo run -p hello_star -- vulkan                         # force a backend: vulkan|dx12|metal|opengl
+cargo run -p triangle_2d                                  # render test: 2D triangle
+cargo run -p triangle_3d                                  # render test: spinning 3D triangle
+cargo run -p star_editor                                  # editor: create or open a project
+cargo run -p star_script --example tokenize -- f.star     # StarScript: show the tokens of a file
+cargo run -p star_script --example parse -- f.star        # StarScript: show the syntax tree
+cargo run -p star_script --example check -- f.star        # StarScript: check types and errors
 ```
 
-## Estructura
+## Project layout
 
 ```
-crates/      Módulos del motor (star_core, star_math, star_ecs, ...)
-editor/      Editor visual (en desarrollo)
-examples/    Ejemplos de uso del motor
-assets/      Recursos compartidos de ejemplos
-docs/        Arquitectura, hoja de ruta y especificación de StarScript
+crates/      Engine modules (star_core, star_math, star_render, star_script, ...)
+editor/      Visual editor
+examples/    Examples of how to use the engine
+assets/      Assets shared by the examples
+docs/        Architecture, roadmap and StarScript specification
 ```
 
-## Licencia
+## Documentation
 
-ProjectStar es software libre bajo la [GNU GPL v3 o posterior](LICENSE), con una
-[excepción para juegos](LICENSE-GAME-EXCEPTION.md):
+The project documents are written in Spanish:
 
-- **Tus juegos son tuyos.** Un juego hecho con ProjectStar, incluido el código
-  generado desde StarScript o blueprints, puede publicarse con la licencia que
-  quieras, también cerrada y de pago.
-- **El motor sigue siendo libre.** Si modificas el motor y distribuyes esa
-  versión (o un juego que la incluya), debes publicar el código de tus cambios
-  al motor bajo la GPL.
-- Un motor, editor o herramienta derivados de ProjectStar no cuentan como
-  juego: son GPL.
+- [`CLAUDE.md`](CLAUDE.md): project rules (code quality, architecture, conventions).
+- [`docs/architecture.md`](docs/architecture.md): architecture and recorded decisions.
+- [`docs/roadmap.md`](docs/roadmap.md): roadmap.
+- [`docs/starscript.md`](docs/starscript.md): StarScript language specification.
 
-Normas del proyecto: [`CLAUDE.md`](CLAUDE.md) · Arquitectura:
-[`docs/architecture.md`](docs/architecture.md) · Hoja de ruta:
-[`docs/roadmap.md`](docs/roadmap.md)
+Code, comments and API documentation are in English.
+
+## License
+
+ProjectStar is free software under the [GNU GPL v3 or later](LICENSE), with a
+[game exception](LICENSE-GAME-EXCEPTION.md):
+
+- **Your games are yours.** A game made with ProjectStar, including code
+  generated from StarScript or blueprints, can be released under any license
+  you want, including closed-source and commercial ones.
+- **The engine stays free.** If you modify the engine and distribute that
+  version (or a game that includes it), you must publish the source code of
+  your engine changes under the GPL.
+- An engine, editor or tool derived from ProjectStar is not a game: it is GPL.
