@@ -17,7 +17,8 @@ pub struct Expr {
     pub span: Span,
 }
 
-/// Unique identifier of an expression within a file.
+/// Unique identifier of an expression within a program, even one made of
+/// several files.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ExprId(u32);
 

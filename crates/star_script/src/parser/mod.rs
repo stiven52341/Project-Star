@@ -25,10 +25,24 @@ static END_OF_FILE: Token = Token::new(TokenKind::EndOfFile, Span::new(0, 0));
 ///
 /// Returns every syntax mistake found, in source order.
 pub fn parse(tokens: &[Token]) -> Result<SourceFile, Vec<ParseError>> {
-    let mut parser = Parser::new(tokens);
+    parse_numbering_from(tokens, 0).map(|(file, _)| file)
+}
+
+/// Builds the syntax tree of one file of a program, numbering its
+/// expressions from `first_expression_id`, so the files of a program never
+/// share an [`ExprId`]. Returns the tree and the first identifier left free.
+///
+/// # Errors
+///
+/// As [`parse`].
+pub(crate) fn parse_numbering_from(
+    tokens: &[Token],
+    first_expression_id: u32,
+) -> Result<(SourceFile, u32), Vec<ParseError>> {
+    let mut parser = Parser::new(tokens, first_expression_id);
     let file = parser.source_file();
     if parser.errors.is_empty() {
-        Ok(file)
+        Ok((file, parser.next_expression_id))
     } else {
         Err(parser.errors)
     }
@@ -45,13 +59,13 @@ struct Parser<'tokens> {
 }
 
 impl<'tokens> Parser<'tokens> {
-    const fn new(tokens: &'tokens [Token]) -> Self {
+    const fn new(tokens: &'tokens [Token], first_expression_id: u32) -> Self {
         Self {
             tokens,
             position: 0,
             errors: Vec::new(),
             depth: 0,
-            next_expression_id: 0,
+            next_expression_id: first_expression_id,
         }
     }
 

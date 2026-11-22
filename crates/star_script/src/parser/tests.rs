@@ -9,7 +9,7 @@ fn expression(source: &str) -> String {
 
 fn try_expression(source: &str) -> ParseResult<String> {
     let tokens = tokenize(source).expect("no lexical errors");
-    let mut parser = Parser::new(&tokens);
+    let mut parser = Parser::new(&tokens, 0);
     let expression = parser.expression()?;
     assert!(
         parser.at(&TokenKind::EndOfFile),
@@ -402,7 +402,7 @@ fn reserved_keywords_explain_themselves() {
 fn every_broken_statement_is_reported_and_the_rest_still_parses() {
     let source = "class A {\n func f() {\n  var = 1\n  ok()\n  x = \n }\n func g() {}\n}";
     let tokens = tokenize(source).expect("no lexical errors");
-    let mut parser = Parser::new(&tokens);
+    let mut parser = Parser::new(&tokens, 0);
 
     let file = parser.source_file();
 
@@ -417,7 +417,7 @@ fn every_broken_statement_is_reported_and_the_rest_still_parses() {
 fn a_broken_member_is_skipped_whole() {
     let source = "class A {\n func (x) { if a { b() } }\n var y = 2\n}";
     let tokens = tokenize(source).expect("no lexical errors");
-    let mut parser = Parser::new(&tokens);
+    let mut parser = Parser::new(&tokens, 0);
 
     let file = parser.source_file();
 

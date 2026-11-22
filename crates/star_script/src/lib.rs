@@ -46,7 +46,7 @@ pub use token::{Keyword, Token, TokenKind};
 /// Returns every mistake found, in source order. Lexical mistakes are
 /// reported alone: parsing broken tokens would only add confusing errors.
 pub fn parse_source(source: &str) -> Result<ast::SourceFile, Vec<CompileError>> {
-    parse_file(source, 0)
+    parse_file(source, 0, 0).map(|(file, _)| file)
 }
 
 /// Reads every file of a program into one syntax tree with all their
@@ -60,9 +60,13 @@ pub fn parse_source(source: &str) -> Result<ast::SourceFile, Vec<CompileError>> 
 pub fn parse_program(sources: &SourceSet) -> Result<ast::SourceFile, Vec<CompileError>> {
     let mut classes = Vec::new();
     let mut errors = Vec::new();
+    let mut next_expression_id = 0;
     for (text, start) in sources.texts() {
-        match parse_file(text, start) {
-            Ok(file) => classes.extend(file.classes),
+        match parse_file(text, start, next_expression_id) {
+            Ok((file, next_free_id)) => {
+                classes.extend(file.classes);
+                next_expression_id = next_free_id;
+            }
             Err(file_errors) => errors.extend(file_errors),
         }
     }
@@ -74,8 +78,13 @@ pub fn parse_program(sources: &SourceSet) -> Result<ast::SourceFile, Vec<Compile
 }
 
 /// Parses one file placed at offset `start` of its program, so every span
-/// it reports is an offset of the program.
-fn parse_file(source: &str, start: usize) -> Result<ast::SourceFile, Vec<CompileError>> {
+/// it reports is an offset of the program, numbering its expressions from
+/// `first_expression_id` (see [`parser::parse_numbering_from`]).
+fn parse_file(
+    source: &str,
+    start: usize,
+    first_expression_id: u32,
+) -> Result<(ast::SourceFile, u32), Vec<CompileError>> {
     let mut tokens = tokenize(source).map_err(|errors| {
         errors
             .into_iter()
@@ -90,7 +99,8 @@ fn parse_file(source: &str, start: usize) -> Result<ast::SourceFile, Vec<Compile
     for token in &mut tokens {
         token.span = token.span.shifted(start);
     }
-    parse(&tokens).map_err(|errors| errors.into_iter().map(CompileError::from).collect())
+    parser::parse_numbering_from(&tokens, first_expression_id)
+        .map_err(|errors| errors.into_iter().map(CompileError::from).collect())
 }
 
 /// A source file whose meaning has been checked.
@@ -222,6 +232,30 @@ mod tests {
         let checked = check_program_with(&sources, &GameSettings::default());
 
         assert!(checked.is_ok(), "{:?}", checked.err());
+    }
+
+    /// Regression: every file numbered its expressions from zero, so the
+    /// analysis of one file's expressions was given to another's and the
+    /// translation to Rust failed.
+    #[test]
+    fn programs_of_several_files_translate_to_rust_in_any_order() {
+        let game =
+            "class Demo extends Game {\n  override func start() {\n    add_child(Rock())\n  }\n}\n";
+        let rock = "class Rock extends Node {\n  var speed = 2.0\n  init() {\n    super.init(\"Rock\")\n  }\n  override func update(delta: float) {\n    speed = speed * delta\n  }\n}\n";
+        for files in [
+            [("demo.star", game), ("rock.star", rock)],
+            [("rock.star", rock), ("demo.star", game)],
+        ] {
+            let sources = program(&files);
+
+            let compiled = compile_program_with(&sources, &GameSettings::default());
+
+            assert!(
+                compiled.is_ok(),
+                "{:?}",
+                compiled.err().map(|errors| reports(&sources, &errors))
+            );
+        }
     }
 
     #[test]
