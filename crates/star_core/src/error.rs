@@ -33,6 +33,8 @@ pub enum EngineError {
     /// A scene or its node tree was misused or is invalid, e.g. a node made
     /// a child of its own descendant, or a corrupt scene file.
     Scene(String),
+    /// A physics setting is not valid, e.g. a circle with a negative radius.
+    Physics(String),
     /// A fixed-capacity resource has no room left.
     CapacityExceeded {
         /// Name of the exhausted resource.
@@ -55,6 +57,7 @@ impl fmt::Display for EngineError {
             Self::Asset(reason) => write!(formatter, "asset error: {reason}"),
             Self::Ecs(reason) => write!(formatter, "ECS error: {reason}"),
             Self::Scene(reason) => write!(formatter, "scene error: {reason}"),
+            Self::Physics(reason) => write!(formatter, "physics error: {reason}"),
             Self::CapacityExceeded { resource } => {
                 write!(formatter, "capacity exceeded for {resource}")
             }

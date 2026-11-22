@@ -57,7 +57,14 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         (`sounds_2d`).
   - [x] 7d Sounds in StarScript (part of 13.5): `Sound.load`, `play`,
         `stop`, `is_playing`, `volume` and `looping`, and `Audio.volume`.
-- [ ] **Phase 8 — 2D physics**.
+- [ ] **Phase 8 — 2D physics** (decision 46):
+  - [x] 8a Simulation (`star_physics`, rapier2d): `Physics2d` with dynamic,
+        static and kinematic bodies; circles, rectangles and capsules;
+        friction, bounciness, density; sensors; fixed steps; contacts that
+        start and end.
+  - [ ] 8b Physics in the engine: bodies of entities and scene nodes, moved
+        by the engine's world, with an example.
+  - [ ] 8c Physics in StarScript (part of 13.5).
 - [ ] **Phase 9 — 3D rendering**: materials, lights, indexed meshes. (`Mat4`
       and a perspective camera already exist.)
 - [ ] **Phase 10 — 3D physics**.

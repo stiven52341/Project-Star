@@ -90,6 +90,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 43 | The editor's texts are **plain Rust values, one per language**, chosen through a global current language | The editor shows a few hundred short texts, so a `Texts` struct with one field per text, filled once per language, is enough: a missing translation does not compile, there is nothing to parse at start-up and no dependency. Texts with values are methods that pick the language's wording, so plurals and word order stay natural in each one. The language lives in an atomic, because every panel draws texts and passing it everywhere would touch every function for no gain; tests use a language's `Texts` directly and never change it. English is the default, and a file written with an unknown language falls back to it. Rejected for now: Fluent or gettext catalogs (a dependency and a runtime format, worth it with many languages or translators who do not read Rust) and following the system's language (it needs one more dependency to read it on every platform) |
 | 44 | “Play” **builds the game with the system's Cargo**, from the engine's crates of the repository | The game a project makes is the same Rust a shipped game will be, built the same way, so what is played is what ships; no interpreter to keep in step with the compiler. The build runs off the UI thread and shares one target folder, so only the first “Play” builds the engine. It needs Rust installed and the editor run from the repository (a compile-time path to `crates/`): enough while the engine is developed. Rejected for now: shipping prebuilt engine libraries with the editor (comes with packaging), and running the game inside the editor's window (a game is its own process, so a crash or `quit()` never takes the editor with it) |
 | 45 | Sound decoding with **symphonia** (MPL-2.0), in `star_assets`; playback with **cpal** (Apache-2.0) and an **own mixer** in `star_audio` | symphonia is pure Rust (it builds for every platform, mobile included), maintained, and reads WAV, OGG Vorbis, MP3 and FLAC with one API; only the needed formats are enabled. Sounds are decoded whole into memory (`Sound`), simple and fast to start; long music may stream from the file later. cpal only opens the system's audio output (on Linux it needs the ALSA headers to build, `libasound2-dev`); mixing (voices, volumes, loops, groups) is the engine's own code, so it can be tested without a device and shaped by the engine's needs. Rejected: `rodio` and `kira` (they bring their own mixer and model), and one decoder crate per format (`hound`, `lewton`…: several APIs for the same job) |
+| 46 | 2D physics with **rapier2d** (Apache-2.0), hidden in `star_physics` | Pure Rust (every platform, mobile included), maintained, and mature: stable stacks, sensors, sleeping bodies, joints and continuous collision for later. The engine's own `Physics2d`, `BodySettings`, `Shape2d` and `Contact` are all games see, so the solver can be replaced. Time advances in **fixed steps** (1/60 s, at most 8 per frame), so a game behaves the same at any frame rate. Rejected: an own solver (stable stacking and many bodies are hard to get right) and `box2d` bindings (C code to build on every platform). It needs Rust 1.86 |
 
 ## ECS
 
@@ -292,6 +293,29 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   folder into an `Arc<Sound>`, kept by a `SoundLibrary` (in `star_engine`)
   so a file is decoded once; a failed load is tried again. Sounds have no
   hot-reload yet. Example: `sounds_2d`.
+
+## Physics
+
+- `star_physics` simulates 2D bodies with rapier2d (decision 46). A
+  `Physics2d` holds them: `add_body(&BodySettings)` gives a `BodyId`, and
+  ids of removed bodies are simply ignored.
+- A body has one `Shape2d`: a circle, a rectangle (turning with the body)
+  or a vertical capsule, whose constructors reject sizes that are not
+  positive and finite. `BodySettings` gives its `BodyKind` — **dynamic**
+  (gravity, collisions, impulses), **static** (never moves) or
+  **kinematic** (follows only the velocity the game sets, pushes dynamic
+  bodies) — its start (position, rotation, velocity), gravity scale, fixed
+  rotation, and surface: friction, bounciness and density. Invalid numbers
+  are `EngineError::Physics`.
+- `advance(elapsed)` runs as many `FIXED_STEP`s (1/60 s) as fit, keeping the
+  rest for the next call; at most `MAX_STEPS_PER_ADVANCE` (8), so a long
+  frame slows the game down instead of piling up steps.
+- `contacts()` are the bodies that started or stopped touching during the
+  last advance (`ContactPhase::Started`/`Ended`). A **sensor** overlaps
+  instead of colliding, and its contacts say so. Every pair of kinds is
+  reported, so a kinematic character notices a static sensor. A removed
+  body's contacts end with the next step: `Physics2d` keeps which body each
+  collider was until then.
 
 ## Rendering
 

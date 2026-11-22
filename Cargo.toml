@@ -5,7 +5,7 @@ members = ["crates/*", "editor", "examples/*"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.86"
 authors = ["ProjectStar contributors"]
 # GPL-3.0-or-later plus the additional permission in LICENSE-GAME-EXCEPTION.md,
 # which lets games made with the engine use any license.
@@ -38,6 +38,7 @@ symphonia = { version = "0.6", default-features = false, features = [
     "wav", "pcm", "ogg", "vorbis", "mp3", "flac",
 ] }                        # Sound decoding: WAV, OGG Vorbis, MP3 and FLAC
 cpal = "0.18"              # Audio output device (needs ALSA headers to build on Linux)
+rapier2d = "0.36"          # 2D rigid-body physics and collisions
 raw-window-handle = "0.6"  # Window handle interop between winit and wgpu
 pollster = "1.0"           # Blocks on wgpu's async initialization
 log = "0.4"                # Logging facade

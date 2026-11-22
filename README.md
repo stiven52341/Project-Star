@@ -20,7 +20,7 @@ workflow of Unity and Godot.
 
 ## Requirements
 
-- Stable [Rust](https://rustup.rs) (≥ 1.85 for the engine, ≥ 1.95 for the
+- Stable [Rust](https://rustup.rs) (≥ 1.86 for the engine, ≥ 1.95 for the
   editor). The `rust-toolchain.toml` file selects the version automatically.
 - On Linux, the libudev headers (gamepad support) and the ALSA headers
   (audio), e.g. on Debian/Ubuntu:
