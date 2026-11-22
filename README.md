@@ -22,6 +22,8 @@ workflow of Unity and Godot.
 
 - Stable [Rust](https://rustup.rs) (≥ 1.85 for the engine, ≥ 1.95 for the
   editor). The `rust-toolchain.toml` file selects the version automatically.
+- On Linux, the libudev headers (gamepad support), e.g. on Debian/Ubuntu:
+  `sudo apt install libudev-dev pkg-config`.
 
 ## Commands
 

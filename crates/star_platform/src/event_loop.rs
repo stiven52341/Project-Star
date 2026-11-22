@@ -7,6 +7,7 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
 
+use crate::gilrs_input::GamepadEvents;
 use crate::input_event::InputEvent;
 use crate::window::{Window, WindowConfig, WindowSize};
 use crate::winit_input::translate_window_event;
@@ -61,6 +62,7 @@ pub fn run_event_loop(
         config,
         handler,
         window: None,
+        gamepads: GamepadEvents::new(),
         error: None,
     };
     event_loop
@@ -75,6 +77,7 @@ struct WinitAdapter<'handler, H> {
     config: WindowConfig,
     handler: &'handler mut H,
     window: Option<Window>,
+    gamepads: Option<GamepadEvents>,
     error: Option<EngineError>,
 }
 
@@ -100,6 +103,12 @@ impl<H: WindowEventHandler> WinitAdapter<'_, H> {
         self.handler.on_window_created(window.clone())?;
         self.window = Some(window);
         Ok(())
+    }
+
+    fn poll_gamepads(&mut self) {
+        if let Some(gamepads) = &mut self.gamepads {
+            gamepads.poll(|event| self.handler.on_input(event));
+        }
     }
 
     fn stop_with_error(&mut self, event_loop: &ActiveEventLoop, error: EngineError) {
@@ -146,6 +155,7 @@ impl<H: WindowEventHandler> ApplicationHandler for WinitAdapter<'_, H> {
             event_loop.exit();
             return;
         }
+        self.poll_gamepads();
         if let Some(window) = &self.window {
             window.request_redraw();
         }

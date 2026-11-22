@@ -29,6 +29,7 @@ star_engine = { path = "crates/star_engine" }
 # External dependencies. Each one is wrapped by an engine crate (see CLAUDE.md 3.5).
 wgpu = "30.0"              # GPU abstraction: DX12, Vulkan, Metal, OpenGL
 winit = "0.30"             # Cross-platform windows and OS events
+gilrs = "0.11"             # Gamepads (needs libudev headers to build on Linux)
 raw-window-handle = "0.6"  # Window handle interop between winit and wgpu
 pollster = "1.0"           # Blocks on wgpu's async initialization
 log = "0.4"                # Logging facade

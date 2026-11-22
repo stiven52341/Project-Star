@@ -2,7 +2,8 @@
 //!
 //! The side moving away from the camera must look smaller (perspective) and
 //! the back face must stay visible when it turns around. The `pause` action
-//! (Space or the left mouse button) stops and resumes the rotation.
+//! (Space, the left mouse button, a tap or a gamepad's South button) stops
+//! and resumes the rotation.
 //! Run it with an optional graphics backend:
 //! `cargo run -p triangle_3d -- [auto|vulkan|dx12|metal|opengl]`
 
@@ -75,7 +76,15 @@ fn run() -> Result<(), Box<dyn Error>> {
     };
 
     let mut actions = ActionMap::new();
-    actions.add(PAUSE, &[Key::Space.into(), MouseButton::Left.into()])?;
+    actions.add(
+        PAUSE,
+        &[
+            Key::Space.into(),
+            MouseButton::Left.into(),
+            Binding::Touch,
+            GamepadButton::South.into(),
+        ],
+    )?;
 
     App::new()
         .with_title(format!("Triangle 3D — {backend}"))

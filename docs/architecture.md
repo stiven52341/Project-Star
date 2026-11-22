@@ -65,6 +65,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 20 | StarScript games **extend the engine class `Game`** | The engine calls `start` and `update(delta)` through a generated adapter that implements the `Game` trait of `star_engine`; `quit()` sets an internal field that the loop checks (`Game::is_finished`). Only games depend on `star_engine`: console programs (`static func main()`) still do not depend on wgpu. The StarScript API for input and nodes will be made together with phases 2 and 6, so it is not invented twice |
 | 21 | Raw input events defined in `star_platform`, input state in `star_input` | `star_platform` (layer 1) is the only crate that knows winit, so it translates OS events into its own vocabulary (`InputEvent`, `Key`, `MouseButton`); `star_input` (layer 2) builds the per-frame state from them, without knowing winit. Keys are identified by their **physical position** (US QWERTY names), so WASD works on any layout. State lives in fixed-size arrays: updating it never allocates in the game loop |
 | 22 | Actions **identified by name** (`"jump"`) | It is what StarScript and the editor will use (names in project settings and scripts), and the lookup does not allocate. Action names are unique and non-empty, checked when the `ActionMap` is built (`EngineError::Input`). Rejected for now: typed action ids, which would add a second way to do the same thing |
+| 23 | Gamepads with **gilrs** (MIT/Apache-2.0) | Maintained and pure Rust, with backends for Windows (WGI/XInput), macOS (IOKit) and Linux (evdev), SDL-style mappings and dead zones. Only `star_platform` knows it. On Linux it needs the libudev headers to build (`libudev-dev`). Rejected: writing our own backends per OS (a lot of platform code for little gain) |
 
 ## Input
 
@@ -86,10 +87,18 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input �
   `just_started` and `just_ended`. A finger that leaves the screen stays
   listed until the frame ends, so quick taps are not lost; a touch cancelled
   by the system counts as ended. More fingers than the capacity are ignored.
+- **Gamepads**: they are not delivered through the window, so
+  `star_platform` polls `gilrs` once per frame (before the redraw) and
+  reports the gamepads already connected at start. `Gamepads` keeps up to
+  `MAX_GAMEPADS` (8). Buttons are named by position (`South` is «A» on
+  Xbox and «✕» on PlayStation); sticks go from -1 to 1 (positive Y up, dead
+  zone already applied) and triggers from 0 to 1, besides being buttons.
+  If gamepads cannot be opened, the game still runs (a warning is logged).
 - Raw keyboard and mouse are the base layer: games normally use **actions**.
   An `ActionMap` (given to `App::with_actions`) binds each action name to
   one or more `Binding`s: a key, a mouse button or `Binding::Touch` (any
-  finger on the screen); gamepads will be added as a new kind. On-screen
+  finger on the screen) or `Binding::GamepadButton` (that button on any
+  gamepad). On-screen
   virtual buttons (touch regions) will come later. An action is held while **any** of its bindings is
   held: it keeps a count of held bindings, so pressing a second binding of a
   held action is not a new press. Actions are asked for by name

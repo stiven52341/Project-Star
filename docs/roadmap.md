@@ -16,7 +16,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `App::with_actions`. Gamepad bindings come with 2d.
   - [x] 2c Touch screens: fingers with id, position and start position (up
         to 10 at once); `Binding::Touch` (any finger) for actions.
-  - [ ] 2d Gamepads.
+  - [x] 2d Gamepads (`gilrs`): buttons by position, sticks and triggers, up
+        to 8 at once; `Binding::GamepadButton` for actions. On Android and
+        iOS `gilrs` has no backend yet: gamepads will come with Phase 11.
 - [ ] **Phase 3 — 2D rendering**:
   - [x] wgpu integration: DX12, Vulkan, Metal and OpenGL; backend selection;
         clearing the screen with a color; recovery from a lost surface.

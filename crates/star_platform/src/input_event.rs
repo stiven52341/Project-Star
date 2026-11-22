@@ -99,6 +99,120 @@ impl MouseButton {
     }
 }
 
+/// A gamepad button, named by its **position** on the gamepad, so the same
+/// code works with every brand: `South` is «A» on Xbox and «✕» on PlayStation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GamepadButton {
+    /// Bottom face button.
+    South,
+    /// Right face button.
+    East,
+    /// Top face button.
+    North,
+    /// Left face button.
+    West,
+    /// Left shoulder button (LB, L1).
+    LeftBumper,
+    /// Right shoulder button (RB, R1).
+    RightBumper,
+    /// Left trigger (LT, L2) pressed far enough; its travel is [`GamepadAxis::LeftTrigger`].
+    LeftTrigger,
+    /// Right trigger (RT, R2) pressed far enough; its travel is [`GamepadAxis::RightTrigger`].
+    RightTrigger,
+    /// Left menu button (Back, View, Share, Select).
+    Select,
+    /// Right menu button (Start, Menu, Options).
+    Start,
+    /// Central button with the brand's logo.
+    Mode,
+    /// Pressing the left stick (L3).
+    LeftStick,
+    /// Pressing the right stick (R3).
+    RightStick,
+    /// Directional pad, up.
+    DPadUp,
+    /// Directional pad, down.
+    DPadDown,
+    /// Directional pad, left.
+    DPadLeft,
+    /// Directional pad, right.
+    DPadRight,
+}
+
+impl GamepadButton {
+    /// Every button, in declaration order: `GamepadButton::ALL[button.index()] == button`.
+    pub const ALL: &'static [Self] = &[
+        Self::South,
+        Self::East,
+        Self::North,
+        Self::West,
+        Self::LeftBumper,
+        Self::RightBumper,
+        Self::LeftTrigger,
+        Self::RightTrigger,
+        Self::Select,
+        Self::Start,
+        Self::Mode,
+        Self::LeftStick,
+        Self::RightStick,
+        Self::DPadUp,
+        Self::DPadDown,
+        Self::DPadLeft,
+        Self::DPadRight,
+    ];
+
+    /// Number of buttons.
+    pub const COUNT: usize = Self::ALL.len();
+
+    /// Position of the button in [`GamepadButton::ALL`].
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self as usize
+    }
+}
+
+/// An analog control of a gamepad.
+///
+/// Sticks go from `-1.0` to `1.0` (positive X to the right, positive Y
+/// **up**) and rest at `0.0`; small movements around the center are already
+/// ignored (dead zone). Triggers go from `0.0` (released) to `1.0`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GamepadAxis {
+    /// Left stick, horizontal.
+    LeftStickX,
+    /// Left stick, vertical.
+    LeftStickY,
+    /// Right stick, horizontal.
+    RightStickX,
+    /// Right stick, vertical.
+    RightStickY,
+    /// Left trigger travel.
+    LeftTrigger,
+    /// Right trigger travel.
+    RightTrigger,
+}
+
+impl GamepadAxis {
+    /// Every axis, in declaration order: `GamepadAxis::ALL[axis.index()] == axis`.
+    pub const ALL: &'static [Self] = &[
+        Self::LeftStickX,
+        Self::LeftStickY,
+        Self::RightStickX,
+        Self::RightStickY,
+        Self::LeftTrigger,
+        Self::RightTrigger,
+    ];
+
+    /// Number of axes.
+    pub const COUNT: usize = Self::ALL.len();
+
+    /// Position of the axis in [`GamepadAxis::ALL`].
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self as usize
+    }
+}
+
 /// Stage of a finger's contact with a touch screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TouchPhase {
@@ -161,6 +275,34 @@ pub enum InputEvent {
         /// Vertical position, in pixels from the top edge.
         y: f32,
     },
+    /// A gamepad was connected (also reported for those connected at start).
+    GamepadConnected {
+        /// Identifies the gamepad while it is connected.
+        gamepad: usize,
+    },
+    /// A gamepad was disconnected.
+    GamepadDisconnected {
+        /// The gamepad.
+        gamepad: usize,
+    },
+    /// A gamepad button went down or up.
+    GamepadButton {
+        /// The gamepad.
+        gamepad: usize,
+        /// The button.
+        button: GamepadButton,
+        /// Whether it went down or up.
+        state: ButtonState,
+    },
+    /// An analog control of a gamepad moved.
+    GamepadAxis {
+        /// The gamepad.
+        gamepad: usize,
+        /// The control.
+        axis: GamepadAxis,
+        /// Its new value (see [`GamepadAxis`] for the ranges).
+        value: f32,
+    },
     /// The window stopped receiving input. Keys and buttons held at that moment
     /// will not report their release, so they must be treated as released.
     FocusLost,
@@ -185,8 +327,20 @@ mod tests {
     }
 
     #[test]
+    fn every_gamepad_control_is_at_its_own_index() {
+        for (index, button) in GamepadButton::ALL.iter().enumerate() {
+            assert_eq!(button.index(), index);
+        }
+        for (index, axis) in GamepadAxis::ALL.iter().enumerate() {
+            assert_eq!(axis.index(), index);
+        }
+    }
+
+    #[test]
     fn the_last_key_fits_in_the_count() {
         assert_eq!(Key::NumpadEnter.index(), Key::COUNT - 1);
         assert_eq!(MouseButton::Forward.index(), MouseButton::COUNT - 1);
+        assert_eq!(GamepadButton::DPadRight.index(), GamepadButton::COUNT - 1);
+        assert_eq!(GamepadAxis::RightTrigger.index(), GamepadAxis::COUNT - 1);
     }
 }

@@ -1,11 +1,12 @@
 //! State of every input device, updated from the platform's input events.
 
 use star_math::Vec2;
-use star_platform::{ButtonState, InputEvent, TouchPhase};
+use star_platform::{ButtonState, GamepadButton, InputEvent, TouchPhase};
 
 use crate::action_map::ActionMap;
 use crate::actions::Actions;
 use crate::binding::Binding;
+use crate::gamepads::Gamepads;
 use crate::keyboard::Keyboard;
 use crate::mouse::Mouse;
 use crate::touches::Touches;
@@ -13,7 +14,7 @@ use crate::touches::Touches;
 /// Everything the player is doing with their input devices this frame.
 ///
 /// Games normally ask for [`Input::actions`], which work with any device;
-/// the keyboard and the mouse are there for what is specific to them.
+/// each device is also available for what is specific to it.
 ///
 /// The engine feeds it with [`Input::apply`] as events arrive and calls
 /// [`Input::end_frame`] after each update; games only read it.
@@ -22,6 +23,7 @@ pub struct Input {
     keyboard: Keyboard,
     mouse: Mouse,
     touches: Touches,
+    gamepads: Gamepads,
     actions: Actions,
 }
 
@@ -39,6 +41,7 @@ impl Input {
             keyboard: Keyboard::new(),
             mouse: Mouse::new(),
             touches: Touches::new(),
+            gamepads: Gamepads::new(),
             actions: Actions::new(map),
         }
     }
@@ -67,6 +70,12 @@ impl Input {
         &self.touches
     }
 
+    /// Connected gamepads.
+    #[must_use]
+    pub const fn gamepads(&self) -> &Gamepads {
+        &self.gamepads
+    }
+
     /// Updates the state with something the user did.
     pub fn apply(&mut self, event: InputEvent) {
         match event {
@@ -85,6 +94,20 @@ impl Input {
             InputEvent::CursorLeft => self.mouse.leave_window(),
             InputEvent::MouseWheel { x, y } => self.mouse.scroll(Vec2::new(x, y)),
             InputEvent::Touch { id, phase, x, y } => self.touch(id, phase, Vec2::new(x, y)),
+            InputEvent::GamepadConnected { gamepad } => self.gamepads.connect(gamepad),
+            InputEvent::GamepadDisconnected { gamepad } => {
+                self.change_gamepads(|gamepads| gamepads.disconnect(gamepad));
+            }
+            InputEvent::GamepadButton {
+                gamepad,
+                button,
+                state,
+            } => self.change_gamepads(|gamepads| gamepads.set_button(gamepad, button, state)),
+            InputEvent::GamepadAxis {
+                gamepad,
+                axis,
+                value,
+            } => self.gamepads.set_axis(gamepad, axis, value),
             InputEvent::FocusLost => self.release_everything(),
         }
     }
@@ -95,6 +118,7 @@ impl Input {
         self.keyboard.end_frame();
         self.mouse.end_frame();
         self.touches.end_frame();
+        self.gamepads.end_frame();
         self.actions.end_frame();
     }
 
@@ -103,14 +127,32 @@ impl Input {
         let was_touching = self.touches.is_any_down();
         self.touches.apply(id, phase, position);
         let is_touching = self.touches.is_any_down();
-        if is_touching != was_touching {
-            let state = if is_touching {
-                ButtonState::Pressed
-            } else {
-                ButtonState::Released
-            };
-            self.actions.binding_changed(Binding::Touch, state);
+        self.follow_binding(Binding::Touch, was_touching, is_touching);
+    }
+
+    /// The [`Binding::GamepadButton`] actions follow whether the button is
+    /// held on any gamepad; disconnecting one can release several at once.
+    fn change_gamepads(&mut self, change: impl FnOnce(&mut Gamepads)) {
+        let held_before = self.gamepads.held_buttons();
+        change(&mut self.gamepads);
+        let held_after = self.gamepads.held_buttons();
+        for (index, button) in GamepadButton::ALL.iter().enumerate() {
+            self.follow_binding(
+                Binding::GamepadButton(*button),
+                held_before[index],
+                held_after[index],
+            );
         }
+    }
+
+    /// Tells the actions about `binding` if it went from held to released or back.
+    fn follow_binding(&mut self, binding: Binding, was_down: bool, is_down: bool) {
+        let state = match (was_down, is_down) {
+            (false, true) => ButtonState::Pressed,
+            (true, false) => ButtonState::Released,
+            _ => return,
+        };
+        self.actions.binding_changed(binding, state);
     }
 
     fn release_everything(&mut self) {
@@ -295,6 +337,62 @@ mod tests {
 
         assert!(!input.touches().is_any_down());
         assert!(!input.actions().is_down(JUMP));
+    }
+
+    fn gamepad_button(gamepad: usize, state: ButtonState) -> InputEvent {
+        InputEvent::GamepadButton {
+            gamepad,
+            button: GamepadButton::South,
+            state,
+        }
+    }
+
+    fn gamepad_jump_input() -> Input {
+        let mut map = ActionMap::new();
+        map.add(JUMP, &[GamepadButton::South.into()]).unwrap();
+        Input::with_actions(map)
+    }
+
+    #[test]
+    fn gamepad_events_reach_the_gamepads() {
+        let mut input = Input::new();
+
+        input.apply(InputEvent::GamepadConnected { gamepad: 0 });
+        input.apply(InputEvent::GamepadAxis {
+            gamepad: 0,
+            axis: star_platform::GamepadAxis::LeftStickX,
+            value: -0.5,
+        });
+
+        let gamepad = input.gamepads().iter().next().unwrap();
+        assert_eq!(gamepad.axis(star_platform::GamepadAxis::LeftStickX), -0.5);
+    }
+
+    #[test]
+    fn gamepad_buttons_trigger_their_actions_on_any_gamepad() {
+        let mut input = gamepad_jump_input();
+        input.apply(gamepad_button(0, ButtonState::Pressed));
+        input.apply(gamepad_button(1, ButtonState::Pressed));
+        input.end_frame();
+
+        input.apply(gamepad_button(0, ButtonState::Released));
+
+        assert!(input.actions().is_down(JUMP), "the second gamepad holds it");
+
+        input.apply(gamepad_button(1, ButtonState::Released));
+
+        assert!(input.actions().just_released(JUMP));
+    }
+
+    #[test]
+    fn disconnecting_a_gamepad_releases_its_actions() {
+        let mut input = gamepad_jump_input();
+        input.apply(gamepad_button(0, ButtonState::Pressed));
+
+        input.apply(InputEvent::GamepadDisconnected { gamepad: 0 });
+
+        assert!(!input.actions().is_down(JUMP));
+        assert_eq!(input.gamepads().iter().count(), 0);
     }
 
     #[test]
