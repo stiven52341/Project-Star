@@ -83,15 +83,19 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           `Sprite` objects of a `.scene` file (`null` if it cannot).
     - [x] 13.5f Script classes in scenes: a scene node names the StarScript
           class it is built as (`class = "Rock"`), created without arguments.
-  - [ ] 13.6 Editor integration: compiling and an error panel.
+  - [x] 13.6 Editor integration: compiling and an error panel.
     - [x] 13.6a Programs of several files (`SourceSet`): each file is read
           on its own and their classes are checked as one program; errors
           name their file.
-    - [ ] 13.6b Checking a project in the editor (no UI): every `.star` of
+    - [x] 13.6b Checking a project in the editor: every `.star` of
           `assets/`, the input actions of `project.toml` and the script
           classes named by its scenes.
-    - [ ] 13.6c Error panel: «Compilar», a «Problemas» list and a count in
-          the status bar, checked off the UI thread.
+    - [x] 13.6c Error panel: «Compilar», a «Problemas» tab and the result
+          in the status bar, checked off the UI thread. (13.6b and 13.6c
+          went in together: the editor is a binary, so a check without its
+          panel would be dead code.)
+    - Next, on top of it: building the generated Rust with Cargo and
+      running the game from the editor.
   - [ ] 13.7 Blueprint model and translation to StarScript.
   - [ ] 13.8 Visual blueprint editor.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

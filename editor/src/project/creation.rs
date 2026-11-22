@@ -11,7 +11,7 @@ use super::ProjectSettings;
 use super::manifest::{MANIFEST_FILE_NAME, render_manifest};
 
 /// Folder, inside the project, where games keep their resources.
-const ASSETS_DIRECTORY: &str = "assets";
+pub(crate) const ASSETS_DIRECTORY: &str = "assets";
 /// Folder, inside the user's home, offered by default to store projects.
 const DEFAULT_PROJECTS_DIRECTORY: &str = "ProjectStar Projects";
 

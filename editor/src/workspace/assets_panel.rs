@@ -5,12 +5,10 @@ use std::path::{Path, PathBuf};
 
 use eframe::egui;
 
-use super::file_tree::{FileNode, scan_directory};
+use crate::file_tree::{FileNode, scan_directory};
+use crate::project::ASSETS_DIRECTORY;
 use crate::style::ERROR_COLOR;
 use crate::texts;
-
-/// Folder, inside the project, shown by the browser.
-const ASSETS_DIRECTORY: &str = "assets";
 
 /// Contents of the assets folder, refreshed on demand.
 pub(crate) struct AssetsPanel {
@@ -34,13 +32,11 @@ impl AssetsPanel {
 
     pub(crate) fn show(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.strong(texts::ASSETS);
             ui.weak(format!("{ASSETS_DIRECTORY}/"));
             if ui.small_button(texts::REFRESH).clicked() {
                 self.refresh();
             }
         });
-        ui.separator();
         egui::ScrollArea::vertical()
             .auto_shrink(false)
             .show(ui, |ui| match &self.contents {

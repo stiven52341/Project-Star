@@ -2608,6 +2608,7 @@ dependencies = [
  "serde",
  "star_engine",
  "star_render",
+ "star_script",
  "toml",
 ]
 

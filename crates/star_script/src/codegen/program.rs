@@ -12,7 +12,7 @@ use crate::Span;
 use crate::ast::{ClassDecl, ConstructorDecl, Expr, MemberKind, MethodDecl, VariableKind};
 use crate::semantic::{
     CAMERA_CLASS, COLOR_CLASS, ClassId, ClassOrigin, GAME_CLASS, MethodInfo, NODE_CLASS,
-    ParameterInfo, SPRITE_CLASS, Type,
+    ParameterInfo, SPRITE_CLASS, SceneClassError, Type,
 };
 
 /// The engine classes that scripts can extend.
@@ -173,49 +173,38 @@ fn any_object(context: Context<'_>, out: &mut Writer, classes: &[ClassId]) {
 /// `Node`, `Sprite` and `Camera` are created by the `Scene` module itself.
 fn scene_classes(context: Context<'_>, out: &mut Writer) {
     let classes = context.analysis.classes();
-    let node = classes.find(NODE_CLASS);
     out.line("");
     out.line("/// Creates an object of the class a node of a scene names, as its `init()`");
     out.line("/// leaves it.");
-    out.open(
-        "pub fn new_scene_object_(class_: &str) -> ::std::result::Result<crate::classes::Node::Ref, ::std::string::String> {",
-    );
-    out.open("match class_ {");
+    out.open(&format!(
+        "pub fn new_scene_object_({UNKNOWN_CLASS_ARGUMENT}: &str) -> ::std::result::Result<crate::classes::Node::Ref, ::std::string::String> {{",
+    ));
+    out.open(&format!("match {UNKNOWN_CLASS_ARGUMENT} {{"));
     for (id, class) in classes.iter() {
         if [NODE_CLASS, SPRITE_CLASS, CAMERA_CLASS].contains(&class.name.as_str()) {
             continue;
         }
-        let is_node = node.is_some_and(|node| classes.is_subclass(id, node));
-        let constructor = class.constructor.as_ref();
-        let outcome = if !is_node {
-            reason(&format!(
-                "`{}` is not a node: it does not extend `Node`",
-                class.name
-            ))
-        } else if constructor.is_some_and(|constructor| constructor.is_private) {
-            reason(&format!(
-                "`{}` cannot be created by a scene: its `init` is private",
-                class.name
-            ))
-        } else if !class.constructor_parameters().is_empty() {
-            reason(&format!(
-                "`{}` cannot be created by a scene: its `init` needs arguments",
-                class.name
-            ))
-        } else {
-            format!(
+        let outcome = match classes.check_scene_class(id) {
+            Ok(()) => format!(
                 "::std::result::Result::Ok({}::new())",
                 context.class_path(id)
-            )
+            ),
+            Err(error) => reason(&error.to_string()),
         };
         out.line(&format!("{:?} => {outcome},", class.name));
     }
-    out.line(
-        "_ => ::std::result::Result::Err(::std::format!(\"there is no class \\\"{class_}\\\"\")),",
-    );
+    // The message names the class the scene asked for, filled in when it runs.
+    let unknown = SceneClassError::Unknown(format!("{{{UNKNOWN_CLASS_ARGUMENT}}}"));
+    out.line(&format!(
+        "_ => ::std::result::Result::Err(::std::format!({:?})),",
+        unknown.to_string()
+    ));
     out.close("}");
     out.close("}");
 }
+
+/// Parameter of `new_scene_object_`: the class name the scene gives.
+const UNKNOWN_CLASS_ARGUMENT: &str = "class_";
 
 /// Code that gives `message` as an error of `new_scene_object_`.
 fn reason(message: &str) -> String {

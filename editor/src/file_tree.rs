@@ -1,4 +1,5 @@
-//! Snapshot of a folder's contents, for the assets browser.
+//! Snapshot of a folder's contents, for the assets browser and the checks
+//! that read every file of a kind.
 
 use std::cmp::Ordering;
 use std::fs;
@@ -68,6 +69,27 @@ fn scan(directory: &Path, depth: usize) -> io::Result<Vec<FileNode>> {
     Ok(nodes)
 }
 
+/// Paths of every file in `nodes`, relative to the folder they were scanned
+/// from, with `/` between folders on every platform (`"enemies/rock.star"`).
+/// They come in the order of the listing.
+pub(crate) fn file_paths(nodes: &[FileNode]) -> Vec<String> {
+    let mut paths = Vec::new();
+    collect_file_paths(nodes, "", &mut paths);
+    paths
+}
+
+fn collect_file_paths(nodes: &[FileNode], prefix: &str, paths: &mut Vec<String>) {
+    for node in nodes {
+        let path = format!("{prefix}{}", node.name());
+        match node {
+            FileNode::File { .. } => paths.push(path),
+            FileNode::Folder { children, .. } => {
+                collect_file_paths(children, &format!("{path}/"), paths);
+            }
+        }
+    }
+}
+
 fn compare_nodes(first: &FileNode, second: &FileNode) -> Ordering {
     second.is_folder().cmp(&first.is_folder()).then_with(|| {
         first
@@ -99,6 +121,26 @@ mod tests {
             &nodes[0],
             FileNode::Folder { children, .. } if children.len() == 1
         ));
+    }
+
+    #[test]
+    fn file_paths_name_their_folders() {
+        let root = TestDirectory::new("file_tree_paths");
+        fs::create_dir_all(root.path().join("enemies").join("big")).expect("folders");
+        fs::write(
+            root.path().join("enemies").join("big").join("rock.star"),
+            "",
+        )
+        .expect("file");
+        fs::write(root.path().join("enemies").join("bat.star"), "").expect("file");
+        fs::write(root.path().join("game.star"), "").expect("file");
+
+        let nodes = scan_directory(root.path()).expect("scanned");
+
+        assert_eq!(
+            file_paths(&nodes),
+            ["enemies/big/rock.star", "enemies/bat.star", "game.star"]
+        );
     }
 
     #[test]

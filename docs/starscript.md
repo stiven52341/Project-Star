@@ -38,7 +38,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
-| 6 | Editor integration | Pending |
+| 6 | Editor integration | In progress: «Compilar» checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
 | 7–8 | Blueprints | Draft |
 
 ## 1. Lexicon (final)

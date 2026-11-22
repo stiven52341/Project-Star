@@ -128,7 +128,7 @@ Tools    star_script                         (StarScript compiler; no dependenci
 | `star_engine` | Public entry point that integrates everything |
 | `star_script` | StarScript compiler (`.star` → Rust). Specification in `docs/starscript.md` |
 | `star_script_runtime` | Support for the generated Rust: shared lists, fields, equality, input actions, runtime errors |
-| `editor` | Visual editor (egui): project manager and main window |
+| `editor` | Visual editor (egui): project manager, main window and «Compilar» (checks a project's StarScript with `star_script`) |
 
 More detail in `docs/architecture.md`. Roadmap in `docs/roadmap.md`.
 

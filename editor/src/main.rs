@@ -1,9 +1,11 @@
 //! ProjectStar visual editor. Starts on the project manager.
 
 mod app;
+mod file_tree;
 mod folder_dialog;
 mod launcher;
 mod project;
+mod project_check;
 mod recent_projects;
 mod style;
 mod texts;

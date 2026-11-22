@@ -82,6 +82,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 37 | StarScript `Color` is an **object**, and the camera is a **node** | StarScript has no value types yet, so `Color` follows the language's one rule for classes (shared references): two sprites given the same color change together, which is documented. A `Camera` node follows its parents for free (child of the ship = follows the ship) and `Game.camera` says which one is used; its world position comes from the mirrored node's global transform, its rotation is ignored so the view never tilts, and views are never thinner than 0.001 units so a wrong height cannot hide the frame. Rejected: loose `red`/`green`/… and `camera_x`/`camera_y` fields (verbose, and following a node would need code in every game) |
 | 38 | StarScript scenes are read **through a loader the game registers** in the runtime | The generated `Scene` class only uses `star_script_runtime`, so console programs still do not depend on the engine. The generated game registers, before the game object is created, a loader that reads `SceneOutline`s from the app's asset folder and turns them into the runtime's plain `SceneNode` list; `Scene.load` builds `Node`/`Sprite` objects from it. Results are kept per path (failures too, so a missing file warns once). A scene that cannot be loaded gives `null`, not a stopped game, so the error rule of decision 4 holds without a new `fault` case. Rejected: reading files in the generated `Node` module (console programs would need the engine) and `Game.load_scene` (nodes could not load scenes) |
 | 39 | Scene nodes name StarScript classes **by name, resolved by generated code** | A `.scene` file is data, so the class is a text (`class = "Rock"`). The compiler writes `new_scene_object_`, a `match` over the program's classes: the node classes created without arguments are built with `new()`, and the others give the reason they cannot (needs arguments, private `init`, not a node). The object is created as its `init` leaves it and the scene's values are applied on top (name always; transform and image only when the file writes them), as an instance overrides its prefab. Any problem rejects the whole scene (`null`, one warning naming the node), so a typo is never half-loaded. The format version stays 1: the field is optional and old files read the same. Rejected for now: checking the project's scenes at compile time (it fits the editor's build, step 13.6) and passing arguments to `init` from the scene |
+| 40 | The editor **checks** projects with `star_script` as a library | «Compilar» gives every mistake the compiler can find (scripts, input actions, scene classes) in a fraction of a second, without Cargo, so it can run often. Scripts live anywhere in `assets/`, next to the scenes and images they use, and all of them form one program: each file is tokenized and parsed on its own (an unclosed `{` stays in its file) and their classes are checked together, with spans placed in one range of offsets that `SourceSet` maps back to file, line and column. The check runs on a thread so big projects never freeze the editor. Rejected for now: building with Cargo from the editor (needs a way to find the engine's crates outside the repository) and a `scripts/` folder apart from the assets |
 
 ## ECS
 
@@ -293,19 +294,37 @@ A single native window with two screens. Its texts are in Spanish for now
    `<location>/<name>/` with `project.toml` and `assets/` (it never
    overwrites) and opens the editor.
 2. **Editor** (`workspace/`), maximized: menu («Archivo» → «Cerrar
-   proyecto» / «Salir»; «Ayuda» → «Acerca de»), **Scene** panel (hierarchy, empty until `star_scene`
+   proyecto» / «Salir»; «Proyecto» → «Compilar»; «Ayuda» → «Acerca de») and
+   a «Compilar» button next to it, **Scene** panel (hierarchy, empty until `star_scene`
    exists), central **view** rendered by the engine (reference grid; drag =
    pan in 2D / orbit in 3D, wheel = zoom), **Inspector** (project
-   properties), **Files** (tree of `assets/`, with «Actualizar») and a
-   status bar.
+   properties), a bottom panel with two tabs, **Archivos** (tree of
+   `assets/`, with «Actualizar») and **Problemas** (what the last
+   «Compilar» found, as `file:line:column` and a message; it opens by itself
+   when there are problems), and a status bar (with the result of the last
+   «Compilar»).
 
 The view uses `OffscreenRenderer` on egui's wgpu device and registers its
 texture in `egui_wgpu` (it is registered again when its size changes). The
 texture is `Rgba8Unorm` with colors already encoded in sRGB, because egui
 samples textures as gamma values.
 
+«Compilar» runs `project_check/` (no UI, with tests) on a thread of its own
+(`CheckJob`), which asks egui to redraw when it finishes. It checks:
+
+- `project.toml`: its `[input.actions]`, which scripts name.
+- Every `.star` file of `assets/` (any subfolder), as **one program**
+  (`star_script::SourceSet`), including its translation to Rust.
+- Every `.scene` file of `assets/`: that it can be read and, if the project
+  has scripts, that the classes its nodes name can build them
+  (`ClassTable::scene_class`, the same rule the generated code follows).
+
+Building the generated Rust with Cargo and running the game are not part of
+«Compilar» yet.
+
 Modules: `project/` (validated model, creation and opening, no UI and with
-tests), `recent_projects.rs` (recent projects list, at most 10, in
+tests), `project_check/` (see above), `file_tree.rs` (snapshot of a folder,
+for the Files tab and the checks), `recent_projects.rs` (recent projects list, at most 10, in
 `<config>/ProjectStar/recent_projects.toml`), `folder_dialog.rs` (rfd),
 `texts.rs` (every visible text, to translate them later) and `style.rs`
 (shared visual constants).

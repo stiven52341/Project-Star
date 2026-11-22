@@ -2,10 +2,10 @@
 
 mod assets_panel;
 mod editor_camera;
-mod file_tree;
 mod grid;
 mod inspector_panel;
 mod menu_bar;
+mod problems_panel;
 mod viewport;
 
 use eframe::{egui, egui_wgpu};
@@ -14,6 +14,7 @@ use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
 use self::assets_panel::AssetsPanel;
 use self::inspector_panel::show_inspector;
 use self::menu_bar::{MenuAction, show_menu_bar};
+use self::problems_panel::ProblemsPanel;
 use self::viewport::SceneViewport;
 use crate::project::Project;
 use crate::style::ERROR_COLOR;
@@ -21,18 +22,27 @@ use crate::texts;
 
 const SIDE_PANEL_WIDTH: f32 = 260.0;
 const SIDE_PANEL_MIN_WIDTH: f32 = 180.0;
-const ASSETS_PANEL_HEIGHT: f32 = 200.0;
-const ASSETS_PANEL_MIN_HEIGHT: f32 = 100.0;
+const BOTTOM_PANEL_HEIGHT: f32 = 200.0;
+const BOTTOM_PANEL_MIN_HEIGHT: f32 = 100.0;
 
 /// What the editor window asks the application to do.
 pub(crate) enum EditorAction {
     CloseProject,
 }
 
+/// What the panel below the view shows.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BottomTab {
+    Assets,
+    Problems,
+}
+
 /// Editor for one open project.
 pub(crate) struct EditorWindow {
     project: Project,
     assets: AssetsPanel,
+    problems: ProblemsPanel,
+    bottom_tab: BottomTab,
     /// The engine view, or why it could not be created.
     viewport: Result<SceneViewport, String>,
     about_open: bool,
@@ -54,6 +64,8 @@ impl EditorWindow {
         Self {
             project,
             assets,
+            problems: ProblemsPanel::new(),
+            bottom_tab: BottomTab::Assets,
             viewport,
             about_open: false,
         }
@@ -66,8 +78,15 @@ impl EditorWindow {
 
     pub(crate) fn show(&mut self, ui: &mut egui::Ui) -> Option<EditorAction> {
         let mut action = None;
-        egui::Panel::top("menu_bar").show(ui, |ui| match show_menu_bar(ui) {
+        if self.problems.update() {
+            self.bottom_tab = BottomTab::Problems;
+        }
+        let compiling = self.problems.is_compiling();
+        egui::Panel::top("menu_bar").show(ui, |ui| match show_menu_bar(ui, compiling) {
             Some(MenuAction::CloseProject) => action = Some(EditorAction::CloseProject),
+            Some(MenuAction::Compile) => {
+                self.problems.compile(self.project.directory(), ui.ctx());
+            }
             Some(MenuAction::ShowAbout) => self.about_open = true,
             None => {}
         });
@@ -82,11 +101,11 @@ impl EditorWindow {
             .default_size(SIDE_PANEL_WIDTH)
             .min_size(SIDE_PANEL_MIN_WIDTH)
             .show(ui, |ui| show_inspector(ui, &self.project));
-        egui::Panel::bottom("assets")
+        egui::Panel::bottom("bottom_panel")
             .resizable(true)
-            .default_size(ASSETS_PANEL_HEIGHT)
-            .min_size(ASSETS_PANEL_MIN_HEIGHT)
-            .show(ui, |ui| self.assets.show(ui));
+            .default_size(BOTTOM_PANEL_HEIGHT)
+            .min_size(BOTTOM_PANEL_MIN_HEIGHT)
+            .show(ui, |ui| self.show_bottom_panel(ui));
         egui::CentralPanel::no_frame().show(ui, |ui| match &mut self.viewport {
             Ok(viewport) => viewport.show(ui),
             Err(error) => {
@@ -97,6 +116,22 @@ impl EditorWindow {
         action
     }
 
+    fn show_bottom_panel(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.bottom_tab, BottomTab::Assets, texts::ASSETS);
+            ui.selectable_value(
+                &mut self.bottom_tab,
+                BottomTab::Problems,
+                self.problems.title(),
+            );
+        });
+        ui.separator();
+        match self.bottom_tab {
+            BottomTab::Assets => self.assets.show(ui),
+            BottomTab::Problems => self.problems.show(ui),
+        }
+    }
+
     fn show_status_bar(&self, ui: &mut egui::Ui) {
         let settings = self.project.settings();
         ui.horizontal(|ui| {
@@ -105,6 +140,8 @@ impl EditorWindow {
             ui.weak(self.project.directory().display().to_string());
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.weak(format!("{ENGINE_NAME} {ENGINE_VERSION}"));
+                ui.separator();
+                self.problems.show_summary(ui);
             });
         });
     }

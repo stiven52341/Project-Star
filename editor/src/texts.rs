@@ -58,6 +58,16 @@ pub(crate) const ASSETS: &str = "Archivos";
 pub(crate) const REFRESH: &str = "Actualizar";
 pub(crate) const EMPTY_ASSETS: &str =
     "La carpeta assets está vacía. Copia aquí imágenes, sonidos y modelos.";
+pub(crate) const MENU_PROJECT: &str = "Proyecto";
+pub(crate) const COMPILE: &str = "Compilar";
+pub(crate) const COMPILE_HINT: &str =
+    "Comprueba los scripts, las acciones de project.toml y las clases de las escenas";
+pub(crate) const COMPILING: &str = "Compilando…";
+pub(crate) const PROBLEMS: &str = "Problemas";
+pub(crate) const NOT_COMPILED: &str =
+    "Pulsa «Compilar» para comprobar los scripts .star de la carpeta assets.";
+pub(crate) const CHECK_FAILED: &str = "No se pudo compilar";
+pub(crate) const CHECK_LOST: &str = "La compilación se detuvo sin dar un resultado.";
 pub(crate) const NO_GPU_FOR_VIEWPORT: &str = "la interfaz no se está dibujando con wgpu";
 
 pub(crate) fn viewport_title(dimension_label: &str) -> String {
@@ -73,6 +83,30 @@ pub(crate) fn viewport_controls(dimension: ProjectDimension) -> &'static str {
 
 pub(crate) fn viewport_error(error: &str) -> String {
     format!("No se pudo renderizar la escena: {error}")
+}
+
+pub(crate) fn problems_title(count: usize) -> String {
+    format!("{PROBLEMS} ({count})")
+}
+
+pub(crate) fn problems_found(count: usize) -> String {
+    if count == 1 {
+        "1 problema".to_owned()
+    } else {
+        format!("{count} problemas")
+    }
+}
+
+pub(crate) fn check_passed(scripts: usize) -> String {
+    match scripts {
+        0 => "Sin problemas (el proyecto no tiene scripts)".to_owned(),
+        1 => "Sin problemas en 1 script".to_owned(),
+        _ => format!("Sin problemas en {scripts} scripts"),
+    }
+}
+
+pub(crate) fn check_not_started(error: &std::io::Error) -> String {
+    format!("No se pudo empezar a compilar: {error}")
 }
 
 pub(crate) fn assets_unreadable(error: &std::io::Error) -> String {

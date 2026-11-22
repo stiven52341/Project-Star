@@ -25,6 +25,7 @@ star_audio = { path = "crates/star_audio" }
 star_physics = { path = "crates/star_physics" }
 star_scene = { path = "crates/star_scene" }
 star_engine = { path = "crates/star_engine" }
+star_script = { path = "crates/star_script" }
 
 # External dependencies. Each one is wrapped by an engine crate (see CLAUDE.md 3.5).
 wgpu = "30.0"              # GPU abstraction: DX12, Vulkan, Metal, OpenGL

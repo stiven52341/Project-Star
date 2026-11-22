@@ -15,6 +15,7 @@ mod expressions;
 mod flow;
 mod narrowing;
 mod natives;
+mod scene_classes;
 mod statements;
 mod types;
 
@@ -28,6 +29,7 @@ pub use natives::{
     BuiltinMethod, CAMERA_CLASS, COLOR_CLASS, GAME_CLASS, INPUT_CLASS, NODE_CLASS, SCENE_CLASS,
     SPRITE_CLASS,
 };
+pub use scene_classes::SceneClassError;
 pub use types::Type;
 
 use crate::GameSettings;
