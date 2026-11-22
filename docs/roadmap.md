@@ -46,7 +46,15 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] 6d `.scene` files (TOML): loading, instancing, capturing and saving.
   - Next, on top of it: the real hierarchy and inspector of the editor
     (Phase 12), and scenes from StarScript.
-- [ ] **Phase 7 — Audio**: playback, and loading sounds from the asset folder.
+- [ ] **Phase 7 — Audio** (decision 45):
+  - [x] 7a Decoding sounds (`SoundFormat`, symphonia): WAV, OGG Vorbis,
+        MP3 and FLAC into a `Sound` in memory (`star_core`).
+  - [ ] 7b Mixer (`star_audio`): voices that play `Sound`s with volume,
+        loops and stop, converted to the output's rate and channels; tested
+        without an audio device.
+  - [ ] 7c Audio output (cpal) owned by the engine, and loading sounds from
+        the asset folder (`GameContext::load_sound`), with an example.
+  - [ ] 7d Sounds in StarScript (part of 13.5).
 - [ ] **Phase 8 — 2D physics**.
 - [ ] **Phase 9 — 3D rendering**: materials, lights, indexed meshes. (`Mat4`
       and a perspective camera already exist.)

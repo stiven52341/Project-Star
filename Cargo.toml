@@ -34,6 +34,9 @@ winit = "0.30"             # Cross-platform windows and OS events
 gilrs = "0.11"             # Gamepads (needs libudev headers to build on Linux)
 png = "0.18"               # PNG image decoding for textures
 zune-jpeg = "0.5"           # JPEG image decoding for textures
+symphonia = { version = "0.6", default-features = false, features = [
+    "wav", "pcm", "ogg", "vorbis", "mp3", "flac",
+] }                        # Sound decoding: WAV, OGG Vorbis, MP3 and FLAC
 raw-window-handle = "0.6"  # Window handle interop between winit and wgpu
 pollster = "1.0"           # Blocks on wgpu's async initialization
 log = "0.4"                # Logging facade
