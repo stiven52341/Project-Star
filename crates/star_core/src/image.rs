@@ -1,6 +1,6 @@
-//! Pictures in memory, ready to become textures.
+//! Pictures in memory: what image files decode to and textures are made from.
 
-use star_core::{EngineError, EngineResult};
+use crate::{EngineError, EngineResult};
 
 /// Bytes of one pixel: red, green, blue and alpha.
 const BYTES_PER_PIXEL: u32 = 4;
@@ -19,16 +19,16 @@ impl Image {
     ///
     /// # Errors
     ///
-    /// Returns [`EngineError::Rendering`] if the image is empty or `pixels`
+    /// Returns [`EngineError::Asset`] if the image is empty or `pixels`
     /// does not hold exactly 4 bytes per pixel.
     pub fn from_rgba8(width: u32, height: u32, pixels: Vec<u8>) -> EngineResult<Self> {
         if width == 0 || height == 0 {
-            return Err(EngineError::Rendering(format!(
+            return Err(EngineError::Asset(format!(
                 "images need at least one pixel, got {width}x{height}"
             )));
         }
         if Some(pixels.len()) != byte_count(width, height) {
-            return Err(EngineError::Rendering(format!(
+            return Err(EngineError::Asset(format!(
                 "a {width}x{height} image needs {BYTES_PER_PIXEL} bytes per pixel, got {} bytes",
                 pixels.len()
             )));

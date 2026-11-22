@@ -1,5 +1,7 @@
 //! The behavior a game plugs into the engine.
 
+use std::path::Path;
+
 use star_core::{EngineResult, Time};
 use star_input::Input;
 use star_render::{Frame, Image, MeshId, Renderer, TextureFilter, TextureId, Vertex};
@@ -71,6 +73,22 @@ impl<'a> GameContext<'a> {
         filter: TextureFilter,
     ) -> EngineResult<TextureId> {
         self.renderer.create_texture(image, filter)
+    }
+
+    /// Loads the PNG image at `path` (relative to the working directory) and
+    /// uploads it to the GPU, to be drawn with `filter`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, is not a valid PNG image
+    /// or is too big for the GPU.
+    pub fn load_texture(
+        &mut self,
+        path: impl AsRef<Path>,
+        filter: TextureFilter,
+    ) -> EngineResult<TextureId> {
+        let image = star_assets::load_png(path)?;
+        self.create_texture(&image, filter)
     }
 }
 

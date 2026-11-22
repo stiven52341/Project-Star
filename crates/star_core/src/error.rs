@@ -25,6 +25,8 @@ pub enum EngineError {
     Rendering(String),
     /// An input setting is not valid, e.g. two actions with the same name.
     Input(String),
+    /// An asset cannot be used: a missing file, a corrupt image…
+    Asset(String),
     /// A fixed-capacity resource has no room left.
     CapacityExceeded {
         /// Name of the exhausted resource.
@@ -44,6 +46,7 @@ impl fmt::Display for EngineError {
             Self::Platform(reason) => write!(formatter, "platform error: {reason}"),
             Self::Rendering(reason) => write!(formatter, "rendering error: {reason}"),
             Self::Input(reason) => write!(formatter, "input error: {reason}"),
+            Self::Asset(reason) => write!(formatter, "asset error: {reason}"),
             Self::CapacityExceeded { resource } => {
                 write!(formatter, "capacity exceeded for {resource}")
             }
@@ -77,6 +80,16 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "input error: the action \"jump\" already exists"
+        );
+    }
+
+    #[test]
+    fn asset_errors_explain_the_reason() {
+        let error = EngineError::Asset("\"hero.png\" does not exist".to_owned());
+
+        assert_eq!(
+            error.to_string(),
+            "asset error: \"hero.png\" does not exist"
         );
     }
 }

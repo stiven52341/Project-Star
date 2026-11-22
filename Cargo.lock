@@ -2567,6 +2567,10 @@ dependencies = [
 [[package]]
 name = "star_assets"
 version = "0.1.0"
+dependencies = [
+ "png",
+ "star_core",
+]
 
 [[package]]
 name = "star_audio"

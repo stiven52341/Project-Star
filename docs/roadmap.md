@@ -19,7 +19,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] 2d Gamepads (`gilrs`): buttons by position, sticks and triggers, up
         to 8 at once; `Binding::GamepadButton` for actions. On Android and
         iOS `gilrs` has no backend yet: gamepads will come with Phase 11.
-- [ ] **Phase 3 — 2D rendering**:
+- [x] **Phase 3 — 2D rendering**:
   - [x] wgpu integration: DX12, Vulkan, Metal and OpenGL; backend selection;
         clearing the screen with a color; recovery from a lost surface.
   - [x] Shader pipeline (WGSL), triangle meshes with per-vertex color,
@@ -27,9 +27,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] Textures (from pixels in memory, smooth or pixelated filtering),
         sprites (tint, rotation, anchor, layers, sprite sheet cells) and
         sprite batching (example `sprites_2d`).
-  - [ ] Loading PNG images from files.
+  - [x] Loading PNG images from files (`GameContext::load_texture`).
 - [ ] **Phase 4 — Full ECS**: components, queries, systems and stages.
-- [ ] **Phase 5 — Assets**: loading textures/sounds, handles, hot-reload.
+- [ ] **Phase 5 — Assets**: asset folders, handles and caching, sounds,
+      hot-reload, more image formats. (PNG decoding already exists.)
 - [ ] **Phase 6 — Scenes**: node tree, serialization.
 - [ ] **Phase 7 — Audio**.
 - [ ] **Phase 8 — 2D physics**.

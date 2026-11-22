@@ -68,6 +68,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 23 | Gamepads with **gilrs** (MIT/Apache-2.0) | Maintained and pure Rust, with backends for Windows (WGI/XInput), macOS (IOKit) and Linux (evdev), SDL-style mappings and dead zones. Only `star_platform` knows it. On Linux it needs the libudev headers to build (`libudev-dev`). Rejected: writing our own backends per OS (a lot of platform code for little gain) |
 | 24 | StarScript input: actions in **`project.toml`**, read through `star_script_runtime::input` | Actions are project settings (`[input.actions]`), as an editor panel will show them, so scripts stay clean and the compiler can reject misspelled action names (it receives them in `GameSettings`). `Input.is_down("jump")` is a static call with no object to read the engine's input from, so the generated game copies each action's state into a per-thread table of the runtime once per frame (no allocations; the runtime stays without dependencies) and the calls read it by name. Rejected: declaring actions in scripts (typos in key names only fail while playing) |
 | 25 | Sprites **batched by texture**, in an immediate `Frame` | The game adds sprites every frame (like meshes, decision 9); the renderer groups consecutive sprites that share a texture into one draw call. The order is explicit (layers, then order of addition), so translucent sprites always blend correctly without sorting by depth. Rejected for now: texture arrays or bindless textures (not available on OpenGL ES and older GPUs) and automatic atlases (they belong to the asset pipeline, Phase 5) |
+| 26 | PNG decoding with **png** (MIT/Apache-2.0), in `star_assets` | The image-rs project's decoder: maintained, pure Rust (it builds for every platform, mobile included) and light. PNG is lossless with transparency, the usual format for 2D game art. Only `star_assets` knows it. Rejected: the `image` crate (many formats, but much heavier to build; more formats can come in Phase 5) |
 
 ## Input
 
@@ -136,7 +137,13 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
   when built) with `GameContext::create_texture(&image, TextureFilter)` and
   identified by a `TextureId`. `Smooth` filtering blends pixels, `Pixelated`
   keeps them sharp (pixel art). Texture coordinates are clamped, so cells of a
-  sprite sheet never bleed into their neighbors. sRGB targets get sRGB
+  sprite sheet never bleed into their neighbors.
+- `GameContext::load_texture(path, filter)` reads a PNG file through
+  `star_assets::load_png` (any PNG kind becomes RGBA8). `Image` lives in
+  `star_core`, so `star_assets` produces it and `star_render` consumes it
+  without depending on each other (they share layer 2); `star_engine`
+  connects them. Paths are relative to the working directory until Phase 5
+  brings asset folders. sRGB targets get sRGB
   textures; other targets (the editor's) get the values unchanged, as with colors.
 - Sprites (`Frame::draw_sprite(Sprite)`) are textured rectangles on the
   `z = 0` plane: position, size (negative mirrors), rotation around an

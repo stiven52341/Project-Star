@@ -3,8 +3,9 @@
 //! A tiled floor (pixelated texture) lies under hundreds of tinted,
 //! translucent balls (smooth texture) that bounce around. On top, a hero
 //! animated from a sprite sheet walks with the arrow keys, WASD or a
-//! gamepad's directional pad, and turns to face where it goes. Every
-//! texture is generated in code, pixel by pixel.
+//! gamepad's directional pad, and turns to face where it goes, among
+//! spinning stars loaded from a PNG file. The other textures are generated
+//! in code, pixel by pixel.
 //! Run it with an optional graphics backend:
 //! `cargo run -p sprites_2d -- [auto|vulkan|dx12|metal|opengl]`
 
@@ -23,7 +24,8 @@ const ARENA: Vec2 = Vec2::new(8.5, 4.8);
 
 const FLOOR_LAYER: i32 = -1;
 const BALL_LAYER: i32 = 0;
-const HERO_LAYER: i32 = 1;
+const STAR_LAYER: i32 = 1;
+const HERO_LAYER: i32 = 2;
 
 /// Floor tiles in each direction from the origin.
 const FLOOR_TILES: i16 = 9;
@@ -39,6 +41,15 @@ const BALL_MAX_SPEED: f32 = 3.0;
 const BALL_OPACITY: f32 = 0.7;
 /// Fixed seed: every run looks the same.
 const SEED: u32 = 0x5EED;
+
+/// Found from the example's folder, wherever it is run from.
+const STAR_IMAGE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/star.png");
+const STAR_COUNT: u8 = 8;
+/// Distance of the stars from the center, in world units.
+const STAR_CIRCLE_RADIUS: f32 = 3.0;
+const STAR_SIZE: f32 = 0.8;
+/// Radians per second.
+const STAR_SPIN_SPEED: f32 = 1.5;
 
 /// The hero's sheet: 4 frames in a row, each a square of this many pixels.
 const HERO_FRAMES: u16 = 4;
@@ -58,6 +69,7 @@ const DOWN: &str = "down";
 struct Textures {
     floor: TextureId,
     ball: TextureId,
+    star: TextureId,
     hero: TextureId,
 }
 
@@ -78,6 +90,8 @@ struct Hero {
 struct Sprites2d {
     textures: Option<Textures>,
     balls: Vec<Ball>,
+    /// Rotation of the stars, in radians.
+    star_spin: f32,
     hero: Hero,
 }
 
@@ -87,6 +101,7 @@ impl Sprites2d {
         Self {
             textures: None,
             balls: (0..BALL_COUNT).map(|_| Ball::random(&mut random)).collect(),
+            star_spin: 0.0,
             hero: Hero {
                 position: Vec2::ZERO,
                 facing_left: false,
@@ -101,6 +116,7 @@ impl Game for Sprites2d {
         self.textures = Some(Textures {
             floor: context.create_texture(&floor_image()?, TextureFilter::Pixelated)?,
             ball: context.create_texture(&ball_image()?, TextureFilter::Smooth)?,
+            star: context.load_texture(STAR_IMAGE, TextureFilter::Smooth)?,
             hero: context.create_texture(&hero_sheet()?, TextureFilter::Pixelated)?,
         });
         Ok(())
@@ -111,6 +127,7 @@ impl Game for Sprites2d {
         for ball in &mut self.balls {
             ball.advance(seconds);
         }
+        self.star_spin = (self.star_spin + STAR_SPIN_SPEED * seconds) % TAU;
         self.hero.walk(direction(input.actions()), seconds);
     }
 
@@ -131,6 +148,7 @@ impl Game for Sprites2d {
                 .with_layer(BALL_LAYER),
             );
         }
+        draw_stars(frame, textures.star, self.star_spin);
         frame.draw_sprite(self.hero.sprite(textures.hero));
     }
 }
@@ -220,6 +238,19 @@ fn draw_floor(frame: &mut Frame, texture: TextureId) {
             let position = Vec2::new(f32::from(column), f32::from(row));
             frame.draw_sprite(Sprite::new(texture, position, Vec2::ONE).with_layer(FLOOR_LAYER));
         }
+    }
+}
+
+/// Stars on a circle around the center, each spinning on itself.
+fn draw_stars(frame: &mut Frame, texture: TextureId, spin: f32) {
+    for star in 0..STAR_COUNT {
+        let angle = f32::from(star) / f32::from(STAR_COUNT) * TAU;
+        let position = Vec2::new(angle.cos(), angle.sin()) * STAR_CIRCLE_RADIUS;
+        frame.draw_sprite(
+            Sprite::new(texture, position, Vec2::new(STAR_SIZE, STAR_SIZE))
+                .with_rotation(spin)
+                .with_layer(STAR_LAYER),
+        );
     }
 }
 
