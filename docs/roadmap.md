@@ -52,8 +52,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] 7b Mixer (`star_audio`): voices that play `Sound`s with volume,
         loops and stop, converted to the output's rate and channels; tested
         without an audio device.
-  - [ ] 7c Audio output (cpal) owned by the engine, and loading sounds from
-        the asset folder (`GameContext::load_sound`), with an example.
+  - [x] 7c Audio output (cpal) owned by the engine, and loading sounds from
+        the asset folder (`GameContext::load_sound`), with an example
+        (`sounds_2d`).
   - [ ] 7d Sounds in StarScript (part of 13.5).
 - [ ] **Phase 8 — 2D physics**.
 - [ ] **Phase 9 — 3D rendering**: materials, lights, indexed meshes. (`Mat4`

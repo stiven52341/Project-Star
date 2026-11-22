@@ -1,7 +1,9 @@
 //! The behavior a game plugs into the engine.
 
+use std::sync::Arc;
+
 use star_assets::AssetFolder;
-use star_core::EngineResult;
+use star_core::{EngineResult, Sound};
 use star_ecs::World;
 use star_render::{Frame, Image, MeshId, Renderer, TextureFilter, TextureId, Vertex};
 use star_scene::Scene;
@@ -116,6 +118,21 @@ impl<'a> GameContext<'a> {
     pub fn load_texture(&mut self, path: &str, filter: TextureFilter) -> EngineResult<TextureId> {
         self.assets
             .load_texture(self.renderer, star_assets::AssetPath::new(path)?, filter)
+    }
+
+    /// Loads the whole sound at `path` in the asset folder, e.g.
+    /// `"sounds/jump.wav"` (WAV, OGG Vorbis, MP3 or FLAC), to play it with
+    /// [`Audio::play`](star_audio::Audio::play) (see
+    /// [`EngineWorld::audio`](crate::EngineWorld::audio)). Loading the same
+    /// file again gives the same sound, without reading it again.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `path` is not a valid
+    /// [`AssetPath`](star_assets::AssetPath), or the file cannot be read or
+    /// decoded.
+    pub fn load_sound(&mut self, path: &str) -> EngineResult<Arc<Sound>> {
+        self.assets.load_sound(star_assets::AssetPath::new(path)?)
     }
 
     /// Reads the scene file at `path` in the asset folder, e.g.

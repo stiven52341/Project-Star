@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use star_core::{EngineError, EngineResult, Image};
+use star_core::{EngineError, EngineResult, Image, Sound};
 
-use crate::{AssetPath, ImageFormat};
+use crate::{AssetPath, ImageFormat, SoundFormat};
 
 /// Name of the asset folder of a game, next to its executable or its project.
 pub const DEFAULT_ASSET_FOLDER: &str = "assets";
@@ -80,6 +80,21 @@ impl AssetFolder {
     /// file cannot be read or is not a valid image.
     pub fn load_image(&self, path: &AssetPath) -> EngineResult<Image> {
         let format = ImageFormat::of(path)?;
+        let bytes = self.read(path)?;
+        format
+            .decode(&bytes)
+            .map_err(|error| EngineError::Asset(format!("\"{path}\": {error}")))
+    }
+
+    /// Reads and decodes the whole sound at `path`, in the format of its
+    /// extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Asset`] if the format is not supported, or the
+    /// file cannot be read or is not a valid sound.
+    pub fn load_sound(&self, path: &AssetPath) -> EngineResult<Sound> {
+        let format = SoundFormat::of(path)?;
         let bytes = self.read(path)?;
         format
             .decode(&bytes)
@@ -175,6 +190,29 @@ mod tests {
         let image = folder.0.load_image(&path("sprites/dot.png")).unwrap();
 
         assert_eq!(image.pixels(), [1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn sounds_are_decoded_by_their_extension() {
+        let folder = TemporaryFolder::new("sound");
+        folder.write(
+            "sounds/tone.wav",
+            include_bytes!("../test_data/tone_mono.wav"),
+        );
+
+        let sound = folder.0.load_sound(&path("sounds/tone.wav")).unwrap();
+
+        assert_eq!(sound.channels(), 1);
+    }
+
+    #[test]
+    fn corrupt_sounds_name_their_path() {
+        let folder = TemporaryFolder::new("corrupt_sound");
+        folder.write("broken.ogg", b"not a sound");
+
+        let error = folder.0.load_sound(&path("broken.ogg")).unwrap_err();
+
+        assert!(error.to_string().contains("\"broken.ogg\""), "{error}");
     }
 
     #[test]

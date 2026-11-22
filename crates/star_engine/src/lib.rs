@@ -14,6 +14,7 @@ mod game_assets;
 pub mod prelude;
 mod runtime;
 pub mod script_nodes;
+mod sound_library;
 mod sprite_file;
 mod texture_library;
 

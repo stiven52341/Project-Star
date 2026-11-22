@@ -10,6 +10,8 @@ repository.workspace = true
 
 [dependencies]
 star_core.workspace = true
+cpal.workspace = true
+log.workspace = true
 
 [lints]
 workspace = true

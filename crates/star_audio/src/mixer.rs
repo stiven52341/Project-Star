@@ -56,11 +56,17 @@ impl Mixer {
                 resource: "audio voices",
             });
         }
-        let id = VoiceId(self.next_id);
-        self.next_id += 1;
+        let id = self.unused_id();
         self.voices
             .push((id, Voice::new(sound, settings, self.format)));
         Ok(id)
+    }
+
+    /// An id no sound has had, for a sound that is not played.
+    pub(crate) const fn unused_id(&mut self) -> VoiceId {
+        let id = VoiceId(self.next_id);
+        self.next_id += 1;
+        id
     }
 
     /// Stops the sound `id`; nothing happens if it already ended.

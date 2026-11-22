@@ -2,6 +2,7 @@
 
 use std::time::{Duration, Instant};
 
+use star_audio::Audio;
 use star_core::{EngineResult, Time};
 use star_ecs::{Schedule, Stage, World};
 use star_input::Input;
@@ -21,7 +22,7 @@ pub(crate) struct Runtime<G: Game> {
     renderer: Option<Renderer>,
     frame: Frame,
     /// Holds the game's entities and the engine's resources: [`Time`],
-    /// [`Input`] and the [`WindowSize`].
+    /// [`Input`], the [`WindowSize`] and the [`Audio`].
     world: World,
     schedule: Schedule,
     transforms: TransformPropagation,
@@ -37,10 +38,12 @@ impl<G: Game> Runtime<G> {
         input: Input,
         schedule: Schedule,
         assets: GameAssets,
+        audio: Audio,
     ) -> Self {
         let mut world = World::new();
         world.insert_resource(Time::new());
         world.insert_resource(input);
+        world.insert_resource(audio);
         Self {
             game,
             renderer_config,
@@ -191,6 +194,7 @@ mod tests {
             input,
             schedule,
             GameAssets::new(AssetFolder::new("assets"), false),
+            Audio::silent(),
         )
     }
 

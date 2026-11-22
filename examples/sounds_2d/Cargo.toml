@@ -1,0 +1,18 @@
+[package]
+name = "sounds_2d"
+description = "Plays sounds from the asset folder: overlapping effects, looping music and the master volume."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+star_engine.workspace = true
+env_logger.workspace = true
+log.workspace = true
+
+[lints]
+workspace = true

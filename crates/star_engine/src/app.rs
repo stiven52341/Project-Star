@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use star_assets::AssetFolder;
+use star_audio::{Audio, AudioOutput};
 use star_core::{EngineError, EngineResult};
 use star_ecs::{Schedule, Stage, World};
 use star_input::{ActionMap, Input};
@@ -171,6 +172,11 @@ impl App {
         }
         fallback_logger::install();
         let input = Input::with_actions(self.actions);
+        // Kept open on this thread until the window closes.
+        let audio_output = open_audio();
+        let audio = audio_output
+            .as_ref()
+            .map_or_else(Audio::silent, AudioOutput::audio);
         let mut runtime = Runtime::new(
             game,
             self.renderer_config,
@@ -178,9 +184,18 @@ impl App {
             input,
             self.schedule,
             GameAssets::new(self.assets, self.hot_reload),
+            audio,
         );
         run_event_loop(self.window_config, &mut runtime)
     }
+}
+
+/// The system's audio device, or `None` (and a warning) if there is none:
+/// the game still runs, without sound.
+fn open_audio() -> Option<AudioOutput> {
+    AudioOutput::open_default()
+        .inspect_err(|error| log::warn!("The game will be silent: {error}"))
+        .ok()
 }
 
 impl Default for App {

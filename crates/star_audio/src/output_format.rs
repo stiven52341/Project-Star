@@ -11,6 +11,12 @@ pub struct OutputFormat {
 }
 
 impl OutputFormat {
+    /// Stereo at 48 kHz: what most devices play.
+    pub const STEREO_48K: Self = Self {
+        channels: 2,
+        sample_rate: 48_000,
+    };
+
     /// An output of `channels` channels played `sample_rate` frames per second.
     ///
     /// # Errors

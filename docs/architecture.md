@@ -89,7 +89,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 42 | The blueprint editor is **drawn by the editor** with egui's painter, in tabs of the central area | No node-editor library: the canvas is a few hundred lines on top of `star_blueprint` (pins, rules, files), which already says what a node is, so there is no second model to keep in step, and no dependency that must follow each egui version. Blueprints open as tabs next to the scene view, so several can be open and the inspector shows what is selected in the tab shown. Rejected: `egui-snarl` and similar crates (their own graph model and egui version), and floating windows (they cover the other panels) |
 | 43 | The editor's texts are **plain Rust values, one per language**, chosen through a global current language | The editor shows a few hundred short texts, so a `Texts` struct with one field per text, filled once per language, is enough: a missing translation does not compile, there is nothing to parse at start-up and no dependency. Texts with values are methods that pick the language's wording, so plurals and word order stay natural in each one. The language lives in an atomic, because every panel draws texts and passing it everywhere would touch every function for no gain; tests use a language's `Texts` directly and never change it. English is the default, and a file written with an unknown language falls back to it. Rejected for now: Fluent or gettext catalogs (a dependency and a runtime format, worth it with many languages or translators who do not read Rust) and following the system's language (it needs one more dependency to read it on every platform) |
 | 44 | “Play” **builds the game with the system's Cargo**, from the engine's crates of the repository | The game a project makes is the same Rust a shipped game will be, built the same way, so what is played is what ships; no interpreter to keep in step with the compiler. The build runs off the UI thread and shares one target folder, so only the first “Play” builds the engine. It needs Rust installed and the editor run from the repository (a compile-time path to `crates/`): enough while the engine is developed. Rejected for now: shipping prebuilt engine libraries with the editor (comes with packaging), and running the game inside the editor's window (a game is its own process, so a crash or `quit()` never takes the editor with it) |
-| 45 | Sound decoding with **symphonia** (MPL-2.0), in `star_assets`; playback with **cpal** (Apache-2.0) and an **own mixer** in `star_audio` | symphonia is pure Rust (it builds for every platform, mobile included), maintained, and reads WAV, OGG Vorbis, MP3 and FLAC with one API; only the needed formats are enabled. Sounds are decoded whole into memory (`Sound`), simple and fast to start; long music may stream from the file later. cpal only opens the system's audio output; mixing (voices, volumes, loops, groups) is the engine's own code, so it can be tested without a device and shaped by the engine's needs. Rejected: `rodio` and `kira` (they bring their own mixer and model), and one decoder crate per format (`hound`, `lewton`…: several APIs for the same job) |
+| 45 | Sound decoding with **symphonia** (MPL-2.0), in `star_assets`; playback with **cpal** (Apache-2.0) and an **own mixer** in `star_audio` | symphonia is pure Rust (it builds for every platform, mobile included), maintained, and reads WAV, OGG Vorbis, MP3 and FLAC with one API; only the needed formats are enabled. Sounds are decoded whole into memory (`Sound`), simple and fast to start; long music may stream from the file later. cpal only opens the system's audio output (on Linux it needs the ALSA headers to build, `libasound2-dev`); mixing (voices, volumes, loops, groups) is the engine's own code, so it can be tested without a device and shaped by the engine's needs. Rejected: `rodio` and `kira` (they bring their own mixer and model), and one decoder crate per format (`hound`, `lewton`…: several APIs for the same job) |
 
 ## ECS
 
@@ -258,8 +258,8 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   [Assets](#assets)) through its own **mixer** (decision 45). A `Mixer` is
   made for an `OutputFormat` (channels and sample rate of the output) and
   `Mixer::mix` fills a buffer of interleaved `f32` samples with the next
-  samples of every sound playing; the output device (Phase 7c) only asks
-  for those buffers, so the mixer is tested without one.
+  samples of every sound playing; the output device only asks for those
+  buffers, so the mixer is tested without one.
 - `Mixer::play(Arc<Sound>, PlaySettings)` starts a **voice** and gives its
   `VoiceId` (never reused) to stop it or change its volume. `PlaySettings`
   holds the volume (1 as recorded; negative or not-a-number is silent) and
@@ -273,6 +273,25 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   -1..1.
 - At most `MAX_VOICES` (128) sounds play at once, reserved up front so
   starting one never allocates; more is `EngineError::CapacityExceeded`.
+- `AudioOutput::open_default` opens the system's default device through
+  `cpal` (only `audio_output.rs` knows it), in the device's preferred
+  channels, rate and sample format (`f32`, `f64`, `i16`, `i32`, `u16` or
+  `u8`; the mixer always works in `f32`). The device's thread calls back for
+  samples and locks the mixer (`Arc<Mutex<Mixer>>`) only while it mixes;
+  the game locks it only to start, stop or change a sound. A poisoned lock
+  is taken back: every change to the mixer is one step, so it stays whole.
+  The stream lives in `AudioOutput`, which stays on the thread that opened
+  it, because some systems require it.
+- Games play sounds through **`Audio`**, a cheap handle (copies share the
+  output) that the engine keeps as a world resource (`EngineWorld::audio`).
+  `App::run_game` opens the output before the event loop and keeps it until
+  the window closes. Without an audio device it logs a warning and the game
+  runs silent: `Audio::silent()` accepts every call, hears nothing and never
+  reports a sound as playing, so games need no special case.
+- `GameContext::load_sound(path)` decodes a whole sound from the asset
+  folder into an `Arc<Sound>`, kept by a `SoundLibrary` (in `star_engine`)
+  so a file is decoded once; a failed load is tried again. Sounds have no
+  hot-reload yet. Example: `sounds_2d`.
 
 ## Rendering
 

@@ -2,13 +2,14 @@
 
 use std::cell::Ref;
 
+use star_audio::Audio;
 use star_core::Time;
 use star_ecs::World;
 use star_input::Input;
 use star_platform::WindowSize;
 
 /// Quick access to the engine's resources in a [`World`]: the [`Time`] and
-/// the [`Input`] of the current frame, and the [`WindowSize`]. The engine
+/// the [`Input`] of the current frame, the [`WindowSize`] and the [`Audio`]. The engine
 /// adds them before the game starts and keeps them updated.
 pub trait EngineWorld {
     /// The timing of the current frame (zero before the first one).
@@ -20,6 +21,10 @@ pub trait EngineWorld {
 
     /// The size of the game's window, empty (zero) before it opens.
     fn window_size(&self) -> WindowSize;
+
+    /// Where the game plays its sounds. It is silent on machines without an
+    /// audio device, and in a world the engine does not run.
+    fn audio(&self) -> Audio;
 }
 
 impl EngineWorld for World {
@@ -36,6 +41,11 @@ impl EngineWorld for World {
     fn window_size(&self) -> WindowSize {
         self.resource::<WindowSize>()
             .map_or(WindowSize::new(0, 0), |size| *size)
+    }
+
+    fn audio(&self) -> Audio {
+        self.resource::<Audio>()
+            .map_or_else(Audio::silent, |audio| audio.clone())
     }
 }
 
@@ -66,5 +76,6 @@ mod tests {
         assert_eq!(world.time().frame_count(), 0);
         assert!(world.input().is_none());
         assert!(world.window_size().is_empty());
+        assert!(!world.audio().has_output());
     }
 }

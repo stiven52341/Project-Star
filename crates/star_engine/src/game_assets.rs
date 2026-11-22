@@ -1,20 +1,23 @@
 //! The assets of a running game: where they are read from and what is loaded.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use star_assets::{AssetFolder, AssetPath};
-use star_core::EngineResult;
+use star_core::{EngineResult, Sound};
 use star_ecs::World;
 use star_render::{Frame, Renderer, TextureFilter, TextureId};
 use star_scene::{GlobalTransform2D, Scene, SpriteNode};
 
+use crate::sound_library::SoundLibrary;
 use crate::sprite_file::SpriteFile;
 use crate::texture_library::TextureLibrary;
 
-/// The asset folder of a game and the textures loaded from it.
+/// The asset folder of a game and the textures and sounds loaded from it.
 pub(crate) struct GameAssets {
     folder: AssetFolder,
     textures: TextureLibrary,
+    sounds: SoundLibrary,
 }
 
 impl GameAssets {
@@ -23,6 +26,7 @@ impl GameAssets {
         Self {
             folder,
             textures: TextureLibrary::new(hot_reload),
+            sounds: SoundLibrary::default(),
         }
     }
 
@@ -41,6 +45,11 @@ impl GameAssets {
         self.textures.load(folder, path, filter, |path| {
             renderer.create_texture(&folder.load_image(path)?, filter)
         })
+    }
+
+    /// The sound at `path`, decoded the first time.
+    pub(crate) fn load_sound(&mut self, path: AssetPath) -> EngineResult<Arc<Sound>> {
+        self.sounds.load(&self.folder, path)
     }
 
     /// Reads the scene file at `path`, loading the textures its sprites show.
