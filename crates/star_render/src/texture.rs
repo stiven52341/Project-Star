@@ -21,6 +21,16 @@ pub enum TextureFilter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TextureId(pub(crate) usize);
 
+impl TextureId {
+    /// The id of the `index`-th texture a renderer created. Ids normally come
+    /// from the renderer; one it did not create is reported as an error when
+    /// drawn, so this is meant for tests and tools that store ids.
+    #[must_use]
+    pub const fn from_index(index: usize) -> Self {
+        Self(index)
+    }
+}
+
 /// A texture together with the way it is sampled, as the shaders bind it.
 pub(crate) struct GpuTexture {
     pub(crate) bind_group: wgpu::BindGroup,

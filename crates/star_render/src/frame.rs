@@ -84,7 +84,9 @@ impl Frame {
         &self.draws
     }
 
-    pub(crate) fn sprites(&self) -> &[Sprite] {
+    /// The sprites drawn in this frame, in the order they were added.
+    #[must_use]
+    pub fn sprites(&self) -> &[Sprite] {
         &self.sprites
     }
 }

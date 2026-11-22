@@ -27,7 +27,9 @@ pub trait Game {
     /// is doing are resources of `world`: see [`EngineWorld`](crate::EngineWorld).
     fn update(&mut self, _world: &mut World) {}
 
-    /// Describes what the current frame shows; called after every system ran.
+    /// Describes what the current frame shows; called after every system ran
+    /// and after the engine added the sprites of the nodes with a
+    /// [`SpriteNode`](star_scene::SpriteNode).
     fn draw(&self, _world: &World, _frame: &mut Frame) {}
 
     /// Whether the game wants to close; checked after each frame. By default

@@ -5,8 +5,10 @@
 //! entity of the world, moved by a system. On top, a hero
 //! animated from a sprite sheet walks with the arrow keys, WASD or a
 //! gamepad's directional pad, and turns to face where it goes, among
-//! spinning stars loaded from a PNG file. The other textures are generated
-//! in code, pixel by pixel.
+//! stars loaded from a PNG file: they are nodes, children of a ring node, and
+//! the engine draws them; the ring turns and carries them along while each
+//! one spins on itself. The other textures are generated in code, pixel by
+//! pixel.
 //! Run it with an optional graphics backend:
 //! `cargo run -p sprites_2d -- [auto|vulkan|dx12|metal|opengl]`
 
@@ -52,6 +54,8 @@ const STAR_CIRCLE_RADIUS: f32 = 3.0;
 const STAR_SIZE: f32 = 0.8;
 /// Radians per second.
 const STAR_SPIN_SPEED: f32 = 1.5;
+/// Turning speed of the ring that carries the stars, in radians per second.
+const RING_SPIN_SPEED: f32 = -0.3;
 
 /// The hero's sheet: 4 frames in a row, each a square of this many pixels.
 const HERO_FRAMES: u16 = 4;
@@ -71,7 +75,6 @@ const DOWN: &str = "down";
 struct Textures {
     floor: TextureId,
     ball: TextureId,
-    star: TextureId,
     hero: TextureId,
 }
 
@@ -94,10 +97,11 @@ struct Hero {
     animation: f32,
 }
 
+/// Makes a node turn on itself, in radians per second.
+struct Spin(f32);
+
 struct Sprites2d {
     textures: Option<Textures>,
-    /// Rotation of the stars, in radians.
-    star_spin: f32,
     hero: Hero,
 }
 
@@ -105,7 +109,6 @@ impl Sprites2d {
     fn new() -> Self {
         Self {
             textures: None,
-            star_spin: 0.0,
             hero: Hero {
                 position: Vec2::ZERO,
                 facing_left: false,
@@ -120,15 +123,15 @@ impl Game for Sprites2d {
         self.textures = Some(Textures {
             floor: context.create_texture(&floor_image()?, TextureFilter::Pixelated)?,
             ball: context.create_texture(&ball_image()?, TextureFilter::Smooth)?,
-            star: context.load_texture(STAR_IMAGE, TextureFilter::Smooth)?,
             hero: context.create_texture(&hero_sheet()?, TextureFilter::Pixelated)?,
         });
+        let star = context.load_texture(STAR_IMAGE, TextureFilter::Smooth)?;
+        spawn_star_ring(context.world(), star)?;
         spawn_balls(context.world())
     }
 
     fn update(&mut self, world: &mut World) {
         let seconds = world.time().delta_seconds();
-        self.star_spin = (self.star_spin + STAR_SPIN_SPEED * seconds) % TAU;
         let direction = world
             .input()
             .map_or(Vec2::ZERO, |input| direction(input.actions()));
@@ -151,7 +154,6 @@ impl Game for Sprites2d {
         if let Err(error) = balls {
             log::warn!("{error}");
         }
-        draw_stars(frame, textures.star, self.star_spin);
         frame.draw_sprite(self.hero.sprite(textures.hero));
     }
 }
@@ -256,17 +258,31 @@ fn draw_floor(frame: &mut Frame, texture: TextureId) {
     }
 }
 
-/// Stars on a circle around the center, each spinning on itself.
-fn draw_stars(frame: &mut Frame, texture: TextureId, spin: f32) {
-    for star in 0..STAR_COUNT {
-        let angle = f32::from(star) / f32::from(STAR_COUNT) * TAU;
+/// A ring node with the stars as its children, on a circle around it.
+fn spawn_star_ring(world: &mut World, texture: TextureId) -> EngineResult<()> {
+    let ring = world.spawn_node("StarRing", None)?;
+    world.insert(ring, Transform2D::IDENTITY)?;
+    world.insert(ring, Spin(RING_SPIN_SPEED))?;
+    for index in 0..STAR_COUNT {
+        let angle = f32::from(index) / f32::from(STAR_COUNT) * TAU;
+        let star = world.spawn_node(&format!("Star{index}"), Some(ring))?;
         let position = Vec2::new(angle.cos(), angle.sin()) * STAR_CIRCLE_RADIUS;
-        frame.draw_sprite(
-            Sprite::new(texture, position, Vec2::new(STAR_SIZE, STAR_SIZE))
-                .with_rotation(spin)
-                .with_layer(STAR_LAYER),
-        );
+        world.insert(star, Transform2D::from_position(position))?;
+        world.insert(star, Spin(STAR_SPIN_SPEED))?;
+        world.insert(
+            star,
+            SpriteNode::new(texture, Vec2::new(STAR_SIZE, STAR_SIZE)).with_layer(STAR_LAYER),
+        )?;
     }
+    Ok(())
+}
+
+/// Turns every node with a [`Spin`].
+fn spin(world: &mut World) -> EngineResult<()> {
+    let seconds = world.time().delta_seconds();
+    world.each::<(&mut Transform2D, &Spin)>(|_, (transform, spin)| {
+        transform.rotation = (transform.rotation + spin.0 * seconds) % TAU;
+    })
 }
 
 /// 2 x 2 checkerboard.
@@ -400,6 +416,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         .with_actions(actions)
         .with_asset_folder(ASSET_FOLDER)
         .with_system(Stage::Update, move_and_bounce)
+        .with_system(Stage::Update, spin)
         .with_graphics_backend(backend)
         .with_clear_color(BACKGROUND)
         .run_game(Sprites2d::new())?;

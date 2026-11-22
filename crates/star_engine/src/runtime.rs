@@ -7,7 +7,7 @@ use star_ecs::{Schedule, Stage, World};
 use star_input::Input;
 use star_platform::{InputEvent, Window, WindowEventHandler, WindowSize};
 use star_render::{Color, Frame, Renderer, RendererConfig};
-use star_scene::TransformPropagation;
+use star_scene::{TransformPropagation, draw_sprite_nodes};
 
 use crate::EngineWorld as _;
 use crate::game::{Game, GameContext};
@@ -120,6 +120,7 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
         self.reload_changed_assets();
         self.simulate()?;
         self.frame.begin(self.clear_color);
+        draw_sprite_nodes(&self.world, &mut self.frame)?;
         self.game.draw(&self.world, &mut self.frame);
         match &mut self.renderer {
             Some(renderer) => renderer.render(&self.frame),

@@ -16,4 +16,6 @@ pub use star_render::{
     Camera, Color, Frame, GraphicsBackend, Image, MeshId, Projection, Sprite, TextureFilter,
     TextureId, TextureRegion, Vertex,
 };
-pub use star_scene::{Children, GlobalTransform2D, Hierarchy, Name, Parent, Transform2D};
+pub use star_scene::{
+    Children, GlobalTransform2D, Hierarchy, Name, Parent, SpriteNode, Transform2D,
+};
