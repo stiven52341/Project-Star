@@ -12,10 +12,12 @@ mod common;
 use std::path::Path;
 use std::process::Command;
 
-use common::{ENGINE_CRATES, binary, build, compile, package_directory};
+use common::{ENGINE_CRATES, binary, build, compile_with, package_directory};
 use star_script::package::Package;
+use star_script::{GameSettings, InputAction};
 
-/// Counts its frames and closes itself after the third one.
+/// Counts its frames and closes itself after the third one. Nobody presses
+/// `jump` while the test runs.
 const GAME: &str = "
 class CountingGame extends Game {
     var frames = 0
@@ -27,6 +29,9 @@ class CountingGame extends Game {
     override func update(delta: float) {
         frames += 1
         Debug.print(\"frame \" + frames.to_string() + \" \" + (delta >= 0.0).to_string())
+        if Input.is_down(\"jump\") || Input.just_pressed(\"jump\") {
+            Debug.print(\"jump\")
+        }
         if frames == 3 {
             quit()
         }
@@ -34,13 +39,30 @@ class CountingGame extends Game {
 }
 ";
 
+fn settings(bindings: &[&str]) -> GameSettings {
+    GameSettings {
+        actions: vec![InputAction {
+            name: "jump".to_owned(),
+            bindings: bindings.iter().map(|&binding| binding.to_owned()).collect(),
+        }],
+    }
+}
+
 #[test]
 #[ignore = "builds the whole engine and opens a window"]
 fn games_run_in_the_engine_until_they_quit() {
     let directory = package_directory("star_script_engine_game");
     let mut package = Package::new("engine_game", Path::new(ENGINE_CRATES)).expect("valid name");
+    let valid = settings(&["Space", "MouseLeft", "Touch", "GamepadSouth"]);
     package
-        .add_program("counting_game", compile("counting_game", GAME))
+        .add_program("counting_game", compile_with("counting_game", GAME, &valid))
+        .expect("valid name");
+    let misspelled = settings(&["Spcae"]);
+    package
+        .add_program(
+            "misspelled_game",
+            compile_with("misspelled_game", GAME, &misspelled),
+        )
         .expect("valid name");
     package.write(&directory).expect("package written");
 
@@ -48,11 +70,19 @@ fn games_run_in_the_engine_until_they_quit() {
     let output = Command::new(binary(&directory, "counting_game"))
         .output()
         .expect("the game runs");
-
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "the game failed:\n{stderr}");
     assert_eq!(
         String::from_utf8_lossy(&output.stdout),
         "start\nframe 1 true\nframe 2 true\nframe 3 true\n"
+    );
+
+    let output = Command::new(binary(&directory, "misspelled_game"))
+        .output()
+        .expect("the game runs");
+    assert!(!output.status.success(), "a wrong binding stops the game");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("unknown input binding \"Spcae\""),
+        "the error names the binding"
     );
 }

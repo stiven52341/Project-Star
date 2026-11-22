@@ -4,7 +4,9 @@
 //! Their methods have no StarScript source, so their modules are written
 //! here, with the same shape as the modules of script classes.
 
+use super::conversions::RUNTIME;
 use super::writer::Writer;
+use crate::InputAction;
 
 /// Hidden field of `Game` that `quit()` sets. It ends in a single `_`, so no
 /// StarScript field can have the same Rust name.
@@ -85,20 +87,36 @@ pub mod Game {
     }
 }";
 
-/// `fn main` that runs the game `class_path` in a window of the engine.
-pub(super) fn game_entry_point(out: &mut Writer, class_path: &str, title: &str) {
+/// `fn main` that runs the game `class_path` in a window of the engine, with
+/// the input `actions` of the project.
+pub(super) fn game_entry_point(
+    out: &mut Writer,
+    class_path: &str,
+    title: &str,
+    actions: &[InputAction],
+) {
+    action_declarations(out, actions);
     let main = format!(
-        "/// Starts the program: runs the game in a window of the engine.
+        "
+/// Starts the program: runs the game in a window of the engine.
 pub fn main() -> ::std::process::ExitCode {{
-    let game_: crate::classes::Game::Ref = {class_path}::new();
-    let app_ = ::star_engine::app::App::new().with_title({title:?});
-    match app_.run_game(EngineGame_(game_)) {{
+    match run_() {{
         ::std::result::Result::Ok(()) => ::std::process::ExitCode::SUCCESS,
         ::std::result::Result::Err(error_) => {{
             ::std::eprintln!(\"{{error_}}\");
             ::std::process::ExitCode::FAILURE
         }}
     }}
+}}
+
+fn run_() -> ::star_engine::star_core::EngineResult<()> {{
+    let actions_ = action_map_()?;
+    {RUNTIME}::input::declare_actions(&ACTION_NAMES_);
+    let game_: crate::classes::Game::Ref = {class_path}::new();
+    ::star_engine::app::App::new()
+        .with_title({title:?})
+        .with_actions(actions_)
+        .run_game(EngineGame_(game_))
 }}
 
 /// Connects the StarScript game with the engine's game loop.
@@ -116,17 +134,64 @@ impl ::star_engine::game::Game for EngineGame_ {{
     fn update(
         &mut self,
         time: &::star_engine::star_core::Time,
-        _input: &::star_engine::star_input::Input,
+        input: &::star_engine::star_input::Input,
     ) {{
+        share_actions_(input.actions());
         crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.0), time.delta_seconds());
     }}
 
     fn is_finished(&self) -> bool {{
         crate::classes::Game::HasFields::fields(&*self.0).{QUIT_FIELD}.get()
     }}
+}}
+
+/// Copies the state of each action where `Input` reads it.
+fn share_actions_(actions_: &::star_engine::star_input::Actions) {{
+    for (index_, name_) in ACTION_NAMES_.iter().enumerate() {{
+        let state_ = {RUNTIME}::input::ActionState {{
+            is_down: actions_.is_down(name_),
+            just_pressed: actions_.just_pressed(name_),
+            just_released: actions_.just_released(name_),
+        }};
+        {RUNTIME}::input::set_action_state(index_, state_);
+    }}
 }}"
     );
     for line in main.lines() {
         out.line(line);
     }
+}
+
+/// The names of the actions and the function that builds their map. The
+/// engine checks the bindings' names when the game starts.
+fn action_declarations(out: &mut Writer, actions: &[InputAction]) {
+    let names: Vec<String> = actions
+        .iter()
+        .map(|action| format!("{:?}", action.name))
+        .collect();
+    out.line("/// The input actions declared in the project.");
+    out.line(&format!(
+        "const ACTION_NAMES_: [&str; {}] = [{}];",
+        actions.len(),
+        names.join(", ")
+    ));
+    out.line("");
+    out.open(
+        "fn action_map_() -> ::star_engine::star_core::EngineResult<::star_engine::star_input::ActionMap> {",
+    );
+    out.line("let mut actions_ = ::star_engine::star_input::ActionMap::new();");
+    for action in actions {
+        let bindings: Vec<String> = action
+            .bindings
+            .iter()
+            .map(|binding| format!("{binding:?}.parse()?"))
+            .collect();
+        out.line(&format!(
+            "actions_.add({:?}, &[{}])?;",
+            action.name,
+            bindings.join(", ")
+        ));
+    }
+    out.line("::std::result::Result::Ok(actions_)");
+    out.close("}");
 }

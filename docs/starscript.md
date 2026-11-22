@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`) done; input and nodes with engine phases 2 and 6 |
+| 5 | Engine API | In progress: lifecycle (`Game`) and input (`Input`) done; nodes with engine phase 6 |
 | 6 | Editor integration | Pending |
 | 7–8 | Blueprints | Draft |
 
@@ -359,6 +359,7 @@ The engine provides them; their names cannot be used for other classes.
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. |
 | `Game` | `start()`, `update(delta: float)`, `quit()` |
+| `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool` |
 
 **A game is a class that extends `Game`**:
 
@@ -383,8 +384,40 @@ class MyGame extends Game {
 - `quit()` closes the game at the end of the frame. If it is not called, the
   game goes on until the user closes the window.
 - `start` and `update` do nothing unless they are overridden.
-- Input and nodes will come with phases 2 (input) and 6 (scenes) of the
-  engine: each piece of the engine is born with its StarScript API.
+- Nodes will come with phase 6 (scenes) of the engine: each piece of the
+  engine is born with its StarScript API.
+
+**Input works with actions**, declared in the project, not in the scripts.
+The game asks for an action by name, so the same code works with keyboard,
+mouse, touch screens and gamepads:
+
+```toml
+# project.toml
+[input.actions]
+jump = ["Space", "MouseLeft", "Touch", "GamepadSouth"]
+quit = ["Escape", "GamepadStart"]
+```
+
+```
+override func update(delta: float) {
+    if Input.just_pressed("jump") { jump() }
+    if Input.just_pressed("quit") { quit() }
+}
+```
+
+- An action is held (`is_down`) while any of its bindings is held;
+  `just_pressed` and `just_released` are true only in the frame it changes.
+- Binding names: keys by their position on a US keyboard (`"A"`, `"Space"`,
+  `"ArrowLeft"`, `"Digit1"`, `"F1"`, `"ShiftLeft"`…), mouse buttons
+  (`"MouseLeft"`, `"MouseRight"`, `"MouseMiddle"`…), `"Touch"` (any finger)
+  and gamepad buttons by position (`"GamepadSouth"` is A on Xbox and ✕ on
+  PlayStation; `"GamepadStart"`, `"GamepadDPadUp"`, `"GamepadLeftBumper"`…).
+- **An action name written as text is checked when compiling**: a typo such
+  as `Input.is_down("jupm")` is an error. A name computed while playing
+  (`Input.is_down(player + "_jump")`) can only be checked then: an action
+  that does not exist is never held.
+- A misspelled binding name in `project.toml` stops the game when it starts,
+  with an error that names it.
 
 ## 4. Translation to Rust (final)
 
@@ -394,6 +427,9 @@ To see the Rust of a program, or to compile and run it:
 cargo run -p star_script --example run -- --rust file.star   # shows the Rust
 cargo run -p star_script --example run -- file.star          # compiles and runs it
 ```
+
+If the script's folder has a `project.toml`, the `run` example reads the
+input actions from it (see `crates/star_script/examples/scripts/input/`).
 
 A program starts in **one single** place:
 

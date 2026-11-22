@@ -10,5 +10,9 @@ repository.workspace = true
 
 [dependencies]
 
+# Only the `run` example reads `project.toml`; the compiler itself has no dependencies.
+[dev-dependencies]
+toml.workspace = true
+
 [lints]
 workspace = true

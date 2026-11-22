@@ -3,8 +3,8 @@
 //! Generated games depend on this crate; StarScript programmers never see
 //! it. It provides what the language needs beyond plain Rust: shared lists,
 //! object fields that can change through shared references, equality as
-//! StarScript defines it, and the few runtime errors that cannot be caught
-//! at compile time.
+//! StarScript defines it, the state of the game's input actions, and the few
+//! runtime errors that cannot be caught at compile time.
 //!
 //! It has no dependencies, so a game built from StarScript only needs the
 //! Rust toolchain and the engine.
@@ -12,6 +12,7 @@
 mod equality;
 mod fault;
 mod field;
+pub mod input;
 mod list;
 mod operations;
 

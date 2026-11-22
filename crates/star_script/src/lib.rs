@@ -11,7 +11,9 @@
 //! 4. [`codegen`]: checked program → Rust code, which depends on the
 //!    `star_script_runtime` crate.
 //!
-//! [`check_source`] runs the first three and [`compile_source`] all of them. The language is specified in
+//! [`check_source`] runs the first three and [`compile_source`] all of them;
+//! their `_with` versions also take the project's [`GameSettings`]
+//! (e.g. its input actions). The language is specified in
 //! `docs/starscript.md`. This crate has no dependencies, so the editor and
 //! command-line tools can embed it freely.
 
@@ -22,12 +24,14 @@ pub mod lexer;
 pub mod package;
 pub mod parser;
 pub mod semantic;
+pub mod settings;
 mod source;
 mod token;
 
 pub use diagnostic::CompileError;
 pub use lexer::{LexError, LexErrorKind, tokenize};
 pub use parser::{ParseError, ParseErrorKind, parse};
+pub use settings::{GameSettings, InputAction};
 pub use source::{LineIndex, Position, Span};
 pub use token::{Keyword, Token, TokenKind};
 
@@ -63,8 +67,20 @@ pub struct CheckedSource {
 /// Returns every mistake found by the first stage that finds any; later
 /// stages would only add errors caused by the earlier ones.
 pub fn check_source(source: &str) -> Result<CheckedSource, Vec<CompileError>> {
+    check_source_with(source, &GameSettings::default())
+}
+
+/// Reads and checks the source of a `.star` file of a game with `settings`.
+///
+/// # Errors
+///
+/// As [`check_source`].
+pub fn check_source_with(
+    source: &str,
+    settings: &GameSettings,
+) -> Result<CheckedSource, Vec<CompileError>> {
     let syntax = parse_source(source)?;
-    let analysis = semantic::check(&syntax).map_err(|errors| {
+    let analysis = semantic::check_with(&syntax, settings).map_err(|errors| {
         errors
             .into_iter()
             .map(CompileError::from)
@@ -82,7 +98,19 @@ pub fn check_source(source: &str) -> Result<CheckedSource, Vec<CompileError>> {
 /// Returns the mistakes found, as [`check_source`] does, or the construct
 /// that cannot be translated to Rust yet.
 pub fn compile_source(source: &str) -> Result<codegen::GeneratedProgram, Vec<CompileError>> {
-    let checked = check_source(source)?;
+    compile_source_with(source, &GameSettings::default())
+}
+
+/// Compiles the source of a `.star` file of a game with `settings`.
+///
+/// # Errors
+///
+/// As [`compile_source`].
+pub fn compile_source_with(
+    source: &str,
+    settings: &GameSettings,
+) -> Result<codegen::GeneratedProgram, Vec<CompileError>> {
+    let checked = check_source_with(source, settings)?;
     codegen::generate(&checked.syntax, &checked.analysis)
         .map_err(|error| vec![CompileError::Codegen(error)])
 }

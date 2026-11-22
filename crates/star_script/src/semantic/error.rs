@@ -61,6 +61,8 @@ pub enum SemanticErrorKind {
     },
     /// A class or method used where a value is expected.
     NotAValue(String),
+    /// An input action that the project does not declare.
+    UnknownAction(String),
 
     // --- Classes and inheritance ---
     /// A class that inherits from itself.
@@ -220,6 +222,11 @@ impl fmt::Display for SemanticErrorKind {
             Self::UnknownMember { owner, name } => {
                 write!(formatter, "`{owner}` has no member called `{name}`")
             }
+            Self::UnknownAction(name) => write!(
+                formatter,
+                "there is no input action called \"{name}\"; actions are declared in \
+                 `[input.actions]` of `project.toml`"
+            ),
             Self::DuplicateClass(name) => write!(formatter, "class `{name}` already exists"),
             Self::DuplicateMember(name) => {
                 write!(formatter, "`{name}` is already declared in this class")

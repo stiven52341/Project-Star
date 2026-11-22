@@ -1,5 +1,6 @@
 //! What semantic analysis learns about a program: the result later stages use.
 
+use crate::GameSettings;
 use std::collections::HashMap;
 
 use super::{BuiltinMethod, ClassId, ClassTable, Type};
@@ -74,9 +75,16 @@ pub struct Analysis {
     pub(super) expressions: HashMap<ExprId, ExprInfo>,
     pub(super) locals: Vec<LocalInfo>,
     pub(super) declarations: HashMap<Span, LocalId>,
+    pub(super) settings: GameSettings,
 }
 
 impl Analysis {
+    /// The project settings the program was checked with.
+    #[must_use]
+    pub const fn settings(&self) -> &GameSettings {
+        &self.settings
+    }
+
     /// Every class of the program, native ones included.
     #[must_use]
     pub const fn classes(&self) -> &ClassTable {

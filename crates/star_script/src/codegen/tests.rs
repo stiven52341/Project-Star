@@ -123,3 +123,54 @@ fn games_cannot_need_arguments() {
         "the game `G` must be creatable without arguments: its `init` cannot have parameters"
     );
 }
+
+fn game_with_jump_action() -> super::GeneratedProgram {
+    let settings = crate::GameSettings {
+        actions: vec![crate::InputAction {
+            name: "jump".into(),
+            bindings: vec!["Space".into(), "GamepadSouth".into()],
+        }],
+    };
+    crate::compile_source_with(
+        "class G extends Game {\n override func update(delta: float) {\n \
+         if Input.just_pressed(\"jump\") { quit() }\n }\n}",
+        &settings,
+    )
+    .expect("valid program")
+}
+
+#[test]
+fn games_build_the_action_map_of_the_project() {
+    let code = game_with_jump_action().code;
+
+    assert!(code.contains("const ACTION_NAMES_: [&str; 1] = [\"jump\"];"));
+    assert!(
+        code.contains("actions_.add(\"jump\", &[\"Space\".parse()?, \"GamepadSouth\".parse()?])?;")
+    );
+    assert!(code.contains(".with_actions(actions_)"));
+}
+
+#[test]
+fn input_calls_read_the_shared_action_state() {
+    let code = game_with_jump_action().code;
+
+    assert!(code.contains("::star_script_runtime::input::action_state(\"jump\").just_pressed"));
+    assert!(code.contains("share_actions_(input.actions());"));
+}
+
+#[test]
+fn computed_action_names_are_borrowed() {
+    let code = rust(
+        "class G extends Game {\n var name = \"jump\"\n \
+         override func update(delta: float) { if Input.is_down(name) { quit() } }\n}",
+    );
+
+    assert!(code.contains("::star_script_runtime::input::action_state(&("));
+}
+
+#[test]
+fn games_without_actions_have_an_empty_map() {
+    let code = rust("class G extends Game {}");
+
+    assert!(code.contains("const ACTION_NAMES_: [&str; 0] = [];"));
+}

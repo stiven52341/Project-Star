@@ -2,10 +2,10 @@
 
 use super::checker::{Checker, ContextKind, NameTarget};
 use super::expressions::{Receiver, wrap_null_safe};
-use super::natives::builtin_method;
-use super::{ClassId, MemberRef, MethodInfo, Resolution, SemanticErrorKind, Type};
+use super::natives::{INPUT_CLASS, builtin_method};
+use super::{ClassId, ClassOrigin, MemberRef, MethodInfo, Resolution, SemanticErrorKind, Type};
 use crate::Span;
-use crate::ast::{Expr, ExprKind, Name};
+use crate::ast::{Expr, ExprKind, Literal, Name};
 
 /// Name of the constructor in `super.init(…)`.
 const CONSTRUCTOR_NAME: &str = "init";
@@ -157,7 +157,29 @@ impl Checker<'_> {
             self.error(SemanticErrorKind::NotStatic(name.text.clone()), name.span);
             return self.unchecked_call(callee, arguments);
         }
+        if self.is_input_class(found.class) {
+            self.check_action_names(arguments);
+        }
         self.method_call(callee, found.class, index, &method, false, arguments, span)
+    }
+
+    fn is_input_class(&self, class: ClassId) -> bool {
+        let info = self.analysis.classes.class(class);
+        info.origin == ClassOrigin::Native && info.name == INPUT_CLASS
+    }
+
+    /// Action names written as text are checked against the project's
+    /// actions, so a typo is a compile error. Names computed while playing
+    /// can only be checked then: an unknown action is never held.
+    fn check_action_names(&mut self, arguments: &[Expr]) {
+        for argument in arguments {
+            if let ExprKind::Literal(Literal::String(action)) = &argument.kind
+                && !self.analysis.settings.has_action(action)
+            {
+                let kind = SemanticErrorKind::UnknownAction(action.clone());
+                self.error(kind, argument.span);
+            }
+        }
     }
 
     fn call_builtin(

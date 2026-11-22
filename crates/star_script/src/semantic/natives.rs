@@ -20,26 +20,58 @@ pub(super) fn basic_type(name: &str) -> Option<Type> {
 /// Name of the engine class that games extend.
 pub const GAME_CLASS: &str = "Game";
 
+/// Name of the engine class that reads the game's input actions.
+pub const INPUT_CLASS: &str = "Input";
+
+/// The methods of `Input`: each one takes the name of an action.
+pub(super) const INPUT_METHODS: [&str; 3] = ["is_down", "just_pressed", "just_released"];
+
 /// Adds the classes implemented by the engine.
 pub(super) fn add_native_classes(classes: &mut ClassTable) {
     let mut debug = ClassInfo::new("Debug".to_owned(), ClassOrigin::Native);
-    debug
-        .methods
-        .push(native_method("print", &[("message", Type::String)], true));
+    debug.methods.push(native_method(
+        "print",
+        &[("message", Type::String)],
+        Type::Void,
+        true,
+    ));
     classes.add(debug);
+
+    // The game's input actions, declared in the project settings.
+    let mut input = ClassInfo::new(INPUT_CLASS.to_owned(), ClassOrigin::Native);
+    for name in INPUT_METHODS {
+        input.methods.push(native_method(
+            name,
+            &[("action", Type::String)],
+            Type::Bool,
+            true,
+        ));
+    }
+    classes.add(input);
 
     // A game: the engine calls `start` once and `update` every frame, until
     // `quit` is called or the window is closed.
     let mut game = ClassInfo::new(GAME_CLASS.to_owned(), ClassOrigin::Native);
-    game.methods.push(native_method("start", &[], false));
     game.methods
-        .push(native_method("update", &[("delta", Type::Float)], false));
-    game.methods.push(native_method("quit", &[], false));
+        .push(native_method("start", &[], Type::Void, false));
+    game.methods.push(native_method(
+        "update",
+        &[("delta", Type::Float)],
+        Type::Void,
+        false,
+    ));
+    game.methods
+        .push(native_method("quit", &[], Type::Void, false));
     classes.add(game);
 }
 
-/// A method of an engine class, without a result.
-fn native_method(name: &str, parameters: &[(&str, Type)], is_static: bool) -> MethodInfo {
+/// A method of an engine class.
+fn native_method(
+    name: &str,
+    parameters: &[(&str, Type)],
+    return_type: Type,
+    is_static: bool,
+) -> MethodInfo {
     MethodInfo {
         name: name.to_owned(),
         parameters: parameters
@@ -49,7 +81,7 @@ fn native_method(name: &str, parameters: &[(&str, Type)], is_static: bool) -> Me
                 ty: ty.clone(),
             })
             .collect(),
-        return_type: Type::Void,
+        return_type,
         is_static,
         is_private: false,
         is_override: false,

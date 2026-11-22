@@ -32,6 +32,14 @@ macro_rules! define_keys {
         impl Key {
             /// Every key, in declaration order: `Key::ALL[key.index()] == key`.
             pub const ALL: &'static [Self] = &[$(Self::$name),+];
+
+            /// The name of the key, as written in settings files: `"Space"`, `"A"`.
+            #[must_use]
+            pub const fn name(self) -> &'static str {
+                match self {
+                    $(Self::$name => stringify!($name),)+
+                }
+            }
         }
     };
 }
@@ -61,6 +69,12 @@ impl Key {
     #[must_use]
     pub const fn index(self) -> usize {
         self as usize
+    }
+
+    /// The key called `name` (see [`Key::name`]).
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|key| key.name() == name)
     }
 }
 
@@ -96,6 +110,27 @@ impl MouseButton {
     #[must_use]
     pub const fn index(self) -> usize {
         self as usize
+    }
+
+    /// The name of the button: `"Left"`, `"Right"`…
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Left => "Left",
+            Self::Right => "Right",
+            Self::Middle => "Middle",
+            Self::Back => "Back",
+            Self::Forward => "Forward",
+        }
+    }
+
+    /// The button called `name` (see [`MouseButton::name`]).
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|button| button.name() == name)
     }
 }
 
@@ -168,6 +203,39 @@ impl GamepadButton {
     #[must_use]
     pub const fn index(self) -> usize {
         self as usize
+    }
+
+    /// The name of the button: `"South"`, `"LeftBumper"`…
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::South => "South",
+            Self::East => "East",
+            Self::North => "North",
+            Self::West => "West",
+            Self::LeftBumper => "LeftBumper",
+            Self::RightBumper => "RightBumper",
+            Self::LeftTrigger => "LeftTrigger",
+            Self::RightTrigger => "RightTrigger",
+            Self::Select => "Select",
+            Self::Start => "Start",
+            Self::Mode => "Mode",
+            Self::LeftStick => "LeftStick",
+            Self::RightStick => "RightStick",
+            Self::DPadUp => "DPadUp",
+            Self::DPadDown => "DPadDown",
+            Self::DPadLeft => "DPadLeft",
+            Self::DPadRight => "DPadRight",
+        }
+    }
+
+    /// The button called `name` (see [`GamepadButton::name`]).
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|button| button.name() == name)
     }
 }
 
@@ -334,6 +402,21 @@ mod tests {
         for (index, axis) in GamepadAxis::ALL.iter().enumerate() {
             assert_eq!(axis.index(), index);
         }
+    }
+
+    #[test]
+    fn names_lead_back_to_their_control() {
+        for key in Key::ALL {
+            assert_eq!(Key::from_name(key.name()), Some(*key));
+        }
+        for button in MouseButton::ALL {
+            assert_eq!(MouseButton::from_name(button.name()), Some(*button));
+        }
+        for button in GamepadButton::ALL {
+            assert_eq!(GamepadButton::from_name(button.name()), Some(*button));
+        }
+        assert_eq!(Key::Space.name(), "Space");
+        assert_eq!(Key::from_name("space"), None, "names are case-sensitive");
     }
 
     #[test]

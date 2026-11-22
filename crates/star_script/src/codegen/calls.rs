@@ -6,8 +6,10 @@ use super::expressions::self_reference;
 use super::names::ident;
 use super::statements::Body;
 use super::{Result, internal};
-use crate::ast::{Expr, ExprKind};
-use crate::semantic::{BuiltinMethod, ClassId, ClassOrigin, ParameterInfo, Resolution, Type};
+use crate::ast::{Expr, ExprKind, Literal};
+use crate::semantic::{
+    BuiltinMethod, ClassId, ClassOrigin, INPUT_CLASS, ParameterInfo, Resolution, Type,
+};
 
 impl Body<'_> {
     /// `callee(arguments)`
@@ -58,6 +60,9 @@ impl Body<'_> {
             .methods
             .get(index)
             .ok_or_else(|| internal("unknown method", callee.span))?;
+        if info.origin == ClassOrigin::Native && info.name == INPUT_CLASS {
+            return self.input_call(callee, &method.name, arguments);
+        }
         let arguments = self.arguments(&method.parameters, arguments)?;
         // Static methods of the engine are functions of the runtime; the
         // others belong to an engine class with a generated module.
@@ -172,6 +177,21 @@ impl Body<'_> {
             "map"
         };
         Ok(format!("({receiver}).{adapter}(|value_| {code})"))
+    }
+
+    /// `Input.is_down(action)` reads the field `is_down` of the action's
+    /// state; the same for `just_pressed` and `just_released`. Action names
+    /// written as text are passed as they are: the game loop never allocates
+    /// memory to ask for an action.
+    fn input_call(&self, callee: &Expr, state: &str, arguments: &[Expr]) -> Result<String> {
+        let name = match arguments {
+            [argument] => match &argument.kind {
+                ExprKind::Literal(Literal::String(text)) => format!("{text:?}"),
+                _ => format!("&({})", self.value_as(argument, &Type::String)?),
+            },
+            _ => return Err(internal("`Input` takes one action", callee.span)),
+        };
+        Ok(format!("{RUNTIME}::input::action_state({name}).{state}"))
     }
 }
 

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use star_script::codegen::GeneratedProgram;
-use star_script::compile_source;
+use star_script::{GameSettings, compile_source_with};
 
 /// The `crates` folder of ProjectStar, with the runtime and the engine.
 pub const ENGINE_CRATES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
@@ -16,8 +16,8 @@ pub fn package_directory(name: &str) -> PathBuf {
     Path::new(env!("CARGO_TARGET_TMPDIR")).join(name)
 }
 
-pub fn compile(name: &str, source: &str) -> GeneratedProgram {
-    compile_source(source).unwrap_or_else(|errors| {
+pub fn compile_with(name: &str, source: &str, settings: &GameSettings) -> GeneratedProgram {
+    compile_source_with(source, settings).unwrap_or_else(|errors| {
         let messages: Vec<String> = errors.iter().map(ToString::to_string).collect();
         panic!("{name} does not compile: {messages:#?}")
     })

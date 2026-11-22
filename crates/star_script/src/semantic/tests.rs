@@ -780,3 +780,65 @@ fn games_extend_the_engine_class() {
         }]
     );
 }
+
+/// Errors of a whole source file of a game whose only action is `jump`.
+fn errors_with_jump_action(source: &str) -> Vec<SemanticErrorKind> {
+    let settings = crate::GameSettings {
+        actions: vec![crate::InputAction {
+            name: "jump".into(),
+            bindings: vec!["Space".into()],
+        }],
+    };
+    match check_with(&parse_source(source).expect("valid syntax"), &settings) {
+        Ok(_) => Vec::new(),
+        Err(errors) => errors.into_iter().map(|error| error.kind).collect(),
+    }
+}
+
+#[test]
+fn input_reads_declared_actions() {
+    let source = "class G extends Game {\n override func update(delta: float) {\n \
+                  if Input.is_down(\"jump\") || Input.just_pressed(\"jump\") { quit() }\n \
+                  const released: bool = Input.just_released(\"jump\")\n }\n}";
+
+    assert_eq!(errors_with_jump_action(source), []);
+}
+
+#[test]
+fn misspelled_actions_are_compile_errors() {
+    let source = "class G extends Game {\n override func update(delta: float) {\n \
+                  if Input.just_pressed(\"jupm\") { quit() }\n }\n}";
+
+    assert_eq!(
+        errors_with_jump_action(source),
+        [Kind::UnknownAction("jupm".into())]
+    );
+}
+
+#[test]
+fn computed_action_names_are_checked_while_playing() {
+    let source = "class G extends Game {\n var player = \"p1\"\n \
+                  override func update(delta: float) {\n \
+                  if Input.is_down(player + \"_jump\") { quit() }\n }\n}";
+
+    assert_eq!(errors_with_jump_action(source), []);
+}
+
+#[test]
+fn without_settings_no_action_is_declared() {
+    assert_eq!(
+        body_errors("const jumping = Input.is_down(\"jump\")"),
+        [Kind::UnknownAction("jump".into())]
+    );
+}
+
+#[test]
+fn input_takes_an_action_name() {
+    assert_eq!(
+        errors_with_jump_action("class G { func f() { const x = Input.is_down(3) } }"),
+        [Kind::TypeMismatch {
+            expected: "string".into(),
+            found: "int".into()
+        }]
+    );
+}

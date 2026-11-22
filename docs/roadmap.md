@@ -52,7 +52,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         born with its StarScript API):
     - [x] 13.5a Lifecycle: engine class `Game` (`start`, `update`, `quit`);
           a script that extends it runs in a window of the engine.
-    - [ ] 13.5b Input in StarScript, together with Phase 2.
+    - [x] 13.5b Input in StarScript: class `Input` (`is_down`, `just_pressed`,
+          `just_released`) over the actions of `project.toml`; misspelled
+          action names are compile errors.
     - [ ] 13.5c Nodes in StarScript, together with Phase 6.
   - [ ] 13.6 Editor integration: compiling and an error panel.
   - [ ] 13.7 Blueprint model and translation to StarScript.

@@ -7,15 +7,16 @@
 //! cargo run -p star_script --example run -- --rust path/to/file.star
 //! ```
 //!
-//! With `--rust` it only prints the generated Rust code.
+//! With `--rust` it only prints the generated Rust code. If the script's
+//! folder has a `project.toml`, its `[input.actions]` are the game's actions.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::{env, fs};
 
 use star_script::codegen::GeneratedProgram;
 use star_script::package::Package;
-use star_script::{LineIndex, compile_source};
+use star_script::{GameSettings, InputAction, LineIndex, compile_source_with};
 
 const DEFAULT_SCRIPT: &str = "crates/star_script/examples/scripts/hello.star";
 /// The `crates` folder of ProjectStar, with the runtime and the engine.
@@ -23,6 +24,8 @@ const ENGINE_CRATES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
 /// Where the generated packages are written, inside the workspace's `target`.
 const OUTPUT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/star_script_run");
 const SHOW_RUST_FLAG: &str = "--rust";
+/// The project settings file, looked for next to the script.
+const PROJECT_FILE: &str = "project.toml";
 
 fn main() -> ExitCode {
     let mut arguments: Vec<String> = env::args().skip(1).collect();
@@ -43,7 +46,14 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let program = match compile_source(&source) {
+    let settings = match game_settings(Path::new(&path)) {
+        Ok(settings) => settings,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let program = match compile_source_with(&source, &settings) {
         Ok(program) => program,
         Err(errors) => {
             let lines = LineIndex::new(&source);
@@ -88,6 +98,54 @@ fn build_and_run(name: &str, program: GeneratedProgram) -> Result<ExitCode, Stri
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
+    })
+}
+
+/// The settings of the project the script belongs to: none if its folder
+/// has no `project.toml`.
+fn game_settings(script: &Path) -> Result<GameSettings, String> {
+    let project = script.parent().map_or_else(
+        || PathBuf::from(PROJECT_FILE),
+        |folder| folder.join(PROJECT_FILE),
+    );
+    if !project.is_file() {
+        return Ok(GameSettings::default());
+    }
+    let text = fs::read_to_string(&project)
+        .map_err(|error| format!("cannot read {}: {error}", project.display()))?;
+    let table: toml::Table = text
+        .parse()
+        .map_err(|error| format!("{}: {error}", project.display()))?;
+    let actions = match table.get("input").and_then(|input| input.get("actions")) {
+        None => return Ok(GameSettings::default()),
+        Some(toml::Value::Table(actions)) => actions,
+        Some(_) => {
+            return Err(format!(
+                "{}: `input.actions` must be a table",
+                project.display()
+            ));
+        }
+    };
+    let actions = actions
+        .iter()
+        .map(|(name, bindings)| input_action(name, bindings))
+        .collect::<Result<_, _>>()
+        .map_err(|error| format!("{}: {error}", project.display()))?;
+    Ok(GameSettings { actions })
+}
+
+/// `name = ["Space", "GamepadSouth"]`
+fn input_action(name: &str, bindings: &toml::Value) -> Result<InputAction, String> {
+    let not_a_list = || format!("the action \"{name}\" must be a list of binding names");
+    let bindings = bindings
+        .as_array()
+        .ok_or_else(not_a_list)?
+        .iter()
+        .map(|binding| binding.as_str().map(str::to_owned).ok_or_else(not_a_list))
+        .collect::<Result<_, _>>()?;
+    Ok(InputAction {
+        name: name.to_owned(),
+        bindings,
     })
 }
 

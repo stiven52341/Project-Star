@@ -13,7 +13,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use common::{ENGINE_CRATES, binary, build, compile, package_directory};
+use common::{ENGINE_CRATES, binary, build, compile_with, package_directory};
+use star_script::GameSettings;
 use star_script::package::Package;
 
 const PROGRAMS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/programs");
@@ -37,7 +38,10 @@ fn programs_behave_as_expected() {
         let name = file_stem(&path);
         let source = fs::read_to_string(&path).expect("readable program");
         package
-            .add_program(&name, compile(&name, &source))
+            .add_program(
+                &name,
+                compile_with(&name, &source, &GameSettings::default()),
+            )
             .expect("valid program name");
         expectations.push(Expectation {
             output: read_expected(&path, "out").unwrap_or_default(),
@@ -47,7 +51,7 @@ fn programs_behave_as_expected() {
     }
     let (name, source, output) = example_program();
     package
-        .add_program(name, compile(name, &source))
+        .add_program(name, compile_with(name, &source, &GameSettings::default()))
         .expect("valid program name");
     expectations.push(Expectation {
         name: name.to_owned(),

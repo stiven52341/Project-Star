@@ -24,9 +24,10 @@ pub use classes::{
     FoundMember, MemberRef, MethodInfo, ParameterInfo,
 };
 pub use error::{SemanticError, SemanticErrorKind};
-pub use natives::{BuiltinMethod, GAME_CLASS};
+pub use natives::{BuiltinMethod, GAME_CLASS, INPUT_CLASS};
 pub use types::Type;
 
+use crate::GameSettings;
 use crate::ast::SourceFile;
 use checker::Checker;
 
@@ -36,7 +37,22 @@ use checker::Checker;
 ///
 /// Returns every semantic mistake found, in source order.
 pub fn check(file: &SourceFile) -> Result<Analysis, Vec<SemanticError>> {
-    let mut analysis = Analysis::default();
+    check_with(file, &GameSettings::default())
+}
+
+/// Checks the meaning of `file`, a script of a game with `settings`.
+///
+/// # Errors
+///
+/// Returns every semantic mistake found, in source order.
+pub fn check_with(
+    file: &SourceFile,
+    settings: &GameSettings,
+) -> Result<Analysis, Vec<SemanticError>> {
+    let mut analysis = Analysis {
+        settings: settings.clone(),
+        ..Analysis::default()
+    };
     natives::add_native_classes(&mut analysis.classes);
     let mut checker = Checker::new(file, analysis);
     checker.check_file();

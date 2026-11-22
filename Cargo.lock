@@ -2651,6 +2651,9 @@ version = "0.1.0"
 [[package]]
 name = "star_script"
 version = "0.1.0"
+dependencies = [
+ "toml",
+]
 
 [[package]]
 name = "star_script_runtime"

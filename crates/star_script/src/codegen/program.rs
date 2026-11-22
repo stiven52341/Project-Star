@@ -183,7 +183,12 @@ fn entry_point(
             span: item.span(),
         });
     }
-    native::game_entry_point(out, &path, &class.name);
+    native::game_entry_point(
+        out,
+        &path,
+        &class.name,
+        &context.analysis.settings().actions,
+    );
     Ok(kind)
 }
 

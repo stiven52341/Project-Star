@@ -1,0 +1,13 @@
+# ProjectStar project file.
+[project]
+name = "Input demo"
+engine_version = "0.1.0"
+dimension = "2d"
+platforms = ["linux", "windows", "macos"]
+
+# Each action lists the inputs that trigger it: keys ("Space", "A",
+# "ArrowLeft"…), mouse buttons ("MouseLeft"…), "Touch" (any finger) and
+# gamepad buttons ("GamepadSouth"…).
+[input.actions]
+jump = ["Space", "MouseLeft", "Touch", "GamepadSouth"]
+quit = ["Escape", "GamepadStart"]
