@@ -39,7 +39,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 4 | Rust generation | **Final** |
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
 | 6 | Editor integration | In progress: «Compilar» checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
-| 7–8 | Blueprints | In progress: model, rules, files and translation to StarScript done; the editor pending |
+| 7–8 | Blueprints | In progress: model, rules, files, translation to StarScript and «Compilar» in the editor done; the visual editor pending |
 
 ## 1. Lexicon (final)
 
@@ -721,6 +721,11 @@ class Player extends Sprite {
 - Each piece of the code remembers its node, variable or graph
   (`Translation::origin`), so the mistakes the StarScript compiler finds in
   it are placed back on the blueprint.
+
+The editor's «Compilar» checks every `.blueprint` of `assets/` together with
+the `.star` files, as one program: scripts can use the classes of blueprints
+and the other way round. A mistake in a blueprint is shown as
+`assets/rock.blueprint: graph `update`, node 3: …`.
 
 ## 6. Plain Rust
 

@@ -34,6 +34,9 @@ pub struct SourceLocation<'set> {
     pub file: &'set str,
     /// Its line and column inside that file.
     pub position: Position,
+    /// Its byte offset inside that file, for tools that map the file's
+    /// code back to where it came from (such as blueprints).
+    pub offset: usize,
 }
 
 impl SourceSet {
@@ -86,6 +89,7 @@ impl SourceSet {
         Some(SourceLocation {
             file: &file.name,
             position: LineIndex::new(&file.text).position(local_offset),
+            offset: local_offset,
         })
     }
 
@@ -134,6 +138,7 @@ mod tests {
             Some(SourceLocation {
                 file: "b.star",
                 position: Position { line: 2, column: 3 },
+                offset: "class B {\n  ".len(),
             })
         );
     }

@@ -2615,6 +2615,7 @@ dependencies = [
  "log",
  "rfd",
  "serde",
+ "star_blueprint",
  "star_engine",
  "star_render",
  "star_script",

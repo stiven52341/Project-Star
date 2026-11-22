@@ -160,3 +160,85 @@ fn programs_that_cannot_be_translated_are_problems() {
             .starts_with("assets/demo.star:")
     );
 }
+
+/// `Rock`, as a blueprint: `update` sets `speed` to the value of node 3.
+fn rock_blueprint(node_3: &str) -> String {
+    format!(
+        "format = 1\nclass = \"Rock\"\nextends = \"Node\"\nbase_arguments = [\"Rock\"]\n\n\
+         [[variable]]\nname = \"speed\"\ndefault = 2.0\n\n\
+         [[graph]]\nname = \"update\"\noverride = true\n\
+         parameters = [{{ name = \"delta\", type = \"float\" }}]\n\n\
+         [[graph.node]]\nid = 1\nkind = \"entry\"\n\n\
+         [[graph.node]]\nid = 2\nkind = \"set_variable\"\nvariable = \"speed\"\n\n\
+         [[graph.node]]\nid = 3\n{node_3}\n\n\
+         [[graph.link]]\nfrom = {{ node = 1, pin = \"then\" }}\nto = {{ node = 2, pin = \"in\" }}\n\n\
+         [[graph.link]]\nfrom = {{ node = 3, pin = \"value\" }}\nto = {{ node = 2, pin = \"value\" }}\n"
+    )
+}
+
+const DELTA_NODE: &str = "kind = \"get_variable\"\nvariable = \"speed\"";
+
+#[test]
+fn scripts_use_the_classes_of_blueprints() {
+    let directory = project(
+        "check_blueprint_class",
+        &[
+            (MANIFEST_FILE_NAME, MANIFEST),
+            ("assets/demo.star", GAME),
+            ("assets/rock.blueprint", &rock_blueprint(DELTA_NODE)),
+            ("assets/one.scene", SCENE),
+        ],
+    );
+
+    let check = check_project(directory.path());
+
+    assert_eq!(check.scripts, 2);
+    assert!(check.problems.is_empty(), "{:?}", messages(&check));
+}
+
+#[test]
+fn compiler_mistakes_in_blueprints_name_their_node() {
+    let text_node = "kind = \"literal\"\nvalue = \"fast\"";
+    let directory = project(
+        "check_blueprint_node",
+        &[
+            (MANIFEST_FILE_NAME, MANIFEST),
+            ("assets/demo.star", GAME),
+            ("assets/rock.blueprint", &rock_blueprint(text_node)),
+        ],
+    );
+
+    let check = check_project(directory.path());
+
+    let messages = messages(&check);
+    assert_eq!(messages.len(), 1, "{messages:?}");
+    assert!(
+        messages[0].starts_with("assets/rock.blueprint: graph `update`, node 3: "),
+        "{messages:?}"
+    );
+}
+
+#[test]
+fn broken_blueprints_are_reported_alone() {
+    let unwired_node = "kind = \"return\"";
+    let directory = project(
+        "check_blueprint_broken",
+        &[
+            (MANIFEST_FILE_NAME, MANIFEST),
+            ("assets/demo.star", GAME),
+            ("assets/rock.blueprint", &rock_blueprint(unwired_node)),
+        ],
+    );
+
+    let check = check_project(directory.path());
+
+    assert_ne!(check.problems, []);
+    assert!(
+        check
+            .problems
+            .iter()
+            .all(|problem| problem.file == "assets/rock.blueprint"),
+        "{:?}",
+        messages(&check)
+    );
+}

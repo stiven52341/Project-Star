@@ -13,6 +13,7 @@ publish = false
 [dependencies]
 star_engine.workspace = true
 star_script.workspace = true
+star_blueprint.workspace = true
 star_render = { workspace = true, features = ["interop"] }
 eframe.workspace = true
 rfd.workspace = true

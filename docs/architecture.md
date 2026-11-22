@@ -316,8 +316,13 @@ samples textures as gamma values.
 (`CheckJob`), which asks egui to redraw when it finishes. It checks:
 
 - `project.toml`: its `[input.actions]`, which scripts name.
-- Every `.star` file of `assets/` (any subfolder), as **one program**
-  (`star_script::SourceSet`), including its translation to Rust.
+- Every `.star` and `.blueprint` file of `assets/` (any subfolder), as
+  **one program** (`star_script::SourceSet`), including its translation to
+  Rust. Blueprints are translated to StarScript first (`star_blueprint`);
+  the compiler's mistakes in their code are reported on the blueprint's
+  node, variable or graph (`Translation::origin`), not on lines of code the
+  user never wrote. A blueprint that cannot be translated is reported
+  alone, since the rest of the program would only miss its class.
 - Every `.scene` file of `assets/`: that it can be read and, if the project
   has scripts, that the classes its nodes name can build them
   (`ClassTable::scene_class`, the same rule the generated code follows).

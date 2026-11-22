@@ -10,6 +10,8 @@ mod graph;
 mod literals;
 mod writer;
 
+use std::fmt;
+
 use crate::model::{Blueprint, Literal, NodeId, Variable};
 use crate::validation::{BlueprintError, BlueprintErrorKind, validate};
 
@@ -37,6 +39,20 @@ pub enum Origin {
         /// The node.
         node: NodeId,
     },
+}
+
+impl fmt::Display for Origin {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Class => formatter.write_str("class"),
+            Self::Variable(name) => write!(formatter, "variable `{name}`"),
+            Self::Graph(name) => write!(formatter, "graph `{name}`"),
+            Self::Node {
+                graph,
+                node: NodeId(node),
+            } => write!(formatter, "graph `{graph}`, node {node}"),
+        }
+    }
 }
 
 /// A piece of a translation and what it was written for.
