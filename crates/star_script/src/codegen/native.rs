@@ -622,7 +622,7 @@ impl ::star_engine::game::Game for EngineGame_ {{
     fn update(&mut self, world: &mut ::star_engine::star_ecs::World) {{
         use ::star_engine::EngineWorld as _;
         if let ::std::option::Option::Some(input) = world.input() {{
-            share_actions_(input.actions());
+            share_actions_(&input);
             share_pointer_(&input, &self.view_(world), world.window_size());
         }}
         let delta_ = world.time().delta_seconds();
@@ -665,12 +665,14 @@ fn share_pointer_(
 }}
 
 /// Copies the state of each action where `Input` reads it.
-fn share_actions_(actions_: &::star_engine::star_input::Actions) {{
+fn share_actions_(input_: &::star_engine::star_input::Input) {{
+    let actions_ = input_.actions();
     for (index_, name_) in ACTION_NAMES_.iter().enumerate() {{
         let state_ = {RUNTIME}::input::ActionState {{
             is_down: actions_.is_down(name_),
             just_pressed: actions_.just_pressed(name_),
             just_released: actions_.just_released(name_),
+            strength: input_.action_strength(name_),
         }};
         {RUNTIME}::input::set_action_state(index_, state_);
     }}

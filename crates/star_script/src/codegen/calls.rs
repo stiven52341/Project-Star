@@ -182,20 +182,32 @@ impl Body<'_> {
     /// `Input.is_down(action)` reads the field `is_down` of the action's
     /// state; the same for `just_pressed` and `just_released`. Action names
     /// written as text are passed as they are: the game loop never allocates
-    /// memory to ask for an action. The pointer's methods read a field of
-    /// the pointer's state.
+    /// memory to ask for an action. `axis` is a function of the runtime,
+    /// and the pointer's methods read a field of the pointer's state.
     fn input_call(&self, callee: &Expr, method: &str, arguments: &[Expr]) -> Result<String> {
         if let Some(field) = pointer_field(method) {
             return Ok(format!("{RUNTIME}::input::pointer().{field}"));
         }
-        let name = match arguments {
-            [argument] => match &argument.kind {
-                ExprKind::Literal(Literal::String(text)) => format!("{text:?}"),
-                _ => format!("&({})", self.value_as(argument, &Type::String)?),
-            },
-            _ => return Err(internal("`Input` takes one action", callee.span)),
-        };
-        Ok(format!("{RUNTIME}::input::action_state({name}).{method}"))
+        match arguments {
+            [negative, positive] => Ok(format!(
+                "{RUNTIME}::input::axis({}, {})",
+                self.action_name(negative)?,
+                self.action_name(positive)?
+            )),
+            [action] => Ok(format!(
+                "{RUNTIME}::input::action_state({}).{method}",
+                self.action_name(action)?
+            )),
+            _ => Err(internal("`Input` takes one or two actions", callee.span)),
+        }
+    }
+
+    /// An action name for the runtime: text as it is, or a borrowed value.
+    fn action_name(&self, argument: &Expr) -> Result<String> {
+        Ok(match &argument.kind {
+            ExprKind::Literal(Literal::String(text)) => format!("{text:?}"),
+            _ => format!("&({})", self.value_as(argument, &Type::String)?),
+        })
     }
 }
 

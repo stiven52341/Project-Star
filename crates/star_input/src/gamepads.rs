@@ -3,6 +3,7 @@
 use star_platform::{ButtonState, GamepadAxis, GamepadButton};
 
 use crate::button_states::ButtonStates;
+use crate::stick_direction::{STICK_PRESS_THRESHOLD, StickDirection};
 
 /// Most gamepads tracked at once; more are ignored. Eight is beyond what
 /// local multiplayer games use.
@@ -141,6 +142,45 @@ impl Gamepads {
             }
         }
         held
+    }
+
+    /// Which stick directions are held on any gamepad (leaning at least
+    /// [`STICK_PRESS_THRESHOLD`]), to tell when actions change.
+    pub(crate) fn held_directions(&self) -> [bool; StickDirection::COUNT] {
+        let mut held = [false; StickDirection::COUNT];
+        for (index, direction) in StickDirection::ALL.iter().enumerate() {
+            held[index] = self.stick_strength(*direction) >= STICK_PRESS_THRESHOLD;
+        }
+        held
+    }
+
+    /// How far a stick leans `direction` on the gamepad that leans it most.
+    pub(crate) fn stick_strength(&self, direction: StickDirection) -> f32 {
+        self.iter()
+            .map(|gamepad| direction.strength(|axis| gamepad.axis(axis)))
+            .fold(0.0, f32::max)
+    }
+
+    /// How far `button` is pressed on the gamepad that presses it most: the
+    /// travel of a trigger, or `1.0` for a held button (and a held trigger
+    /// that reports no travel).
+    pub(crate) fn button_strength(&self, button: GamepadButton) -> f32 {
+        self.iter()
+            .map(|gamepad| {
+                let travel = match button {
+                    GamepadButton::LeftTrigger => gamepad.axis(GamepadAxis::LeftTrigger),
+                    GamepadButton::RightTrigger => gamepad.axis(GamepadAxis::RightTrigger),
+                    _ => 0.0,
+                };
+                if travel > 0.0 {
+                    travel.min(1.0)
+                } else if gamepad.is_down(button) {
+                    1.0
+                } else {
+                    0.0
+                }
+            })
+            .fold(0.0, f32::max)
     }
 
     /// `None` if the gamepad is new and every slot is taken.

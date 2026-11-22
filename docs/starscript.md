@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
+| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
 
@@ -364,7 +364,7 @@ The engine provides them; their names cannot be used for other classes.
 | `Camera` (extends `Node`) | `init(name: string)`; field `view_height: float` (2.0) |
 | `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
 | `Scene` | `static load(path: string) -> Node?` |
-| `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool`, `static pointer_x() -> float`, `static pointer_y() -> float`, `static has_pointer() -> bool` |
+| `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool`, `static strength(action: string) -> float`, `static axis(negative: string, positive: string) -> float`, `static pointer_x() -> float`, `static pointer_y() -> float`, `static has_pointer() -> bool` |
 
 **A game is a class that extends `Game`**:
 
@@ -498,8 +498,29 @@ override func update(delta: float) {
 - Binding names: keys by their position on a US keyboard (`"A"`, `"Space"`,
   `"ArrowLeft"`, `"Digit1"`, `"F1"`, `"ShiftLeft"`…), mouse buttons
   (`"MouseLeft"`, `"MouseRight"`, `"MouseMiddle"`…), `"Touch"` (any finger)
-  and gamepad buttons by position (`"GamepadSouth"` is A on Xbox and ✕ on
-  PlayStation; `"GamepadStart"`, `"GamepadDPadUp"`, `"GamepadLeftBumper"`…).
+  gamepad buttons by position (`"GamepadSouth"` is A on Xbox and ✕ on
+  PlayStation; `"GamepadStart"`, `"GamepadDPadUp"`, `"GamepadLeftBumper"`…)
+  and the directions of the sticks (`"GamepadLeftStickLeft"`,
+  `"GamepadLeftStickRight"`, `"GamepadLeftStickUp"`, `"GamepadLeftStickDown"`
+  and the same with `RightStick`).
+- **Analog input**: a stick direction holds its action once the stick leans
+  halfway. `Input.strength("right")` says how strongly an action is held,
+  from `0.0` to `1.0`: keys and buttons give `1.0` while held, triggers
+  (`"GamepadLeftTrigger"`, `"GamepadRightTrigger"`) how far they are
+  pressed, and stick directions how far the stick leans, even before it
+  holds the action. `Input.axis("left", "right")` is the strength of
+  `right` minus that of `left`, from `-1.0` to `1.0`: one line moves with
+  keys and sticks alike, softly with a stick. Both names are checked when
+  compiling.
+
+```toml
+left = ["A", "ArrowLeft", "GamepadLeftStickLeft"]
+right = ["D", "ArrowRight", "GamepadLeftStickRight"]
+```
+
+```
+x += Input.axis("left", "right") * speed * delta
+```
 - **An action name written as text is checked when compiling**: a typo such
   as `Input.is_down("jupm")` is an error. A name computed while playing
   (`Input.is_down(player + "_jump")`) can only be checked then: an action

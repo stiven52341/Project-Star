@@ -9,6 +9,7 @@ use crate::binding::Binding;
 use crate::gamepads::Gamepads;
 use crate::keyboard::Keyboard;
 use crate::mouse::Mouse;
+use crate::stick_direction::StickDirection;
 use crate::touches::{Touch, Touches};
 
 /// Everything the player is doing with their input devices this frame.
@@ -121,7 +122,7 @@ impl Input {
                 gamepad,
                 axis,
                 value,
-            } => self.gamepads.set_axis(gamepad, axis, value),
+            } => self.change_gamepads(|gamepads| gamepads.set_axis(gamepad, axis, value)),
             InputEvent::FocusLost => self.release_everything(),
         }
     }
@@ -144,18 +145,55 @@ impl Input {
         self.follow_binding(Binding::Touch, was_touching, is_touching);
     }
 
-    /// The [`Binding::GamepadButton`] actions follow whether the button is
-    /// held on any gamepad; disconnecting one can release several at once.
+    /// The [`Binding::GamepadButton`] and [`Binding::GamepadStick`] actions
+    /// follow whether the button is held, or the stick leans that way, on
+    /// any gamepad; disconnecting one can release several at once.
     fn change_gamepads(&mut self, change: impl FnOnce(&mut Gamepads)) {
-        let held_before = self.gamepads.held_buttons();
+        let buttons_before = self.gamepads.held_buttons();
+        let directions_before = self.gamepads.held_directions();
         change(&mut self.gamepads);
-        let held_after = self.gamepads.held_buttons();
+        let buttons_after = self.gamepads.held_buttons();
+        let directions_after = self.gamepads.held_directions();
         for (index, button) in GamepadButton::ALL.iter().enumerate() {
             self.follow_binding(
                 Binding::GamepadButton(*button),
-                held_before[index],
-                held_after[index],
+                buttons_before[index],
+                buttons_after[index],
             );
+        }
+        for (index, direction) in StickDirection::ALL.iter().enumerate() {
+            self.follow_binding(
+                Binding::GamepadStick(*direction),
+                directions_before[index],
+                directions_after[index],
+            );
+        }
+    }
+
+    /// How strongly the action `name` is held, from `0.0` to `1.0`: the
+    /// strongest of its bindings. Keys, mouse buttons, touch and gamepad
+    /// buttons give `1.0` while held; triggers give how far they are
+    /// pressed, and stick directions how far the stick leans that way, so a
+    /// stick can give some strength before it holds the action. An action
+    /// that does not exist gives `0.0`.
+    #[must_use]
+    pub fn action_strength(&self, name: &str) -> f32 {
+        self.actions
+            .bindings(name)
+            .unwrap_or_default()
+            .iter()
+            .map(|binding| self.binding_strength(*binding))
+            .fold(0.0, f32::max)
+    }
+
+    fn binding_strength(&self, binding: Binding) -> f32 {
+        let held = |is_down: bool| if is_down { 1.0 } else { 0.0 };
+        match binding {
+            Binding::Key(key) => held(self.keyboard.is_down(key)),
+            Binding::MouseButton(button) => held(self.mouse.is_down(button)),
+            Binding::Touch => held(self.touches.is_any_down()),
+            Binding::GamepadButton(button) => self.gamepads.button_strength(button),
+            Binding::GamepadStick(direction) => self.gamepads.stick_strength(direction),
         }
     }
 
@@ -179,7 +217,7 @@ impl Input {
 
 #[cfg(test)]
 mod tests {
-    use star_platform::{Key, MouseButton};
+    use star_platform::{GamepadAxis, Key, MouseButton};
 
     use super::*;
 
@@ -446,5 +484,80 @@ mod tests {
         input.end_frame();
 
         assert_eq!(input.pointer(), Some(Vec2::new(3.0, 4.0)));
+    }
+
+    fn stick(value: f32) -> InputEvent {
+        InputEvent::GamepadAxis {
+            gamepad: 0,
+            axis: GamepadAxis::LeftStickX,
+            value,
+        }
+    }
+
+    fn move_input() -> Input {
+        let mut map = ActionMap::new();
+        map.add(
+            JUMP,
+            &[Key::D.into(), StickDirection::LeftStickRight.into()],
+        )
+        .unwrap();
+        Input::with_actions(map)
+    }
+
+    #[test]
+    fn sticks_hold_actions_from_half_their_travel() {
+        let mut input = move_input();
+
+        input.apply(stick(0.3));
+
+        assert!(!input.actions().is_down(JUMP));
+        assert!((input.action_strength(JUMP) - 0.3).abs() < f32::EPSILON);
+
+        input.apply(stick(0.8));
+
+        assert!(input.actions().just_pressed(JUMP));
+        assert!((input.action_strength(JUMP) - 0.8).abs() < f32::EPSILON);
+
+        input.apply(stick(-0.8));
+
+        assert!(input.actions().just_released(JUMP));
+        assert!(input.action_strength(JUMP).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn the_strongest_binding_gives_the_strength() {
+        let mut input = move_input();
+        input.apply(stick(0.3));
+
+        input.apply(press(Key::D));
+
+        assert!((input.action_strength(JUMP) - 1.0).abs() < f32::EPSILON);
+        assert!(input.action_strength("dance").abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn triggers_give_how_far_they_are_pressed() {
+        let mut map = ActionMap::new();
+        map.add(JUMP, &[GamepadButton::RightTrigger.into()])
+            .unwrap();
+        let mut input = Input::with_actions(map);
+
+        input.apply(InputEvent::GamepadAxis {
+            gamepad: 0,
+            axis: GamepadAxis::RightTrigger,
+            value: 0.25,
+        });
+
+        assert!((input.action_strength(JUMP) - 0.25).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn disconnecting_a_leaning_gamepad_releases_its_directions() {
+        let mut input = move_input();
+        input.apply(stick(1.0));
+
+        input.apply(InputEvent::GamepadDisconnected { gamepad: 0 });
+
+        assert!(!input.actions().is_down(JUMP));
     }
 }

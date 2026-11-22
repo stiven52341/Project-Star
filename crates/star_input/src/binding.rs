@@ -6,9 +6,12 @@ use std::str::FromStr;
 use star_core::EngineError;
 use star_platform::{GamepadButton, Key, MouseButton};
 
+use crate::stick_direction::StickDirection;
+
 /// Prefix of the names of mouse button bindings: `"MouseLeft"`.
 const MOUSE_PREFIX: &str = "Mouse";
-/// Prefix of the names of gamepad button bindings: `"GamepadSouth"`.
+/// Prefix of the names of gamepad bindings: `"GamepadSouth"`,
+/// `"GamepadLeftStickLeft"`.
 const GAMEPAD_PREFIX: &str = "Gamepad";
 /// Name of the touch binding.
 const TOUCH_NAME: &str = "Touch";
@@ -29,8 +32,13 @@ pub enum Binding {
     MouseButton(MouseButton),
     /// Any finger on the touch screen, e.g. "tap anywhere to jump".
     Touch,
-    /// A button of any gamepad.
+    /// A button of any gamepad. With [`crate::Input::action_strength`],
+    /// the triggers give how far they are pressed.
     GamepadButton(GamepadButton),
+    /// A stick of any gamepad leaning one way: held from
+    /// [`crate::STICK_PRESS_THRESHOLD`], and analog with
+    /// [`crate::Input::action_strength`].
+    GamepadStick(StickDirection),
 }
 
 impl From<Key> for Binding {
@@ -51,18 +59,27 @@ impl From<GamepadButton> for Binding {
     }
 }
 
+impl From<StickDirection> for Binding {
+    fn from(direction: StickDirection) -> Self {
+        Self::GamepadStick(direction)
+    }
+}
+
 impl FromStr for Binding {
     type Err = EngineError;
 
     /// Reads a binding name: a key (`"Space"`, `"A"`, `"ArrowLeft"`), a mouse
-    /// button (`"MouseLeft"`), `"Touch"` or a gamepad button (`"GamepadSouth"`).
+    /// button (`"MouseLeft"`), `"Touch"`, a gamepad button (`"GamepadSouth"`)
+    /// or a stick direction (`"GamepadLeftStickLeft"`).
     fn from_str(name: &str) -> Result<Self, Self::Err> {
         let binding = if name == TOUCH_NAME {
             Some(Self::Touch)
         } else if let Some(button) = name.strip_prefix(MOUSE_PREFIX) {
             MouseButton::from_name(button).map(Self::MouseButton)
-        } else if let Some(button) = name.strip_prefix(GAMEPAD_PREFIX) {
-            GamepadButton::from_name(button).map(Self::GamepadButton)
+        } else if let Some(input) = name.strip_prefix(GAMEPAD_PREFIX) {
+            GamepadButton::from_name(input)
+                .map(Self::GamepadButton)
+                .or_else(|| StickDirection::from_name(input).map(Self::GamepadStick))
         } else {
             Key::from_name(name).map(Self::Key)
         };
@@ -77,6 +94,9 @@ impl fmt::Display for Binding {
             Self::MouseButton(button) => write!(formatter, "{MOUSE_PREFIX}{}", button.name()),
             Self::Touch => formatter.write_str(TOUCH_NAME),
             Self::GamepadButton(button) => write!(formatter, "{GAMEPAD_PREFIX}{}", button.name()),
+            Self::GamepadStick(direction) => {
+                write!(formatter, "{GAMEPAD_PREFIX}{}", direction.name())
+            }
         }
     }
 }
@@ -97,6 +117,14 @@ mod tests {
             "GamepadSouth".parse(),
             Ok(Binding::GamepadButton(GamepadButton::South))
         );
+        assert_eq!(
+            "GamepadLeftStickLeft".parse(),
+            Ok(Binding::GamepadStick(StickDirection::LeftStickLeft))
+        );
+        assert_eq!(
+            "GamepadLeftStick".parse(),
+            Ok(Binding::GamepadButton(GamepadButton::LeftStick))
+        );
     }
 
     #[test]
@@ -106,6 +134,7 @@ mod tests {
             Binding::MouseButton(MouseButton::Right),
             Binding::Touch,
             Binding::GamepadButton(GamepadButton::DPadUp),
+            Binding::GamepadStick(StickDirection::RightStickDown),
         ];
         for binding in bindings {
             assert_eq!(binding.to_string().parse(), Ok(binding));

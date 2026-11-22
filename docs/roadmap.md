@@ -88,8 +88,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.5g Pointer in StarScript: `Input.pointer_x`, `pointer_y` and
           `has_pointer`, the mouse or a finger in world units, seen from
           the game's camera.
-    - [ ] 13.5h Analog input by actions: stick directions and triggers as
-          bindings, `Input.strength(action)` and `Input.axis(negative,
+    - [x] 13.5h Analog input by actions: stick directions as bindings
+          (`"GamepadLeftStickLeft"`…), `Input.strength(action)` (triggers
+          and sticks give how far they go) and `Input.axis(negative,
           positive)`.
   - [x] 13.6 Editor integration: compiling and an error panel.
     - [x] 13.6a Programs of several files (`SourceSet`): each file is read

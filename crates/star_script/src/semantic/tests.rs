@@ -799,7 +799,9 @@ fn errors_with_jump_action(source: &str) -> Vec<SemanticErrorKind> {
 fn input_reads_declared_actions() {
     let source = "class G extends Game {\n override func update(delta: float) {\n \
                   if Input.is_down(\"jump\") || Input.just_pressed(\"jump\") { quit() }\n \
-                  const released: bool = Input.just_released(\"jump\")\n }\n}";
+                  const released: bool = Input.just_released(\"jump\")\n \
+                  const strength: float = Input.strength(\"jump\")\n \
+                  const axis: float = Input.axis(\"jump\", \"jump\")\n }\n}";
 
     assert_eq!(errors_with_jump_action(source), []);
 }
@@ -812,6 +814,17 @@ fn misspelled_actions_are_compile_errors() {
     assert_eq!(
         errors_with_jump_action(source),
         [Kind::UnknownAction("jupm".into())]
+    );
+}
+
+#[test]
+fn both_actions_of_an_axis_are_checked() {
+    let source = "class G extends Game {\n override func update(delta: float) {\n \
+                  x = Input.axis(\"left\", \"jump\")\n }\n var x = 0.0\n}";
+
+    assert_eq!(
+        errors_with_jump_action(source),
+        [Kind::UnknownAction("left".into())]
     );
 }
 

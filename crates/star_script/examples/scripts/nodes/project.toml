@@ -6,8 +6,11 @@ dimension = "2d"
 platforms = ["linux", "windows", "macos"]
 
 [input.actions]
-left = ["ArrowLeft", "A", "GamepadDPadLeft"]
-right = ["ArrowRight", "D", "GamepadDPadRight"]
-up = ["ArrowUp", "W", "GamepadDPadUp"]
-down = ["ArrowDown", "S", "GamepadDPadDown"]
+left = ["ArrowLeft", "A", "GamepadDPadLeft", "GamepadLeftStickLeft"]
+right = ["ArrowRight", "D", "GamepadDPadRight", "GamepadLeftStickRight"]
+up = ["ArrowUp", "W", "GamepadDPadUp", "GamepadLeftStickUp"]
+down = ["ArrowDown", "S", "GamepadDPadDown", "GamepadLeftStickDown"]
+# Held while the mouse button or a finger is down: the ship flies towards
+# where it points.
+follow = ["MouseLeft", "Touch"]
 quit = ["Escape", "GamepadStart"]

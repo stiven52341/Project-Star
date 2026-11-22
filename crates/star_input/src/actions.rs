@@ -78,6 +78,14 @@ impl Actions {
         self.button(name).is_some_and(TrackedButton::just_released)
     }
 
+    /// The bindings of the action `name`, if it exists.
+    pub(crate) fn bindings(&self, name: &str) -> Option<&[Binding]> {
+        self.actions
+            .iter()
+            .find(|state| state.action.name == name)
+            .map(|state| state.action.bindings.as_slice())
+    }
+
     /// Updates the actions bound to `binding`, which has just changed to `state`.
     pub(crate) fn binding_changed(&mut self, binding: Binding, state: ButtonState) {
         let bound = self

@@ -6,8 +6,9 @@ dimension = "2d"
 platforms = ["linux", "windows", "macos"]
 
 # Each action lists the inputs that trigger it: keys ("Space", "A",
-# "ArrowLeft"…), mouse buttons ("MouseLeft"…), "Touch" (any finger) and
-# gamepad buttons ("GamepadSouth"…).
+# "ArrowLeft"…), mouse buttons ("MouseLeft"…), "Touch" (any finger),
+# gamepad buttons ("GamepadSouth"…) and stick directions
+# ("GamepadLeftStickLeft"…).
 [input.actions]
 jump = ["Space", "MouseLeft", "Touch", "GamepadSouth"]
 quit = ["Escape", "GamepadStart"]

@@ -9,7 +9,7 @@
 use std::cell::{Cell, RefCell};
 
 /// The state of one action during the current frame.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ActionState {
     /// Whether the action is held.
     pub is_down: bool,
@@ -17,6 +17,9 @@ pub struct ActionState {
     pub just_pressed: bool,
     /// Whether the action went up during the current frame.
     pub just_released: bool,
+    /// How strongly it is held, from `0.0` to `1.0`: a stick that leans a
+    /// little gives a little.
+    pub strength: f32,
 }
 
 /// Where the player points, in world units.
@@ -87,6 +90,13 @@ pub fn action_state(name: &str) -> ActionState {
     })
 }
 
+/// The strength of the action `positive` minus that of `negative`: from
+/// `-1.0` to `1.0`, for movements with two opposite actions.
+#[must_use]
+pub fn axis(negative: &str, positive: &str) -> f32 {
+    action_state(positive).strength - action_state(negative).strength
+}
+
 /// Sets where the player points this frame, as `(x, y)` in world units, or
 /// `None` if they point nowhere: then the last position is kept.
 pub fn set_pointer(position: Option<(f32, f32)>) {
@@ -120,6 +130,7 @@ mod tests {
         is_down: true,
         just_pressed: true,
         just_released: false,
+        strength: 1.0,
     };
 
     #[test]
@@ -156,6 +167,23 @@ mod tests {
         declare_actions(&["fire"]);
 
         assert_eq!(action_state("jump"), ActionState::default());
+    }
+
+    #[test]
+    fn axes_subtract_the_negative_action() {
+        declare_actions(&["left", "right"]);
+        let leaning = ActionState {
+            strength: 0.25,
+            ..ActionState::default()
+        };
+
+        set_action_state(0, leaning);
+
+        assert!((axis("left", "right") + 0.25).abs() < f32::EPSILON);
+
+        set_action_state(1, HELD);
+
+        assert!((axis("left", "right") - 0.75).abs() < f32::EPSILON);
     }
 
     #[test]

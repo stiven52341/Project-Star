@@ -13,6 +13,7 @@ mod gamepads;
 mod input;
 mod keyboard;
 mod mouse;
+mod stick_direction;
 mod touches;
 
 pub use action_map::ActionMap;
@@ -25,4 +26,5 @@ pub use mouse::Mouse;
 pub use star_platform::{
     ButtonState, GamepadAxis, GamepadButton, InputEvent, Key, MouseButton, TouchPhase,
 };
+pub use stick_direction::{STICK_PRESS_THRESHOLD, StickDirection};
 pub use touches::{MAX_TOUCHES, Touch, TouchId, Touches};

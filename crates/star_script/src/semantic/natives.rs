@@ -43,7 +43,15 @@ pub const SCENE_CLASS: &str = "Scene";
 pub const COLOR_CLASS: &str = "Color";
 
 /// The methods of `Input` that take the name of an action.
-pub(super) const INPUT_ACTION_METHODS: [&str; 3] = ["is_down", "just_pressed", "just_released"];
+pub(super) const INPUT_ACTION_METHODS: [(&str, Type); 4] = [
+    ("is_down", Type::Bool),
+    ("just_pressed", Type::Bool),
+    ("just_released", Type::Bool),
+    ("strength", Type::Float),
+];
+
+/// The method of `Input` that takes two opposite actions.
+pub(super) const INPUT_AXIS_METHOD: &str = "axis";
 
 /// The methods of `Input` that say where the player points, without arguments.
 pub(super) const INPUT_POINTER_METHODS: [(&str, Type); 3] = [
@@ -66,14 +74,20 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     // The game's input actions, declared in the project settings, and where
     // the player points.
     let mut input = ClassInfo::new(INPUT_CLASS.to_owned(), ClassOrigin::Native);
-    for name in INPUT_ACTION_METHODS {
+    for (name, return_type) in INPUT_ACTION_METHODS {
         input.methods.push(native_method(
             name,
             &[("action", Type::String)],
-            Type::Bool,
+            return_type,
             true,
         ));
     }
+    input.methods.push(native_method(
+        INPUT_AXIS_METHOD,
+        &[("negative", Type::String), ("positive", Type::String)],
+        Type::Float,
+        true,
+    ));
     for (name, return_type) in INPUT_POINTER_METHODS {
         input
             .methods

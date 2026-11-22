@@ -19,7 +19,8 @@ class Orbit extends Node {
     }
 }
 
-// Moved with the arrow keys, WASD or a gamepad; a moon goes around it.
+// Moved with the arrow keys, WASD, a gamepad (the left stick is analog) or
+// by pointing with the mouse or a finger; a moon goes around it.
 class Ship extends Sprite {
     const SPEED = 0.9
     const LIMIT_X = 1.8
@@ -44,10 +45,12 @@ class Ship extends Sprite {
     }
 
     override func update(delta: float) {
-        if Input.is_down("left") { x -= SPEED * delta }
-        if Input.is_down("right") { x += SPEED * delta }
-        if Input.is_down("up") { y += SPEED * delta }
-        if Input.is_down("down") { y -= SPEED * delta }
+        x += Input.axis("left", "right") * SPEED * delta
+        y += Input.axis("down", "up") * SPEED * delta
+        if Input.is_down("follow") && Input.has_pointer() {
+            x += (Input.pointer_x() - x).max(-SPEED * delta).min(SPEED * delta)
+            y += (Input.pointer_y() - y).max(-SPEED * delta).min(SPEED * delta)
+        }
         x = x.max(-LIMIT_X).min(LIMIT_X)
         y = y.max(-LIMIT_Y).min(LIMIT_Y)
     }
@@ -127,7 +130,7 @@ class Space extends Game {
     var rocks = 0
 
     override func start() {
-        Debug.print("Muévete con las flechas, WASD o la cruceta; sal con Escape")
+        Debug.print("Muévete con las flechas, WASD, el mando o el ratón; sal con Escape")
         background = Color(0.02, 0.02, 0.08, 1.0)
         const sky = Scene.load("scenes/sky.scene")
         if sky != null {

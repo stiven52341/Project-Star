@@ -155,8 +155,19 @@ fn input_calls_read_the_shared_action_state() {
     let code = game_with_jump_action().code;
 
     assert!(code.contains("::star_script_runtime::input::action_state(\"jump\").just_pressed"));
-    assert!(code.contains("share_actions_(input.actions());"));
+    assert!(code.contains("share_actions_(&input);"));
+    assert!(code.contains("strength: input_.action_strength(name_),"));
     assert!(code.contains("world.input()"));
+}
+
+#[test]
+fn axes_read_two_actions() {
+    let code = rust(
+        "class G extends Game {\n var left = \"left\"\n var right = \"right\"\n \
+         override func update(delta: float) { Debug.print(Input.axis(left, right).to_string()) }\n}",
+    );
+
+    assert!(code.contains("::star_script_runtime::input::axis(&("));
 }
 
 #[test]
