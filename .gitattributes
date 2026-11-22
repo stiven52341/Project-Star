@@ -1,0 +1,9 @@
+# Text files keep LF line ends in every checkout, Windows included, as
+# .editorconfig asks: tests compare files byte by byte (expected outputs,
+# generated code) and the engine's tools write LF.
+* text=auto eol=lf
+
+# Binary files are never converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
