@@ -519,6 +519,13 @@ cargo run -p star_script --example run -- file.star          # compiles and runs
 If the script's folder has a `project.toml`, the `run` example reads the
 input actions from it (see `crates/star_script/examples/scripts/input/`).
 
+**A program can have several files**: their classes form one program, so a
+class of one file uses those of the others without importing them. Each file
+is read on its own (an unclosed `{` never spills into the next one) and every
+error names its file, line and column. The library takes them as a
+`SourceSet` (`check_program_with`, `compile_program_with`); the editor gives
+it every `.star` file of the project's `assets` folder.
+
 A program starts in **one single** place:
 
 - **A game**: the class that extends `Game` and that no other class extends

@@ -35,6 +35,16 @@ impl Span {
         self.end
     }
 
+    /// The same span, `offset` bytes later: where it is once its file is
+    /// placed at `offset` inside a program of several files.
+    #[must_use]
+    pub(crate) const fn shifted(self, offset: usize) -> Self {
+        Self {
+            start: self.start + offset,
+            end: self.end + offset,
+        }
+    }
+
     /// The code this span covers, or `""` if it does not belong to `source`.
     #[must_use]
     pub fn text(self, source: &str) -> &str {

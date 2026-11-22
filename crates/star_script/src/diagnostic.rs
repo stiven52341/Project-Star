@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::codegen::CodegenError;
 use crate::semantic::SemanticError;
-use crate::{LexError, LineIndex, ParseError, Span};
+use crate::{LexError, LineIndex, ParseError, Position, Span};
 
 /// A mistake found by any stage of the compiler.
 #[derive(Debug, Clone, PartialEq)]
@@ -36,12 +36,16 @@ impl CompileError {
     /// `file:line:column: error: message`.
     #[must_use]
     pub fn report(&self, file_name: &str, lines: &LineIndex<'_>) -> String {
-        let position = lines.position(self.span().start());
-        format!(
-            "{file_name}:{}:{}: error: {self}",
-            position.line, position.column
-        )
+        format_report(file_name, lines.position(self.span().start()), self)
     }
+}
+
+/// `file:line:column: error: message`, the format of every report.
+pub(crate) fn format_report(file_name: &str, position: Position, error: &CompileError) -> String {
+    format!(
+        "{file_name}:{}:{}: error: {error}",
+        position.line, position.column
+    )
 }
 
 impl fmt::Display for CompileError {
