@@ -766,3 +766,17 @@ fn example_script_is_valid() {
         panic!("example script has errors: {messages:#?}");
     }
 }
+
+#[test]
+fn games_extend_the_engine_class() {
+    assert_valid(
+        "class MyGame extends Game {\n var frames = 0\n override func start() { Debug.print(\"go\") }\n override func update(delta: float) {\n frames += 1\n if frames == 3 { quit() }\n }\n}",
+    );
+    assert_eq!(
+        errors("class Bad extends Game { func update(delta: float) {} }"),
+        [Kind::MissingOverride {
+            name: "update".into(),
+            base: "Game".into()
+        }]
+    );
+}

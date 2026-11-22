@@ -22,6 +22,12 @@ pub trait Game {
 
     /// Describes what the current frame shows.
     fn draw(&self, _frame: &mut Frame) {}
+
+    /// Whether the game wants to close; checked after each frame. By default
+    /// the game runs until the user closes the window.
+    fn is_finished(&self) -> bool {
+        false
+    }
 }
 
 /// Engine services available while a game starts.
@@ -57,3 +63,13 @@ impl<'a> GameContext<'a> {
 pub(crate) struct EmptyGame;
 
 impl Game for EmptyGame {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn games_run_until_the_window_is_closed_by_default() {
+        assert!(!EmptyGame.is_finished());
+    }
+}

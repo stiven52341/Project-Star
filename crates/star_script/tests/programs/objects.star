@@ -85,7 +85,7 @@ class Puppy extends Dog {
     }
 }
 
-class Game {
+class Main {
     static func main() {
         const hero = Player("Ana", 30)
         const orc = Character("Orc")

@@ -24,7 +24,7 @@ pub use classes::{
     FoundMember, MemberRef, MethodInfo, ParameterInfo,
 };
 pub use error::{SemanticError, SemanticErrorKind};
-pub use natives::BuiltinMethod;
+pub use natives::{BuiltinMethod, GAME_CLASS};
 pub use types::Type;
 
 use crate::ast::SourceFile;

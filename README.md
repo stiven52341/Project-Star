@@ -38,7 +38,7 @@ cargo run -p star_editor                                  # editor: create or op
 cargo run -p star_script --example tokenize -- f.star     # StarScript: show the tokens of a file
 cargo run -p star_script --example parse -- f.star        # StarScript: show the syntax tree
 cargo run -p star_script --example check -- f.star        # StarScript: check types and errors
-cargo run -p star_script --example run -- f.star          # StarScript: compile to Rust, build and run
+cargo run -p star_script --example run -- f.star          # StarScript: compile to Rust, build and run (games open a window)
 cargo run -p star_script --example run -- --rust f.star   # StarScript: show the generated Rust
 ```
 

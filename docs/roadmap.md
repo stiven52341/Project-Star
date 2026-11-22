@@ -40,7 +40,12 @@ Se avanza por fases; cada fase deja el motor compilando y con tests en verde.
         y construcción segura.
   - [x] 13.4 Generación de Rust y prueba de punta a punta (`.star` → binario),
         con el runtime `star_script_runtime`.
-  - [ ] 13.5 API del motor para StarScript (ciclo de vida, nodos, input).
+  - [ ] 13.5 API del motor para StarScript, por partes (cada pieza del motor
+        nace con su API de StarScript):
+    - [x] 13.5a Ciclo de vida: clase del motor `Game` (`start`, `update`, `quit`);
+          un script que la extiende corre en una ventana del motor.
+    - [ ] 13.5b Input en StarScript, junto con la Fase 2.
+    - [ ] 13.5c Nodos en StarScript, junto con la Fase 6.
   - [ ] 13.6 Integración en el editor: compilar y panel de errores.
   - [ ] 13.7 Modelo de blueprints y traducción a StarScript.
   - [ ] 13.8 Editor visual de blueprints.

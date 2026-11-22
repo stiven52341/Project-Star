@@ -20,6 +20,7 @@ mod constructor;
 mod conversions;
 mod expressions;
 mod names;
+mod native;
 mod program;
 mod statements;
 mod writer;
@@ -33,17 +34,47 @@ use crate::semantic::{Analysis, ExprInfo, Resolution, Type};
 
 /// Generates the Rust code of a checked program.
 ///
-/// If one class has a `static func main()`, the code also gets a `main`
-/// function that calls it, so it can be built as a program.
+/// The code gets a `main` function, so it can be built as a program, if it
+/// has an entry point: a class with `static func main()`, or one game (a
+/// class that extends `Game` and that no other class extends).
 ///
 /// # Errors
 ///
-/// Returns the first construct that cannot be translated yet.
+/// Returns the first construct that cannot be translated yet, or a problem
+/// with the entry point.
 pub fn generate(
     syntax: &SourceFile,
     analysis: &Analysis,
-) -> std::result::Result<String, CodegenError> {
+) -> std::result::Result<GeneratedProgram, CodegenError> {
     program::generate(Context { syntax, analysis })
+}
+
+/// The Rust code of a program.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeneratedProgram {
+    /// The code: the root file of a crate.
+    pub code: String,
+    /// How the program starts.
+    pub entry_point: EntryPoint,
+}
+
+impl GeneratedProgram {
+    /// Whether the code needs the engine (`star_engine`) besides the runtime.
+    #[must_use]
+    pub fn uses_engine(&self) -> bool {
+        self.entry_point == EntryPoint::Game
+    }
+}
+
+/// How a generated program starts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntryPoint {
+    /// It does not start by itself: it can only be used as a library.
+    None,
+    /// It runs `static func main()` and ends: a command-line program.
+    Main,
+    /// It runs a game in a window of the engine.
+    Game,
 }
 
 /// Why a program could not be translated to Rust.
@@ -58,8 +89,10 @@ pub struct CodegenError {
 /// The kinds of [`CodegenError`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CodegenErrorKind {
-    /// Several classes declare `static func main()`.
+    /// More than one class could start the program.
     SeveralEntryPoints,
+    /// The game class needs arguments to be created; the engine has none.
+    GameNeedsArguments(String),
     /// A script class inherits from a class implemented by the engine.
     NativeBaseClass(String),
     /// The analysis lacks information it always provides for valid code:
@@ -70,9 +103,14 @@ pub enum CodegenErrorKind {
 impl fmt::Display for CodegenError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
-            CodegenErrorKind::SeveralEntryPoints => {
-                formatter.write_str("only one class can declare `static func main()`")
-            }
+            CodegenErrorKind::SeveralEntryPoints => formatter.write_str(
+                "a program starts in one place: one class with `static func main()`, \
+                 or one game (a class that extends `Game`)",
+            ),
+            CodegenErrorKind::GameNeedsArguments(game) => write!(
+                formatter,
+                "the game `{game}` must be creatable without arguments: its `init` cannot have parameters"
+            ),
             CodegenErrorKind::NativeBaseClass(base) => write!(
                 formatter,
                 "classes cannot inherit from the engine class `{base}` yet"

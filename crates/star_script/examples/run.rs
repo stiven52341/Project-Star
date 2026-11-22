@@ -1,5 +1,6 @@
 //! Compiles a StarScript program to Rust, builds it with Cargo and runs it.
-//! The program needs a class with `static func main()`.
+//! The program needs an entry point: a class with `static func main()`, or a
+//! game (a class that extends `Game`), which opens a window of the engine.
 //!
 //! ```text
 //! cargo run -p star_script --example run -- path/to/file.star
@@ -12,11 +13,13 @@ use std::path::Path;
 use std::process::{Command, ExitCode};
 use std::{env, fs};
 
+use star_script::codegen::GeneratedProgram;
 use star_script::package::Package;
 use star_script::{LineIndex, compile_source};
 
 const DEFAULT_SCRIPT: &str = "crates/star_script/examples/scripts/hello.star";
-const RUNTIME: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../star_script_runtime");
+/// The `crates` folder of ProjectStar, with the runtime and the engine.
+const ENGINE_CRATES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
 /// Where the generated packages are written, inside the workspace's `target`.
 const OUTPUT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/star_script_run");
 const SHOW_RUST_FLAG: &str = "--rust";
@@ -40,8 +43,8 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let code = match compile_source(&source) {
-        Ok(code) => code,
+    let program = match compile_source(&source) {
+        Ok(program) => program,
         Err(errors) => {
             let lines = LineIndex::new(&source);
             for error in &errors {
@@ -51,10 +54,10 @@ fn main() -> ExitCode {
         }
     };
     if show_rust {
-        print!("{code}");
+        print!("{}", program.code);
         return ExitCode::SUCCESS;
     }
-    match build_and_run(&program_name(&path), code) {
+    match build_and_run(&program_name(&path), program) {
         Ok(code) => code,
         Err(error) => {
             eprintln!("{error}");
@@ -63,11 +66,13 @@ fn main() -> ExitCode {
     }
 }
 
-fn build_and_run(name: &str, code: String) -> Result<ExitCode, String> {
+fn build_and_run(name: &str, program: GeneratedProgram) -> Result<ExitCode, String> {
     let output = Path::new(OUTPUT);
     let directory = output.join(name);
-    let mut package = Package::new(name, Path::new(RUNTIME)).map_err(|e| e.to_string())?;
-    package.add_program(name, code).map_err(|e| e.to_string())?;
+    let mut package = Package::new(name, Path::new(ENGINE_CRATES)).map_err(|e| e.to_string())?;
+    package
+        .add_program(name, program)
+        .map_err(|e| e.to_string())?;
     package
         .write(&directory)
         .map_err(|error| format!("cannot write {}: {error}", directory.display()))?;

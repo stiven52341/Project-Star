@@ -27,6 +27,12 @@ pub trait WindowEventHandler {
     ///
     /// An error stops the event loop and is returned by [`run_event_loop`].
     fn on_redraw_requested(&mut self) -> EngineResult<()>;
+
+    /// Whether the application wants to close, checked after each frame.
+    /// By default it only closes when the user closes the window.
+    fn should_exit(&self) -> bool {
+        false
+    }
 }
 
 /// Opens a window and runs the event loop until the window is closed.
@@ -126,7 +132,11 @@ impl<H: WindowEventHandler> ApplicationHandler for WinitAdapter<'_, H> {
         }
     }
 
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        if self.handler.should_exit() {
+            event_loop.exit();
+            return;
+        }
         if let Some(window) = &self.window {
             window.request_redraw();
         }

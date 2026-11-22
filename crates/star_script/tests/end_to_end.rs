@@ -7,15 +7,16 @@
 // Test code: a failed step should stop the test with its explanation.
 #![allow(clippy::expect_used, clippy::panic)]
 
+mod common;
+
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::{env, fs};
 
-use star_script::compile_source;
+use common::{ENGINE_CRATES, binary, build, compile, package_directory};
 use star_script::package::Package;
 
 const PROGRAMS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/programs");
-const RUNTIME: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../star_script_runtime");
 const EXAMPLE_SCRIPT: &str = include_str!("../examples/scripts/player.star");
 
 /// A program and how it must behave.
@@ -27,10 +28,10 @@ struct Expectation {
 
 #[test]
 fn programs_behave_as_expected() {
-    let directory = Path::new(env!("CARGO_TARGET_TMPDIR")).join("star_script_end_to_end");
+    let directory = package_directory("star_script_end_to_end");
     // Programs removed since the last run must not linger.
     let _ = fs::remove_dir_all(directory.join("src"));
-    let mut package = Package::new("end_to_end", Path::new(RUNTIME)).expect("valid name");
+    let mut package = Package::new("end_to_end", Path::new(ENGINE_CRATES)).expect("valid name");
     let mut expectations = Vec::new();
     for path in star_files() {
         let name = file_stem(&path);
@@ -99,34 +100,9 @@ fn read_expected(program: &Path, extension: &str) -> Option<String> {
     fs::read_to_string(program.with_extension(extension)).ok()
 }
 
-fn compile(name: &str, source: &str) -> String {
-    compile_source(source).unwrap_or_else(|errors| {
-        let messages: Vec<String> = errors.iter().map(ToString::to_string).collect();
-        panic!("{name} does not compile: {messages:#?}")
-    })
-}
-
-fn build(directory: &Path) {
-    let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
-    let output = Command::new(cargo)
-        .args(["build", "--quiet", "--manifest-path"])
-        .arg(directory.join("Cargo.toml"))
-        .env("CARGO_TARGET_DIR", directory.join("target"))
-        .output()
-        .expect("cargo runs");
-    assert!(
-        output.status.success(),
-        "the generated Rust does not build:\n{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
-
 fn run(directory: &Path, expectation: &Expectation) -> Result<(), String> {
     let name = &expectation.name;
-    let binary = directory
-        .join("target")
-        .join("debug")
-        .join(format!("{name}{}", env::consts::EXE_SUFFIX));
+    let binary = binary(directory, name);
     let output = Command::new(&binary)
         .output()
         .map_err(|error| format!("{name}: cannot run {}: {error}", binary.display()))?;

@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Sintaxis (parser y AST) | **Definitivo** |
 | 3 | Tipos, null safety y semántica | **Definitivo** |
 | 4 | Generación de Rust | **Definitivo** |
-| 5 | API del motor | Pendiente |
+| 5 | API del motor | En curso: ciclo de vida (`Game`) hecho; input y nodos con las fases 2 y 6 del motor |
 | 6 | Integración en el editor | Pendiente |
 | 7–8 | Blueprints | Borrador |
 
@@ -349,8 +349,42 @@ lo impide.
 | `string` | `length()` `is_empty()` `contains(s)` `to_upper()` `to_lower()` `to_string()` |
 | `[T]` | `length()` `is_empty()` `contains(x)` `push(x)` `pop() -> T?` `clear()` |
 
-Clase nativa `Debug`: `Debug.print(mensaje: string)`. No hay funciones
-globales: todo es un método de alguna clase.
+No hay funciones globales: todo es un método de alguna clase.
+
+### Clases del motor
+
+Las proporciona el motor; sus nombres no se pueden usar para otras clases.
+
+| Clase | Miembros |
+|-------|----------|
+| `Debug` | `static print(mensaje: string)`: escribe una línea en la salida. |
+| `Game` | `start()`, `update(delta: float)`, `quit()` |
+
+**Un juego es una clase que extiende `Game`**:
+
+```
+class MiJuego extends Game {
+    var tiempo = 0.0
+
+    override func start() {
+        Debug.print("¡Empieza!")
+    }
+
+    override func update(delta: float) {
+        tiempo += delta
+        if tiempo > 10.0 { quit() }
+    }
+}
+```
+
+- El motor crea el objeto (su `init` no puede tener parámetros), abre la
+  ventana, llama a `start()` una vez y a `update(delta)` en cada frame;
+  `delta` son los segundos desde el frame anterior.
+- `quit()` cierra el juego al terminar el frame. Si no se llama, el juego
+  sigue hasta que el usuario cierra la ventana.
+- `start` y `update` no hacen nada si no se redefinen.
+- El input y los nodos llegarán con las fases 2 (input) y 6 (escenas) del
+  motor: cada pieza del motor nace con su API de StarScript.
 
 ## 4. Traducción a Rust (definitiva)
 
@@ -361,8 +395,16 @@ cargo run -p star_script --example run -- --rust archivo.star   # muestra el Rus
 cargo run -p star_script --example run -- archivo.star          # lo compila y ejecuta
 ```
 
-Hasta que exista la API del motor (fase 5), un programa empieza en el
-`static func main()` de una de sus clases (solo una puede tenerlo).
+Un programa empieza en **un solo** sitio:
+
+- **Un juego**: la clase que extiende `Game` y que ninguna otra extiende (así
+  `class MiJuego extends JuegoBase` ejecuta `MiJuego`). Se abre en una ventana
+  del motor, titulada con el nombre de la clase, y el crate generado depende
+  también de `star_engine`.
+- **Un programa de consola**: la clase con `static func main()`. Solo
+  depende de `star_script_runtime`; lo usan las pruebas y las herramientas.
+
+Sin ninguno de los dos, el código generado solo sirve como biblioteca.
 
 **Resultado**: un archivo Rust, raíz de su propio crate, que depende de
 `star_script_runtime` (listas compartidas, campos, igualdad y errores en

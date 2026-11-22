@@ -1,11 +1,12 @@
 //! Tests of the shape of the generated code. Whether it compiles and runs
 //! as expected is tested end to end in `tests/end_to_end.rs`.
 
+use super::EntryPoint;
 use crate::compile_source;
 
 fn rust(source: &str) -> String {
     match compile_source(source) {
-        Ok(code) => code,
+        Ok(program) => program.code,
         Err(errors) => {
             let messages: Vec<String> = errors.iter().map(ToString::to_string).collect();
             panic!("compile errors: {messages:#?}");
@@ -48,10 +49,10 @@ fn integers_wrap_around() {
 
 #[test]
 fn entry_point_calls_static_main() {
-    let code = rust("class Game { static func main() { Debug.print(\"hola\") } }");
+    let code = rust("class Main { static func main() { Debug.print(\"hola\") } }");
 
     assert!(code.contains("pub fn main() {"));
-    assert!(code.contains("crate::classes::Game::Methods::main();"));
+    assert!(code.contains("crate::classes::Main::Methods::main();"));
 }
 
 #[test]
@@ -65,9 +66,10 @@ fn only_one_class_can_have_main() {
         compile_source("class A { static func main() {} }\nclass B { static func main() {} }")
             .expect_err("two entry points");
 
-    assert_eq!(
-        errors[0].to_string(),
-        "only one class can declare `static func main()`"
+    assert!(
+        errors[0]
+            .to_string()
+            .starts_with("a program starts in one place")
     );
 }
 
@@ -75,4 +77,49 @@ fn only_one_class_can_have_main() {
 fn generated_code_has_no_license_notice() {
     // Generated code belongs to the game's author (CLAUDE.md 3.6).
     assert!(!rust("class A {}").contains("GPL"));
+}
+
+#[test]
+fn games_run_in_the_engine() {
+    let program = compile_source(
+        "class Base extends Game {}\nclass MyGame extends Base { override func update(delta: float) { quit() } }",
+    )
+    .expect("valid program");
+
+    assert_eq!(program.entry_point, EntryPoint::Game);
+    assert!(program.uses_engine());
+    assert!(program.code.contains("crate::classes::MyGame::new()"));
+    assert!(program.code.contains(".with_title(\"MyGame\")"));
+}
+
+#[test]
+fn console_programs_do_not_need_the_engine() {
+    let program = compile_source("class A { static func main() {} }").expect("valid program");
+
+    assert_eq!(program.entry_point, EntryPoint::Main);
+    assert!(!program.uses_engine());
+}
+
+#[test]
+fn a_program_has_one_entry_point() {
+    let errors = compile_source("class G extends Game {}\nclass A { static func main() {} }")
+        .expect_err("two entry points");
+
+    assert!(
+        errors[0]
+            .to_string()
+            .starts_with("a program starts in one place")
+    );
+}
+
+#[test]
+fn games_cannot_need_arguments() {
+    let errors =
+        compile_source("class G extends Game { var n: int\n init(n: int) { self.n = n } }")
+            .expect_err("game with parameters");
+
+    assert_eq!(
+        errors[0].to_string(),
+        "the game `G` must be creatable without arguments: its `init` cannot have parameters"
+    );
 }

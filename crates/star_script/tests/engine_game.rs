@@ -1,0 +1,58 @@
+//! A StarScript game run in a real window of the engine.
+//!
+//! Ignored by default: it builds the whole engine (wgpu included) and needs
+//! a screen and a GPU (or a software renderer). Run it with
+//! `cargo test -p star_script --test engine_game -- --ignored`.
+
+// Test code: a failed step should stop the test with its explanation.
+#![allow(clippy::expect_used, clippy::panic)]
+
+mod common;
+
+use std::path::Path;
+use std::process::Command;
+
+use common::{ENGINE_CRATES, binary, build, compile, package_directory};
+use star_script::package::Package;
+
+/// Counts its frames and closes itself after the third one.
+const GAME: &str = "
+class CountingGame extends Game {
+    var frames = 0
+
+    override func start() {
+        Debug.print(\"start\")
+    }
+
+    override func update(delta: float) {
+        frames += 1
+        Debug.print(\"frame \" + frames.to_string() + \" \" + (delta >= 0.0).to_string())
+        if frames == 3 {
+            quit()
+        }
+    }
+}
+";
+
+#[test]
+#[ignore = "builds the whole engine and opens a window"]
+fn games_run_in_the_engine_until_they_quit() {
+    let directory = package_directory("star_script_engine_game");
+    let mut package = Package::new("engine_game", Path::new(ENGINE_CRATES)).expect("valid name");
+    package
+        .add_program("counting_game", compile("counting_game", GAME))
+        .expect("valid name");
+    package.write(&directory).expect("package written");
+
+    build(&directory);
+    let output = Command::new(binary(&directory, "counting_game"))
+        .output()
+        .expect("the game runs");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "the game failed:\n{stderr}");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "start\nframe 1 true\nframe 2 true\nframe 3 true\n"
+    );
+}

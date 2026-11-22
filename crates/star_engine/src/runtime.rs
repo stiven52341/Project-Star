@@ -74,4 +74,30 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
             None => Ok(()),
         }
     }
+
+    fn should_exit(&self) -> bool {
+        self.game.is_finished()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A game that has already finished.
+    struct FinishedGame;
+
+    impl Game for FinishedGame {
+        fn is_finished(&self) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn the_loop_stops_when_the_game_finishes() {
+        let config = RendererConfig::default();
+
+        assert!(Runtime::new(FinishedGame, config, Color::BLACK).should_exit());
+        assert!(!Runtime::new(crate::game::EmptyGame, config, Color::BLACK).should_exit());
+    }
 }

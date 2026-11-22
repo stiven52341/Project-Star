@@ -59,7 +59,9 @@ impl Body<'_> {
             .get(index)
             .ok_or_else(|| internal("unknown method", callee.span))?;
         let arguments = self.arguments(&method.parameters, arguments)?;
-        if info.origin == ClassOrigin::Native {
+        // Static methods of the engine are functions of the runtime; the
+        // others belong to an engine class with a generated module.
+        if info.origin == ClassOrigin::Native && method.is_static {
             return native_call(&info.name, &method.name, &arguments)
                 .ok_or_else(|| internal("unknown engine method", callee.span));
         }

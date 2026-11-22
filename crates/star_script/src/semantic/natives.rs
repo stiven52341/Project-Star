@@ -17,22 +17,44 @@ pub(super) fn basic_type(name: &str) -> Option<Type> {
     }
 }
 
+/// Name of the engine class that games extend.
+pub const GAME_CLASS: &str = "Game";
+
 /// Adds the classes implemented by the engine.
 pub(super) fn add_native_classes(classes: &mut ClassTable) {
     let mut debug = ClassInfo::new("Debug".to_owned(), ClassOrigin::Native);
-    debug.methods.push(MethodInfo {
-        name: "print".to_owned(),
-        parameters: vec![ParameterInfo {
-            name: "message".to_owned(),
-            ty: Type::String,
-        }],
+    debug
+        .methods
+        .push(native_method("print", &[("message", Type::String)], true));
+    classes.add(debug);
+
+    // A game: the engine calls `start` once and `update` every frame, until
+    // `quit` is called or the window is closed.
+    let mut game = ClassInfo::new(GAME_CLASS.to_owned(), ClassOrigin::Native);
+    game.methods.push(native_method("start", &[], false));
+    game.methods
+        .push(native_method("update", &[("delta", Type::Float)], false));
+    game.methods.push(native_method("quit", &[], false));
+    classes.add(game);
+}
+
+/// A method of an engine class, without a result.
+fn native_method(name: &str, parameters: &[(&str, Type)], is_static: bool) -> MethodInfo {
+    MethodInfo {
+        name: name.to_owned(),
+        parameters: parameters
+            .iter()
+            .map(|(name, ty)| ParameterInfo {
+                name: (*name).to_owned(),
+                ty: ty.clone(),
+            })
+            .collect(),
         return_type: Type::Void,
-        is_static: true,
+        is_static,
         is_private: false,
         is_override: false,
         span: None,
-    });
-    classes.add(debug);
+    }
 }
 
 /// A method of a basic type or list. The receiver type tells them apart:

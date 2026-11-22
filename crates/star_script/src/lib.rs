@@ -81,7 +81,7 @@ pub fn check_source(source: &str) -> Result<CheckedSource, Vec<CompileError>> {
 ///
 /// Returns the mistakes found, as [`check_source`] does, or the construct
 /// that cannot be translated to Rust yet.
-pub fn compile_source(source: &str) -> Result<String, Vec<CompileError>> {
+pub fn compile_source(source: &str) -> Result<codegen::GeneratedProgram, Vec<CompileError>> {
     let checked = check_source(source)?;
     codegen::generate(&checked.syntax, &checked.analysis)
         .map_err(|error| vec![CompileError::Codegen(error)])
