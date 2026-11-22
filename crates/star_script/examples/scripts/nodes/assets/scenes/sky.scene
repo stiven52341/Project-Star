@@ -1,4 +1,5 @@
 # Far stars behind the game, loaded with Scene.load("scenes/sky.scene").
+# Each star is a `Twinkle` of space.star, so it runs its own code.
 format = 1
 
 [[node]]
@@ -6,6 +7,7 @@ name = "Sky"
 
 [[node]]
 name = "Star 1"
+class = "Twinkle"
 parent = 0
 position = [-2.1, 0.8]
 
@@ -17,6 +19,7 @@ layer = -1
 
 [[node]]
 name = "Star 2"
+class = "Twinkle"
 parent = 0
 position = [-1.6, -0.4]
 
@@ -28,6 +31,7 @@ layer = -1
 
 [[node]]
 name = "Star 3"
+class = "Twinkle"
 parent = 0
 position = [-1.1, 0.3]
 
@@ -39,6 +43,7 @@ layer = -1
 
 [[node]]
 name = "Star 4"
+class = "Twinkle"
 parent = 0
 position = [-0.5, -0.9]
 
@@ -50,6 +55,7 @@ layer = -1
 
 [[node]]
 name = "Star 5"
+class = "Twinkle"
 parent = 0
 position = [0.1, 0.6]
 
@@ -61,6 +67,7 @@ layer = -1
 
 [[node]]
 name = "Star 6"
+class = "Twinkle"
 parent = 0
 position = [0.7, -0.2]
 
@@ -72,6 +79,7 @@ layer = -1
 
 [[node]]
 name = "Star 7"
+class = "Twinkle"
 parent = 0
 position = [1.2, 0.95]
 
@@ -83,6 +91,7 @@ layer = -1
 
 [[node]]
 name = "Star 8"
+class = "Twinkle"
 parent = 0
 position = [1.7, -0.7]
 
@@ -94,6 +103,7 @@ layer = -1
 
 [[node]]
 name = "Star 9"
+class = "Twinkle"
 parent = 0
 position = [2.2, 0.2]
 
@@ -105,6 +115,7 @@ layer = -1
 
 [[node]]
 name = "Star 10"
+class = "Twinkle"
 parent = 0
 position = [-0.2, -0.3]
 

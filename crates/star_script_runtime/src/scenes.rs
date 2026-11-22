@@ -13,17 +13,31 @@ use std::collections::HashMap;
 use std::io::Write as _;
 use std::rc::Rc;
 
-/// One node of a scene, as `Node` and `Sprite` objects are built from it.
+/// One node of a scene, as the objects of the game are built from it. What
+/// the file does not write is `None`, so it keeps the value the object's
+/// `init` gave it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneNode {
     /// Its name.
     pub name: String,
+    /// The StarScript class it is built as; `None` for a plain `Node`, or a
+    /// `Sprite` if it shows an image.
+    pub class: Option<String>,
     /// Position of its parent in the scene's list; only the root, the first
     /// node, has none.
     pub parent: Option<usize>,
-    /// Horizontal position, relative to its parent.
+    /// Where it is, relative to its parent.
+    pub transform: Option<SceneTransform>,
+    /// The image it shows; only `Sprite` objects can show one.
+    pub sprite: Option<SceneSprite>,
+}
+
+/// Where a [`SceneNode`] is, relative to its parent.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SceneTransform {
+    /// Horizontal position.
     pub x: f32,
-    /// Vertical position, relative to its parent.
+    /// Vertical position.
     pub y: f32,
     /// Rotation in radians, counterclockwise.
     pub rotation: f32,
@@ -31,8 +45,6 @@ pub struct SceneNode {
     pub scale_x: f32,
     /// Vertical scale.
     pub scale_y: f32,
-    /// The image it shows, for nodes that become `Sprite` objects.
-    pub sprite: Option<SceneSprite>,
 }
 
 /// The image a [`SceneNode`] shows.
@@ -106,6 +118,16 @@ pub fn load(path: &str) -> Option<Rc<[SceneNode]>> {
     loaded
 }
 
+/// Marks the scene at `path` as one that cannot be loaded, because its
+/// nodes could not be built (e.g. a class that does not exist): the reason
+/// is written once, and [`load`] gives `None` for it from then on.
+pub fn reject(path: &str, reason: &str) {
+    warn(path, reason);
+    LOADED.with(|cache| {
+        cache.borrow_mut().insert(path.to_owned(), None);
+    });
+}
+
 fn warn(path: &str, reason: &str) {
     // Nothing can be reported if the error output itself fails.
     let _ = writeln!(
@@ -123,12 +145,9 @@ mod tests {
     fn node(name: &str, parent: Option<usize>) -> SceneNode {
         SceneNode {
             name: name.to_owned(),
+            class: None,
             parent,
-            x: 0.0,
-            y: 0.0,
-            rotation: 0.0,
-            scale_x: 1.0,
-            scale_y: 1.0,
+            transform: None,
             sprite: None,
         }
     }
@@ -169,6 +188,16 @@ mod tests {
         assert!(load("nothing.scene").is_none());
         assert!(load("nothing.scene").is_none());
         assert_eq!(reads.get(), 1);
+    }
+
+    #[test]
+    fn rejected_scenes_are_not_loaded_again() {
+        set_loader(|path| Ok(vec![node(path, None)]));
+        assert!(load("broken.scene").is_some());
+
+        reject("broken.scene", "there is no class \"Rokc\"");
+
+        assert!(load("broken.scene").is_none());
     }
 
     #[test]

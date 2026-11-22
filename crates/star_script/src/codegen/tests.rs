@@ -238,6 +238,20 @@ fn games_read_scenes_through_the_engine() {
 }
 
 #[test]
+fn scenes_create_the_node_classes_that_need_no_arguments() {
+    let code = rust(
+        "class Rock extends Sprite {\n init() { super.init(\"Rock\", \"rock.png\") }\n}\n\
+         class Big extends Node {\n init(size: float) { super.init(\"Big\") }\n}\n\
+         class Score {}",
+    );
+
+    assert!(code.contains("\"Rock\" => ::std::result::Result::Ok(crate::classes::Rock::new()),"));
+    assert!(code.contains("its `init` needs arguments"));
+    assert!(code.contains("`Score` is not a node: it does not extend `Node`"));
+    assert!(code.contains("there is no class"));
+}
+
+#[test]
 fn other_engine_classes_cannot_be_extended() {
     let errors = compile_source(
         "class Paint extends Color {\n init() { super.init(1.0, 1.0, 1.0, 1.0) }\n}",

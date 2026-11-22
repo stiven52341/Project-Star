@@ -57,6 +57,16 @@ class Ship extends Sprite {
     }
 }
 
+class Drone extends Node {
+    init() {
+        super.init(\"Drone\")
+    }
+
+    override func start() {
+        Debug.print(\"drone start \" + name + \" \" + x.to_string())
+    }
+}
+
 class NodeGame extends Game {
     var frames = 0
 
@@ -72,6 +82,7 @@ class NodeGame extends Game {
             }
         }
         Debug.print((Scene.load(\"levels/missing.scene\") == null).to_string())
+        Debug.print((Scene.load(\"levels/misspelled.scene\") == null).to_string())
         const ship = Ship()
         add_child(ship)
         const eye = Camera(\"Eye\")
@@ -109,7 +120,18 @@ color = [1.0, 0.5, 0.5, 1.0]
 
 [[node]]
 name = "Wingman"
+class = "Drone"
 parent = 0
+position = [-2.0, 0.0]
+"#;
+
+/// A scene whose node names a class the game does not have.
+const MISSPELLED_SCENE: &str = r#"
+format = 1
+
+[[node]]
+name = "Drone"
+class = "Dron"
 "#;
 
 fn settings(bindings: &[&str]) -> GameSettings {
@@ -156,16 +178,21 @@ fn games_run_in_the_engine_until_they_quit() {
     let levels = directory.join("assets/levels");
     std::fs::create_dir_all(&levels).expect("asset folder created");
     std::fs::write(levels.join("fleet.scene"), FLEET_SCENE).expect("scene written");
+    std::fs::write(levels.join("misspelled.scene"), MISSPELLED_SCENE).expect("scene written");
     let output = Command::new(binary(&directory, "node_game"))
         .current_dir(&directory)
         .output()
         .expect("the game runs");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "the node game failed:\n{stderr}");
+    assert!(
+        stderr.contains("node \"Drone\": there is no class \"Dron\""),
+        "the misspelled class is reported:\n{stderr}"
+    );
     assert_eq!(
         String::from_utf8_lossy(&output.stdout),
-        "Fleet 2\nsprites/leader.png 1.5 0.5\ntrue\n\
-         game frame 1\nship start\nship x 1.0\ngame frame 2\nship x 2.0\n\
+        "Fleet 2\nsprites/leader.png 1.5 0.5\ntrue\ntrue\n\
+         game frame 1\nship start\nship x 1.0\ndrone start Wingman -2.0\ngame frame 2\nship x 2.0\n\
          game frame 3\nship x 3.0\n"
     );
 

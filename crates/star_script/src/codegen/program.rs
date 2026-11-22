@@ -101,6 +101,7 @@ pub(super) fn generate(context: Context<'_>) -> Result<GeneratedProgram> {
         context.class_module(&mut out, item)?;
     }
     out.close("}");
+    scene_classes(context, &mut out);
     let entry_point = entry_point(context, &mut out, &items, game)?;
     Ok(GeneratedProgram {
         code: out.finish(),
@@ -164,6 +165,61 @@ fn any_object(context: Context<'_>, out: &mut Writer, classes: &[ClassId]) {
         ));
     }
     out.close("}");
+}
+
+/// `new_scene_object_`, which `Scene.load` calls to create a node of the
+/// class a scene names: the program's classes that extend `Node` and are
+/// created without arguments. The others get the reason they cannot be used.
+/// `Node`, `Sprite` and `Camera` are created by the `Scene` module itself.
+fn scene_classes(context: Context<'_>, out: &mut Writer) {
+    let classes = context.analysis.classes();
+    let node = classes.find(NODE_CLASS);
+    out.line("");
+    out.line("/// Creates an object of the class a node of a scene names, as its `init()`");
+    out.line("/// leaves it.");
+    out.open(
+        "pub fn new_scene_object_(class_: &str) -> ::std::result::Result<crate::classes::Node::Ref, ::std::string::String> {",
+    );
+    out.open("match class_ {");
+    for (id, class) in classes.iter() {
+        if [NODE_CLASS, SPRITE_CLASS, CAMERA_CLASS].contains(&class.name.as_str()) {
+            continue;
+        }
+        let is_node = node.is_some_and(|node| classes.is_subclass(id, node));
+        let constructor = class.constructor.as_ref();
+        let outcome = if !is_node {
+            reason(&format!(
+                "`{}` is not a node: it does not extend `Node`",
+                class.name
+            ))
+        } else if constructor.is_some_and(|constructor| constructor.is_private) {
+            reason(&format!(
+                "`{}` cannot be created by a scene: its `init` is private",
+                class.name
+            ))
+        } else if !class.constructor_parameters().is_empty() {
+            reason(&format!(
+                "`{}` cannot be created by a scene: its `init` needs arguments",
+                class.name
+            ))
+        } else {
+            format!(
+                "::std::result::Result::Ok({}::new())",
+                context.class_path(id)
+            )
+        };
+        out.line(&format!("{:?} => {outcome},", class.name));
+    }
+    out.line(
+        "_ => ::std::result::Result::Err(::std::format!(\"there is no class \\\"{class_}\\\"\")),",
+    );
+    out.close("}");
+    out.close("}");
+}
+
+/// Code that gives `message` as an error of `new_scene_object_`.
+fn reason(message: &str) -> String {
+    format!("::std::result::Result::Err(::std::string::String::from({message:?}))")
 }
 
 /// Writes `fn main` for the program's entry point, if it has one.

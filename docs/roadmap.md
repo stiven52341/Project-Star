@@ -81,8 +81,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           logger so the engine's warnings always reach the console.
     - [x] 13.5e Scenes in StarScript: `Scene.load` builds the `Node` and
           `Sprite` objects of a `.scene` file (`null` if it cannot).
-    - [ ] 13.5f Script classes in scenes: a scene node names the StarScript
-          class it is built as.
+    - [x] 13.5f Script classes in scenes: a scene node names the StarScript
+          class it is built as (`class = "Rock"`), created without arguments.
   - [ ] 13.6 Editor integration: compiling and an error panel.
   - [ ] 13.7 Blueprint model and translation to StarScript.
   - [ ] 13.8 Visual blueprint editor.

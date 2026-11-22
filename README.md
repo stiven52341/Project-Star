@@ -45,7 +45,7 @@ cargo run -p star_script --example check -- f.star        # StarScript: check ty
 cargo run -p star_script --example run -- f.star          # StarScript: compile to Rust, build and run (games open a window)
 cargo run -p star_script --example run -- --rust f.star   # StarScript: show the generated Rust
 cargo run -p star_script --example run -- crates/star_script/examples/scripts/input/jumper.star  # StarScript: input actions from project.toml
-cargo run -p star_script --example run -- crates/star_script/examples/scripts/nodes/space.star   # StarScript: nodes, sprites, colors, a camera and a scene (arrows/WASD move)
+cargo run -p star_script --example run -- crates/star_script/examples/scripts/nodes/space.star   # StarScript: nodes, sprites, colors, a camera and a scene with script classes (arrows/WASD move)
 ```
 
 ## Project layout

@@ -1,6 +1,7 @@
 // Nodes in a game: sprites with their own code, children that move with
 // their parent, nodes that are added and removed while playing, colors, a
-// camera that follows the ship and a sky loaded from a scene file.
+// camera that follows the ship and a sky of twinkling stars loaded from a
+// scene file.
 // `cargo run -p star_script --example run -- crates/star_script/examples/scripts/nodes/space.star`
 // The images are in the `assets` folder next to this file.
 
@@ -71,6 +72,34 @@ class Rock extends Sprite {
         y -= speed * delta
         if y < -1.4 {
             remove()
+        }
+    }
+}
+
+// A far star of the sky scene: it fades in and out, each one at its own
+// pace. The scene creates it with `Twinkle()` and then gives it its place,
+// size and color.
+class Twinkle extends Sprite {
+    const DIMMEST = 0.15
+    const BRIGHTEST = 0.8
+    var speed = 0.3
+    var fading = true
+
+    init() {
+        super.init("Star", "sprites/disc.png")
+    }
+
+    override func start() {
+        speed = 0.15 + (x + 2.5) * 0.08
+    }
+
+    override func update(delta: float) {
+        if fading {
+            color.a -= speed * delta
+            if color.a < DIMMEST { fading = false }
+        } else {
+            color.a += speed * delta
+            if color.a > BRIGHTEST { fading = true }
         }
     }
 }

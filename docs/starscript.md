@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`) done; script classes in scenes next |
+| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
 | 6 | Editor integration | Pending |
 | 7–8 | Blueprints | Draft |
 
@@ -449,7 +449,24 @@ class Space extends Game {
   the same scene again (a bullet, an enemy) only builds new objects. If the
   scene cannot be loaded, `load` gives `null` and the reason is written once
   to the error output. Console programs have no asset folder: for them it
-  is always `null`. Scene nodes cannot name script classes yet.
+  is always `null`.
+- A scene node can name the class it is built as, with `class = "Rock"` in
+  its `[[node]]`. The class must extend `Node` (or `Sprite`, `Camera`) and
+  its `init` must take no arguments: the object is created with `Rock()`,
+  so it runs its own `start` and `update`, and then gets what the scene
+  writes, which wins over what `init` set: its name always, its transform
+  and image only if the file has them. `class = "Camera"` gives a plain
+  camera. If a class does not exist, needs arguments, or is not a `Sprite`
+  but the node shows an image, the whole scene is not loaded (`null`) and
+  the reason, with the node's name, is written once.
+
+```toml
+[[node]]
+name = "Big rock"
+class = "Rock"
+parent = 0
+position = [1.0, 2.0]
+```
 
 ```
 const level = Scene.load("levels/one.scene")

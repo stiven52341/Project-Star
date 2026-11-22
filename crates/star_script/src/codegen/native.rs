@@ -496,42 +496,66 @@ pub mod Scene {
     /// out of the game until it is added; `None` if it cannot be loaded.
     pub fn load(path: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> {
         let nodes_ = ::star_script_runtime::scenes::load(&path)?;
+        match build_(&nodes_) {
+            ::std::result::Result::Ok(root_) => ::std::option::Option::Some(root_),
+            ::std::result::Result::Err(reason_) => {
+                ::star_script_runtime::scenes::reject(&path, &reason_);
+                ::std::option::Option::None
+            }
+        }
+    }
+
+    /// The objects of `nodes_`, each one added to its parent; the root first.
+    fn build_(nodes_: &[::star_script_runtime::scenes::SceneNode]) -> ::std::result::Result<crate::classes::Node::Ref, ::std::string::String> {
         let mut built_: ::std::vec::Vec<crate::classes::Node::Ref> = ::std::vec::Vec::with_capacity(nodes_.len());
-        for node_ in nodes_.iter() {
-            let object_ = build_node_(node_);
+        for node_ in nodes_ {
+            let object_ = build_node_(node_).map_err(|reason_| ::std::format!(\"node \\\"{}\\\": {reason_}\", node_.name))?;
             if let ::std::option::Option::Some(parent_) = node_.parent.and_then(|index_| built_.get(index_)) {
                 crate::classes::Node::Methods::add_child(parent_, ::std::rc::Rc::clone(&object_));
             }
             built_.push(object_);
         }
-        built_.into_iter().next()
+        built_.into_iter().next().ok_or_else(|| ::std::string::String::from(\"it has no nodes\"))
     }
 
-    /// A `Sprite` for a node with an image, a `Node` for the others.
-    fn build_node_(node_: &::star_script_runtime::scenes::SceneNode) -> crate::classes::Node::Ref {
-        let object_: crate::classes::Node::Ref = match &node_.sprite {
-            ::std::option::Option::Some(image_) => {
-                let sprite_ = crate::classes::Sprite::init_(node_.name.clone(), image_.texture.clone(), |node_fields_, sprite_fields_| {
-                    ::std::rc::Rc::new(crate::classes::Sprite::Instance { Node: node_fields_, Sprite: sprite_fields_ })
-                });
-                let look_ = &sprite_.Sprite;
-                look_.width.set(image_.width);
-                look_.height.set(image_.height);
-                look_.layer.set(image_.layer);
-                look_.pixelated.set(image_.pixelated);
-                let [r_, g_, b_, a_] = image_.color;
-                look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
-                sprite_
+    /// The object of one node: of its class, created as `init()` leaves it,
+    /// with what the scene writes on top.
+    fn build_node_(node_: &::star_script_runtime::scenes::SceneNode) -> ::std::result::Result<crate::classes::Node::Ref, ::std::string::String> {
+        let name_ = node_.name.clone();
+        let object_: crate::classes::Node::Ref = match (node_.class.as_deref(), &node_.sprite) {
+            (::std::option::Option::None | ::std::option::Option::Some(\"Sprite\"), ::std::option::Option::Some(image_)) => {
+                crate::classes::Sprite::new(name_, image_.texture.clone())
             }
-            ::std::option::Option::None => crate::classes::Node::new(node_.name.clone()),
+            (::std::option::Option::None | ::std::option::Option::Some(\"Node\"), _) => crate::classes::Node::new(name_),
+            (::std::option::Option::Some(\"Camera\"), _) => crate::classes::Camera::new(name_),
+            (::std::option::Option::Some(\"Sprite\"), ::std::option::Option::None) => {
+                return ::std::result::Result::Err(::std::string::String::from(\"a `Sprite` needs a `[node.sprite]` with its image\"));
+            }
+            (::std::option::Option::Some(class_), _) => crate::new_scene_object_(class_)?,
         };
         let fields_ = crate::classes::Node::HasFields::fields(&*object_);
-        fields_.x.set(node_.x);
-        fields_.y.set(node_.y);
-        fields_.rotation.set(node_.rotation);
-        fields_.scale_x.set(node_.scale_x);
-        fields_.scale_y.set(node_.scale_y);
-        object_
+        fields_.name.set(node_.name.clone());
+        if let ::std::option::Option::Some(place_) = &node_.transform {
+            fields_.x.set(place_.x);
+            fields_.y.set(place_.y);
+            fields_.rotation.set(place_.rotation);
+            fields_.scale_x.set(place_.scale_x);
+            fields_.scale_y.set(place_.scale_y);
+        }
+        if let ::std::option::Option::Some(image_) = &node_.sprite {
+            let class_ = node_.class.as_deref().unwrap_or(\"Node\");
+            let sprite_ = crate::AnyObject::Sprite(::std::rc::Rc::clone(&object_))
+                .ok_or_else(|| ::std::format!(\"it shows an image, but `{class_}` is not a `Sprite`\"))?;
+            let look_ = crate::classes::Sprite::HasFields::fields(&*sprite_);
+            look_.texture.set(image_.texture.clone());
+            look_.width.set(image_.width);
+            look_.height.set(image_.height);
+            look_.layer.set(image_.layer);
+            look_.pixelated.set(image_.pixelated);
+            let [r_, g_, b_, a_] = image_.color;
+            look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
+        }
+        ::std::result::Result::Ok(object_)
     }
 }";
 
@@ -733,15 +757,17 @@ fn read_scene_(
         .and_then(|text_| ::star_engine::star_scene::SceneOutline::from_text(&text_))
         .map_err(|error_| error_.to_string())?;
     let nodes_ = outline_.into_nodes().into_iter().map(|node_| {
-        let transform_ = node_.transform.unwrap_or(::star_engine::star_scene::Transform2D::IDENTITY);
         ::star_script_runtime::scenes::SceneNode {
             name: node_.name,
+            class: node_.class,
             parent: node_.parent,
-            x: transform_.position.x,
-            y: transform_.position.y,
-            rotation: transform_.rotation,
-            scale_x: transform_.scale.x,
-            scale_y: transform_.scale.y,
+            transform: node_.transform.map(|place_| ::star_script_runtime::scenes::SceneTransform {
+                x: place_.position.x,
+                y: place_.position.y,
+                rotation: place_.rotation,
+                scale_x: place_.scale.x,
+                scale_y: place_.scale.y,
+            }),
             sprite: node_.sprite.map(|image_| ::star_script_runtime::scenes::SceneSprite {
                 texture: image_.texture.as_str().to_owned(),
                 width: image_.size.x,
