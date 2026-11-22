@@ -30,6 +30,9 @@ pub enum EngineError {
     /// Entities, components or systems were misused, e.g. a component added
     /// to a destroyed entity.
     Ecs(String),
+    /// A scene or its node tree was misused or is invalid, e.g. a node made
+    /// a child of its own descendant, or a corrupt scene file.
+    Scene(String),
     /// A fixed-capacity resource has no room left.
     CapacityExceeded {
         /// Name of the exhausted resource.
@@ -51,6 +54,7 @@ impl fmt::Display for EngineError {
             Self::Input(reason) => write!(formatter, "input error: {reason}"),
             Self::Asset(reason) => write!(formatter, "asset error: {reason}"),
             Self::Ecs(reason) => write!(formatter, "ECS error: {reason}"),
+            Self::Scene(reason) => write!(formatter, "scene error: {reason}"),
             Self::CapacityExceeded { resource } => {
                 write!(formatter, "capacity exceeded for {resource}")
             }
@@ -94,6 +98,16 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "asset error: \"hero.png\" does not exist"
+        );
+    }
+
+    #[test]
+    fn scene_errors_explain_the_reason() {
+        let error = EngineError::Scene("\"Hero\" cannot be its own parent".to_owned());
+
+        assert_eq!(
+            error.to_string(),
+            "scene error: \"Hero\" cannot be its own parent"
         );
     }
 }

@@ -16,3 +16,4 @@ pub use star_render::{
     Camera, Color, Frame, GraphicsBackend, Image, MeshId, Projection, Sprite, TextureFilter,
     TextureId, TextureRegion, Vertex,
 };
+pub use star_scene::{Children, Hierarchy, Name, Parent};

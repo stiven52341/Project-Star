@@ -2661,6 +2661,10 @@ dependencies = [
 [[package]]
 name = "star_scene"
 version = "0.1.0"
+dependencies = [
+ "star_core",
+ "star_ecs",
+]
 
 [[package]]
 name = "star_script"
