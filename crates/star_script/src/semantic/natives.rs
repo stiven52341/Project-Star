@@ -33,6 +33,9 @@ pub const NODE_CLASS: &str = "Node";
 /// Name of the engine class of the nodes that show an image.
 pub const SPRITE_CLASS: &str = "Sprite";
 
+/// Name of the engine class of the nodes the game is seen from.
+pub const CAMERA_CLASS: &str = "Camera";
+
 /// Name of the engine class of colors: of sprites and of the background.
 pub const COLOR_CLASS: &str = "Color";
 
@@ -65,11 +68,15 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     let color = add_color_class(classes);
     let node = add_node_class(classes);
     add_sprite_class(classes, node, color);
+    let camera = add_camera_class(classes, node);
 
     // A game: the engine calls `start` once and `update` every frame, until
     // `quit` is called or the window is closed. Its nodes hang from it.
     let mut game = ClassInfo::new(GAME_CLASS.to_owned(), ClassOrigin::Native);
-    game.fields = vec![native_field("background", Type::Class(color))];
+    game.fields = vec![
+        native_field("background", Type::Class(color)),
+        native_field("camera", Type::Class(camera).nullable()),
+    ];
     game.methods
         .push(native_method("start", &[], Type::Void, false));
     game.methods.push(native_method(
@@ -162,6 +169,15 @@ fn add_sprite_class(classes: &mut ClassTable, node: ClassId, color: ClassId) -> 
         ("texture", Type::String),
     ]));
     classes.add(sprite)
+}
+
+/// `Camera`: a node the game is seen from, when it is the game's `camera`.
+fn add_camera_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
+    let mut camera = ClassInfo::new(CAMERA_CLASS.to_owned(), ClassOrigin::Native);
+    camera.base = Some(node);
+    camera.fields = vec![native_field("view_height", Type::Float)];
+    camera.constructor = Some(native_constructor(&[("name", Type::String)]));
+    classes.add(camera)
 }
 
 /// A public field of an engine class; the engine gives it its first value.

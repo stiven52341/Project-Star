@@ -62,7 +62,11 @@ class NodeGame extends Game {
 
     override func start() {
         background = Color(0.0, 0.0, 0.1, 1.0)
-        add_child(Ship())
+        const ship = Ship()
+        add_child(ship)
+        const eye = Camera(\"Eye\")
+        ship.add_child(eye)
+        camera = eye
     }
 
     override func update(delta: float) {

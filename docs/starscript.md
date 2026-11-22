@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`) done; camera, scenes and more next |
+| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`) and the camera (`Camera`) done; scenes and more next |
 | 6 | Editor integration | Pending |
 | 7–8 | Blueprints | Draft |
 
@@ -358,9 +358,10 @@ The engine provides them; their names cannot be used for other classes.
 | Class | Members |
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. |
-| `Game` | field `background: Color` (black); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
+| `Game` | fields `background: Color` (black), `camera: Camera?` (`null`); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
 | `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`; `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors) |
+| `Camera` (extends `Node`) | `init(name: string)`; field `view_height: float` (2.0) |
 | `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
 | `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool` |
 
@@ -423,8 +424,12 @@ class Space extends Game {
 - `remove()` takes the node, with its children, out of the tree: they stop
   running and are no longer shown. The object can be added again later.
 - `x`, `y`, `width` and `height` are in world units; `rotation` in radians,
-  counterclockwise. The window shows 2 units from bottom to top for now,
-  centered on `(0, 0)`.
+  counterclockwise.
+- The game is seen from its `camera`: the window is centered on where that
+  `Camera` is in the world (so a camera that is the child of a node follows
+  it) and shows `view_height` world units from bottom to top; the width
+  follows the window's shape. The camera's rotation and scale are ignored.
+  Without a camera, the window shows 2 units centered on `(0, 0)`.
 - `texture` is an asset path such as `"sprites/hero.png"` (PNG or JPEG). An
   image that cannot be loaded is not shown; the engine warns once on the
   error output.

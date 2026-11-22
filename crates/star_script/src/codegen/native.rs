@@ -28,6 +28,7 @@ pub mod Game {
     /// the root of its tree of nodes.
     pub struct Fields {
         pub background: ::star_script_runtime::Field<crate::classes::Color::Ref>,
+        pub camera: ::star_script_runtime::Field<::std::option::Option<crate::classes::Camera::Ref>>,
         pub quit_requested_: ::star_script_runtime::Field<bool>,
         pub root_: crate::classes::Node::Ref,
     }
@@ -90,6 +91,7 @@ pub mod Game {
     pub fn init_<O: Object + 'static>(make_: impl FnOnce(Fields) -> ::std::rc::Rc<O>) -> ::std::rc::Rc<O> {
         make_(Fields {
             background: ::star_script_runtime::Field::new(crate::classes::Color::new(0.0, 0.0, 0.0, 1.0)),
+            camera: ::star_script_runtime::Field::new(::std::option::Option::None),
             quit_requested_: ::star_script_runtime::Field::new(false),
             root_: crate::classes::Node::new(::std::string::String::from(\"Game\")),
         })
@@ -101,9 +103,9 @@ pub mod Game {
     }
 }";
 
-/// The modules of the engine classes `Color`, `Node` and `Sprite`.
+/// The modules of the engine classes `Color`, `Node`, `Sprite` and `Camera`.
 pub(super) fn node_modules(out: &mut Writer) {
-    let modules = [COLOR_MODULE, NODE_MODULE, SPRITE_MODULE];
+    let modules = [COLOR_MODULE, NODE_MODULE, SPRITE_MODULE, CAMERA_MODULE];
     for (index, module) in modules.iter().enumerate() {
         if index > 0 {
             out.line("");
@@ -411,6 +413,76 @@ pub mod Sprite {
     }
 }";
 
+const CAMERA_MODULE: &str = "/// `class Camera`, provided by the engine.
+pub mod Camera {
+    /// A reference to an object of this class or of a subclass.
+    pub type Ref = ::std::rc::Rc<dyn Object>;
+
+    /// The fields of a camera: how much of the world it shows.
+    pub struct Fields {
+        pub view_height: ::star_script_runtime::Field<f32>,
+    }
+
+    /// Gives access to the fields of this class, in objects of any subclass.
+    pub trait HasFields {
+        fn fields(&self) -> &Fields;
+    }
+
+    /// A camera adds no methods to those of a node.
+    pub trait Object: crate::classes::Node::Object + HasFields {}
+
+    /// A camera adds no methods to those of a node.
+    pub struct Methods;
+
+    /// An object created as this class (not as a subclass).
+    pub struct Instance {
+        pub Node: crate::classes::Node::Fields,
+        pub Camera: Fields,
+    }
+
+    impl crate::classes::Node::HasFields for Instance {
+        fn fields(&self) -> &crate::classes::Node::Fields { &self.Node }
+    }
+
+    impl HasFields for Instance {
+        fn fields(&self) -> &Fields { &self.Camera }
+    }
+
+    impl crate::AnyObject for Instance {
+        fn Node(self: ::std::rc::Rc<Self>) -> ::std::option::Option<crate::classes::Node::Ref> { ::std::option::Option::Some(self) }
+        fn Camera(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref> { ::std::option::Option::Some(self) }
+    }
+
+    impl crate::classes::Node::Object for Instance {
+        fn start(self: ::std::rc::Rc<Self>) { crate::classes::Node::Methods::start(&(self as crate::classes::Node::Ref)) }
+        fn update(self: ::std::rc::Rc<Self>, delta: f32) { crate::classes::Node::Methods::update(&(self as crate::classes::Node::Ref), delta) }
+        fn add_child(self: ::std::rc::Rc<Self>, child: crate::classes::Node::Ref) { crate::classes::Node::Methods::add_child(&(self as crate::classes::Node::Ref), child) }
+        fn remove(self: ::std::rc::Rc<Self>) { crate::classes::Node::Methods::remove(&(self as crate::classes::Node::Ref)) }
+        fn parent(self: ::std::rc::Rc<Self>) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::parent(&(self as crate::classes::Node::Ref)) }
+        fn children(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::children(&(self as crate::classes::Node::Ref)) }
+        fn find_child(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_child(&(self as crate::classes::Node::Ref), name) }
+    }
+
+    impl Object for Instance {}
+
+    /// Prepares an object of this class: `make_` builds it from the fields
+    /// of a node and of a camera.
+    pub fn init_<O: Object + 'static>(
+        name: ::std::string::String,
+        make_: impl FnOnce(crate::classes::Node::Fields, Fields) -> ::std::rc::Rc<O>,
+    ) -> ::std::rc::Rc<O> {
+        let fields_ = Fields {
+            view_height: ::star_script_runtime::Field::new(2.0),
+        };
+        crate::classes::Node::init_(name, move |base0_| make_(base0_, fields_))
+    }
+
+    /// Creates an object of this class.
+    pub fn new(name: ::std::string::String) -> Ref {
+        init_(name, |fields0_, fields1_| ::std::rc::Rc::new(Instance { Node: fields0_, Camera: fields1_ }))
+    }
+}";
+
 /// `fn main` that runs the game `class_path` in a window of the engine, with
 /// the input `actions` of the project.
 pub(super) fn game_entry_point(
@@ -480,9 +552,14 @@ impl ::star_engine::game::Game for EngineGame_ {{
         mirror_nodes_(world, &mut self.mirror, &root_, &mut self.pending);
     }}
 
-    fn draw(&self, _world: &::star_engine::star_ecs::World, frame: &mut ::star_engine::star_render::Frame) {{
+    fn draw(&self, world: &::star_engine::star_ecs::World, frame: &mut ::star_engine::star_render::Frame) {{
         let fields_ = crate::classes::Game::HasFields::fields(&*self.game);
         frame.set_clear_color(fields_.background.read(|color_| engine_color_(&**color_)));
+        let camera_ = fields_.camera.read(|camera_| match camera_ {{
+            ::std::option::Option::Some(camera_) => self.mirror.camera(world, &script_camera_(&**camera_)),
+            ::std::option::Option::None => ::star_engine::star_render::Camera::default(),
+        }});
+        frame.set_camera(camera_);
     }}
 
     fn is_finished(&self) -> bool {{
@@ -555,6 +632,16 @@ fn mirror_nodes_(
 fn engine_color_(color_: &dyn crate::classes::Color::Object) -> ::star_engine::star_render::Color {
     let channels_ = crate::classes::Color::HasFields::fields(color_);
     ::star_engine::star_render::Color::rgba(channels_.r.get(), channels_.g.get(), channels_.b.get(), channels_.a.get())
+}
+
+/// What the engine needs to know about the game's camera.
+fn script_camera_(camera_: &dyn crate::classes::Camera::Object) -> ::star_engine::script_nodes::ScriptCamera {
+    let node_ = crate::classes::Node::HasFields::fields(camera_);
+    ::star_engine::script_nodes::ScriptCamera {
+        id: node_.id_,
+        position: ::star_engine::star_math::Vec2::new(node_.x.get(), node_.y.get()),
+        view_height: crate::classes::Camera::HasFields::fields(camera_).view_height.get(),
+    }
 }
 
 /// What the engine needs to know about one node.

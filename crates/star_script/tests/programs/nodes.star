@@ -59,5 +59,11 @@ class Main {
         shade.a = 0.5
         Debug.print(player.color.g.to_string() + " " + bat.color.a.to_string())
         Debug.print(Sprite("Rock", "rock.png").color.r.to_string())
+
+        // Cameras are nodes too.
+        const eye = Camera("Eye")
+        player.add_child(eye)
+        eye.view_height *= 2.0
+        Debug.print(eye.name + " " + eye.view_height.to_string() + " " + player.children().length().to_string())
     }
 }

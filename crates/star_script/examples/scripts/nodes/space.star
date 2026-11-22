@@ -1,5 +1,6 @@
 // Nodes in a game: sprites with their own code, children that move with
-// their parent, and nodes that are added and removed while playing.
+// their parent, nodes that are added and removed while playing, colors and
+// a camera that follows the ship.
 // `cargo run -p star_script --example run -- crates/star_script/examples/scripts/nodes/space.star`
 // The images are in the `assets` folder next to this file.
 
@@ -20,7 +21,8 @@ class Orbit extends Node {
 // Moved with the arrow keys, WASD or a gamepad; a moon goes around it.
 class Ship extends Sprite {
     const SPEED = 0.9
-    const LIMIT = 0.85
+    const LIMIT_X = 1.8
+    const LIMIT_Y = 0.9
 
     init() {
         super.init("Ship", "sprites/star.png")
@@ -35,6 +37,7 @@ class Ship extends Sprite {
         moon.x = 0.18
         moon.width = 0.06
         moon.height = 0.06
+        moon.color = Color(0.6, 0.8, 1.0, 1.0)
         orbit.add_child(moon)
         add_child(orbit)
     }
@@ -44,8 +47,8 @@ class Ship extends Sprite {
         if Input.is_down("right") { x += SPEED * delta }
         if Input.is_down("up") { y += SPEED * delta }
         if Input.is_down("down") { y -= SPEED * delta }
-        x = x.max(-LIMIT).min(LIMIT)
-        y = y.max(-LIMIT).min(LIMIT)
+        x = x.max(-LIMIT_X).min(LIMIT_X)
+        y = y.max(-LIMIT_Y).min(LIMIT_Y)
     }
 }
 
@@ -57,16 +60,35 @@ class Rock extends Sprite {
         super.init("Rock", "sprites/disc.png")
         speed = fall_speed
         x = start_x
-        y = 1.2
+        y = 1.4
         width = 0.12
         height = 0.12
+        // Faster rocks are redder.
+        color = Color(1.0, 1.2 - fall_speed, 0.3, 1.0)
     }
 
     override func update(delta: float) {
         y -= speed * delta
-        if y < -1.2 {
+        if y < -1.4 {
             remove()
         }
+    }
+}
+
+// Shows a wider world than the window: it glides after the ship from side
+// to side, without following it up and down.
+class FollowCamera extends Camera {
+    const CATCH_UP = 3.0
+    var ship: Node
+
+    init(target: Node) {
+        ship = target
+        super.init("Camera")
+        view_height = 2.4
+    }
+
+    override func update(delta: float) {
+        x += (ship.x - x) * (CATCH_UP * delta).min(1.0)
     }
 }
 
@@ -77,7 +99,12 @@ class Space extends Game {
 
     override func start() {
         Debug.print("Muévete con las flechas, WASD o la cruceta; sal con Escape")
-        add_child(Ship())
+        background = Color(0.02, 0.02, 0.08, 1.0)
+        const ship = Ship()
+        add_child(ship)
+        const eye = FollowCamera(ship)
+        add_child(eye)
+        camera = eye
     }
 
     override func update(delta: float) {
@@ -86,7 +113,7 @@ class Space extends Game {
             until_next_rock = ROCK_EVERY
             rocks += 1
             // Spread them over the width, without a random number generator.
-            const x = ((rocks * 37) % 17) as float / 8.5 - 1.0
+            const x = ((rocks * 37) % 17) as float / 4.0 - 2.0
             add_child(Rock(x, 0.4 + (rocks % 3) as float * 0.2))
         }
         if Input.just_pressed("quit") {

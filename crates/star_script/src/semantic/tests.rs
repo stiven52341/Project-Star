@@ -907,6 +907,22 @@ fn sprites_and_the_background_have_colors() {
 }
 
 #[test]
+fn games_are_seen_from_their_camera() {
+    assert_valid(
+        "class Shaky extends Camera {\n init() { super.init(\"Eye\") }\n \
+         override func update(delta: float) { view_height = 4.0 }\n}\n\
+         class G extends Game {\n override func start() {\n \
+         const ship = Node(\"Ship\")\n const eye = Shaky()\n \
+         ship.add_child(eye)\n add_child(ship)\n camera = eye\n }\n \
+         override func update(delta: float) { camera = null }\n}",
+    );
+    assert_eq!(
+        body_errors("const eye: Camera = Node(\"Eye\")"),
+        [mismatch("Camera", "Node")]
+    );
+}
+
+#[test]
 fn only_nodes_can_join_the_tree() {
     assert_eq!(
         errors("class G extends Game {\n override func start() { add_child(Enemy()) }\n}"),

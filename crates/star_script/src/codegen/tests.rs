@@ -214,6 +214,18 @@ fn games_show_the_colors_of_their_sprites_and_background() {
 }
 
 #[test]
+fn games_are_drawn_from_their_camera() {
+    let code = rust(
+        "class G extends Game {\n override func start() {\n \
+         const eye = Camera(\"Eye\")\n add_child(eye)\n camera = eye\n }\n}",
+    );
+
+    assert!(code.contains("pub mod Camera {"));
+    assert!(code.contains("self.mirror.camera(world, &script_camera_(&**camera_))"));
+    assert!(code.contains("frame.set_camera(camera_);"));
+}
+
+#[test]
 fn other_engine_classes_cannot_be_extended() {
     let errors = compile_source(
         "class Paint extends Color {\n init() { super.init(1.0, 1.0, 1.0, 1.0) }\n}",
