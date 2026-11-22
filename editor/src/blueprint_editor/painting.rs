@@ -47,6 +47,8 @@ const WIRE_WIDTH: f32 = 2.5;
 /// zoom 1.
 const MIN_WIRE_BEND: f32 = 40.0;
 const SELECTED_BORDER: Color32 = Color32::from_rgb(240, 190, 80);
+/// Inside of the selection box: the selection's color, see-through.
+const SELECTION_FILL: Color32 = Color32::from_rgba_premultiplied(48, 38, 16, 48);
 /// Width of the border of the selected node, and of nodes with mistakes.
 const MARKED_BORDER_WIDTH: f32 = 2.0;
 
@@ -128,6 +130,18 @@ impl Painting {
                 Color32::TRANSPARENT,
                 stroke,
             ));
+    }
+
+    /// The box being dragged to select nodes, between two screen points.
+    pub(super) fn paint_selection_box(&self, start: Pos2, end: Pos2) {
+        let area = Rect::from_two_pos(start, end);
+        self.painter.rect_filled(area, 0, SELECTION_FILL);
+        self.painter.rect_stroke(
+            area,
+            0,
+            Stroke::new(1.0, SELECTED_BORDER),
+            egui::StrokeKind::Inside,
+        );
     }
 
     /// Draws `node`; its border says if it is `selected` or `has_mistakes`.

@@ -6,6 +6,7 @@ use star_blueprint::{Call, CallTarget, Graph, NodeId, NodeKind, Operator, PinRef
 
 use super::edit;
 use super::names::{BlueprintNames, LiteralKind};
+use super::selection::Selection;
 use crate::texts;
 
 /// What was under the pointer when the menu was opened.
@@ -23,7 +24,7 @@ pub(super) fn show_menu(
     graph: &mut Graph,
     target: &MenuTarget,
     names: &BlueprintNames,
-    selected: &mut Option<NodeId>,
+    selection: &mut Selection,
 ) -> bool {
     match target {
         MenuTarget::Pin(pin) => {
@@ -42,23 +43,35 @@ pub(super) fn show_menu(
             false
         }
         MenuTarget::Node(id) => {
-            let is_entry = graph
-                .node(*id)
-                .is_some_and(|node| matches!(node.kind, NodeKind::Entry));
+            // The node right-clicked is in the selection: the menu acts on
+            // all of it.
+            let only_entry = selection.nodes().iter().all(|selected| {
+                graph
+                    .node(*selected)
+                    .is_none_or(|node| matches!(node.kind, NodeKind::Entry))
+            });
+            let label = if selection.len() > 1 {
+                texts::current().delete_nodes
+            } else {
+                texts::current().delete_node
+            };
             let button = ui
-                .add_enabled(!is_entry, egui::Button::new(texts::current().delete_node))
+                .add_enabled(
+                    !only_entry && selection.contains(*id),
+                    egui::Button::new(label),
+                )
                 .on_disabled_hover_text(texts::current().entry_cannot_be_deleted);
             if button.clicked() {
-                edit::remove_node(graph, *id);
-                *selected = None;
+                let removed = edit::remove_nodes(graph, selection.nodes());
+                selection.clear();
                 ui.close();
-                return true;
+                return removed;
             }
             false
         }
         MenuTarget::Background(position) => match new_node_menu(ui, names) {
             Some(kind) => {
-                *selected = Some(edit::add_node(graph, kind, *position));
+                *selection = Selection::only(edit::add_node(graph, kind, *position));
                 ui.close();
                 true
             }

@@ -96,6 +96,7 @@ pub(super) static SPANISH: Texts = Texts {
     call_method_of_value: "Método de otro objeto…",
     call_class_function: "Función de una clase…",
     delete_node: "Borrar nodo",
+    delete_nodes: "Borrar nodos",
     entry_cannot_be_deleted: "Todo gráfico necesita su nodo de inicio.",
     disconnect_pin: "Quitar cables",
     bool_kind: "Booleano",

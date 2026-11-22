@@ -344,25 +344,31 @@ A selector chooses the graph. Nodes are boxes with a colored title by family
 (entry, flow, variables, calls, values), inputs down the left side and
 outputs down the right one, in the order of `Node::pins`; execution pins
 are triangles and data pins circles, and wires are curves between them.
-Dragging the background moves the view and the wheel zooms around the
-pointer (`CanvasView`, between ×0.25 and ×2). Where each node and pin is
+Dragging with the middle button, or scrolling with two fingers on a
+touchpad, moves the view; the mouse wheel, `Ctrl` + wheel and pinching zoom
+around the pointer (`CanvasView`, between ×0.25 and ×2). Wheels and
+touchpads are told apart by egui's unit of the scroll: lines for a wheel,
+points for a touchpad. Where each node and pin is
 comes from `layout.rs` (graph units, with tests), so drawing and picking
 pins with the mouse use the same geometry.
 
 Editing (`canvas.rs` for the mouse, `edit.rs` for the changes, with tests):
-clicking a node selects it and dragging moves it; dragging from a pin to
-another joins them, whichever is the output; the right button opens a menu
-to add a node where it was opened (values, variables of the blueprint,
-calls to its own methods or to any other, operators, “If”, “Return”), to
-delete the node under it or to remove a pin's wires; `Delete` deletes the
-selected node. The entry cannot be deleted. The editor keeps only wires it
+the left button selects (`selection.rs`): clicking a node selects it,
+dragging the background draws a box that selects the nodes it touches, and
+`Shift` or `Ctrl` add to the selection (clicking a selected node then
+leaves it out); dragging a selected node moves all the selected ones.
+Dragging from a pin to another joins them, whichever is the output; the
+right button opens a menu to add a node where it was opened (values,
+variables of the blueprint, calls to its own methods or to any other,
+operators, “If”, “Return”), to delete the selected nodes or to remove a
+pin's wires; `Delete` deletes the selected nodes. The entry cannot be deleted. The editor keeps only wires it
 can draw: from an output to an input of the same kind, on two nodes, and a
 pin that takes one wire (every input, and execution outputs) keeps the
 newest one. Everything else (unreachable nodes, cycles, inputs without a
 wire) is allowed while building and reported by “Compile”.
 
-While a blueprint is shown, the **Inspector** gives the selected node's
-fields (`properties.rs`): a value's type and value, a variable's name
+While a blueprint is shown and one node is selected, the **Inspector**
+gives its fields (`properties.rs`; with several selected it says how many): a value's type and value, a variable's name
 (typed or picked from the blueprint), what a call calls, its method, its
 arguments (renaming one keeps its wire), whether it returns a value and
 whether it is pure, and an operator. A change that takes pins away also

@@ -13,6 +13,7 @@ mod menus;
 mod names;
 mod painting;
 mod properties;
+mod selection;
 mod view;
 
 use std::fs;
@@ -132,7 +133,7 @@ impl BlueprintTab {
                     self.show_graph(index);
                 }
             }
-            Origin::Class | Origin::Variable(_) => self.canvas.selected = None,
+            Origin::Class | Origin::Variable(_) => self.canvas.selection.clear(),
         }
     }
 
@@ -141,7 +142,7 @@ impl BlueprintTab {
             self.graph = index;
             self.canvas.show_other_graph();
         }
-        self.canvas.selected = None;
+        self.canvas.selection.clear();
     }
 
     /// How “Compile” names its file.
@@ -223,7 +224,8 @@ impl BlueprintTab {
             .graphs
             .get(self.graph)
             .map(|graph| graph.name.clone());
-        match (self.canvas.selected, current_graph) {
+        let selected = self.canvas.selection.len();
+        match (self.canvas.selection.single(), current_graph) {
             (Some(id), Some(graph_name)) => {
                 for problem in &own_problems {
                     if problem.origin.as_ref()
@@ -238,6 +240,9 @@ impl BlueprintTab {
                 if let Some(graph) = blueprint.graphs.get_mut(self.graph) {
                     self.unsaved |= properties::show_node_properties(ui, graph, id, &names);
                 }
+            }
+            _ if selected > 1 => {
+                ui.weak(texts::current().nodes_selected(selected));
             }
             _ => {
                 self.unsaved |= class_properties::show_class_properties(ui, blueprint, self.graph);

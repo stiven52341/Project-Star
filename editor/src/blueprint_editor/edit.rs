@@ -37,6 +37,24 @@ pub(super) fn remove_node(graph: &mut Graph, id: NodeId) {
         .retain(|link| link.from.node != id && link.to.node != id);
 }
 
+/// Removes the nodes `ids`, except the entry, which every graph needs.
+/// Returns whether any was removed.
+pub(super) fn remove_nodes(graph: &mut Graph, ids: &[NodeId]) -> bool {
+    let deletable: Vec<NodeId> = ids
+        .iter()
+        .copied()
+        .filter(|id| {
+            graph
+                .node(*id)
+                .is_some_and(|node| !matches!(node.kind, NodeKind::Entry))
+        })
+        .collect();
+    for id in &deletable {
+        remove_node(graph, *id);
+    }
+    !deletable.is_empty()
+}
+
 /// Moves the node `id` by `delta`, in graph units.
 pub(super) fn move_node(graph: &mut Graph, id: NodeId, delta: Vec2) {
     if let Some(node) = graph.nodes.iter_mut().find(|node| node.id == id) {
@@ -335,6 +353,18 @@ mod tests {
 
         assert_eq!(graph.node(NodeId(2)), None);
         assert_eq!(graph.links, []);
+    }
+
+    #[test]
+    fn removing_several_nodes_keeps_the_entry() {
+        let mut graph = graph();
+
+        let removed = remove_nodes(&mut graph, &[NodeId(1), NodeId(2), NodeId(3)]);
+
+        assert!(removed);
+        let left: Vec<NodeId> = graph.nodes.iter().map(|node| node.id).collect();
+        assert_eq!(left, [NodeId(1), NodeId(4)]);
+        assert!(!remove_nodes(&mut graph, &[NodeId(1)]), "only the entry");
     }
 
     #[test]

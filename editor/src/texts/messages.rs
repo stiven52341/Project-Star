@@ -283,6 +283,14 @@ impl Texts {
         }
     }
 
+    /// The inspector while several nodes are selected.
+    pub(crate) fn nodes_selected(&self, count: usize) -> String {
+        match self.language {
+            Language::English => format!("{count} nodes selected"),
+            Language::Spanish => format!("{count} nodos seleccionados"),
+        }
+    }
+
     pub(crate) fn assets_unreadable(&self, error: &std::io::Error) -> String {
         match self.language {
             Language::English => format!("Could not read the assets folder: {error}"),

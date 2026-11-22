@@ -90,6 +90,24 @@ pub(super) fn pin_at(
 
 /// The node of `graph` under `point`: the one drawn last, on top, if
 /// several are.
+/// The nodes whose box touches `area` of the graph, in their order.
+pub(super) fn nodes_in(
+    graph: &Graph,
+    layouts: &HashMap<NodeId, NodeLayout>,
+    area: Rect,
+) -> Vec<NodeId> {
+    graph
+        .nodes
+        .iter()
+        .filter(|node| {
+            layouts
+                .get(&node.id)
+                .is_some_and(|layout| layout.rect.intersects(area))
+        })
+        .map(|node| node.id)
+        .collect()
+}
+
 pub(super) fn node_at(
     graph: &Graph,
     layouts: &HashMap<NodeId, NodeLayout>,
@@ -127,6 +145,18 @@ mod tests {
             }],
             links: Vec::new(),
         }
+    }
+
+    #[test]
+    fn boxes_take_the_nodes_they_touch() {
+        let graph = graph_with(NodeKind::Branch);
+        let layouts = graph_layout(&graph);
+
+        let touching = Rect::from_min_max(pos2(0.0, 0.0), pos2(110.0, 60.0));
+        let apart = Rect::from_min_max(pos2(0.0, 0.0), pos2(90.0, 40.0));
+
+        assert_eq!(nodes_in(&graph, &layouts, touching), [NodeId(1)]);
+        assert_eq!(nodes_in(&graph, &layouts, apart), []);
     }
 
     #[test]
