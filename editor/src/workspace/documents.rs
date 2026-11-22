@@ -112,14 +112,14 @@ impl Documents {
     pub(crate) fn show_tabs(&mut self, ui: &mut egui::Ui) -> Option<usize> {
         let mut close = None;
         ui.horizontal(|ui| {
-            ui.selectable_value(&mut self.active, None, texts::SCENE_TAB);
+            ui.selectable_value(&mut self.active, None, texts::current().scene_tab);
             for (index, tab) in self.blueprints.iter().enumerate() {
                 ui.separator();
                 ui.selectable_value(&mut self.active, Some(index), tab.title())
                     .on_hover_text(tab.path());
                 if ui
                     .small_button("×")
-                    .on_hover_text(texts::CLOSE_TAB)
+                    .on_hover_text(texts::current().close_tab)
                     .clicked()
                 {
                     close = Some(index);

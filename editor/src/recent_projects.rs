@@ -1,12 +1,11 @@
 //! Projects opened recently, remembered between editor sessions.
 
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use star_engine::prelude::ENGINE_NAME;
-use star_engine::star_platform::user_directories::config_directory;
+
+use crate::config_file::{config_file, read_or_default, write};
 
 /// How many projects the list remembers.
 const MAX_RECENT_PROJECTS: usize = 10;
@@ -34,20 +33,11 @@ impl RecentProjects {
     pub(crate) fn remove(&mut self, directory: &Path) {
         self.projects.retain(|path| path != directory);
     }
-
-    fn from_toml(text: &str) -> Result<Self, toml::de::Error> {
-        toml::from_str(text)
-    }
-
-    fn to_toml(&self) -> Result<String, toml::ser::Error> {
-        toml::to_string(self)
-    }
 }
 
 /// The recent projects list, kept in sync with its file.
 ///
-/// Losing this list is harmless, so read and write failures are logged
-/// instead of interrupting the user.
+/// Losing this list is harmless, so write failures are only logged.
 pub(crate) struct RecentProjectsStore {
     file: Option<PathBuf>,
     projects: RecentProjects,
@@ -56,13 +46,11 @@ pub(crate) struct RecentProjectsStore {
 impl RecentProjectsStore {
     /// Loads the list saved in the user's configuration folder.
     pub(crate) fn load() -> Self {
-        let file = config_directory()
-            .map(|directory| directory.join(ENGINE_NAME).join(RECENT_PROJECTS_FILE_NAME));
-        Self::load_from(file)
+        Self::load_from(config_file(RECENT_PROJECTS_FILE_NAME))
     }
 
     fn load_from(file: Option<PathBuf>) -> Self {
-        let projects = file.as_deref().map(read_list).unwrap_or_default();
+        let projects = file.as_deref().map(read_or_default).unwrap_or_default();
         Self { file, projects }
     }
 
@@ -86,31 +74,10 @@ impl RecentProjectsStore {
         let Some(file) = &self.file else {
             return;
         };
-        if let Err(error) = write_list(&self.projects, file) {
+        if let Err(error) = write(&self.projects, file) {
             log::warn!("Cannot save the recent projects list: {error}");
         }
     }
-}
-
-fn read_list(file: &Path) -> RecentProjects {
-    match fs::read_to_string(file) {
-        Ok(text) => RecentProjects::from_toml(&text).unwrap_or_else(|error| {
-            log::warn!("Ignoring corrupt {}: {}", file.display(), error.message());
-            RecentProjects::default()
-        }),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => RecentProjects::default(),
-        Err(error) => {
-            log::warn!("Cannot read {}: {error}", file.display());
-            RecentProjects::default()
-        }
-    }
-}
-
-fn write_list(projects: &RecentProjects, file: &Path) -> io::Result<()> {
-    if let Some(parent) = file.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(file, projects.to_toml().map_err(io::Error::other)?)
 }
 
 #[cfg(test)]

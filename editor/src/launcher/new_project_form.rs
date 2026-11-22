@@ -41,7 +41,7 @@ impl NewProjectForm {
 
     /// Draws the form. Returns the folder of the project created this frame.
     pub(crate) fn show(&mut self, ui: &mut egui::Ui) -> Option<PathBuf> {
-        ui.heading(texts::NEW_PROJECT);
+        ui.heading(texts::current().new_project);
         ui.add_space(SECTION_SPACING);
         egui::Grid::new("new_project_form")
             .num_columns(2)
@@ -52,23 +52,23 @@ impl NewProjectForm {
     }
 
     fn show_fields(&mut self, ui: &mut egui::Ui) {
-        ui.label(texts::PROJECT_NAME);
+        ui.label(texts::current().project_name);
         ui.add(
             egui::TextEdit::singleline(&mut self.name)
-                .hint_text(texts::PROJECT_NAME_HINT)
+                .hint_text(texts::current().project_name_hint)
                 .desired_width(TEXT_FIELD_WIDTH),
         );
         ui.end_row();
 
-        ui.label(texts::LOCATION);
+        ui.label(texts::current().location);
         self.show_location(ui);
         ui.end_row();
 
-        ui.label(texts::DIMENSION);
+        ui.label(texts::current().dimension);
         self.show_dimension_choice(ui);
         ui.end_row();
 
-        ui.label(texts::PLATFORMS);
+        ui.label(texts::current().platforms);
         self.show_platform_checks(ui);
         ui.end_row();
     }
@@ -76,9 +76,11 @@ impl NewProjectForm {
     fn show_location(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
             ui.add(egui::TextEdit::singleline(&mut self.location).desired_width(TEXT_FIELD_WIDTH));
-            if ui.button(texts::BROWSE).clicked()
-                && let Some(folder) =
-                    pick_folder(texts::CHOOSE_LOCATION, Path::new(self.location.trim()))
+            if ui.button(texts::current().browse).clicked()
+                && let Some(folder) = pick_folder(
+                    texts::current().choose_location,
+                    Path::new(self.location.trim()),
+                )
             {
                 self.location = folder.display().to_string();
             }
@@ -98,8 +100,8 @@ impl NewProjectForm {
 
     fn show_platform_checks(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
-            self.show_platform_group(ui, texts::DESKTOP, TargetPlatform::is_desktop);
-            self.show_platform_group(ui, texts::MOBILE, TargetPlatform::is_mobile);
+            self.show_platform_group(ui, texts::current().desktop, TargetPlatform::is_desktop);
+            self.show_platform_group(ui, texts::current().mobile, TargetPlatform::is_mobile);
         });
     }
 
@@ -129,7 +131,7 @@ impl NewProjectForm {
                 let directory = project_directory(settings, location);
                 ui.label(format!(
                     "{} {}",
-                    texts::WILL_BE_CREATED_IN,
+                    texts::current().will_be_created_in,
                     directory.display()
                 ));
             }
@@ -139,7 +141,8 @@ impl NewProjectForm {
         }
         ui.add_space(SECTION_SPACING);
 
-        let button = egui::Button::new(texts::CREATE_PROJECT).min_size(CREATE_BUTTON_SIZE.into());
+        let button =
+            egui::Button::new(texts::current().create_project).min_size(CREATE_BUTTON_SIZE.into());
         let clicked = ui.add_enabled(input.is_ok(), button).clicked();
         let created = match (clicked, input) {
             (true, Ok((settings, location))) => self.create(&settings, &location),
@@ -162,10 +165,10 @@ impl NewProjectForm {
     /// The validated project and its location, or the text explaining what is missing.
     fn validated_input(&self) -> Result<(ProjectSettings, PathBuf), String> {
         let settings = ProjectSettings::new(&self.name, self.dimension, self.selected_platforms())
-            .map_err(texts::settings_error)?;
+            .map_err(|error| texts::current().settings_error(error))?;
         let location = self.location.trim();
         if location.is_empty() {
-            return Err(texts::LOCATION_REQUIRED.to_owned());
+            return Err(texts::current().location_required.to_owned());
         }
         Ok((settings, PathBuf::from(location)))
     }
@@ -179,7 +182,7 @@ impl NewProjectForm {
             }
             Err(error) => {
                 log::error!("{error}");
-                self.creation_error = Some(texts::creation_error(&error));
+                self.creation_error = Some(texts::current().creation_error(&error));
                 None
             }
         }
@@ -188,7 +191,7 @@ impl NewProjectForm {
 
 fn dimension_description(dimension: ProjectDimension) -> &'static str {
     match dimension {
-        ProjectDimension::TwoD => texts::DIMENSION_2D_DESCRIPTION,
-        ProjectDimension::ThreeD => texts::DIMENSION_3D_DESCRIPTION,
+        ProjectDimension::TwoD => texts::current().dimension_2d_description,
+        ProjectDimension::ThreeD => texts::current().dimension_3d_description,
     }
 }

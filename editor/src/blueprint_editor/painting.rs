@@ -165,7 +165,7 @@ impl Painting {
         self.painter.text(
             header.left_center() + vec2(self.scaled(TEXT_PADDING), 0.0),
             Align2::LEFT_CENTER,
-            texts::node_title(&node.kind),
+            texts::current().node_title(&node.kind),
             FontId::proportional(self.scaled(TITLE_SIZE)),
             TITLE_COLOR,
         );
@@ -191,7 +191,7 @@ impl Painting {
             )),
             PinKind::Data => self.painter.circle_filled(center, size, color),
         };
-        let label = texts::pin_label(kind, &placed.pin.name);
+        let label = texts::current().pin_label(kind, &placed.pin.name);
         if label.is_empty() {
             return;
         }

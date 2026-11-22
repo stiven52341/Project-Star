@@ -15,7 +15,7 @@ use crate::texts;
 pub(crate) struct AssetsPanel {
     directory: PathBuf,
     contents: io::Result<Vec<FileNode>>,
-    /// The form of «Nuevo blueprint…», while it is open.
+    /// The form of “New blueprint…”, while it is open.
     new_blueprint: Option<NewBlueprintForm>,
 }
 
@@ -52,10 +52,10 @@ impl AssetsPanel {
         let mut opened = None;
         ui.horizontal(|ui| {
             ui.weak(format!("{ASSETS_DIRECTORY}/"));
-            if ui.small_button(texts::REFRESH).clicked() {
+            if ui.small_button(texts::current().refresh).clicked() {
                 self.refresh();
             }
-            if ui.small_button(texts::NEW_BLUEPRINT).clicked() {
+            if ui.small_button(texts::current().new_blueprint).clicked() {
                 self.new_blueprint = Some(NewBlueprintForm::default());
             }
         });
@@ -67,11 +67,11 @@ impl AssetsPanel {
             .auto_shrink(false)
             .show(ui, |ui| match &self.contents {
                 Ok(nodes) if nodes.is_empty() => {
-                    ui.weak(texts::EMPTY_ASSETS);
+                    ui.weak(texts::current().empty_assets);
                 }
                 Ok(nodes) => show_nodes(ui, nodes, "", &mut opened),
                 Err(error) => {
-                    ui.colored_label(ERROR_COLOR, texts::assets_unreadable(error));
+                    ui.colored_label(ERROR_COLOR, texts::current().assets_unreadable(error));
                 }
             });
         opened
@@ -87,17 +87,20 @@ impl AssetsPanel {
         let mut created = None;
         let mut close = false;
         ui.horizontal(|ui| {
-            ui.add(egui::TextEdit::singleline(&mut form.class).hint_text(texts::CLASS_NAME_HINT));
-            if ui.button(texts::CREATE).clicked() {
+            ui.add(
+                egui::TextEdit::singleline(&mut form.class)
+                    .hint_text(texts::current().class_name_hint),
+            );
+            if ui.button(texts::current().create).clicked() {
                 match create_blueprint(&self.directory, &form.class) {
                     Ok(path) => {
                         created = Some(path);
                         close = true;
                     }
-                    Err(error) => form.error = Some(texts::new_blueprint_error(&error)),
+                    Err(error) => form.error = Some(texts::current().new_blueprint_error(&error)),
                 }
             }
-            if ui.button(texts::CANCEL).clicked() {
+            if ui.button(texts::current().cancel).clicked() {
                 close = true;
             }
         });
@@ -128,7 +131,7 @@ fn show_nodes(ui: &mut egui::Ui, nodes: &[FileNode], prefix: &str, opened: &mut 
             FileNode::File { name } if name.ends_with(BLUEPRINT_EXTENSION) => {
                 let response = ui
                     .add(egui::Label::new(name.as_str()).sense(egui::Sense::click()))
-                    .on_hover_text(texts::OPEN_BLUEPRINT_HINT);
+                    .on_hover_text(texts::current().open_blueprint_hint);
                 if response.double_clicked() {
                     *opened = Some(format!("{prefix}{name}"));
                 }

@@ -24,14 +24,14 @@ pub(super) fn show_class_properties(
     graph: usize,
 ) -> bool {
     let mut changed = false;
-    egui::CollapsingHeader::new(texts::CLASS)
+    egui::CollapsingHeader::new(texts::current().class)
         .default_open(true)
         .show(ui, |ui| changed |= class_fields(ui, blueprint));
-    egui::CollapsingHeader::new(texts::VARIABLES)
+    egui::CollapsingHeader::new(texts::current().variables)
         .default_open(true)
         .show(ui, |ui| changed |= variables_fields(ui, blueprint));
     if graph < blueprint.graphs.len() {
-        egui::CollapsingHeader::new(texts::METHOD)
+        egui::CollapsingHeader::new(texts::current().method)
             .default_open(true)
             .show(ui, |ui| changed |= method_fields(ui, blueprint, graph));
     }
@@ -44,14 +44,14 @@ fn class_fields(ui: &mut egui::Ui, blueprint: &mut Blueprint) -> bool {
         .num_columns(2)
         .spacing(PROPERTY_SPACING)
         .show(ui, |ui| {
-            ui.weak(texts::NAME);
+            ui.weak(texts::current().name);
             changed |= ui.text_edit_singleline(&mut blueprint.class).changed();
             ui.end_row();
-            ui.weak(texts::EXTENDS);
+            ui.weak(texts::current().extends);
             changed |= optional_text(ui, &mut blueprint.extends);
             ui.end_row();
-            ui.weak(texts::BASE_ARGUMENTS)
-                .on_hover_text(texts::BASE_ARGUMENTS_HINT);
+            ui.weak(texts::current().base_arguments)
+                .on_hover_text(texts::current().base_arguments_hint);
             changed |= base_arguments_field(ui, &mut blueprint.base_arguments);
             ui.end_row();
         });
@@ -75,14 +75,18 @@ fn base_arguments_field(ui: &mut egui::Ui, arguments: &mut Vec<Literal>) -> bool
         for (index, argument) in arguments.iter_mut().enumerate() {
             ui.horizontal(|ui| {
                 changed |= literal_field(ui, ("base_argument", index), argument);
-                if ui.small_button("×").on_hover_text(texts::REMOVE).clicked() {
+                if ui
+                    .small_button("×")
+                    .on_hover_text(texts::current().remove)
+                    .clicked()
+                {
                     removed = Some(index);
                 }
             });
         }
         if ui
             .small_button("+")
-            .on_hover_text(texts::ADD_ARGUMENT)
+            .on_hover_text(texts::current().add_argument)
             .clicked()
         {
             arguments.push(Literal::String(String::new()));
@@ -103,12 +107,12 @@ fn variables_fields(ui: &mut egui::Ui, blueprint: &mut Blueprint) -> bool {
     for (index, variable) in blueprint.variables.iter_mut().enumerate() {
         ui.group(|ui| {
             changed |= variable_fields(ui, index, variable, &mut renamed);
-            if ui.small_button(texts::REMOVE_VARIABLE).clicked() {
+            if ui.small_button(texts::current().remove_variable).clicked() {
                 removed = Some(index);
             }
         });
     }
-    if ui.button(texts::ADD_VARIABLE).clicked() {
+    if ui.button(texts::current().add_variable).clicked() {
         let taken: Vec<&str> = blueprint
             .variables
             .iter()
@@ -144,18 +148,18 @@ fn variable_fields(
         .num_columns(2)
         .spacing(PROPERTY_SPACING)
         .show(ui, |ui| {
-            ui.weak(texts::NAME);
+            ui.weak(texts::current().name);
             let old = variable.name.clone();
             if ui.text_edit_singleline(&mut variable.name).changed() {
                 renamed.push((old, variable.name.clone()));
                 changed = true;
             }
             ui.end_row();
-            ui.weak(texts::TYPE)
-                .on_hover_text(texts::VARIABLE_TYPE_HINT);
+            ui.weak(texts::current().type_label)
+                .on_hover_text(texts::current().variable_type_hint);
             changed |= optional_text(ui, &mut variable.ty);
             ui.end_row();
-            ui.weak(texts::DEFAULT_VALUE);
+            ui.weak(texts::current().default_value);
             ui.horizontal(|ui| {
                 let mut has_default = variable.default.is_some();
                 if ui.checkbox(&mut has_default, "").changed() {
@@ -167,7 +171,7 @@ fn variable_fields(
                 }
             });
             ui.end_row();
-            ui.weak(texts::PRIVATE);
+            ui.weak(texts::current().private);
             changed |= ui.checkbox(&mut variable.private, "").changed();
             ui.end_row();
         });
@@ -185,19 +189,20 @@ fn method_fields(ui: &mut egui::Ui, blueprint: &mut Blueprint, index: usize) -> 
         .num_columns(2)
         .spacing(PROPERTY_SPACING)
         .show(ui, |ui| {
-            ui.weak(texts::NAME);
+            ui.weak(texts::current().name);
             changed |= ui.text_edit_singleline(&mut graph.name).changed();
             ui.end_row();
-            ui.weak(texts::PARAMETERS);
+            ui.weak(texts::current().parameters);
             changed |= parameters_field(ui, graph);
             ui.end_row();
-            ui.weak(texts::RETURNS);
+            ui.weak(texts::current().returns);
             changed |= optional_text(ui, &mut graph.returns);
             ui.end_row();
-            ui.weak(texts::OVERRIDE).on_hover_text(texts::OVERRIDE_HINT);
+            ui.weak(texts::current().overrides)
+                .on_hover_text(texts::current().override_hint);
             changed |= ui.checkbox(&mut graph.is_override, "").changed();
             ui.end_row();
-            ui.weak(texts::PRIVATE);
+            ui.weak(texts::current().private);
             changed |= ui.checkbox(&mut graph.private, "").changed();
             ui.end_row();
         });
@@ -226,14 +231,18 @@ fn parameters_field(ui: &mut egui::Ui, graph: &mut Graph) -> bool {
                 }
                 ui.label(":");
                 changed |= ui.text_edit_singleline(&mut parameter.ty).changed();
-                if ui.small_button("×").on_hover_text(texts::REMOVE).clicked() {
+                if ui
+                    .small_button("×")
+                    .on_hover_text(texts::current().remove)
+                    .clicked()
+                {
                     removed = Some(index);
                 }
             });
         }
         if ui
             .small_button("+")
-            .on_hover_text(texts::ADD_PARAMETER)
+            .on_hover_text(texts::current().add_parameter)
             .clicked()
         {
             let taken: Vec<&str> = graph

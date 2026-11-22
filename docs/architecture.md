@@ -84,9 +84,10 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 37 | StarScript `Color` is an **object**, and the camera is a **node** | StarScript has no value types yet, so `Color` follows the language's one rule for classes (shared references): two sprites given the same color change together, which is documented. A `Camera` node follows its parents for free (child of the ship = follows the ship) and `Game.camera` says which one is used; its world position comes from the mirrored node's global transform, its rotation is ignored so the view never tilts, and views are never thinner than 0.001 units so a wrong height cannot hide the frame. Rejected: loose `red`/`green`/… and `camera_x`/`camera_y` fields (verbose, and following a node would need code in every game) |
 | 38 | StarScript scenes are read **through a loader the game registers** in the runtime | The generated `Scene` class only uses `star_script_runtime`, so console programs still do not depend on the engine. The generated game registers, before the game object is created, a loader that reads `SceneOutline`s from the app's asset folder and turns them into the runtime's plain `SceneNode` list; `Scene.load` builds `Node`/`Sprite` objects from it. Results are kept per path (failures too, so a missing file warns once). A scene that cannot be loaded gives `null`, not a stopped game, so the error rule of decision 4 holds without a new `fault` case. Rejected: reading files in the generated `Node` module (console programs would need the engine) and `Game.load_scene` (nodes could not load scenes) |
 | 39 | Scene nodes name StarScript classes **by name, resolved by generated code** | A `.scene` file is data, so the class is a text (`class = "Rock"`). The compiler writes `new_scene_object_`, a `match` over the program's classes: the node classes created without arguments are built with `new()`, and the others give the reason they cannot (needs arguments, private `init`, not a node). The object is created as its `init` leaves it and the scene's values are applied on top (name always; transform and image only when the file writes them), as an instance overrides its prefab. Any problem rejects the whole scene (`null`, one warning naming the node), so a typo is never half-loaded. The format version stays 1: the field is optional and old files read the same. Rejected for now: checking the project's scenes at compile time (it fits the editor's build, step 13.6) and passing arguments to `init` from the scene |
-| 40 | The editor **checks** projects with `star_script` as a library | «Compilar» gives every mistake the compiler can find (scripts, input actions, scene classes) in a fraction of a second, without Cargo, so it can run often. Scripts live anywhere in `assets/`, next to the scenes and images they use, and all of them form one program: each file is tokenized and parsed on its own (an unclosed `{` stays in its file) and their classes are checked together, with spans placed in one range of offsets that `SourceSet` maps back to file, line and column. The check runs on a thread so big projects never freeze the editor. Rejected for now: building with Cargo from the editor (needs a way to find the engine's crates outside the repository) and a `scripts/` folder apart from the assets |
+| 40 | The editor **checks** projects with `star_script` as a library | “Compile” gives every mistake the compiler can find (scripts, input actions, scene classes) in a fraction of a second, without Cargo, so it can run often. Scripts live anywhere in `assets/`, next to the scenes and images they use, and all of them form one program: each file is tokenized and parsed on its own (an unclosed `{` stays in its file) and their classes are checked together, with spans placed in one range of offsets that `SourceSet` maps back to file, line and column. The check runs on a thread so big projects never freeze the editor. Rejected for now: building with Cargo from the editor (needs a way to find the engine's crates outside the repository) and a `scripts/` folder apart from the assets |
 | 41 | Blueprints are **node graphs whose execution is a tree**, in their own crate `star_blueprint` | Each execution pin takes at most one wire, so every graph reads as structured StarScript (`if`/`else`) without jumps; paths that would join again are written as functions. Values flow through data wires and pure nodes run where their value is used. The model is plain data with public fields, like the syntax tree, because the visual editor must hold graphs that are still being built; `validate` lists what is wrong, and types are left to the StarScript compiler, whose errors are placed back on nodes. The files are TOML, like scenes, read with serde, so `star_script` keeps having no dependencies. Rejected: free execution graphs with joins and loops of wires (they need gotos or a structuring pass), and a block editor in the style of Scratch (less familiar for engine users) |
 | 42 | The blueprint editor is **drawn by the editor** with egui's painter, in tabs of the central area | No node-editor library: the canvas is a few hundred lines on top of `star_blueprint` (pins, rules, files), which already says what a node is, so there is no second model to keep in step, and no dependency that must follow each egui version. Blueprints open as tabs next to the scene view, so several can be open and the inspector shows what is selected in the tab shown. Rejected: `egui-snarl` and similar crates (their own graph model and egui version), and floating windows (they cover the other panels) |
+| 43 | The editor's texts are **plain Rust values, one per language**, chosen through a global current language | The editor shows a few hundred short texts, so a `Texts` struct with one field per text, filled once per language, is enough: a missing translation does not compile, there is nothing to parse at start-up and no dependency. Texts with values are methods that pick the language's wording, so plurals and word order stay natural in each one. The language lives in an atomic, because every panel draws texts and passing it everywhere would touch every function for no gain; tests use a language's `Texts` directly and never change it. English is the default, and a file written with an unknown language falls back to it. Rejected for now: Fluent or gettext catalogs (a dependency and a runtime format, worth it with many languages or translators who do not read Rust) and following the system's language (it needs one more dependency to read it on every platform) |
 
 ## ECS
 
@@ -287,28 +288,35 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
 
 ## Editor
 
-A single native window with two screens. Its texts are in Spanish for now
-(all of them in `texts.rs`, ready to be translated):
+A single native window with two screens, in **English** (the default) or
+**Spanish**. Every text is in `texts/`: one `Texts` value per language
+(`english.rs`, `spanish.rs`, with the same fields, so the compiler checks
+that no language misses one) and, in `messages.rs`, the texts built from
+values. A menu “Language” (in the project manager's header and in
+“File”) lists the languages by their own names; the choice applies from
+the next frame and is kept in `preferences.toml`, next to the recent
+projects in the user's configuration folder (`config_file.rs`). Messages
+of the StarScript compiler and of the project check stay in English:
 
 1. **Project manager** (`launcher/`): on the left, recent projects (an
-   «Abrir» button; those that no longer exist appear as «No disponible», with
-   «Quitar») and «Abrir otro proyecto…» (folder picker). On the right, **new
-   project**: name, location (with «Examinar…»), 2D or 3D type (exclusive)
-   and platforms (checkboxes). «Crear y abrir» creates
+   “Open” button; those that no longer exist appear as “Unavailable”, with
+   “Remove”) and “Open another project…” (folder picker). On the right, **new
+   project**: name, location (with “Browse…”), 2D or 3D type (exclusive)
+   and platforms (checkboxes). “Create and open” creates
    `<location>/<name>/` with `project.toml` and `assets/` (it never
    overwrites) and opens the editor.
-2. **Editor** (`workspace/`), maximized: menu («Archivo» → «Cerrar
-   proyecto» / «Salir»; «Proyecto» → «Compilar»; «Ayuda» → «Acerca de») and
-   a «Compilar» button next to it, **Scene** panel (hierarchy, empty until `star_scene`
-   exists), a central area with **tabs**: «Escena», the **view** rendered by
+2. **Editor** (`workspace/`), maximized: menu (“File” → “Save” /
+   “Close project” / “Language” / “Quit”; “Project” → “Compile”; “Help” → “About”) and
+   a “Compile” button next to it, **Scene** panel (hierarchy, empty until `star_scene`
+   exists), a central area with **tabs**: “Scene”, the **view** rendered by
    the engine (reference grid; drag = pan in 2D / orbit in 3D, wheel =
    zoom), always there, and one tab per open **blueprint** (see below),
    **Inspector** (project properties), a bottom panel with two tabs,
-   **Archivos** (tree of `assets/`, with «Actualizar»; a double click on a
-   `.blueprint` opens it) and **Problemas** (what the last
-   «Compilar» found, as `file:line:column` and a message; it opens by itself
+   **Assets** (tree of `assets/`, with “Refresh”; a double click on a
+   `.blueprint` opens it) and **Problems** (what the last
+   “Compile” found, as `file:line:column` and a message; it opens by itself
    when there are problems), and a status bar (with the result of the last
-   «Compilar»).
+   “Compile”).
 
 The view uses `OffscreenRenderer` on egui's wgpu device and registers its
 texture in `egui_wgpu` (it is registered again when its size changes). The
@@ -331,13 +339,13 @@ Editing (`canvas.rs` for the mouse, `edit.rs` for the changes, with tests):
 clicking a node selects it and dragging moves it; dragging from a pin to
 another joins them, whichever is the output; the right button opens a menu
 to add a node where it was opened (values, variables of the blueprint,
-calls to its own methods or to any other, operators, «Si», «Devolver»), to
+calls to its own methods or to any other, operators, “If”, “Return”), to
 delete the node under it or to remove a pin's wires; `Delete` deletes the
 selected node. The entry cannot be deleted. The editor keeps only wires it
 can draw: from an output to an input of the same kind, on two nodes, and a
 pin that takes one wire (every input, and execution outputs) keeps the
 newest one. Everything else (unreachable nodes, cycles, inputs without a
-wire) is allowed while building and reported by «Compilar».
+wire) is allowed while building and reported by “Compile”.
 
 While a blueprint is shown, the **Inspector** gives the selected node's
 fields (`properties.rs`): a value's type and value, a variable's name
@@ -351,26 +359,26 @@ With no node selected, the Inspector edits the **class** (name, base,
 and the **signature** of the graph shown (name, parameters, return type,
 `override`, privacy) (`class_properties.rs`). Renaming a variable, a method
 or a parameter renames it in the nodes that use it (`edit.rs`), and a
-change that takes pins away takes their wires. «Gráficos» in the tab adds a
-graph (with its entry) or deletes the one shown. «Nuevo blueprint…» in
-«Archivos» asks for a class name and writes `assets/<Class>.blueprint`
+change that takes pins away takes their wires. “Graphs” in the tab adds a
+graph (with its entry) or deletes the one shown. “New blueprint…” in
+“Assets” asks for a class name and writes `assets/<Class>.blueprint`
 (`creation.rs`, never overwriting): a `Node` that redefines `start` and
 `update`, empty, which compiles as it is.
 
-The mistakes of the last «Compilar» are shown in their blueprint: each
+The mistakes of the last “Compile” are shown in their blueprint: each
 `Problem` of a blueprint keeps its `Origin` (graph and node, graph, or
 class), so nodes with mistakes get a red border and show them under the
 pointer and in the inspector, and the others are listed above the canvas.
-Clicking the place of such a problem in «Problemas» opens the blueprint on
+Clicking the place of such a problem in “Problems” opens the blueprint on
 its graph, with the node selected in the middle of the canvas.
 
-Blueprints are saved with `Ctrl+S` or «Archivo» → «Guardar», and all of
-them before «Compilar», which reads the files. Tabs with unsaved changes
-show `●`; closing one, the project or the window asks first («Guardar»,
-«No guardar», «Cancelar»). Saving writes the file again from the model, so
+Blueprints are saved with `Ctrl+S` or “File” → “Save”, and all of
+them before “Compile”, which reads the files. Tabs with unsaved changes
+show `●`; closing one, the project or the window asks first (“Save”,
+“Don't save”, “Cancel”). Saving writes the file again from the model, so
 comments written by hand in it are not kept.
 
-«Compilar» runs `project_check/` (no UI, with tests) on a thread of its own
+“Compile” runs `project_check/` (no UI, with tests) on a thread of its own
 (`CheckJob`), which asks egui to redraw when it finishes. It checks:
 
 - `project.toml`: its `[input.actions]`, which scripts name.
@@ -386,7 +394,7 @@ comments written by hand in it are not kept.
   (`ClassTable::scene_class`, the same rule the generated code follows).
 
 Building the generated Rust with Cargo and running the game are not part of
-«Compilar» yet.
+“Compile” yet.
 
 Modules: `project/` (validated model, creation and opening, no UI and with
 tests), `project_check/` (see above), `file_tree.rs` (snapshot of a folder,

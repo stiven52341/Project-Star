@@ -38,8 +38,8 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`) and scenes (`Scene`, with script classes) done |
-| 6 | Editor integration | In progress: «Compilar» checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
-| 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, «Compilar» in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
+| 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
+| 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
 
 ## 1. Lexicon (final)
 
@@ -722,14 +722,14 @@ class Player extends Sprite {
   (`Translation::origin`), so the mistakes the StarScript compiler finds in
   it are placed back on the blueprint.
 
-In the editor, a double click on a `.blueprint` of «Archivos» opens it in a
+In the editor, a double click on a `.blueprint` of “Assets” opens it in a
 tab: its graphs are drawn as nodes and wires, built with the mouse (drag
 between pins, right button to add nodes), and the inspector edits the
-selected node, or the class and the graph shown. «Nuevo blueprint…» creates
+selected node, or the class and the graph shown. “New blueprint…” creates
 one. Saving rewrites the file from the model, so comments written by hand
 are not kept.
 
-The editor's «Compilar» checks every `.blueprint` of `assets/` together with
+The editor's “Compile” checks every `.blueprint` of `assets/` together with
 the `.star` files, as one program: scripts can use the classes of blueprints
 and the other way round. A mistake in a blueprint is shown as
 `assets/rock.blueprint: graph `update`, node 3: …`, and the node is marked

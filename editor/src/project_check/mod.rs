@@ -1,7 +1,7 @@
 //! Checking a project's game without building it: its StarScript files and
 //! blueprints, the input actions they use and the classes its scenes name.
 //!
-//! It is what «Compilar» runs: everything the StarScript compiler can tell
+//! It is what “Compile” runs: everything the StarScript compiler can tell
 //! before Cargo builds the generated Rust.
 
 mod input_actions;

@@ -23,7 +23,7 @@ use self::viewport::SceneViewport;
 use crate::project::{ASSETS_DIRECTORY, Project};
 use crate::project_check::Problem;
 use crate::style::ERROR_COLOR;
-use crate::texts;
+use crate::texts::{self, Language};
 
 const SIDE_PANEL_WIDTH: f32 = 260.0;
 const SIDE_PANEL_MIN_WIDTH: f32 = 180.0;
@@ -35,6 +35,8 @@ pub(crate) enum EditorAction {
     CloseProject,
     /// Close the window: the user chose to lose unsaved changes.
     Quit,
+    /// Show the editor in another language.
+    ChangeLanguage(Language),
 }
 
 /// Something that closes blueprints, waiting for the user to say what to do
@@ -75,7 +77,7 @@ impl EditorWindow {
         let assets = AssetsPanel::new(project.directory());
         let dimension = project.settings().dimension();
         let viewport = render_state
-            .ok_or_else(|| texts::NO_GPU_FOR_VIEWPORT.to_owned())
+            .ok_or_else(|| texts::current().no_gpu_for_viewport.to_owned())
             .and_then(|state| {
                 SceneViewport::new(state, dimension).map_err(|error| error.to_string())
             });
@@ -116,12 +118,15 @@ impl EditorWindow {
                 Some(MenuAction::Save) => self.documents.save_active(),
                 Some(MenuAction::CloseProject) => action = self.leave(Leaving::CloseProject),
                 Some(MenuAction::Compile) => {
-                    // «Compilar» checks the files, so it checks what is
+                    // “Compile” checks the files, so it checks what is
                     // shown.
                     self.documents.save_all();
                     self.problems.compile(self.project.directory(), ui.ctx());
                 }
                 Some(MenuAction::ShowAbout) => self.about_open = true,
+                Some(MenuAction::ChangeLanguage(language)) => {
+                    action = Some(EditorAction::ChangeLanguage(language));
+                }
                 None => {}
             }
         });
@@ -138,7 +143,7 @@ impl EditorWindow {
             .show(ui, |ui| match self.documents.active() {
                 ActiveDocument::Scene => show_inspector(ui, &self.project),
                 ActiveDocument::Blueprint(tab) => {
-                    ui.strong(texts::INSPECTOR);
+                    ui.strong(texts::current().inspector);
                     ui.separator();
                     tab.show_inspector(ui, self.problems.problems());
                 }
@@ -198,8 +203,8 @@ impl EditorWindow {
     fn ask_about_unsaved_changes(&mut self, context: &egui::Context) -> Option<EditorAction> {
         let leaving = self.leaving?;
         let question = match leaving {
-            Leaving::CloseTab(_) => texts::UNSAVED_BLUEPRINT_QUESTION,
-            Leaving::CloseProject | Leaving::Quit => texts::UNSAVED_BLUEPRINTS_QUESTION,
+            Leaving::CloseTab(_) => texts::current().unsaved_blueprint_question,
+            Leaving::CloseProject | Leaving::Quit => texts::current().unsaved_blueprints_question,
         };
         let choice = show_unsaved_dialog(context, question)?;
         self.leaving = None;
@@ -230,7 +235,7 @@ impl EditorWindow {
             ActiveDocument::Scene => match &mut self.viewport {
                 Ok(viewport) => viewport.show(ui),
                 Err(error) => {
-                    ui.colored_label(ERROR_COLOR, texts::viewport_error(error));
+                    ui.colored_label(ERROR_COLOR, texts::current().viewport_error(error));
                 }
             },
             ActiveDocument::Blueprint(tab) => tab.show(ui, self.problems.problems()),
@@ -239,7 +244,11 @@ impl EditorWindow {
 
     fn show_bottom_panel(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.selectable_value(&mut self.bottom_tab, BottomTab::Assets, texts::ASSETS);
+            ui.selectable_value(
+                &mut self.bottom_tab,
+                BottomTab::Assets,
+                texts::current().assets,
+            );
             ui.selectable_value(
                 &mut self.bottom_tab,
                 BottomTab::Problems,
@@ -294,19 +303,19 @@ impl EditorWindow {
     }
 
     fn show_about(&mut self, context: &egui::Context) {
-        egui::Window::new(format!("{} {ENGINE_NAME}", texts::ABOUT))
+        egui::Window::new(format!("{} {ENGINE_NAME}", texts::current().about))
             .open(&mut self.about_open)
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(context, |ui| {
                 ui.strong(format!("{ENGINE_NAME} {ENGINE_VERSION}"));
-                ui.label(texts::ABOUT_DESCRIPTION);
+                ui.label(texts::current().about_description);
                 ui.separator();
-                ui.label(texts::LICENSE_NOTICE);
-                ui.label(texts::GAME_EXCEPTION_NOTICE);
-                ui.weak(texts::NO_WARRANTY);
-                ui.hyperlink_to(texts::SOURCE_CODE, REPOSITORY_URL);
+                ui.label(texts::current().license_notice);
+                ui.label(texts::current().game_exception_notice);
+                ui.weak(texts::current().no_warranty);
+                ui.hyperlink_to(texts::current().source_code, REPOSITORY_URL);
             });
     }
 }
@@ -315,7 +324,7 @@ impl EditorWindow {
 const REPOSITORY_URL: &str = env!("CARGO_PKG_REPOSITORY");
 
 fn show_hierarchy(ui: &mut egui::Ui) {
-    ui.strong(texts::HIERARCHY);
+    ui.strong(texts::current().hierarchy);
     ui.separator();
-    ui.weak(texts::EMPTY_SCENE);
+    ui.weak(texts::current().empty_scene);
 }

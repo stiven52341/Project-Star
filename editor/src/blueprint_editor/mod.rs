@@ -1,7 +1,7 @@
 //! The blueprint editor: a blueprint of the assets folder, open in a tab of
 //! the central area, with its graphs drawn as nodes and wires to edit; the
 //! inspector shows the selected node, or the class and the graph shown.
-//! The mistakes the last «Compilar» found in it are shown on its nodes.
+//! The mistakes the last “Compile” found in it are shown on its nodes.
 
 mod canvas;
 mod class_properties;
@@ -144,12 +144,12 @@ impl BlueprintTab {
         self.canvas.selected = None;
     }
 
-    /// How «Compilar» names its file.
+    /// How “Compile” names its file.
     fn problem_file(&self) -> String {
         format!("{ASSETS_DIRECTORY}/{}", self.path)
     }
 
-    /// The `problems` of the last «Compilar» in this blueprint.
+    /// The `problems` of the last “Compile” in this blueprint.
     fn own_problems<'problems>(
         &self,
         problems: &'problems [Problem],
@@ -159,18 +159,18 @@ impl BlueprintTab {
     }
 
     /// The tab: its class, the graph shown and the mistakes of the last
-    /// «Compilar» (`problems`) that are not on a node of it.
+    /// “Compile” (`problems`) that are not on a node of it.
     pub(crate) fn show(&mut self, ui: &mut egui::Ui, problems: &[Problem]) {
         let own_problems: Vec<&Problem> = self.own_problems(problems).collect();
         let blueprint = match &mut self.content {
             Ok(blueprint) => blueprint,
             Err(error) => {
-                ui.colored_label(ERROR_COLOR, texts::blueprint_unreadable(error));
+                ui.colored_label(ERROR_COLOR, texts::current().blueprint_unreadable(error));
                 return;
             }
         };
         if let Some(error) = &self.save_error {
-            ui.colored_label(ERROR_COLOR, texts::blueprint_not_saved(error));
+            ui.colored_label(ERROR_COLOR, texts::current().blueprint_not_saved(error));
         }
         ui.horizontal(|ui| {
             ui.strong(texts::class_heading(blueprint));
@@ -182,7 +182,7 @@ impl BlueprintTab {
                 self.unsaved = true;
             }
             ui.separator();
-            ui.weak(texts::CANVAS_CONTROLS);
+            ui.weak(texts::current().canvas_controls);
         });
         let current_graph = blueprint
             .graphs
@@ -206,7 +206,7 @@ impl BlueprintTab {
                 self.unsaved |= canvas::show_graph(ui, graph, &mut self.canvas, &names, &mistakes);
             }
             None => {
-                ui.weak(texts::NO_GRAPHS);
+                ui.weak(texts::current().no_graphs);
             }
         }
     }
@@ -272,7 +272,7 @@ fn show_graph_selector(
         });
 }
 
-/// «Nuevo gráfico» and «Borrar este gráfico». Returns whether the
+/// “New graph” and “Delete this graph”. Returns whether the
 /// blueprint changed.
 fn show_graphs_menu(
     ui: &mut egui::Ui,
@@ -281,8 +281,8 @@ fn show_graphs_menu(
     canvas: &mut CanvasState,
 ) -> bool {
     let mut changed = false;
-    ui.menu_button(texts::GRAPHS_MENU, |ui| {
-        if ui.button(texts::NEW_GRAPH).clicked() {
+    ui.menu_button(texts::current().graphs_menu, |ui| {
+        if ui.button(texts::current().new_graph).clicked() {
             let taken: Vec<&str> = blueprint
                 .graphs
                 .iter()
@@ -296,7 +296,7 @@ fn show_graphs_menu(
         }
         let can_delete = *selected < blueprint.graphs.len();
         if ui
-            .add_enabled(can_delete, egui::Button::new(texts::DELETE_GRAPH))
+            .add_enabled(can_delete, egui::Button::new(texts::current().delete_graph))
             .clicked()
         {
             blueprint.graphs.remove(*selected);

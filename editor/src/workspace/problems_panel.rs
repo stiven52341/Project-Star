@@ -1,4 +1,4 @@
-//! «Problemas»: what the last «Compilar» found in the project.
+//! “Problems”: what the last “Compile” found in the project.
 
 use std::path::Path;
 
@@ -45,7 +45,7 @@ impl ProblemsPanel {
             context.request_repaint();
         }) {
             Ok(job) => CompileState::Running(job),
-            Err(error) => CompileState::Failed(texts::check_not_started(&error)),
+            Err(error) => CompileState::Failed(texts::current().check_not_started(&error)),
         };
     }
 
@@ -63,19 +63,19 @@ impl ProblemsPanel {
                 has_problems
             }
             CheckStatus::Lost => {
-                self.state = CompileState::Failed(texts::CHECK_LOST.to_owned());
+                self.state = CompileState::Failed(texts::current().check_lost.to_owned());
                 true
             }
         }
     }
 
-    /// The tab's title: «Problemas», with how many there are.
+    /// The tab's title: “Problems”, with how many there are.
     pub(crate) fn title(&self) -> String {
         match &self.state {
             CompileState::Finished(check) if !check.problems.is_empty() => {
-                texts::problems_title(check.problems.len())
+                texts::current().problems_title(check.problems.len())
             }
-            _ => texts::PROBLEMS.to_owned(),
+            _ => texts::current().problems.to_owned(),
         }
     }
 
@@ -85,16 +85,19 @@ impl ProblemsPanel {
             CompileState::NotCompiled => {}
             CompileState::Running(_) => {
                 ui.spinner();
-                ui.weak(texts::COMPILING);
+                ui.weak(texts::current().compiling);
             }
             CompileState::Finished(check) if check.problems.is_empty() => {
-                ui.colored_label(SUCCESS_COLOR, texts::check_passed(check.scripts));
+                ui.colored_label(SUCCESS_COLOR, texts::current().check_passed(check.scripts));
             }
             CompileState::Finished(check) => {
-                ui.colored_label(ERROR_COLOR, texts::problems_found(check.problems.len()));
+                ui.colored_label(
+                    ERROR_COLOR,
+                    texts::current().problems_found(check.problems.len()),
+                );
             }
             CompileState::Failed(_) => {
-                ui.colored_label(ERROR_COLOR, texts::CHECK_FAILED);
+                ui.colored_label(ERROR_COLOR, texts::current().check_failed);
             }
         }
     }
@@ -115,16 +118,16 @@ impl ProblemsPanel {
             .auto_shrink(false)
             .show(ui, |ui| match &self.state {
                 CompileState::NotCompiled => {
-                    ui.weak(texts::NOT_COMPILED);
+                    ui.weak(texts::current().not_compiled);
                 }
                 CompileState::Running(_) => {
                     ui.horizontal(|ui| {
                         ui.spinner();
-                        ui.weak(texts::COMPILING);
+                        ui.weak(texts::current().compiling);
                     });
                 }
                 CompileState::Finished(check) if check.problems.is_empty() => {
-                    ui.weak(texts::check_passed(check.scripts));
+                    ui.weak(texts::current().check_passed(check.scripts));
                 }
                 CompileState::Finished(check) => {
                     for problem in &check.problems {
@@ -152,7 +155,7 @@ fn show_problem(ui: &mut egui::Ui, problem: &Problem) -> bool {
         let place = egui::RichText::new(place).monospace().color(ERROR_COLOR);
         let clicked = if problem.origin.is_some() {
             ui.add(egui::Link::new(place))
-                .on_hover_text(texts::SHOW_IN_BLUEPRINT)
+                .on_hover_text(texts::current().show_in_blueprint)
                 .clicked()
         } else {
             ui.label(place);

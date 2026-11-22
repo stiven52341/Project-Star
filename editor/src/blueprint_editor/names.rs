@@ -61,12 +61,12 @@ impl LiteralKind {
     }
 
     /// Its name in the editor.
-    pub(super) const fn name(self) -> &'static str {
+    pub(super) fn name(self) -> &'static str {
         match self {
-            Self::Bool => texts::BOOL_KIND,
-            Self::Int => texts::INT_KIND,
-            Self::Float => texts::FLOAT_KIND,
-            Self::String => texts::STRING_KIND,
+            Self::Bool => texts::current().bool_kind,
+            Self::Int => texts::current().int_kind,
+            Self::Float => texts::current().float_kind,
+            Self::String => texts::current().string_kind,
         }
     }
 

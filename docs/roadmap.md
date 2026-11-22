@@ -58,6 +58,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] Main window: menu, Scene / View / Inspector / Files panels, status bar.
   - [x] Engine rendering inside the view (wgpu shared with egui), grid,
         editor camera (pan/orbit and zoom).
+  - [x] Editor in English (default) and Spanish, chosen from a “Language”
+        menu and remembered between sessions.
   - [ ] Real hierarchy and inspector (after `star_scene`), log console.
 - [ ] **Phase 13 — StarScript and Blueprints** (`star_script`, see `docs/starscript.md`):
   - [x] 13.1 Lexical specification and lexer (tokens, errors with line and column).
@@ -90,7 +92,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.6b Checking a project in the editor: every `.star` of
           `assets/`, the input actions of `project.toml` and the script
           classes named by its scenes.
-    - [x] 13.6c Error panel: «Compilar», a «Problemas» tab and the result
+    - [x] 13.6c Error panel: “Compile”, a “Problems” tab and the result
           in the status bar, checked off the UI thread. (13.6b and 13.6c
           went in together: the editor is a binary, so a check without its
           panel would be dead code.)
@@ -101,15 +103,15 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           (`validate`) and `.blueprint` files (TOML).
     - [x] 13.7b Translation to StarScript, remembering which code comes from
           which node.
-    - [x] 13.7c «Compilar» in the editor checks blueprints with the scripts,
+    - [x] 13.7c “Compile” in the editor checks blueprints with the scripts,
           and their errors name the node.
   - [x] 13.8 Visual blueprint editor (drawn with egui, in tabs of the
         central area):
-    - [x] 13.8a Open blueprints from «Archivos» in a tab and see their
+    - [x] 13.8a Open blueprints from “Assets” in a tab and see their
           graphs: nodes, pins and wires, with pan and zoom.
     - [x] 13.8b Edit graphs: move nodes, connect and remove wires, add and
           delete nodes, change their properties, and save.
     - [x] 13.8c Edit the class (variables, graphs and their signature),
           create new blueprints, and mark on their nodes the mistakes
-          «Compilar» finds.
+          “Compile” finds.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

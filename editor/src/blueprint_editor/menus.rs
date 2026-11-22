@@ -29,7 +29,10 @@ pub(super) fn show_menu(
         MenuTarget::Pin(pin) => {
             let connected = edit::is_connected(graph, pin);
             if ui
-                .add_enabled(connected, egui::Button::new(texts::DISCONNECT_PIN))
+                .add_enabled(
+                    connected,
+                    egui::Button::new(texts::current().disconnect_pin),
+                )
                 .clicked()
             {
                 edit::disconnect(graph, pin);
@@ -43,8 +46,8 @@ pub(super) fn show_menu(
                 .node(*id)
                 .is_some_and(|node| matches!(node.kind, NodeKind::Entry));
             let button = ui
-                .add_enabled(!is_entry, egui::Button::new(texts::DELETE_NODE))
-                .on_disabled_hover_text(texts::ENTRY_CANNOT_BE_DELETED);
+                .add_enabled(!is_entry, egui::Button::new(texts::current().delete_node))
+                .on_disabled_hover_text(texts::current().entry_cannot_be_deleted);
             if button.clicked() {
                 edit::remove_node(graph, *id);
                 *selected = None;
@@ -67,8 +70,8 @@ pub(super) fn show_menu(
 /// The kinds of node that can be added; returns the one chosen.
 fn new_node_menu(ui: &mut egui::Ui, names: &BlueprintNames) -> Option<NodeKind> {
     let mut chosen = None;
-    ui.weak(texts::ADD_NODE);
-    ui.menu_button(texts::MENU_VALUE, |ui| {
+    ui.weak(texts::current().add_node);
+    ui.menu_button(texts::current().menu_value, |ui| {
         for kind in LiteralKind::ALL {
             if ui.button(kind.name()).clicked() {
                 chosen = Some(NodeKind::Literal {
@@ -77,32 +80,35 @@ fn new_node_menu(ui: &mut egui::Ui, names: &BlueprintNames) -> Option<NodeKind> 
             }
         }
     });
-    ui.menu_button(texts::MENU_GET_VARIABLE, |ui| {
+    ui.menu_button(texts::current().menu_get_variable, |ui| {
         if let Some(variable) = variable_menu(ui, names) {
             chosen = Some(NodeKind::GetVariable { variable });
         }
     });
-    ui.menu_button(texts::MENU_SET_VARIABLE, |ui| {
+    ui.menu_button(texts::current().menu_set_variable, |ui| {
         if let Some(variable) = variable_menu(ui, names) {
             chosen = Some(NodeKind::SetVariable { variable });
         }
     });
-    ui.menu_button(texts::MENU_CALL, |ui| {
+    ui.menu_button(texts::current().menu_call, |ui| {
         if let Some(call) = call_menu(ui, names) {
             chosen = Some(NodeKind::Call(call));
         }
     });
-    ui.menu_button(texts::MENU_OPERATOR, |ui| {
+    ui.menu_button(texts::current().menu_operator, |ui| {
         for operator in Operator::ALL {
-            if ui.button(texts::operator_name(operator)).clicked() {
+            if ui
+                .button(texts::current().operator_name(operator))
+                .clicked()
+            {
                 chosen = Some(NodeKind::Operator { operator });
             }
         }
     });
-    if ui.button(texts::NODE_BRANCH).clicked() {
+    if ui.button(texts::current().node_branch).clicked() {
         chosen = Some(NodeKind::Branch);
     }
-    if ui.button(texts::NODE_RETURN).clicked() {
+    if ui.button(texts::current().node_return).clicked() {
         chosen = Some(NodeKind::Return);
     }
     chosen
@@ -120,7 +126,7 @@ fn variable_menu(ui: &mut egui::Ui, names: &BlueprintNames) -> Option<String> {
     if !names.variables.is_empty() {
         ui.separator();
     }
-    if ui.button(texts::OTHER_NAME).clicked() {
+    if ui.button(texts::current().other_name).clicked() {
         chosen = Some(String::new());
     }
     chosen
@@ -138,9 +144,12 @@ fn call_menu(ui: &mut egui::Ui, names: &BlueprintNames) -> Option<Call> {
         ui.separator();
     }
     let targets = [
-        (texts::CALL_OWN_METHOD, CallTarget::OwnObject),
-        (texts::CALL_METHOD_OF_VALUE, CallTarget::Value),
-        (texts::CALL_CLASS_FUNCTION, CallTarget::Class(String::new())),
+        (texts::current().call_own_method, CallTarget::OwnObject),
+        (texts::current().call_method_of_value, CallTarget::Value),
+        (
+            texts::current().call_class_function,
+            CallTarget::Class(String::new()),
+        ),
     ];
     for (label, target) in targets {
         if ui.button(label).clicked() {

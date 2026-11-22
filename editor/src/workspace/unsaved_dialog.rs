@@ -21,17 +21,17 @@ pub(crate) fn show_unsaved_dialog(
 ) -> Option<UnsavedChoice> {
     let mut choice = None;
     let modal = egui::Modal::new(egui::Id::unique("unsaved_changes")).show(context, |ui| {
-        ui.strong(texts::UNSAVED_CHANGES);
+        ui.strong(texts::current().unsaved_changes);
         ui.label(question);
         ui.separator();
         ui.horizontal(|ui| {
-            if ui.button(texts::SAVE).clicked() {
+            if ui.button(texts::current().save).clicked() {
                 choice = Some(UnsavedChoice::Save);
             }
-            if ui.button(texts::DISCARD_CHANGES).clicked() {
+            if ui.button(texts::current().discard_changes).clicked() {
                 choice = Some(UnsavedChoice::Discard);
             }
-            if ui.button(texts::CANCEL).clicked() {
+            if ui.button(texts::current().cancel).clicked() {
                 choice = Some(UnsavedChoice::Cancel);
             }
         });

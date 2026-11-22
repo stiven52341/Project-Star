@@ -3,9 +3,10 @@
 use eframe::{egui, egui_wgpu};
 use star_engine::prelude::ENGINE_NAME;
 
-use crate::launcher::Launcher;
+use crate::launcher::{Launcher, LauncherAction};
+use crate::preferences::PreferencesStore;
 use crate::project::Project;
-use crate::texts;
+use crate::texts::{self, Language};
 use crate::workspace::{EditorAction, EditorWindow};
 
 /// Size of the native window while the launcher is shown.
@@ -19,12 +20,23 @@ enum Screen {
 /// The editor process: one screen at a time in a single native window.
 pub(crate) struct EditorApp {
     screen: Screen,
+    preferences: PreferencesStore,
 }
 
 impl EditorApp {
-    pub(crate) fn new() -> Self {
+    /// Starts on the launcher, shown as `preferences` say.
+    pub(crate) fn new(preferences: PreferencesStore) -> Self {
         Self {
             screen: Screen::Launcher(Launcher::new()),
+            preferences,
+        }
+    }
+
+    /// Shows the editor in `language`, window title included.
+    fn change_language(&mut self, context: &egui::Context, language: Language) {
+        self.preferences.set_language(language);
+        if matches!(self.screen, Screen::Launcher(_)) {
+            context.send_viewport_cmd(egui::ViewportCommand::Title(launcher_title()));
         }
     }
 
@@ -53,14 +65,29 @@ impl eframe::App for EditorApp {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let context = ui.ctx().clone();
         let next_screen = match &mut self.screen {
-            Screen::Launcher(launcher) => egui::CentralPanel::default_margins()
+            Screen::Launcher(launcher) => match egui::CentralPanel::default_margins()
                 .show(ui, |ui| launcher.show(ui))
                 .inner
-                .map(|project| Self::open_editor(&context, frame.wgpu_render_state(), project)),
+            {
+                Some(LauncherAction::Open(project)) => Some(Self::open_editor(
+                    &context,
+                    frame.wgpu_render_state(),
+                    project,
+                )),
+                Some(LauncherAction::ChangeLanguage(language)) => {
+                    self.change_language(&context, language);
+                    None
+                }
+                None => None,
+            },
             Screen::Editor(editor) => match editor.show(ui) {
                 Some(EditorAction::CloseProject) => Some(Self::open_launcher(&context)),
                 Some(EditorAction::Quit) => {
                     context.send_viewport_cmd(egui::ViewportCommand::Close);
+                    None
+                }
+                Some(EditorAction::ChangeLanguage(language)) => {
+                    self.change_language(&context, language);
                     None
                 }
                 None => None,
@@ -73,5 +100,5 @@ impl eframe::App for EditorApp {
 }
 
 pub(crate) fn launcher_title() -> String {
-    format!("{ENGINE_NAME} — {}", texts::PROJECT_MANAGER)
+    format!("{ENGINE_NAME} — {}", texts::current().project_manager)
 }

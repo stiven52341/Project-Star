@@ -118,14 +118,16 @@ impl SceneViewport {
         painter.text(
             top_left,
             egui::Align2::LEFT_TOP,
-            texts::viewport_title(self.dimension.label()),
+            texts::current().viewport_title(self.dimension.label()),
             font.clone(),
             ui.visuals().strong_text_color(),
         );
         let (hint, color) = match &self.render_error {
-            Some(error) => (texts::viewport_error(error), ERROR_COLOR),
+            Some(error) => (texts::current().viewport_error(error), ERROR_COLOR),
             None => (
-                texts::viewport_controls(self.dimension).to_owned(),
+                texts::current()
+                    .viewport_controls(self.dimension)
+                    .to_owned(),
                 ui.visuals().weak_text_color(),
             ),
         };

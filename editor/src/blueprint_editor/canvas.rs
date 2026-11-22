@@ -6,7 +6,7 @@
 //! - the right button opens a menu to add nodes, delete them or remove
 //!   wires; `Delete` deletes the selected node.
 //!
-//! Nodes with mistakes found by «Compilar» have a red border, and the
+//! Nodes with mistakes found by “Compile” have a red border, and the
 //! pointer over them shows the mistakes.
 
 use std::collections::HashMap;

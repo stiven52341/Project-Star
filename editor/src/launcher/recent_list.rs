@@ -33,7 +33,7 @@ impl RecentEntry {
 /// Draws `entries` and returns the action the user chose this frame, if any.
 pub(crate) fn show_recent_list(ui: &mut egui::Ui, entries: &[RecentEntry]) -> Option<RecentAction> {
     if entries.is_empty() {
-        ui.weak(texts::NO_RECENT_PROJECTS);
+        ui.weak(texts::current().no_recent_projects);
         return None;
     }
     let mut action = None;
@@ -69,7 +69,7 @@ fn show_available(ui: &mut egui::Ui, project: &Project) -> Option<RecentAction> 
         ui.strong(settings.name());
         ui.weak(settings.dimension().label());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button(texts::OPEN).clicked() {
+            if ui.button(texts::current().open).clicked() {
                 action = Some(RecentAction::Open(project.directory().to_path_buf()));
             }
         });
@@ -84,13 +84,13 @@ fn show_unavailable(ui: &mut egui::Ui, directory: &Path) -> Option<RecentAction>
         ui.weak(texts::folder_name(directory));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let remove = ui
-                .button(texts::REMOVE_FROM_LIST)
-                .on_hover_text(texts::REMOVE_FROM_LIST_HINT);
+                .button(texts::current().remove_from_list)
+                .on_hover_text(texts::current().remove_from_list_hint);
             if remove.clicked() {
                 action = Some(RecentAction::Remove(directory.to_path_buf()));
             }
         });
     });
-    ui.small(texts::PROJECT_UNAVAILABLE);
+    ui.small(texts::current().project_unavailable);
     action
 }
