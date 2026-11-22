@@ -1,13 +1,14 @@
 //! State of every input device, updated from the platform's input events.
 
 use star_math::Vec2;
-use star_platform::InputEvent;
+use star_platform::{ButtonState, InputEvent, TouchPhase};
 
 use crate::action_map::ActionMap;
 use crate::actions::Actions;
 use crate::binding::Binding;
 use crate::keyboard::Keyboard;
 use crate::mouse::Mouse;
+use crate::touches::Touches;
 
 /// Everything the player is doing with their input devices this frame.
 ///
@@ -20,6 +21,7 @@ use crate::mouse::Mouse;
 pub struct Input {
     keyboard: Keyboard,
     mouse: Mouse,
+    touches: Touches,
     actions: Actions,
 }
 
@@ -36,6 +38,7 @@ impl Input {
         Self {
             keyboard: Keyboard::new(),
             mouse: Mouse::new(),
+            touches: Touches::new(),
             actions: Actions::new(map),
         }
     }
@@ -58,6 +61,12 @@ impl Input {
         &self.mouse
     }
 
+    /// Fingers on the touch screen.
+    #[must_use]
+    pub const fn touches(&self) -> &Touches {
+        &self.touches
+    }
+
     /// Updates the state with something the user did.
     pub fn apply(&mut self, event: InputEvent) {
         match event {
@@ -75,6 +84,7 @@ impl Input {
             InputEvent::CursorMoved { x, y } => self.mouse.move_cursor(Vec2::new(x, y)),
             InputEvent::CursorLeft => self.mouse.leave_window(),
             InputEvent::MouseWheel { x, y } => self.mouse.scroll(Vec2::new(x, y)),
+            InputEvent::Touch { id, phase, x, y } => self.touch(id, phase, Vec2::new(x, y)),
             InputEvent::FocusLost => self.release_everything(),
         }
     }
@@ -84,19 +94,36 @@ impl Input {
     pub fn end_frame(&mut self) {
         self.keyboard.end_frame();
         self.mouse.end_frame();
+        self.touches.end_frame();
         self.actions.end_frame();
+    }
+
+    /// The [`Binding::Touch`] actions follow whether any finger is down.
+    fn touch(&mut self, id: u64, phase: TouchPhase, position: Vec2) {
+        let was_touching = self.touches.is_any_down();
+        self.touches.apply(id, phase, position);
+        let is_touching = self.touches.is_any_down();
+        if is_touching != was_touching {
+            let state = if is_touching {
+                ButtonState::Pressed
+            } else {
+                ButtonState::Released
+            };
+            self.actions.binding_changed(Binding::Touch, state);
+        }
     }
 
     fn release_everything(&mut self) {
         self.keyboard.release_all();
         self.mouse.release_all();
+        self.touches.release_all();
         self.actions.release_all();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use star_platform::{ButtonState, Key, MouseButton};
+    use star_platform::{Key, MouseButton};
 
     use super::*;
 
@@ -207,6 +234,67 @@ mod tests {
 
         assert!(input.actions().is_down(JUMP));
         assert!(!input.actions().just_pressed(JUMP));
+    }
+
+    fn touch(id: u64, phase: TouchPhase) -> InputEvent {
+        InputEvent::Touch {
+            id,
+            phase,
+            x: 1.0,
+            y: 2.0,
+        }
+    }
+
+    fn tap_input() -> Input {
+        let mut map = ActionMap::new();
+        map.add(JUMP, &[Binding::Touch]).unwrap();
+        Input::with_actions(map)
+    }
+
+    #[test]
+    fn touch_events_reach_the_touches() {
+        let mut input = Input::new();
+
+        input.apply(touch(1, TouchPhase::Started));
+
+        assert!(input.touches().is_any_down());
+        assert_eq!(input.touches().iter().count(), 1);
+    }
+
+    #[test]
+    fn touching_the_screen_triggers_touch_actions() {
+        let mut input = tap_input();
+
+        input.apply(touch(1, TouchPhase::Started));
+
+        assert!(input.actions().just_pressed(JUMP));
+    }
+
+    #[test]
+    fn touch_actions_stay_held_until_the_last_finger_leaves() {
+        let mut input = tap_input();
+        input.apply(touch(1, TouchPhase::Started));
+        input.apply(touch(2, TouchPhase::Started));
+        input.end_frame();
+
+        input.apply(touch(1, TouchPhase::Ended));
+
+        assert!(input.actions().is_down(JUMP));
+
+        input.apply(touch(2, TouchPhase::Ended));
+
+        assert!(input.actions().just_released(JUMP));
+    }
+
+    #[test]
+    fn losing_focus_lifts_every_finger() {
+        let mut input = tap_input();
+        input.apply(touch(1, TouchPhase::Started));
+
+        input.apply(InputEvent::FocusLost);
+
+        assert!(!input.touches().is_any_down());
+        assert!(!input.actions().is_down(JUMP));
     }
 
     #[test]

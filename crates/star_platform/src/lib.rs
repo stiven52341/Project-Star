@@ -13,6 +13,6 @@ mod window;
 mod winit_input;
 
 pub use event_loop::{WindowEventHandler, run_event_loop};
-pub use input_event::{ButtonState, InputEvent, Key, MouseButton};
+pub use input_event::{ButtonState, InputEvent, Key, MouseButton, TouchPhase};
 pub use target::TargetPlatform;
 pub use window::{Window, WindowConfig, WindowSize};

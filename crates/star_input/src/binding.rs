@@ -4,7 +4,7 @@ use star_platform::{Key, MouseButton};
 
 /// A physical input bound to an action: while it is held, the action is held.
 ///
-/// Touch screens and gamepads will be added as new kinds of binding.
+/// Gamepads will be added as a new kind of binding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Binding {
@@ -12,6 +12,8 @@ pub enum Binding {
     Key(Key),
     /// A mouse button.
     MouseButton(MouseButton),
+    /// Any finger on the touch screen, e.g. "tap anywhere to jump".
+    Touch,
 }
 
 impl From<Key> for Binding {

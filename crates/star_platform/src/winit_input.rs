@@ -1,9 +1,9 @@
 //! Translation of `winit` input events into [`InputEvent`]s.
 
-use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseScrollDelta, Touch, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
 
-use crate::input_event::{ButtonState, InputEvent, Key, MouseButton};
+use crate::input_event::{ButtonState, InputEvent, Key, MouseButton, TouchPhase};
 
 /// Pixels of a touchpad scroll that count as one line of a mouse wheel, so
 /// both devices scroll at a similar speed.
@@ -30,6 +30,7 @@ pub(crate) fn translate_window_event(event: &WindowEvent) -> Option<InputEvent> 
         }),
         WindowEvent::CursorLeft { .. } => Some(InputEvent::CursorLeft),
         WindowEvent::MouseWheel { delta, .. } => Some(translate_scroll(*delta)),
+        WindowEvent::Touch(touch) => Some(translate_touch(touch)),
         WindowEvent::Focused(false) => Some(InputEvent::FocusLost),
         _ => None,
     }
@@ -65,6 +66,24 @@ fn translate_mouse_button(button: winit::event::MouseButton) -> Option<MouseButt
         winit::event::MouseButton::Back => Some(MouseButton::Back),
         winit::event::MouseButton::Forward => Some(MouseButton::Forward),
         winit::event::MouseButton::Other(_) => None,
+    }
+}
+
+fn translate_touch(touch: &Touch) -> InputEvent {
+    InputEvent::Touch {
+        id: touch.id,
+        phase: translate_touch_phase(touch.phase),
+        x: pixels_to_f32(touch.location.x),
+        y: pixels_to_f32(touch.location.y),
+    }
+}
+
+fn translate_touch_phase(phase: winit::event::TouchPhase) -> TouchPhase {
+    match phase {
+        winit::event::TouchPhase::Started => TouchPhase::Started,
+        winit::event::TouchPhase::Moved => TouchPhase::Moved,
+        winit::event::TouchPhase::Ended => TouchPhase::Ended,
+        winit::event::TouchPhase::Cancelled => TouchPhase::Cancelled,
     }
 }
 
@@ -165,6 +184,18 @@ mod tests {
         assert_eq!(
             translate_mouse_button(winit::event::MouseButton::Other(9)),
             None
+        );
+    }
+
+    #[test]
+    fn touch_phases_keep_their_meaning() {
+        assert_eq!(
+            translate_touch_phase(winit::event::TouchPhase::Started),
+            TouchPhase::Started
+        );
+        assert_eq!(
+            translate_touch_phase(winit::event::TouchPhase::Cancelled),
+            TouchPhase::Cancelled
         );
     }
 

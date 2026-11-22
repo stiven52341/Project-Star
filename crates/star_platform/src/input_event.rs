@@ -99,6 +99,20 @@ impl MouseButton {
     }
 }
 
+/// Stage of a finger's contact with a touch screen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TouchPhase {
+    /// The finger touched the screen.
+    Started,
+    /// The finger moved while touching the screen.
+    Moved,
+    /// The finger left the screen.
+    Ended,
+    /// The system took over the touch (e.g. for a gesture); the finger no
+    /// longer belongs to the game.
+    Cancelled,
+}
+
 /// Something the user did with an input device.
 ///
 /// Positions are in physical pixels of the window's drawable area, with the
@@ -133,6 +147,18 @@ pub enum InputEvent {
         /// Horizontal lines; positive to the right.
         x: f32,
         /// Vertical lines; positive when the wheel turns away from the user.
+        y: f32,
+    },
+    /// A finger touched, moved on or left a touch screen.
+    Touch {
+        /// Identifies the finger while it touches the screen; it may be
+        /// reused by a later touch.
+        id: u64,
+        /// What the finger did.
+        phase: TouchPhase,
+        /// Horizontal position, in pixels from the left edge.
+        x: f32,
+        /// Vertical position, in pixels from the top edge.
         y: f32,
     },
     /// The window stopped receiving input. Keys and buttons held at that moment

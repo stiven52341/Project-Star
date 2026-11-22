@@ -81,10 +81,16 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input �
   every key and button is released, so none stays "stuck".
 - The cursor is in physical pixels from the top-left corner (`None` outside
   the window); the wheel is in lines (touchpad pixels are converted).
+- **Touch**: `Touches` keeps up to `MAX_TOUCHES` (10) fingers in a fixed
+  array, each with its id, position, start position, `is_down`,
+  `just_started` and `just_ended`. A finger that leaves the screen stays
+  listed until the frame ends, so quick taps are not lost; a touch cancelled
+  by the system counts as ended. More fingers than the capacity are ignored.
 - Raw keyboard and mouse are the base layer: games normally use **actions**.
   An `ActionMap` (given to `App::with_actions`) binds each action name to
-  one or more `Binding`s (a key or a mouse button; touch and gamepads will be
-  added as new kinds). An action is held while **any** of its bindings is
+  one or more `Binding`s: a key, a mouse button or `Binding::Touch` (any
+  finger on the screen); gamepads will be added as a new kind. On-screen
+  virtual buttons (touch regions) will come later. An action is held while **any** of its bindings is
   held: it keeps a count of held bindings, so pressing a second binding of a
   held action is not a new press. Actions are asked for by name
   (`input.actions().just_pressed("jump")`); an unknown name answers `false`.
