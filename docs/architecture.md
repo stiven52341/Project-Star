@@ -90,6 +90,11 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 - Structural changes (spawn, despawn, add or remove components) need
   `&mut World`; reading and changing existing components only `&World`, so a
   query can read other entities (`world.get`) while it runs.
+- A `Schedule` runs systems (`FnMut(&mut World) -> EngineResult<()>`:
+  functions, or closures that keep their own state) once per frame, stage by
+  stage — `First`, `Update`, `Physics`, `Last` — and, within a stage, in the
+  order they were added. The first failing system stops the frame with its
+  error. Systems get `&mut World`, so they can spawn and despawn directly.
 
 ## Input
 

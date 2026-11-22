@@ -2,7 +2,8 @@
 //!
 //! A [`World`] holds entities, their components (any `'static` type, kept
 //! per type in sparse sets) and resources (global values). Queries visit the
-//! entities that have a set of components:
+//! entities that have a set of components, and a [`Schedule`] runs systems
+//! on the world in the [`Stage`]s of each frame:
 //!
 //! ```
 //! use star_ecs::World;
@@ -26,9 +27,11 @@
 mod entity;
 mod query;
 mod resources;
+mod schedule;
 mod sparse_set;
 mod world;
 
 pub use entity::{Entity, EntityAllocator};
 pub use query::{Query, QueryParam, ReadComponents, WriteComponents};
+pub use schedule::{Schedule, Stage, System};
 pub use world::World;

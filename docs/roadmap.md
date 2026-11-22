@@ -31,7 +31,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
 - [ ] **Phase 4 — Full ECS**:
   - [x] 4a `World`: entities, components in sparse sets, queries
         (`World::each`) and resources.
-  - [ ] 4b Systems and stages (`Schedule`).
+  - [x] 4b Systems and stages (`Schedule`).
   - [ ] 4c The engine owns the `World`: `Time` and `Input` as resources,
         systems registered in `App`.
 - [ ] **Phase 5 — Assets**: asset folders, handles and caching, sounds,
