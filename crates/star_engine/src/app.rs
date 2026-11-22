@@ -9,6 +9,7 @@ use star_input::{ActionMap, Input};
 use star_platform::{TargetPlatform, WindowConfig, WindowSize, run_event_loop};
 use star_render::{Color, GraphicsBackend, RendererConfig};
 
+use crate::fallback_logger;
 use crate::game::{EmptyGame, Game};
 use crate::game_assets::GameAssets;
 use crate::runtime::Runtime;
@@ -155,7 +156,9 @@ impl App {
         self.run_game(EmptyGame)
     }
 
-    /// Opens the window and runs `game` until the window is closed.
+    /// Opens the window and runs `game` until the window is closed. If the
+    /// game installed no logger, the engine's warnings and errors are
+    /// written to the standard error output.
     ///
     /// # Errors
     ///
@@ -166,6 +169,7 @@ impl App {
         if !self.platform.is_supported() {
             return Err(EngineError::UnsupportedPlatform(self.platform.to_string()));
         }
+        fallback_logger::install();
         let input = Input::with_actions(self.actions);
         let mut runtime = Runtime::new(
             game,

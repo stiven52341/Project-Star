@@ -8,6 +8,7 @@
 
 pub mod app;
 mod engine_world;
+mod fallback_logger;
 pub mod game;
 mod game_assets;
 pub mod prelude;
