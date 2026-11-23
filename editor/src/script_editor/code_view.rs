@@ -8,6 +8,7 @@ use eframe::egui;
 use egui::text::{CCursor, CCursorRange, LayoutJob};
 use star_script::Position;
 
+use super::editing::{Action, Selection, apply};
 use super::highlight::colored;
 use crate::texts;
 
@@ -44,13 +45,13 @@ impl CodeView {
             index
         });
         let footer_height = ui.spacing().interact_size.y;
-        let mut changed = false;
+        let mut changed = apply_writing_aids(ui.ctx(), text, id);
         egui::ScrollArea::vertical()
             .id_salt(id)
             .auto_shrink(false)
             .max_height((ui.available_height() - footer_height).max(0.0))
             .show(ui, |ui| {
-                changed = self.show_lines(ui, text, id, &font, jumped);
+                changed |= self.show_lines(ui, text, id, &font, jumped);
             });
         ui.separator();
         if let Some(position) = self.cursor {
@@ -174,6 +175,92 @@ fn paint_line_numbers(
         output.response.rect.y_range(),
         visuals.widgets.noninteractive.bg_stroke,
     );
+}
+
+/// Hands the keys that writing aids handle to them, before the text edit
+/// `id` sees them, while it has the keyboard. Returns whether the text
+/// changed.
+fn apply_writing_aids(context: &egui::Context, text: &mut String, id: egui::Id) -> bool {
+    if !context.memory(|memory| memory.has_focus(id)) {
+        return false;
+    }
+    let Some(mut state) = egui::text_edit::TextEditState::load(context, id) else {
+        return false;
+    };
+    let Some(range) = state.cursor.char_range() else {
+        return false;
+    };
+    let mut selection = Selection {
+        anchor: range.secondary.index.0,
+        cursor: range.primary.index.0,
+    };
+    let mut changed = false;
+    // Once the text edit has to handle a key, it handles those after it
+    // too, so they reach the text in the order they were typed.
+    let mut passing = false;
+    context.input_mut(|input| {
+        input.events.retain(|event| {
+            if passing {
+                return true;
+            }
+            let handled = action_of(event).and_then(|action| apply(text, selection, action));
+            if let Some(new_selection) = handled {
+                selection = new_selection;
+                changed = true;
+                return false;
+            }
+            passing = changes_text(event);
+            true
+        });
+    });
+    if changed {
+        state.cursor.set_char_range(Some(CCursorRange::two(
+            CCursor::new(selection.anchor),
+            CCursor::new(selection.cursor),
+        )));
+        state.store(context, id);
+    }
+    changed
+}
+
+/// What a writing aid may do for `event`.
+fn action_of(event: &egui::Event) -> Option<Action> {
+    match event {
+        egui::Event::Text(typed) => {
+            let mut characters = typed.chars();
+            match (characters.next(), characters.next()) {
+                (Some(character), None) => Some(Action::Type(character)),
+                _ => None,
+            }
+        }
+        egui::Event::Key {
+            key,
+            pressed: true,
+            modifiers,
+            ..
+        } => match key {
+            egui::Key::Enter if modifiers.is_none() => Some(Action::NewLine),
+            egui::Key::Tab if modifiers.is_none() => Some(Action::Indent),
+            egui::Key::Tab if modifiers.matches_exact(egui::Modifiers::SHIFT) => {
+                Some(Action::Outdent)
+            }
+            egui::Key::Backspace if modifiers.is_none() => Some(Action::Backspace),
+            egui::Key::Slash if modifiers.command => Some(Action::ToggleComment),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Whether the text edit would change the text for `event`.
+const fn changes_text(event: &egui::Event) -> bool {
+    matches!(
+        event,
+        egui::Event::Text(_)
+            | egui::Event::Paste(_)
+            | egui::Event::Cut
+            | egui::Event::Key { pressed: true, .. }
+    )
 }
 
 /// Puts the cursor of the text edit `id` before the character at `index`,

@@ -199,7 +199,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.9a Open `.star` files from “Assets” in a tab: colors from the
           compiler's lexer, line numbers, the cursor's line and column,
           saving, and “Problems” opening a script at the problem.
-    - [ ] 13.9b Writing aids: closing brackets and quotes, indentation.
+    - [x] 13.9b Writing aids: closing brackets and quotes, indentation on
+          new lines, `Tab`/`Shift+Tab` over lines, `Ctrl+/` comments.
     - [ ] 13.9c Mistakes while writing: checked in the background and
           marked on their lines.
     - [ ] 13.9d Suggestions: names in scope and members, shown as faint

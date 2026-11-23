@@ -695,6 +695,21 @@ wrap, and the line and column of the cursor are shown below the text.
 Clicking a problem of a script in “Problems” opens it with the cursor on
 the problem's line and column. Scripts are saved as blueprints are.
 
+Writing aids (`editing.rs`, free of egui and tested on their own) take the
+keys they handle before the `TextEdit` sees them: `(`, `[`, `{` and `"`
+close themselves where nothing follows that they would wrap (a quote not
+after a word nor inside a string), surround a selection, and typing the
+closing one again steps over it; `Backspace` between an empty pair deletes
+both, and in indentation goes back one level. `Enter` keeps the line's
+indentation, one level more after an opening bracket (with the closing one
+moved to a line of its own when the cursor was between them); `}` on a
+line of only indentation goes one level back. `Tab` types one level (four
+spaces, as blueprints are translated) or indents the selected lines, and
+`Shift+Tab` takes a level out; `Ctrl+/` comments out the selected lines,
+or uncomments them if they all are. Once the `TextEdit` has to handle a
+key, it handles the keys after it in that frame too, so typing order is
+kept.
+
 Blueprints and scripts are saved with `Ctrl+S` or “File” → “Save”, and
 all of them before “Compile”, which reads the files. Tabs with unsaved changes
 show `●`; closing one, the project or the window asks first (“Save”,

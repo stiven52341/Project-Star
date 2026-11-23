@@ -2,6 +2,7 @@
 //! of the central area, its text colored and its lines numbered.
 
 mod code_view;
+mod editing;
 mod highlight;
 
 use std::fs;
