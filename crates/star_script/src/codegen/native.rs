@@ -1104,8 +1104,8 @@ fn script_camera_(camera_: &dyn crate::classes::Camera::Object) -> ::star_engine
 }";
 
 const READ_SCENE: &str = "/// Reads a scene of the game's asset folder for `Scene.load`. Parts of a
-/// scene that scripts have no field for yet (a sprite's region and anchor)
-/// are left out.
+/// scene that scripts have no field for yet (a sprite's region and anchor,
+/// 3D nodes) are left out.
 fn read_scene_(
     folder_: &::star_engine::star_assets::AssetFolder,
     path_: &str,

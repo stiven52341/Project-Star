@@ -18,8 +18,8 @@ pub use star_physics::{
 pub use star_platform::TargetPlatform;
 pub use star_render::{
     AmbientLight, Camera, Color, DirectionalLight, Frame, GraphicsBackend, Image, Light,
-    MAX_LIGHTS, Material, Mesh3dId, MeshData, MeshId, MeshVertex, PointLight, Projection, Sprite,
-    TextureFilter, TextureId, TextureRegion, Vertex,
+    MAX_LIGHTS, Material, Mesh3dId, MeshData, MeshId, MeshShape, MeshVertex, PointLight,
+    Projection, Sprite, TextureFilter, TextureId, TextureRegion, Vertex,
 };
 pub use star_scene::{
     Body2D, Children, GlobalTransform2D, GlobalTransform3D, Hierarchy, LightNode, MeshNode, Name,

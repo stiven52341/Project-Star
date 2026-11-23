@@ -5,20 +5,25 @@ use star_core::{EngineError, EngineResult};
 use star_ecs::{Entity, World};
 use star_math::Vec2;
 use star_physics::BodySettings;
-use star_render::{Color, Sprite, TextureFilter, TextureId, TextureRegion};
+use star_render::{
+    Color, Material, Mesh3dId, MeshShape, Sprite, TextureFilter, TextureId, TextureRegion,
+};
 
 use crate::body_data::BodyData;
+use crate::node_3d_data::{LightData, MeshOutline, MeshTable, Transform3dData};
 use crate::scene_file::{FORMAT_VERSION, FilterData, NodeData, SceneFile, SpriteData};
 use crate::scene_outline::{NodeOutline, SceneOutline};
-use crate::{Body2D, Children, Hierarchy, Name, SpriteNode, Transform2D};
+use crate::{
+    Body2D, Children, Hierarchy, LightNode, MeshNode, Name, SpriteNode, Transform2D, Transform3D,
+};
 
 /// A tree of nodes that can be added to a world as many times as needed:
 /// a level, an enemy, a bullet. Read from the text of a `.scene` file, or
 /// captured from a world to be saved in one.
 ///
 /// It keeps, for each node, its name, its [`Transform2D`], its
-/// [`SpriteNode`] and its [`Body2D`]; other components are not part of
-/// scenes yet.
+/// [`SpriteNode`], its [`Body2D`], its [`Transform3D`], its [`MeshNode`]
+/// and its [`LightNode`]; other components are not part of scenes yet.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scene {
     /// Parents always come before their children; the first node is the root.
@@ -35,47 +40,72 @@ struct SceneNode {
     transform: Option<Transform2D>,
     sprite: Option<SpriteNode>,
     body: Option<BodySettings>,
+    transform_3d: Option<Transform3D>,
+    mesh: Option<MeshNode>,
+    light: Option<LightNode>,
 }
 
-/// Gives the texture of an image of the asset folder, drawn with a filter.
-pub trait TextureLoader: FnMut(&AssetPath, TextureFilter) -> EngineResult<TextureId> {}
+/// Loads what the nodes of a scene show, so a [`Scene`] can be read.
+pub trait SceneAssets {
+    /// The texture of the image at `path` of the asset folder, drawn with
+    /// `filter`.
+    ///
+    /// # Errors
+    ///
+    /// Whatever keeps the texture from being loaded.
+    fn texture(&mut self, path: &AssetPath, filter: TextureFilter) -> EngineResult<TextureId>;
 
-impl<F: FnMut(&AssetPath, TextureFilter) -> EngineResult<TextureId>> TextureLoader for F {}
+    /// The 3D mesh of `shape`.
+    ///
+    /// # Errors
+    ///
+    /// Whatever keeps the mesh from being built.
+    fn mesh(&mut self, shape: MeshShape) -> EngineResult<Mesh3dId>;
+}
+
+/// Tells where what the nodes of a [`Scene`] show came from, so it can be
+/// saved.
+pub trait SceneSources {
+    /// The image and filter `texture` was loaded from, if it came from a
+    /// file.
+    fn texture_source(&self, texture: TextureId) -> Option<(AssetPath, TextureFilter)>;
+
+    /// The shape `mesh` was built from, if it came from one.
+    fn mesh_source(&self, mesh: Mesh3dId) -> Option<MeshShape>;
+}
 
 impl Scene {
-    /// Reads a scene from the text of a `.scene` file. `load_texture` gives
-    /// the texture of every image the sprites show.
+    /// Reads a scene from the text of a `.scene` file. `assets` gives the
+    /// textures and meshes its nodes show.
     ///
     /// # Errors
     ///
     /// Returns [`EngineError::Scene`] if the text is not a valid scene (bad
     /// TOML, another format version, a missing root or a node before its
-    /// parent, an invalid texture path) and the error of `load_texture` if a
-    /// texture cannot be loaded.
-    pub fn from_text(text: &str, mut load_texture: impl TextureLoader) -> EngineResult<Self> {
+    /// parent, an invalid texture path or shape), naming the node when it is
+    /// one's, and the error of `assets` if something cannot be loaded.
+    pub fn from_text(text: &str, assets: &mut impl SceneAssets) -> EngineResult<Self> {
         let nodes = SceneOutline::from_text(text)?
             .into_nodes()
             .into_iter()
-            .map(|node| load_node(node, &mut load_texture))
+            .map(|node| load_node(node, assets))
             .collect::<EngineResult<_>>()?;
         Ok(Self { nodes })
     }
 
-    /// Writes the scene as the text of a `.scene` file. `texture_source`
-    /// tells which image and filter each texture was loaded from.
+    /// Writes the scene as the text of a `.scene` file. `sources` tells
+    /// which image each texture was loaded from and which shape each mesh
+    /// was built from.
     ///
     /// # Errors
     ///
-    /// Returns [`EngineError::Scene`] if a sprite shows a texture that
-    /// `texture_source` does not know (one made in code, not from a file).
-    pub fn to_text(
-        &self,
-        texture_source: impl Fn(TextureId) -> Option<(AssetPath, TextureFilter)>,
-    ) -> EngineResult<String> {
+    /// Returns [`EngineError::Scene`], naming the node, if a node shows a
+    /// texture or a mesh that `sources` does not know (one made in code).
+    pub fn to_text(&self, sources: &impl SceneSources) -> EngineResult<String> {
         let nodes = self
             .nodes
             .iter()
-            .map(|node| write_node(node, &texture_source))
+            .map(|node| write_node(node, sources))
             .collect::<EngineResult<_>>()?;
         SceneFile {
             format: FORMAT_VERSION,
@@ -158,6 +188,15 @@ impl Scene {
             if let Some(body) = node.body {
                 world.insert(entity, Body2D::new(body))?;
             }
+            if let Some(transform) = node.transform_3d {
+                world.insert(entity, transform)?;
+            }
+            if let Some(mesh) = node.mesh {
+                world.insert(entity, mesh)?;
+            }
+            if let Some(light) = node.light {
+                world.insert(entity, light)?;
+            }
         }
         Ok(())
     }
@@ -169,15 +208,15 @@ impl Scene {
     }
 }
 
-/// The node of `outline`, with its image loaded.
-fn load_node(
-    outline: NodeOutline,
-    load_texture: &mut impl TextureLoader,
-) -> EngineResult<SceneNode> {
+/// The node of `outline`, with its images and mesh loaded.
+fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResult<SceneNode> {
+    let named =
+        |error: EngineError| EngineError::Scene(format!("node \"{}\": {error}", outline.name));
     let sprite = outline
         .sprite
+        .as_ref()
         .map(|sprite| {
-            let texture = load_texture(&sprite.texture, sprite.filter)?;
+            let texture = assets.texture(&sprite.texture, sprite.filter)?;
             Ok(SpriteNode {
                 texture,
                 region: sprite.region,
@@ -188,9 +227,13 @@ fn load_node(
             })
         })
         .transpose()
-        .map_err(|error: EngineError| {
-            EngineError::Scene(format!("node \"{}\": {error}", outline.name))
-        })?;
+        .map_err(named)?;
+    let mesh = outline
+        .mesh
+        .as_ref()
+        .map(|mesh| load_mesh(mesh, assets))
+        .transpose()
+        .map_err(named)?;
     Ok(SceneNode {
         name: outline.name,
         class: outline.class,
@@ -198,18 +241,39 @@ fn load_node(
         transform: outline.transform,
         sprite,
         body: outline.body,
+        transform_3d: outline.transform_3d,
+        mesh,
+        light: outline.light,
     })
 }
 
-fn write_node(
-    node: &SceneNode,
-    texture_source: &impl Fn(TextureId) -> Option<(AssetPath, TextureFilter)>,
-) -> EngineResult<NodeData> {
+fn load_mesh(mesh: &MeshOutline, assets: &mut impl SceneAssets) -> EngineResult<MeshNode> {
+    let texture = mesh
+        .texture
+        .as_ref()
+        .map(|(path, filter)| assets.texture(path, *filter))
+        .transpose()?;
+    let material = Material {
+        base_color: mesh.color,
+        base_color_texture: texture,
+        metallic: mesh.metallic,
+        roughness: mesh.roughness,
+    };
+    Ok(MeshNode::new(assets.mesh(mesh.shape)?, material))
+}
+
+fn write_node(node: &SceneNode, sources: &impl SceneSources) -> EngineResult<NodeData> {
+    let named = |error: EngineError| EngineError::Scene(format!("node \"{}\": {error}", node.name));
     let sprite = node
         .sprite
-        .map(|sprite| write_sprite(sprite, texture_source))
+        .map(|sprite| write_sprite(sprite, sources))
         .transpose()
-        .map_err(|error| EngineError::Scene(format!("node \"{}\": {error}", node.name)))?;
+        .map_err(named)?;
+    let mesh = node
+        .mesh
+        .map(|mesh| write_mesh(mesh, sources))
+        .transpose()
+        .map_err(named)?;
     Ok(NodeData {
         name: node.name.clone(),
         class: node.class.clone(),
@@ -219,18 +283,19 @@ fn write_node(
         scale: node.transform.map(|transform| array(transform.scale)),
         sprite,
         body: node.body.as_ref().map(BodyData::from_settings),
+        transform_3d: node
+            .transform_3d
+            .as_ref()
+            .map(Transform3dData::from_transform),
+        mesh,
+        light: node.light.as_ref().map(LightData::from_light),
     })
 }
 
-fn write_sprite(
-    sprite: SpriteNode,
-    texture_source: &impl Fn(TextureId) -> Option<(AssetPath, TextureFilter)>,
-) -> EngineResult<SpriteData> {
-    let (path, filter) = texture_source(sprite.texture).ok_or_else(|| {
-        EngineError::Scene(
-            "its texture was not loaded from a file, so it cannot be saved".to_owned(),
-        )
-    })?;
+fn write_sprite(sprite: SpriteNode, sources: &impl SceneSources) -> EngineResult<SpriteData> {
+    let (path, filter) = sources
+        .texture_source(sprite.texture)
+        .ok_or_else(|| not_from_a_file("texture"))?;
     let region = sprite.region;
     let color = sprite.color;
     Ok(SpriteData {
@@ -249,6 +314,34 @@ fn write_sprite(
     })
 }
 
+fn write_mesh(mesh: MeshNode, sources: &impl SceneSources) -> EngineResult<MeshTable> {
+    let shape = sources
+        .mesh_source(mesh.mesh)
+        .ok_or_else(|| not_from_a_file("mesh"))?;
+    let material = mesh.material;
+    let texture = material
+        .base_color_texture
+        .map(|texture| {
+            sources
+                .texture_source(texture)
+                .ok_or_else(|| not_from_a_file("texture"))
+        })
+        .transpose()?;
+    Ok(MeshTable::from_outline(&MeshOutline {
+        shape,
+        color: material.base_color,
+        metallic: material.metallic,
+        roughness: material.roughness,
+        texture,
+    }))
+}
+
+fn not_from_a_file(what: &str) -> EngineError {
+    EngineError::Scene(format!(
+        "its {what} was not loaded from a file, so it cannot be saved"
+    ))
+}
+
 fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNode {
     SceneNode {
         name: world
@@ -260,6 +353,9 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
         transform: world.get::<Transform2D>(entity).map(|transform| *transform),
         sprite: world.get::<SpriteNode>(entity).map(|sprite| *sprite),
         body: world.get::<Body2D>(entity).map(|body| *body.settings()),
+        transform_3d: world.get::<Transform3D>(entity).map(|transform| *transform),
+        mesh: world.get::<MeshNode>(entity).map(|mesh| *mesh),
+        light: world.get::<LightNode>(entity).map(|light| *light),
     }
 }
 
@@ -326,31 +422,50 @@ mod tests {
         bounciness = 0.5
     "#;
 
-    /// Gives textures in the order they are asked for, and remembers them.
+    /// Gives textures and meshes in the order they are asked for, and
+    /// remembers them.
     #[derive(Default)]
-    struct Textures(RefCell<Vec<(AssetPath, TextureFilter)>>);
+    struct Textures {
+        textures: RefCell<Vec<(AssetPath, TextureFilter)>>,
+        meshes: RefCell<Vec<MeshShape>>,
+    }
 
-    impl Textures {
-        fn load(&self, path: &AssetPath, filter: TextureFilter) -> TextureId {
-            let mut loaded = self.0.borrow_mut();
+    impl SceneAssets for &Textures {
+        fn texture(&mut self, path: &AssetPath, filter: TextureFilter) -> EngineResult<TextureId> {
+            let mut loaded = self.textures.borrow_mut();
             loaded.push((path.clone(), filter));
-            TextureId::from_index(loaded.len() - 1)
+            Ok(TextureId::from_index(loaded.len() - 1))
         }
 
-        fn source(&self, id: TextureId) -> Option<(AssetPath, TextureFilter)> {
+        fn mesh(&mut self, shape: MeshShape) -> EngineResult<Mesh3dId> {
+            let mut built = self.meshes.borrow_mut();
+            built.push(shape);
+            Ok(Mesh3dId::from_index(built.len() - 1))
+        }
+    }
+
+    impl SceneSources for Textures {
+        fn texture_source(&self, id: TextureId) -> Option<(AssetPath, TextureFilter)> {
             (0..)
-                .zip(self.0.borrow().iter())
+                .zip(self.textures.borrow().iter())
                 .find_map(|(index, source)| {
                     (TextureId::from_index(index) == id).then(|| source.clone())
                 })
         }
+
+        fn mesh_source(&self, id: Mesh3dId) -> Option<MeshShape> {
+            (0..)
+                .zip(self.meshes.borrow().iter())
+                .find_map(|(index, shape)| (Mesh3dId::from_index(index) == id).then_some(*shape))
+        }
+    }
+
+    fn read(text: &str, textures: &Textures) -> EngineResult<Scene> {
+        Scene::from_text(text, &mut &*textures)
     }
 
     fn level(textures: &Textures) -> Scene {
-        Scene::from_text(LEVEL, |path: &AssetPath, filter| {
-            Ok(textures.load(path, filter))
-        })
-        .unwrap()
+        read(LEVEL, textures).unwrap()
     }
 
     fn names(world: &World, nodes: &[Entity]) -> Vec<String> {
@@ -379,7 +494,7 @@ mod tests {
         assert_eq!(sprite.color, Color::rgba(1.0, 0.5, 0.5, 1.0));
         assert_eq!(sprite.layer, 2);
         assert_eq!(
-            textures.source(sprite.texture),
+            textures.texture_source(sprite.texture),
             Some((
                 AssetPath::new("sprites/hero.png").unwrap(),
                 TextureFilter::Pixelated
@@ -430,11 +545,8 @@ mod tests {
         let root = scene.instantiate(&mut world, None).unwrap();
 
         let captured = Scene::capture(&world, root).unwrap();
-        let text = captured.to_text(|id| textures.source(id)).unwrap();
-        let read_back = Scene::from_text(&text, |path: &AssetPath, filter| {
-            Ok(textures.load(path, filter))
-        })
-        .unwrap();
+        let text = captured.to_text(&textures).unwrap();
+        let read_back = read(&text, &textures).unwrap();
 
         assert_eq!(captured, scene);
         assert_eq!(read_back.node_count(), scene.node_count());
@@ -446,10 +558,9 @@ mod tests {
     #[test]
     fn script_classes_survive_reading_and_writing() {
         let text = "format = 1\n[[node]]\nname = \"Rock\"\nclass = \"Rock\"\n";
-        let scene =
-            Scene::from_text(text, |_: &AssetPath, _| Ok(TextureId::from_index(0))).unwrap();
+        let scene = read(text, &Textures::default()).unwrap();
 
-        let written = scene.to_text(|_| None).unwrap();
+        let written = scene.to_text(&Textures::default()).unwrap();
 
         assert!(written.contains("class = \"Rock\""), "{written}");
     }
@@ -458,7 +569,7 @@ mod tests {
     fn textures_made_in_code_cannot_be_saved() {
         let scene = level(&Textures::default());
 
-        let error = scene.to_text(|_| None).unwrap_err();
+        let error = scene.to_text(&Textures::default()).unwrap_err();
 
         assert!(error.to_string().contains("\"Hero\""), "{error}");
     }
@@ -471,8 +582,7 @@ mod tests {
             "format = 1\n[[node]]\nname = \"A\"\n[[node]]\nname = \"B\"",
             "format = 1\n[[node]]\nname = \"A\"\n[[node]]\nname = \"B\"\nparent = 1",
         ] {
-            let error = Scene::from_text(text, |_: &AssetPath, _| Ok(TextureId::from_index(0)))
-                .unwrap_err();
+            let error = read(text, &Textures::default()).unwrap_err();
 
             assert!(matches!(error, EngineError::Scene(_)), "{text}: {error}");
         }
@@ -483,10 +593,87 @@ mod tests {
         let text = "format = 1\n[[node]]\nname = \"Hero\"\n[node.sprite]\n\
                     texture = \"../hero.png\"\nsize = [1.0, 1.0]";
 
-        let error =
-            Scene::from_text(text, |_: &AssetPath, _| Ok(TextureId::from_index(0))).unwrap_err();
+        let error = read(text, &Textures::default()).unwrap_err();
 
         assert!(error.to_string().contains("\"Hero\""), "{error}");
+    }
+
+    const ROOM: &str = r#"
+        format = 1
+
+        [[node]]
+        name = "Room"
+
+        [[node]]
+        name = "Crate"
+        parent = 0
+
+        [node.transform_3d]
+        position = [1.0, 0.5, -2.0]
+        rotation = [0.0, 0.5, 0.0]
+
+        [node.mesh]
+        shape = "cube"
+        size = [1.0, 1.0, 1.0]
+        texture = "crate.png"
+        roughness = 0.8
+
+        [[node]]
+        name = "Lamp"
+        parent = 0
+
+        [node.transform_3d]
+        position = [0.0, 3.0, 0.0]
+
+        [node.light]
+        kind = "point"
+        range = 8.0
+    "#;
+
+    #[test]
+    fn scenes_keep_3d_nodes_with_their_meshes_and_lights() {
+        let textures = Textures::default();
+        let scene = read(ROOM, &textures).unwrap();
+        let mut world = World::new();
+
+        let root = scene.instantiate(&mut world, None).unwrap();
+
+        let crate_node = world.find_child(root, "Crate").unwrap();
+        let transform = *world.get::<Transform3D>(crate_node).unwrap();
+        assert_eq!(transform.position, star_math::Vec3::new(1.0, 0.5, -2.0));
+        let mesh = *world.get::<MeshNode>(crate_node).unwrap();
+        assert_eq!(
+            textures.mesh_source(mesh.mesh),
+            Some(MeshShape::Cube {
+                size: star_math::Vec3::ONE
+            })
+        );
+        assert_eq!(mesh.material.roughness, 0.8);
+        assert!(mesh.material.base_color_texture.is_some());
+        let lamp = world.find_child(root, "Lamp").unwrap();
+        assert!(matches!(
+            world.get::<LightNode>(lamp).map(|light| *light),
+            Some(LightNode::Point { range: 8.0, .. })
+        ));
+
+        let text = Scene::capture(&world, root)
+            .unwrap()
+            .to_text(&textures)
+            .unwrap();
+        assert!(
+            text.contains("[node.mesh]") && text.contains("[node.light]"),
+            "{text}"
+        );
+        assert_eq!(read(&text, &textures).unwrap().node_count(), 3);
+    }
+
+    #[test]
+    fn invalid_meshes_name_their_node() {
+        let text = "format = 1\n[[node]]\nname = \"Ball\"\n[node.mesh]\nshape = \"sphere\"";
+
+        let error = read(text, &Textures::default()).unwrap_err();
+
+        assert!(error.to_string().contains("\"Ball\""), "{error}");
     }
 
     #[test]

@@ -17,6 +17,7 @@ mod body_data;
 mod body_node;
 mod hierarchy;
 mod node_3d;
+mod node_3d_data;
 mod node_physics;
 mod scene;
 mod scene_file;
@@ -27,8 +28,9 @@ mod transform;
 pub use body_node::Body2D;
 pub use hierarchy::{Children, Hierarchy, Name, Parent};
 pub use node_3d::{LightNode, MeshNode, draw_3d_nodes};
+pub use node_3d_data::MeshOutline;
 pub use node_physics::{NodeContact, PhysicsNodes, step_node_physics};
-pub use scene::{Scene, TextureLoader};
+pub use scene::{Scene, SceneAssets, SceneSources};
 pub use scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
 pub use sprite_node::{SpriteNode, draw_sprite_nodes};
 pub use transform::{

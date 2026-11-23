@@ -14,7 +14,57 @@ pub const MIN_SPHERE_RINGS: u32 = 2;
 /// indices.
 pub const MAX_SPHERE_DIVISIONS: u32 = 1024;
 
+/// Segments around a sphere when none are given: round enough up close.
+pub const DEFAULT_SPHERE_SEGMENTS: u32 = 32;
+/// Rings from pole to pole of a sphere when none are given.
+pub const DEFAULT_SPHERE_RINGS: u32 = 16;
+
 const VERTICES_PER_TRIANGLE: usize = 3;
+
+/// A mesh described by its shape instead of its corners, as scene files
+/// keep it: the same shape always builds the same mesh.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MeshShape {
+    /// See [`MeshData::cube`].
+    Cube {
+        /// Width, height and depth.
+        size: Vec3,
+    },
+    /// See [`MeshData::plane`].
+    Plane {
+        /// Width (along x) and depth (along z).
+        size: Vec2,
+    },
+    /// See [`MeshData::sphere`].
+    Sphere {
+        /// Distance from the center to the surface.
+        radius: f32,
+        /// Divisions around it.
+        segments: u32,
+        /// Divisions from pole to pole.
+        rings: u32,
+    },
+}
+
+impl MeshShape {
+    /// The mesh of this shape.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Rendering`] if its sizes are not valid (see each
+    /// constructor of [`MeshData`]).
+    pub fn to_mesh_data(self) -> EngineResult<MeshData> {
+        match self {
+            Self::Cube { size } => MeshData::cube(size),
+            Self::Plane { size } => MeshData::plane(size),
+            Self::Sphere {
+                radius,
+                segments,
+                rings,
+            } => MeshData::sphere(radius, segments, rings),
+        }
+    }
+}
 
 /// A corner of a 3D mesh.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -353,6 +403,21 @@ mod tests {
         for vertex in sphere.vertices() {
             assert!((vertex.position.length() - 2.0).abs() < TOLERANCE);
         }
+    }
+
+    #[test]
+    fn shapes_build_their_meshes() {
+        let shape = MeshShape::Sphere {
+            radius: 1.0,
+            segments: DEFAULT_SPHERE_SEGMENTS,
+            rings: DEFAULT_SPHERE_RINGS,
+        };
+
+        assert_eq!(
+            shape.to_mesh_data().unwrap(),
+            MeshData::sphere(1.0, DEFAULT_SPHERE_SEGMENTS, DEFAULT_SPHERE_RINGS).unwrap()
+        );
+        assert!(MeshShape::Cube { size: Vec3::ZERO }.to_mesh_data().is_err());
     }
 
     #[test]

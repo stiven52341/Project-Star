@@ -42,7 +42,8 @@ pub use light::{AmbientLight, DirectionalLight, Light, MAX_LIGHTS, PointLight};
 pub use material::{DEFAULT_ROUGHNESS, Material};
 pub use mesh::{Mesh3dId, MeshId};
 pub use mesh_data::{
-    MAX_SPHERE_DIVISIONS, MIN_SPHERE_RINGS, MIN_SPHERE_SEGMENTS, MeshData, MeshVertex,
+    DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MAX_SPHERE_DIVISIONS, MIN_SPHERE_RINGS,
+    MIN_SPHERE_SEGMENTS, MeshData, MeshShape, MeshVertex,
 };
 pub use renderer::{Renderer, RendererConfig};
 pub use sprite::{Sprite, TextureRegion};

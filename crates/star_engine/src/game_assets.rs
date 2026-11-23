@@ -6,18 +6,21 @@ use std::time::Duration;
 use star_assets::{AssetFolder, AssetPath};
 use star_core::{EngineResult, Sound};
 use star_ecs::World;
-use star_render::{Frame, Renderer, TextureFilter, TextureId};
-use star_scene::{GlobalTransform2D, Scene, SpriteNode};
+use star_render::{Frame, Mesh3dId, MeshShape, Renderer, TextureFilter, TextureId};
+use star_scene::{GlobalTransform2D, Scene, SceneAssets, SpriteNode};
 
 use crate::sound_library::SoundLibrary;
 use crate::sprite_file::SpriteFile;
 use crate::texture_library::TextureLibrary;
 
-/// The asset folder of a game and the textures and sounds loaded from it.
+/// The asset folder of a game, the textures and sounds loaded from it, and
+/// the meshes built from shapes.
 pub(crate) struct GameAssets {
     folder: AssetFolder,
     textures: TextureLibrary,
     sounds: SoundLibrary,
+    /// Every shape's mesh, built once; few shapes are used, so a list.
+    meshes: Vec<(MeshShape, Mesh3dId)>,
 }
 
 impl GameAssets {
@@ -27,6 +30,7 @@ impl GameAssets {
             folder,
             textures: TextureLibrary::new(hot_reload),
             sounds: SoundLibrary::default(),
+            meshes: Vec::new(),
         }
     }
 
@@ -47,12 +51,27 @@ impl GameAssets {
         })
     }
 
+    /// The mesh of `shape`, built and uploaded the first time.
+    pub(crate) fn mesh(
+        &mut self,
+        renderer: &mut Renderer,
+        shape: MeshShape,
+    ) -> EngineResult<Mesh3dId> {
+        if let Some((_, mesh)) = self.meshes.iter().find(|(built, _)| *built == shape) {
+            return Ok(*mesh);
+        }
+        let mesh = renderer.create_mesh_3d(&shape.to_mesh_data()?)?;
+        self.meshes.push((shape, mesh));
+        Ok(mesh)
+    }
+
     /// The sound at `path`, decoded the first time.
     pub(crate) fn load_sound(&mut self, path: AssetPath) -> EngineResult<Arc<Sound>> {
         self.sounds.load(&self.folder, path)
     }
 
-    /// Reads the scene file at `path`, loading the textures its sprites show.
+    /// Reads the scene file at `path`, loading the textures and meshes its
+    /// nodes show.
     pub(crate) fn load_scene(
         &mut self,
         renderer: &mut Renderer,
@@ -60,10 +79,12 @@ impl GameAssets {
     ) -> EngineResult<Scene> {
         let path = AssetPath::new(path)?;
         let text = self.folder.read_text(&path)?;
-        Scene::from_text(&text, |texture: &AssetPath, filter| {
-            self.load_texture(renderer, texture.clone(), filter)
-        })
-        .map_err(|error| star_core::EngineError::Scene(format!("\"{path}\": {error}")))
+        let mut loader = SceneLoader {
+            assets: self,
+            renderer,
+        };
+        Scene::from_text(&text, &mut loader)
+            .map_err(|error| star_core::EngineError::Scene(format!("\"{path}\": {error}")))
     }
 
     /// Adds to `frame` the sprite of every node with a [`SpriteFile`] and a
@@ -103,5 +124,22 @@ impl GameAssets {
                 Err(error) => log::warn!("Cannot reload \"{}\": {error}", texture.path),
             }
         });
+    }
+}
+
+/// Loads what the nodes of a scene show into the game's assets.
+struct SceneLoader<'a> {
+    assets: &'a mut GameAssets,
+    renderer: &'a mut Renderer,
+}
+
+impl SceneAssets for SceneLoader<'_> {
+    fn texture(&mut self, path: &AssetPath, filter: TextureFilter) -> EngineResult<TextureId> {
+        self.assets
+            .load_texture(self.renderer, path.clone(), filter)
+    }
+
+    fn mesh(&mut self, shape: MeshShape) -> EngineResult<Mesh3dId> {
+        self.assets.mesh(self.renderer, shape)
     }
 }

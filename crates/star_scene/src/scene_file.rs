@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use star_core::{EngineError, EngineResult};
 
 use crate::body_data::BodyData;
+use crate::node_3d_data::{LightData, MeshTable, Transform3dData};
 
 /// The version of the layout this engine writes and reads.
 pub(crate) const FORMAT_VERSION: u32 = 1;
@@ -41,6 +42,12 @@ pub(crate) struct NodeData {
     pub(crate) sprite: Option<SpriteData>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) body: Option<BodyData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) transform_3d: Option<Transform3dData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) mesh: Option<MeshTable>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) light: Option<LightData>,
 }
 
 /// A `[node.sprite]` table.
@@ -157,6 +164,9 @@ mod tests {
                     layer: 3,
                 }),
                 body: None,
+                transform_3d: None,
+                mesh: None,
+                light: None,
             }],
         };
 

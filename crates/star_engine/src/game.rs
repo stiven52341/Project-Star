@@ -148,14 +148,16 @@ impl<'a> GameContext<'a> {
     }
 
     /// Reads the scene file at `path` in the asset folder, e.g.
-    /// `"levels/one.scene"`, and loads the textures it uses. Keep the scene
+    /// `"levels/one.scene"`, and loads the textures and meshes it uses (a
+    /// mesh shape used again is built only once). Keep the scene
     /// to add copies of it to the world at any time with
     /// [`Scene::instantiate`], also from systems, while the game runs.
     ///
     /// # Errors
     ///
     /// Returns an error if `path` is not a valid asset path, the file cannot
-    /// be read, it is not a valid scene, or one of its textures cannot be loaded.
+    /// be read, it is not a valid scene, or one of its textures or meshes
+    /// cannot be loaded.
     pub fn load_scene(&mut self, path: &str) -> EngineResult<Scene> {
         self.assets.load_scene(self.renderer, path)
     }

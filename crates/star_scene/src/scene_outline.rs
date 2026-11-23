@@ -7,9 +7,10 @@ use star_render::{Color, Sprite, TextureFilter, TextureRegion};
 
 use star_physics::BodySettings;
 
-use crate::Transform2D;
 use crate::body_data::BodyData;
+use crate::node_3d_data::MeshOutline;
 use crate::scene_file::{NodeData, SceneFile, SpriteData};
+use crate::{LightNode, Transform2D, Transform3D};
 
 /// The nodes of a `.scene` file, checked to form one tree, with their images
 /// named by asset path instead of loaded. A [`Scene`](crate::Scene) is built
@@ -37,6 +38,12 @@ pub struct NodeOutline {
     pub sprite: Option<SpriteOutline>,
     /// Its body in the 2D physics, if any.
     pub body: Option<BodySettings>,
+    /// Where it is in 3D relative to its parent, if the file places it so.
+    pub transform_3d: Option<Transform3D>,
+    /// The 3D mesh it shows, if any.
+    pub mesh: Option<MeshOutline>,
+    /// The light it shines, if any.
+    pub light: Option<LightNode>,
 }
 
 /// The image a node of a [`SceneOutline`] shows.
@@ -151,12 +158,25 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         .map(read_sprite)
         .transpose()
         .map_err(|error| EngineError::Scene(format!("node \"{}\": {error}", node.name)))?;
+    let named = |error: EngineError| EngineError::Scene(format!("node \"{}\": {error}", node.name));
     let body = node
         .body
         .as_ref()
         .map(BodyData::to_settings)
         .transpose()
-        .map_err(|error| EngineError::Scene(format!("node \"{}\": {error}", node.name)))?;
+        .map_err(named)?;
+    let mesh = node
+        .mesh
+        .as_ref()
+        .map(crate::node_3d_data::MeshTable::to_outline)
+        .transpose()
+        .map_err(named)?;
+    let light = node
+        .light
+        .as_ref()
+        .map(crate::node_3d_data::LightData::to_light)
+        .transpose()
+        .map_err(named)?;
     if node
         .class
         .as_deref()
@@ -174,6 +194,12 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         transform,
         sprite,
         body,
+        transform_3d: node
+            .transform_3d
+            .as_ref()
+            .map(crate::node_3d_data::Transform3dData::to_transform),
+        mesh,
+        light,
     })
 }
 

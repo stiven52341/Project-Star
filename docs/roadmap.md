@@ -70,7 +70,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `body` field of nodes (`Body.circle`, `rectangle`, `capsule`), with
         their surface, velocity, `apply_impulse` and the nodes they touch;
         bodies in scenes loaded by scripts.
-- [ ] **Phase 9 — 3D rendering**:
+- [x] **Phase 9 — 3D rendering** (decision 48):
   - [x] 9a Indexed 3D meshes (`MeshData`: positions, normals, texture
         coordinates), primitives (cube, plane, sphere), uploaded with
         `GameContext::create_mesh_3d` and drawn with a `Material` (base
@@ -79,8 +79,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         lights: ambient, directional and point lights (decision 48).
   - [x] 9c Example `scene_3d`: rows of plastic and metal spheres from
         rough to polished, a checkered cube, the sun and an orbiting lamp.
-  - [ ] 9d 3D nodes: `Transform3D` (with quaternions) and mesh nodes, in
-        the engine and in `.scene` files.
+  - [x] 9d 3D nodes: `Transform3D` (with quaternions), `MeshNode` and
+        `LightNode`, drawn by the engine and kept in `.scene` files
+        (`[node.transform_3d]`, `[node.mesh]`, `[node.light]`). StarScript
+        does not see them yet.
 - [ ] **Phase 10 — 3D physics**.
 - [ ] **Phase 11 — Mobile**: Android and iOS packaging.
 - [ ] **Phase 12 — Visual editor** (egui):

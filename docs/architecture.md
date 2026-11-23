@@ -175,9 +175,20 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   transform (`position`, `rotation`, `scale`), an optional
   `[node.sprite]` (`texture` as an asset path, `filter`, `size`, `region`,
   `anchor`, `color`, `layer`) and an optional `[node.body]` (see
-  [Physics](#physics)). Unknown fields are errors, so typos are not
-  silently ignored. Scenes keep names, classes, transforms, sprites and
-  bodies; other components will join them later.
+  [Physics](#physics)). 3D nodes have an optional `[node.transform_3d]`
+  (`position`, `rotation` as pitch, yaw and roll in radians, `scale`), an
+  optional `[node.mesh]` (`shape` `cube` with a `size` of three numbers,
+  `plane` with two, or `sphere` with a `radius` and optional `segments` and
+  `rings`; and its material: `color`, `metallic`, `roughness`, `texture`,
+  `filter`) and an optional `[node.light]` (`kind` `directional` or `point`,
+  `color` of three numbers, `intensity`, and the `range` of point lights).
+  Unknown fields are errors, so typos are not silently ignored. Scenes keep
+  names, classes, transforms, sprites, bodies, meshes and lights; other
+  components will join them later.
+- Reading a `Scene` takes a `SceneAssets` (it loads textures and builds the
+  meshes of shapes; the engine builds each `MeshShape` once), and writing
+  one a `SceneSources` (which file or shape each texture and mesh came
+  from: those made in code cannot be saved).
 - A `SpriteFile` names a sprite's image by its asset path instead of a
   `TextureId`: the engine loads the texture the first time it draws it (and
   again when the path or filter change), so code without the renderer, such
