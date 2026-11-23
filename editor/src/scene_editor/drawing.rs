@@ -86,27 +86,47 @@ pub(super) struct Place {
     pub(super) solid: Option<Mat4>,
 }
 
-/// The place of every node. Parents come first in a scene, so one pass
-/// finds them all; a node without a transform passes its parent's on to
-/// its children.
+/// The place of every node.
 pub(super) fn places(nodes: &[NodeOutline]) -> Vec<Place> {
-    let mut inherited: Vec<(Affine2, Mat4)> = Vec::with_capacity(nodes.len());
-    let mut places = Vec::with_capacity(nodes.len());
+    let handed = handed_down(nodes);
+    nodes
+        .iter()
+        .map(|node| {
+            let (parent_flat, parent_solid) = parent_place(node, &handed);
+            Place {
+                flat: node
+                    .transform
+                    .map(|transform| parent_flat * transform.to_affine()),
+                solid: node
+                    .transform_3d
+                    .map(|transform| parent_solid * transform.to_mat4()),
+            }
+        })
+        .collect()
+}
+
+/// Where every node places its children, in 2D and in 3D. Parents come
+/// first in a scene, so one pass finds them all; a node without a
+/// transform passes its parent's on.
+pub(super) fn handed_down(nodes: &[NodeOutline]) -> Vec<(Affine2, Mat4)> {
+    let mut handed: Vec<(Affine2, Mat4)> = Vec::with_capacity(nodes.len());
     for node in nodes {
-        let (parent_flat, parent_solid) = node
-            .parent
-            .and_then(|parent| inherited.get(parent).copied())
-            .unwrap_or((Affine2::IDENTITY, Mat4::IDENTITY));
-        let flat = node
-            .transform
-            .map(|transform| parent_flat * transform.to_affine());
-        let solid = node
-            .transform_3d
-            .map(|transform| parent_solid * transform.to_mat4());
-        inherited.push((flat.unwrap_or(parent_flat), solid.unwrap_or(parent_solid)));
-        places.push(Place { flat, solid });
+        let (parent_flat, parent_solid) = parent_place(node, &handed);
+        handed.push((
+            node.transform
+                .map_or(parent_flat, |transform| parent_flat * transform.to_affine()),
+            node.transform_3d
+                .map_or(parent_solid, |transform| parent_solid * transform.to_mat4()),
+        ));
     }
-    places
+    handed
+}
+
+/// Where the parent of `node` places it, from what [`handed_down`] found.
+pub(super) fn parent_place(node: &NodeOutline, handed: &[(Affine2, Mat4)]) -> (Affine2, Mat4) {
+    node.parent
+        .and_then(|parent| handed.get(parent).copied())
+        .unwrap_or((Affine2::IDENTITY, Mat4::IDENTITY))
 }
 
 fn draw_sprite(

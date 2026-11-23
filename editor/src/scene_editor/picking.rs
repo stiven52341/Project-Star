@@ -29,8 +29,8 @@ const UNIT_HALF: f32 = 0.5;
 /// the far one.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Ray {
-    origin: Vec3,
-    direction: Vec3,
+    pub(super) origin: Vec3,
+    pub(super) direction: Vec3,
 }
 
 impl Ray {
@@ -47,7 +47,7 @@ impl Ray {
         })
     }
 
-    fn at(self, distance: f32) -> Vec3 {
+    pub(super) fn at(self, distance: f32) -> Vec3 {
         self.origin + self.direction * distance
     }
 

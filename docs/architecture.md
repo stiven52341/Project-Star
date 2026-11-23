@@ -584,6 +584,23 @@ shows wins over a cross, then the nearest hit, the higher sprite layer
 and the later node (drawn on top); a click on nothing clears the
 selection.
 
+Over the node selected the view draws the handles of the tool chosen in
+its bar (or with `Q`, `W`, `E`, `R`): **View** only moves the camera,
+**Move** has arrows along the world's axes and a square that moves the
+node on the screen's plane (`z = 0` in 2D), **Rotate** has rings around
+the node's own axes (one around Z in 2D) and **Scale** has lines ending
+in boxes along its own axes and a square that scales it evenly. The
+geometry is `scene_editor/gizmo.rs`, in the view's pixels and free of
+egui: a `Lens` places world points on screen and turns pixels into rays,
+handles keep a fixed size on screen, and a `Drag` computes the node's
+new local transform from the transform it had when the drag began (so
+nothing drifts): the point of the axis nearest the pointer's ray, the
+angle turned around the node's point on screen (signed by whether the
+axis faces the viewer), or the ratio along an axis, never below 1% of
+the size it started at. Positions found in the world go back through
+the inverse of the parent's place. 3D nodes are handled in 3D in 3D
+projects; drags that grab no handle still move the camera.
+
 The **blueprint editor** (`blueprint_editor/`) draws a graph of the open
 blueprint on a canvas of its own, painted with egui's painter (no node
 editor library: the model, its pins and its rules are `star_blueprint`'s).

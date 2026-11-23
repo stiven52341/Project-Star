@@ -3,8 +3,39 @@
 use star_engine::prelude::{BodyKind, TextureFilter};
 
 use super::{Language, Texts};
+use crate::scene_editor::Tool;
 
 impl Texts {
+    pub(crate) const fn tool_name(&self, tool: Tool) -> &'static str {
+        match tool {
+            Tool::View => self.pick("View", "Ver"),
+            Tool::Move => self.pick("Move", "Mover"),
+            Tool::Rotate => self.pick("Rotate", "Rotar"),
+            Tool::Scale => self.pick("Scale", "Escalar"),
+        }
+    }
+
+    pub(crate) const fn tool_hint(&self, tool: Tool) -> &'static str {
+        match tool {
+            Tool::View => self.pick(
+                "Dragging only moves the camera (Q)",
+                "Arrastrar solo mueve la cámara (Q)",
+            ),
+            Tool::Move => self.pick(
+                "Drag the arrows or the square to move the node selected (W)",
+                "Arrastra las flechas o el cuadro para mover el nodo seleccionado (W)",
+            ),
+            Tool::Rotate => self.pick(
+                "Drag a ring to turn the node selected (E)",
+                "Arrastra un anillo para rotar el nodo seleccionado (E)",
+            ),
+            Tool::Scale => self.pick(
+                "Drag a box to scale along an axis, or the square to scale evenly (R)",
+                "Arrastra una caja para escalar en un eje, o el cuadro para escalar por igual (R)",
+            ),
+        }
+    }
+
     pub(crate) fn scene_unreadable(&self, reason: &str) -> String {
         match self.language {
             Language::English => format!("Could not open the scene: {reason}"),

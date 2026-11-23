@@ -16,8 +16,12 @@ use star_render::interop::{OffscreenRenderer, wgpu};
 use super::editor_camera::EditorCamera;
 use super::grid::grid_lines;
 use super::viewport_assets::ViewportAssets;
+use super::viewport_tools::{paint_handles, show_toolbar, tool_from_keys};
 use crate::project::ProjectDimension;
-use crate::scene_editor::{Marks, Ray, SceneDocument, cross_lines, cube_lines, square_lines};
+use crate::scene_editor::{
+    Drag, HandleShape, Lens, Marks, Ray, SceneDocument, Tool, cross_lines, cube_lines, handle_at,
+    shapes, square_lines,
+};
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -40,6 +44,10 @@ pub(crate) struct SceneViewport {
     dimension: ProjectDimension,
     frame: Frame,
     render_error: Option<String>,
+    /// What dragging the node selected does.
+    tool: Tool,
+    /// The handle being dragged, if one is.
+    drag: Option<Drag>,
 }
 
 impl SceneViewport {
@@ -78,18 +86,34 @@ impl SceneViewport {
             dimension,
             frame: Frame::new(),
             render_error: None,
+            tool: Tool::default(),
+            drag: None,
         })
     }
 
-    /// Shows the view, with `scene` drawn in it if one is open; a click
-    /// selects the node under the pointer.
+    /// Shows the view, with `scene` drawn in it if one is open: a click
+    /// selects the node under the pointer, and the handles of the tool
+    /// chosen move, turn or scale the node selected.
     pub(crate) fn show(&mut self, ui: &mut egui::Ui, mut scene: Option<&mut SceneDocument>) {
         let (rect, response) =
             ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());
-        self.handle_input(ui, &response, rect);
-        if let Some(scene) = scene.as_deref_mut() {
-            self.select_clicked(&response, rect, scene);
+        if response.hovered()
+            && let Some(tool) = tool_from_keys(ui)
+        {
+            self.tool = tool;
         }
+        let lens = self.lens(rect);
+        let handles = self.handles(scene.as_deref(), lens.as_ref());
+        let hovered = response
+            .hover_pos()
+            .and_then(|pointer| handle_at(&handles, in_view(pointer, rect)));
+        if let Some(scene) = scene.as_deref_mut() {
+            self.drag_handles(ui, &response, rect, lens.as_ref(), &handles, scene);
+            if hovered.is_none() {
+                self.select_clicked(&response, rect, scene);
+            }
+        }
+        self.handle_camera_input(ui, &response, rect);
         self.match_target_size(rect, ui.ctx().pixels_per_point());
         self.render_error = self
             .render(scene.as_deref())
@@ -98,11 +122,72 @@ impl SceneViewport {
 
         let painter = ui.painter_at(rect);
         painter.image(self.texture_id, rect, FULL_TEXTURE, egui::Color32::WHITE);
+        let handles = self.handles(scene.as_deref(), lens.as_ref());
+        let active = self.drag.map(|drag| drag.handle).or(hovered);
+        paint_handles(&painter, rect, &handles, active);
         self.paint_overlay(ui, &painter, rect);
+        show_toolbar(ui, rect, LABEL_MARGIN, &mut self.tool);
     }
 
-    fn handle_input(&mut self, ui: &egui::Ui, response: &egui::Response, rect: egui::Rect) {
-        if response.dragged() {
+    /// How the camera sees the view `rect`.
+    fn lens(&self, rect: egui::Rect) -> Option<Lens> {
+        let view_projection = self
+            .camera
+            .to_camera()
+            .view_projection(rect.aspect_ratio())?;
+        Lens::new(view_projection, Vec2::new(rect.width(), rect.height()))
+    }
+
+    /// The handles of the tool over the node selected in `scene`.
+    fn handles(&self, scene: Option<&SceneDocument>, lens: Option<&Lens>) -> Vec<HandleShape> {
+        match (scene.and_then(SceneDocument::gizmo_target), lens) {
+            (Some(target), Some(lens)) => shapes(self.tool, &target, lens),
+            _ => Vec::new(),
+        }
+    }
+
+    /// Starts dragging the handle pressed, moves the node with the
+    /// pointer while it is dragged, and lets it go when the drag ends.
+    fn drag_handles(
+        &mut self,
+        ui: &egui::Ui,
+        response: &egui::Response,
+        rect: egui::Rect,
+        lens: Option<&Lens>,
+        handles: &[HandleShape],
+        scene: &mut SceneDocument,
+    ) {
+        if response.drag_started_by(egui::PointerButton::Primary) {
+            let pressed = ui.input(|input| input.pointer.press_origin());
+            self.drag = pressed
+                .map(|pointer| in_view(pointer, rect))
+                .and_then(|from| {
+                    Some(Drag {
+                        tool: self.tool,
+                        handle: handle_at(handles, from)?,
+                        start: scene.gizmo_target()?,
+                        from,
+                    })
+                });
+        }
+        if !response.dragged() {
+            self.drag = None;
+            return;
+        }
+        let moved = self
+            .drag
+            .zip(lens)
+            .zip(response.interact_pointer_pos())
+            .and_then(|((drag, lens), pointer)| drag.moved_to(lens, in_view(pointer, rect)));
+        if let Some(moved) = moved {
+            scene.set_gizmo_target(moved);
+        }
+    }
+
+    /// Moves the camera with drags that do not grab a handle, and zooms
+    /// with the wheel.
+    fn handle_camera_input(&mut self, ui: &egui::Ui, response: &egui::Response, rect: egui::Rect) {
+        if response.dragged() && self.drag.is_none() {
             let delta = response.drag_delta();
             self.camera.drag(Vec2::new(delta.x, delta.y), rect.height());
         }
@@ -167,10 +252,10 @@ impl SceneViewport {
 
     fn paint_overlay(&self, ui: &egui::Ui, painter: &egui::Painter, rect: egui::Rect) {
         let font = egui::FontId::proportional(LABEL_SIZE);
-        let top_left = rect.left_top() + egui::vec2(LABEL_MARGIN, LABEL_MARGIN);
+        let top_right = rect.right_top() + egui::vec2(-LABEL_MARGIN, LABEL_MARGIN);
         painter.text(
-            top_left,
-            egui::Align2::LEFT_TOP,
+            top_right,
+            egui::Align2::RIGHT_TOP,
             texts::current().viewport_title(self.dimension.label()),
             font.clone(),
             ui.visuals().strong_text_color(),
@@ -198,6 +283,11 @@ impl Drop for SceneViewport {
     fn drop(&mut self) {
         self.ui_renderer.write().free_texture(&self.texture_id);
     }
+}
+
+/// Where `pointer` is in the view `rect`, in pixels from its top left.
+fn in_view(pointer: egui::Pos2, rect: egui::Rect) -> Vec2 {
+    Vec2::new(pointer.x - rect.left(), pointer.y - rect.top())
 }
 
 /// Where `pointer` is in the view `rect`: from `(-1, -1)` at its bottom

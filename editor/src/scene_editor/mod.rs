@@ -6,6 +6,7 @@
 mod components;
 mod drawing;
 mod fields;
+mod gizmo;
 mod picking;
 mod properties;
 mod tree;
@@ -19,6 +20,9 @@ use star_engine::prelude::{Frame, SceneOutline};
 
 use self::components::new_node;
 pub(crate) use self::drawing::{Marks, SceneGpu, cross_lines, cube_lines, square_lines};
+pub(crate) use self::gizmo::{
+    Drag, Handle, HandleShape, Lens, Target, Tip, Tool, handle_at, shapes,
+};
 pub(crate) use self::picking::Ray;
 use self::properties::{NodeContext, edit_node};
 use self::tree_view::{TreeState, TreeView};
@@ -127,6 +131,44 @@ impl SceneDocument {
             self.selected = picking::node_at(outline, ray);
             self.tree.reveal_selected();
         }
+    }
+
+    /// The node selected, for the handles of the view to move: in 3D if
+    /// the project is 3D and the node has a 3D transform, in 2D if not.
+    /// `None` if no node is selected or it has no transform.
+    pub(crate) fn gizmo_target(&self) -> Option<Target> {
+        let nodes = self.content.as_ref().ok()?.nodes();
+        let node = nodes.get(self.selected?)?;
+        let handed = drawing::handed_down(nodes);
+        let (parent_flat, parent_solid) = drawing::parent_place(node, &handed);
+        let flat = node.transform.map(|local| Target::Flat {
+            parent: parent_flat,
+            local,
+        });
+        let solid = node.transform_3d.map(|local| Target::Solid {
+            parent: parent_solid,
+            local,
+        });
+        match self.dimension {
+            ProjectDimension::TwoD => flat.or(solid),
+            ProjectDimension::ThreeD => solid.or(flat),
+        }
+    }
+
+    /// Gives the node selected the transform the handles of the view
+    /// left it with.
+    pub(crate) fn set_gizmo_target(&mut self, target: Target) {
+        let Some(node) = self.content.as_mut().ok().and_then(|outline| {
+            self.selected
+                .and_then(|selected| outline.node_mut(selected))
+        }) else {
+            return;
+        };
+        let changed = match target {
+            Target::Flat { local, .. } => node.transform.replace(local) != Some(local),
+            Target::Solid { local, .. } => node.transform_3d.replace(local) != Some(local),
+        };
+        self.unsaved |= changed;
     }
 
     /// The tree of its nodes, where the user selects one, with buttons to

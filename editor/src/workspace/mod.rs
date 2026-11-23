@@ -12,6 +12,7 @@ mod problems_panel;
 mod unsaved_dialog;
 mod viewport;
 mod viewport_assets;
+mod viewport_tools;
 
 use eframe::{egui, egui_wgpu};
 use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
