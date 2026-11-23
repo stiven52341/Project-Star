@@ -116,7 +116,15 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         editor camera (pan/orbit and zoom).
   - [x] Editor in English (default) and Spanish, chosen from a “Language”
         menu and remembered between sessions.
-  - [ ] Real hierarchy and inspector (after `star_scene`), log console.
+  - [ ] Real hierarchy and inspector, log console, in parts:
+    - [x] 12a Open a `.scene` from “Assets” in the “Scene” tab: its tree
+          of nodes in the “Scene” panel, and the parts of the node
+          selected in the inspector (read only).
+    - [ ] 12b Edit scenes: the node's values in the inspector, adding,
+          removing and renaming nodes, and saving the file.
+    - [ ] 12c Draw the open scene in the view (sprites, meshes, lights),
+          with the selected node marked.
+    - [ ] 12d Log console in the bottom panel.
 - [ ] **Phase 13 — StarScript and Blueprints** (`star_script`, see `docs/starscript.md`):
   - [x] 13.1 Lexical specification and lexer (tokens, errors with line and column).
   - [x] 13.2 Parser and AST (error recovery, all errors at once).

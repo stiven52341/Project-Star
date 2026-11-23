@@ -7,9 +7,9 @@ use star_blueprint::{Blueprint, Graph, Literal, Parameter, Variable};
 
 use super::edit;
 use super::literal_field::literal_field;
+use crate::style::PROPERTY_SPACING;
 use crate::texts;
 
-const PROPERTY_SPACING: [f32; 2] = [12.0, 8.0];
 /// Names `+` gives: `variable1`, `param1`…
 const NEW_VARIABLE_PREFIX: &str = "variable";
 const NEW_PARAMETER_PREFIX: &str = "param";

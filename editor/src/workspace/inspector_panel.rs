@@ -1,16 +1,20 @@
-//! Properties of the selected element; for now, of the project itself.
+//! Properties of the selected element: the node selected in the scene,
+//! or the project itself when there is none.
 
 use eframe::egui;
 use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
 
 use crate::project::Project;
+use crate::scene_editor::SceneDocument;
+use crate::style::{PROPERTY_SPACING, property_row};
 use crate::texts;
 
-const PROPERTY_SPACING: [f32; 2] = [12.0, 8.0];
-
-pub(crate) fn show_inspector(ui: &mut egui::Ui, project: &Project) {
+pub(crate) fn show_inspector(ui: &mut egui::Ui, project: &Project, scene: Option<&SceneDocument>) {
     ui.strong(texts::current().inspector);
     ui.separator();
+    if scene.is_some_and(|scene| scene.show_selected_node(ui)) {
+        return;
+    }
     egui::CollapsingHeader::new(texts::current().project)
         .default_open(true)
         .show(ui, |ui| show_project_properties(ui, project));
@@ -28,24 +32,18 @@ fn show_project_properties(ui: &mut egui::Ui, project: &Project) {
         .num_columns(2)
         .spacing(PROPERTY_SPACING)
         .show(ui, |ui| {
-            property(ui, texts::current().project_name, settings.name());
-            property(ui, texts::current().dimension, settings.dimension().label());
-            property(ui, texts::current().platforms, &platforms);
-            property(
+            property_row(ui, texts::current().project_name, settings.name());
+            property_row(ui, texts::current().dimension, settings.dimension().label());
+            property_row(ui, texts::current().platforms, &platforms);
+            property_row(
                 ui,
                 texts::current().engine,
                 &format!("{ENGINE_NAME} {ENGINE_VERSION}"),
             );
-            property(
+            property_row(
                 ui,
                 texts::current().folder,
                 &project.directory().display().to_string(),
             );
         });
-}
-
-fn property(ui: &mut egui::Ui, name: &str, value: &str) {
-    ui.weak(name);
-    ui.add(egui::Label::new(value).wrap());
-    ui.end_row();
 }

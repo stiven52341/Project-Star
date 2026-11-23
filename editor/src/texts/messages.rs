@@ -14,7 +14,7 @@ use crate::project::{
 
 impl Texts {
     /// The text in this language, of a pair written in every language.
-    const fn pick(&self, english: &'static str, spanish: &'static str) -> &'static str {
+    pub(super) const fn pick(&self, english: &'static str, spanish: &'static str) -> &'static str {
         match self.language {
             Language::English => english,
             Language::Spanish => spanish,

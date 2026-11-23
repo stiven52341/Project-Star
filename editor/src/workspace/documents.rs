@@ -1,15 +1,18 @@
-//! The tabs of the central area: the scene, always there, and the
-//! blueprints the user opened.
+//! The tabs of the central area: the scene, always there (with the scene
+//! file open in it, if any), and the blueprints the user opened.
 
 use std::path::Path;
 
 use eframe::egui;
 
 use crate::blueprint_editor::BlueprintTab;
+use crate::scene_editor::SceneDocument;
 use crate::texts;
 
-/// The open blueprints, and which tab is shown.
+/// The open scene and blueprints, and which tab is shown.
 pub(crate) struct Documents {
+    /// The scene of the “Scene” tab, once one is opened.
+    scene: Option<SceneDocument>,
     blueprints: Vec<BlueprintTab>,
     /// The blueprint shown, or `None` for the scene.
     active: Option<usize>,
@@ -24,6 +27,7 @@ pub(crate) enum ActiveDocument<'documents> {
 impl Documents {
     pub(crate) const fn new() -> Self {
         Self {
+            scene: None,
             blueprints: Vec::new(),
             active: None,
         }
@@ -37,6 +41,29 @@ impl Documents {
             self.blueprints.len() - 1
         });
         self.active = Some(index);
+    }
+
+    /// Shows the scene at `path` of the `assets` folder in the “Scene”
+    /// tab, in place of the one open there.
+    pub(crate) fn open_scene(&mut self, assets: &Path, path: String) {
+        let already_open = self
+            .scene
+            .as_ref()
+            .is_some_and(|scene| scene.path() == path);
+        if !already_open {
+            self.scene = Some(SceneDocument::open(assets, path));
+        }
+        self.active = None;
+    }
+
+    /// The scene open in the “Scene” tab.
+    pub(crate) fn scene_mut(&mut self) -> Option<&mut SceneDocument> {
+        self.scene.as_mut()
+    }
+
+    /// The scene open in the “Scene” tab.
+    pub(crate) const fn scene(&self) -> Option<&SceneDocument> {
+        self.scene.as_ref()
     }
 
     fn position_of(&self, path: &str) -> Option<usize> {
@@ -112,7 +139,14 @@ impl Documents {
     pub(crate) fn show_tabs(&mut self, ui: &mut egui::Ui) -> Option<usize> {
         let mut close = None;
         ui.horizontal(|ui| {
-            ui.selectable_value(&mut self.active, None, texts::current().scene_tab);
+            let scene_title = self
+                .scene
+                .as_ref()
+                .map_or(texts::current().scene_tab, SceneDocument::title);
+            let scene_tab = ui.selectable_value(&mut self.active, None, scene_title);
+            if let Some(scene) = &self.scene {
+                scene_tab.on_hover_text(scene.path());
+            }
             for (index, tab) in self.blueprints.iter().enumerate() {
                 ui.separator();
                 ui.selectable_value(&mut self.active, Some(index), tab.title())
@@ -181,6 +215,19 @@ mod tests {
 
         assert_eq!(documents.blueprints.len(), 2);
         assert_eq!(active_path(&mut documents).as_deref(), Some("a.blueprint"));
+    }
+
+    #[test]
+    fn opening_a_scene_shows_the_scene_tab_with_it() {
+        let (assets, mut documents) = documents_with(&["a.blueprint"]);
+
+        documents.open_scene(assets.path(), "level.scene".to_owned());
+
+        assert_eq!(active_path(&mut documents), None);
+        assert_eq!(
+            documents.scene().map(SceneDocument::path),
+            Some("level.scene")
+        );
     }
 
     #[test]

@@ -14,7 +14,7 @@ mod viewport;
 use eframe::{egui, egui_wgpu};
 use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
 
-use self::assets_panel::AssetsPanel;
+use self::assets_panel::{AssetsPanel, OpenedAsset};
 use self::documents::{ActiveDocument, Documents};
 use self::inspector_panel::show_inspector;
 use self::menu_bar::{MenuAction, MenuState, SAVE_SHORTCUT, show_menu_bar};
@@ -154,13 +154,15 @@ impl EditorWindow {
             .resizable(true)
             .default_size(SIDE_PANEL_WIDTH)
             .min_size(SIDE_PANEL_MIN_WIDTH)
-            .show(ui, show_hierarchy);
+            .show(ui, |ui| self.show_hierarchy(ui));
         egui::Panel::right("inspector")
             .resizable(true)
             .default_size(SIDE_PANEL_WIDTH)
             .min_size(SIDE_PANEL_MIN_WIDTH)
             .show(ui, |ui| match self.documents.active() {
-                ActiveDocument::Scene => show_inspector(ui, &self.project),
+                ActiveDocument::Scene => {
+                    show_inspector(ui, &self.project, self.documents.scene());
+                }
                 ActiveDocument::Blueprint(tab) => {
                     ui.strong(texts::current().inspector);
                     ui.separator();
@@ -314,11 +316,15 @@ impl EditorWindow {
         });
         ui.separator();
         match self.bottom_tab {
-            BottomTab::Assets => {
-                if let Some(path) = self.assets.show(ui) {
+            BottomTab::Assets => match self.assets.show(ui) {
+                Some(OpenedAsset::Blueprint(path)) => {
                     self.documents.open_blueprint(self.assets.directory(), path);
                 }
-            }
+                Some(OpenedAsset::Scene(path)) => {
+                    self.documents.open_scene(self.assets.directory(), path);
+                }
+                None => {}
+            },
             BottomTab::Problems => {
                 if let Some(problem) = self.problems.show(ui) {
                     self.show_problem_in_blueprint(&problem);
@@ -343,6 +349,18 @@ impl EditorWindow {
             .open_blueprint(self.assets.directory(), path.to_owned());
         if let ActiveDocument::Blueprint(tab) = self.documents.active() {
             tab.reveal(origin);
+        }
+    }
+
+    /// The “Scene” panel: the tree of the open scene's nodes.
+    fn show_hierarchy(&mut self, ui: &mut egui::Ui) {
+        ui.strong(texts::current().hierarchy);
+        ui.separator();
+        match self.documents.scene_mut() {
+            Some(scene) => scene.show_tree(ui),
+            None => {
+                ui.weak(texts::current().no_scene_open);
+            }
         }
     }
 
@@ -381,9 +399,3 @@ impl EditorWindow {
 
 /// Where the source code is published, as the GPL asks programs to tell users.
 const REPOSITORY_URL: &str = env!("CARGO_PKG_REPOSITORY");
-
-fn show_hierarchy(ui: &mut egui::Ui) {
-    ui.strong(texts::current().hierarchy);
-    ui.separator();
-    ui.weak(texts::current().empty_scene);
-}

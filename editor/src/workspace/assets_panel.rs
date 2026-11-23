@@ -7,9 +7,28 @@ use eframe::egui;
 
 use crate::blueprint_editor::create_blueprint;
 use crate::file_tree::{FileNode, scan_directory};
-use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION};
+use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, SCENE_EXTENSION};
 use crate::style::ERROR_COLOR;
 use crate::texts;
+
+/// A file of the assets folder the user opened, as a path inside it.
+pub(crate) enum OpenedAsset {
+    Blueprint(String),
+    Scene(String),
+}
+
+impl OpenedAsset {
+    /// What `name` opens as, if the editor opens files like it.
+    fn of(path: String) -> Option<Self> {
+        if path.ends_with(BLUEPRINT_EXTENSION) {
+            Some(Self::Blueprint(path))
+        } else if path.ends_with(SCENE_EXTENSION) {
+            Some(Self::Scene(path))
+        } else {
+            None
+        }
+    }
+}
 
 /// Contents of the assets folder, refreshed on demand.
 pub(crate) struct AssetsPanel {
@@ -46,9 +65,9 @@ impl AssetsPanel {
         &self.directory
     }
 
-    /// Lists the files. Returns the blueprint the user opened (double
-    /// click) or created, as a path inside the folder.
-    pub(crate) fn show(&mut self, ui: &mut egui::Ui) -> Option<String> {
+    /// Lists the files. Returns the blueprint or scene the user opened
+    /// (double click), or the blueprint they created.
+    pub(crate) fn show(&mut self, ui: &mut egui::Ui) -> Option<OpenedAsset> {
         let mut opened = None;
         ui.horizontal(|ui| {
             ui.weak(format!("{ASSETS_DIRECTORY}/"));
@@ -61,7 +80,7 @@ impl AssetsPanel {
         });
         if let Some(created) = self.show_new_blueprint_form(ui) {
             self.refresh();
-            opened = Some(created);
+            opened = Some(OpenedAsset::Blueprint(created));
         }
         egui::ScrollArea::vertical()
             .auto_shrink(false)
@@ -78,8 +97,6 @@ impl AssetsPanel {
     }
 }
 
-/// Lists `nodes`, inside the folder `prefix` (`""` or `"enemies/"`); a
-/// blueprint double clicked is put in `opened`.
 impl AssetsPanel {
     /// The form to name a new blueprint; returns the one created.
     fn show_new_blueprint_form(&mut self, ui: &mut egui::Ui) -> Option<String> {
@@ -114,7 +131,14 @@ impl AssetsPanel {
     }
 }
 
-fn show_nodes(ui: &mut egui::Ui, nodes: &[FileNode], prefix: &str, opened: &mut Option<String>) {
+/// Lists `nodes`, inside the folder `prefix` (`""` or `"enemies/"`); a
+/// blueprint or scene double clicked is put in `opened`.
+fn show_nodes(
+    ui: &mut egui::Ui,
+    nodes: &[FileNode],
+    prefix: &str,
+    opened: &mut Option<OpenedAsset>,
+) {
     for node in nodes {
         match node {
             FileNode::Folder {
@@ -128,17 +152,19 @@ fn show_nodes(ui: &mut egui::Ui, nodes: &[FileNode], prefix: &str, opened: &mut 
                         show_nodes(ui, children, &format!("{prefix}{name}/"), opened);
                     });
             }
-            FileNode::File { name } if name.ends_with(BLUEPRINT_EXTENSION) => {
-                let response = ui
-                    .add(egui::Label::new(name.as_str()).sense(egui::Sense::click()))
-                    .on_hover_text(texts::current().open_blueprint_hint);
-                if response.double_clicked() {
-                    *opened = Some(format!("{prefix}{name}"));
+            FileNode::File { name } => match OpenedAsset::of(format!("{prefix}{name}")) {
+                Some(asset) => {
+                    let response = ui
+                        .add(egui::Label::new(name.as_str()).sense(egui::Sense::click()))
+                        .on_hover_text(texts::current().open_file_hint);
+                    if response.double_clicked() {
+                        *opened = Some(asset);
+                    }
                 }
-            }
-            FileNode::File { name } => {
-                ui.label(name.as_str());
-            }
+                None => {
+                    ui.label(name.as_str());
+                }
+            },
         }
     }
 }

@@ -494,8 +494,8 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
 A single native window with two screens, in **English** (the default) or
 **Spanish**. Every text is in `texts/`: one `Texts` value per language
 (`english.rs`, `spanish.rs`, with the same fields, so the compiler checks
-that no language misses one) and, in `messages.rs`, the texts built from
-values. A menu “Language” (in the project manager's header and in
+that no language misses one) and, in `messages.rs` and
+`scene_messages.rs`, the texts built from values. A menu “Language” (in the project manager's header and in
 “File”) lists the languages by their own names; the choice applies from
 the next frame and is kept in `preferences.toml`, next to the recent
 projects in the user's configuration folder (`config_file.rs`). Messages
@@ -510,13 +510,15 @@ of the StarScript compiler and of the project check stay in English:
    overwrites) and opens the editor.
 2. **Editor** (`workspace/`), maximized: menu (“File” → “Save” /
    “Close project” / “Language” / “Quit”; “Project” → “Compile” / “Play” /
-   “Stop”; “Help” → “About”) and the same three buttons next to it, **Scene** panel (hierarchy, empty until `star_scene`
-   exists), a central area with **tabs**: “Scene”, the **view** rendered by
-   the engine (reference grid; drag = pan in 2D / orbit in 3D, wheel =
-   zoom), always there, and one tab per open **blueprint** (see below),
-   **Inspector** (project properties), a bottom panel with three tabs,
-   **Assets** (tree of `assets/`, with “Refresh”; a double click on a
-   `.blueprint` opens it) and **Problems** (what the last
+   “Stop”; “Help” → “About”) and the same three buttons next to it, **Scene** panel (the
+   tree of the open scene's nodes, see below), a central area with
+   **tabs**: “Scene”, the **view** rendered by the engine (reference grid;
+   drag = pan in 2D / orbit in 3D, wheel = zoom), always there and named
+   after the open scene file, and one tab per open **blueprint** (see
+   below), **Inspector** (the node selected in the scene, or the project's
+   properties), a bottom panel with three tabs, **Assets** (tree of
+   `assets/`, with “Refresh”; a double click on a `.blueprint` or a
+   `.scene` opens it) and **Problems** (what the last
    “Compile” found, as `file:line:column` and a message; it opens by itself
    when there are problems) and **Output** (what Cargo and the game write
    while playing), and a status bar (with the result of the last
@@ -526,6 +528,14 @@ The view uses `OffscreenRenderer` on egui's wgpu device and registers its
 texture in `egui_wgpu` (it is registered again when its size changes). The
 texture is `Rgba8Unorm` with colors already encoded in sRGB, because egui
 samples textures as gamma values.
+
+The **scene editor** (`scene_editor/`) opens one `.scene` file at a time
+in the “Scene” tab, read as a `SceneOutline` (the nodes as the file
+describes them, images named by path: nothing is loaded to show them).
+The “Scene” panel draws its tree from the parent each node names, every
+branch open at first; a click selects a node, and the inspector shows its
+parts in sections (node, transform, sprite, mesh, light, 2D and 3D body),
+angles in degrees. A file that cannot be read shows why in the panel.
 
 The **blueprint editor** (`blueprint_editor/`) draws a graph of the open
 blueprint on a canvas of its own, painted with egui's painter (no node

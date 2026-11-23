@@ -7,9 +7,9 @@ use star_blueprint::{Call, CallTarget, Graph, Literal, NodeId, NodeKind, Operato
 use super::edit;
 use super::literal_field::literal_field;
 use super::names::BlueprintNames;
+use crate::style::PROPERTY_SPACING;
 use crate::texts;
 
-const PROPERTY_SPACING: [f32; 2] = [12.0, 8.0];
 /// The first name `+` gives to an argument is `arg1`, then `arg2`…
 const NEW_ARGUMENT_PREFIX: &str = "arg";
 

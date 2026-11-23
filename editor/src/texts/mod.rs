@@ -1,11 +1,14 @@
 //! Every text the editor shows, in every language it speaks: English (the
 //! default) and Spanish. Each language is a [`Texts`] with the same fields,
 //! so the compiler checks that none is missing a text; texts built from
-//! values are methods of [`Texts`] (see `messages`).
+//! values are methods of [`Texts`] (see `messages` and `scene_messages`).
 
 mod english;
 mod messages;
+mod scene_messages;
 mod spanish;
+
+pub(crate) use self::scene_messages::{number_text, size_text};
 
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -116,7 +119,40 @@ pub(crate) struct Texts {
     pub(crate) no_warranty: &'static str,
     pub(crate) source_code: &'static str,
     pub(crate) hierarchy: &'static str,
-    pub(crate) empty_scene: &'static str,
+    pub(crate) no_scene_open: &'static str,
+    pub(crate) node_section: &'static str,
+    pub(crate) no_class: &'static str,
+    pub(crate) transform_section: &'static str,
+    pub(crate) transform_3d_section: &'static str,
+    pub(crate) position: &'static str,
+    pub(crate) rotation: &'static str,
+    pub(crate) scale: &'static str,
+    pub(crate) sprite_section: &'static str,
+    pub(crate) image: &'static str,
+    pub(crate) size: &'static str,
+    pub(crate) color: &'static str,
+    pub(crate) layer: &'static str,
+    pub(crate) filter: &'static str,
+    pub(crate) anchor: &'static str,
+    pub(crate) region: &'static str,
+    pub(crate) body_section: &'static str,
+    pub(crate) body_3d_section: &'static str,
+    pub(crate) body_kind: &'static str,
+    pub(crate) shape: &'static str,
+    pub(crate) gravity_scale: &'static str,
+    pub(crate) friction: &'static str,
+    pub(crate) bounciness: &'static str,
+    pub(crate) density: &'static str,
+    pub(crate) sensor: &'static str,
+    pub(crate) fixed_rotation: &'static str,
+    pub(crate) mesh_section: &'static str,
+    pub(crate) metallic: &'static str,
+    pub(crate) roughness: &'static str,
+    pub(crate) light_section: &'static str,
+    pub(crate) intensity: &'static str,
+    pub(crate) range: &'static str,
+    pub(crate) yes: &'static str,
+    pub(crate) no: &'static str,
     pub(crate) inspector: &'static str,
     pub(crate) project: &'static str,
     pub(crate) engine: &'static str,
@@ -148,7 +184,7 @@ pub(crate) struct Texts {
     pub(crate) no_game_to_play: &'static str,
     pub(crate) scene_tab: &'static str,
     pub(crate) close_tab: &'static str,
-    pub(crate) open_blueprint_hint: &'static str,
+    pub(crate) open_file_hint: &'static str,
     // Saving.
     pub(crate) save: &'static str,
     pub(crate) unsaved_changes: &'static str,
