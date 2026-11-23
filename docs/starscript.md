@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes), sounds (`Sound`, `Audio`) and physics (`Body`) done |
+| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes), sounds (`Sound`, `Audio`), physics (`Body`) and 3D (`Node3D`, `Mesh`, `Light`, `Camera3D`) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
 
@@ -358,15 +358,19 @@ The engine provides them; their names cannot be used for other classes.
 | Class | Members |
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. |
-| `Game` | fields `background: Color` (black), `camera: Camera?` (`null`); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
+| `Game` | fields `background: Color` (black), `camera: Camera?` (`null`), `camera_3d: Camera3D?` (`null`), `ambient: Color` (black: no ambient light); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
 | `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `body: Body?` (`null`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors) |
 | `Camera` (extends `Node`) | `init(name: string)`; field `view_height: float` (2.0) |
+| `Node3D` (extends `Node`) | `init(name: string)`; fields `z`, `pitch`, `yaw: float` (0.0), `scale_z: float` (1.0); `look_at(x: float, y: float, z: float)` |
+| `Mesh` (extends `Node3D`) | `init(name: string, shape: string)`; fields `shape: string`, `width`, `height`, `depth` (1.0), `radius` (0.5), `color: Color` (white), `metallic` (0.0), `roughness: float` (0.5), `texture: string` (`""`: none), `pixelated: bool` (`false`) |
+| `Light` (extends `Node3D`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range: float` (10.0) |
+| `Camera3D` (extends `Node3D`) | `init(name: string)`; field `fov: float` (about 1.047 radians: 60°) |
 | `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
 | `Scene` | `static load(path: string) -> Node?` |
 | `Sound` | no `init`: `static load(path: string) -> Sound?`; fields `volume: float` (1.0), `looping: bool` (`false`); `play()`, `stop()`, `is_playing() -> bool` |
 | `Audio` | `static volume() -> float`, `static set_volume(volume: float)` |
-| `Body` | no `init`: `static circle(kind: string, radius: float) -> Body`, `static rectangle(kind: string, width: float, height: float) -> Body`, `static capsule(kind: string, height: float, radius: float) -> Body`; fields `kind`, `shape: string`, `radius` (0.5), `width`, `height` (1.0), `gravity_scale` (1.0), `friction` (0.5), `bounciness` (0.0), `density` (1.0), `velocity_x`, `velocity_y: float` (0.0), `fixed_rotation`, `sensor: bool` (`false`); `apply_impulse(x: float, y: float)`, `touching() -> [Node]`, `just_touched() -> [Node]`, `just_separated() -> [Node]` |
+| `Body` | no `init`: `static circle(kind: string, radius: float) -> Body`, `static rectangle(kind: string, width: float, height: float) -> Body`, `static capsule(kind: string, height: float, radius: float) -> Body`, `static sphere(kind: string, radius: float) -> Body`, `static box(kind: string, width: float, height: float, depth: float) -> Body`; fields `kind`, `shape: string`, `radius` (0.5), `width`, `height`, `depth` (1.0), `gravity_scale` (1.0), `friction` (0.5), `bounciness` (0.0), `density` (1.0), `velocity_x`, `velocity_y`, `velocity_z: float` (0.0), `fixed_rotation`, `sensor: bool` (`false`); `apply_impulse(x: float, y: float)`, `apply_impulse_3d(x: float, y: float, z: float)`, `touching() -> [Node]`, `just_touched() -> [Node]`, `just_separated() -> [Node]` |
 | `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool`, `static strength(action: string) -> float`, `static axis(negative: string, positive: string) -> float`, `static pointer_x() -> float`, `static pointer_y() -> float`, `static has_pointer() -> bool` |
 
 **A game is a class that extends `Game`**:
@@ -579,6 +583,77 @@ class Hero extends Sprite {
 - Nodes of scenes keep their `[node.body]`. Console programs have no
   physics: their bodies never move or touch anything.
 - `Body` cannot be extended, and has no `init`: `Body()` is an error.
+
+**3D**: a `Node3D` is a node placed in 3D. It is a `Node`, so it keeps
+`x`, `y`, `scale_x`, `scale_y`, its `body` and the whole tree (`add_child`,
+`children`, …; 2D and 3D nodes can hang from each other), and adds `z`,
+`pitch` (around x: up and down), `yaw` (around y: left and right) and
+`scale_z`; its `rotation` is the roll, around z. A `Mesh` shows a shape, a
+`Light` lights the meshes, and the game is seen from its `camera_3d`:
+
+```
+class Crate extends Mesh {
+    init() {
+        super.init("Crate", "cube")
+        y = 3.0
+        yaw = 0.5
+        roughness = 0.8
+        texture = "textures/crate.png"
+        body = Body.box("dynamic", 1.0, 1.0, 1.0)
+    }
+}
+
+class World3D extends Game {
+    override func start() {
+        const eye = Camera3D("Eye")
+        eye.y = 4.0
+        eye.z = 10.0
+        eye.look_at(0.0, 0.0, 0.0)
+        camera_3d = eye
+        add_child(eye)
+        const sun = Light("Sun", "directional")
+        sun.pitch = -1.0
+        add_child(sun)
+        ambient = Color(0.2, 0.2, 0.25, 1.0)
+        add_child(Crate())
+    }
+}
+```
+
+- Angles are radians, applied roll first, then pitch, then yaw: a camera
+  turns left and right, then looks up and down. A 3D node looks along its
+  -z axis (where cameras look and directional lights shine), so with no
+  rotation it looks towards -z. `look_at(x, y, z)` sets the pitch and yaw
+  that make it look at a point given in its parent's space, as its own
+  `x`, `y` and `z` are; the roll is kept.
+- A `Mesh`'s `shape` is `"cube"` (`width`, `height`, `depth`), `"sphere"`
+  (`radius`) or `"plane"` (flat and facing up: `width` and `depth`); only
+  the sizes of its shape are used. Its surface is physically based:
+  `color`, `metallic` (0 plastic, wood…; 1 metal) and `roughness` (0
+  polished, 1 matte); `texture` is an image of the asset folder multiplied
+  by the color. A mesh of an unknown shape or a size that is not positive
+  is not shown, and the reason is written once to the error output.
+- A `Light` is `"directional"` (the sun: from far away, along the node's
+  -z, wherever the node is) or `"point"` (a lamp: from the node, in every
+  direction, reaching `range` world units). `intensity` 1 lights a white
+  matte surface facing it fully. At most 16 lights shine in a frame.
+  `ambient` lights everything a little, from no direction.
+- With a `camera_3d` the game is drawn in perspective from where that
+  camera is in the world (so it follows its parents), looking along its
+  -z; `fov` is how wide it sees, from bottom to top, in radians. Its roll
+  is ignored. `camera_3d` wins over `camera`; with a 3D camera,
+  `Input.pointer_x` and `pointer_y` are not known (`has_pointer()` is
+  `false`).
+- The `body` of a `Node3D` is a body of the 3D physics: `Body.sphere`,
+  `Body.box` (with `depth`) or `Body.capsule` (vertical), and it moves in
+  `z`, `pitch` and `yaw` too, with `velocity_z` and `apply_impulse_3d`. A
+  2D shape on a 3D node (or a 3D one on a 2D node) is left out, and the
+  reason is written once.
+- `Scene.load` builds 3D nodes too: a node with `[node.transform_3d]` is a
+  `Node3D`, with `[node.mesh]` a `Mesh` and with `[node.light]` a `Light`
+  (or the class it names, which must extend them); `[node.body_3d]` gives
+  its body. `class = "Camera3D"` gives a 3D camera. The divisions of a
+  sphere are not kept.
 
 **Input works with actions**, declared in the project, not in the scripts.
 The game asks for an action by name, so the same code works with keyboard,

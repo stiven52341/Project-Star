@@ -5,6 +5,7 @@
 //! here, with the same shape as the modules of script classes.
 
 use super::conversions::RUNTIME;
+use super::native_3d;
 use super::writer::Writer;
 use crate::InputAction;
 
@@ -29,6 +30,8 @@ pub mod Game {
     pub struct Fields {
         pub background: ::star_script_runtime::Field<crate::classes::Color::Ref>,
         pub camera: ::star_script_runtime::Field<::std::option::Option<crate::classes::Camera::Ref>>,
+        pub camera_3d: ::star_script_runtime::Field<::std::option::Option<crate::classes::Camera3D::Ref>>,
+        pub ambient: ::star_script_runtime::Field<crate::classes::Color::Ref>,
         pub quit_requested_: ::star_script_runtime::Field<bool>,
         pub root_: crate::classes::Node::Ref,
     }
@@ -92,6 +95,8 @@ pub mod Game {
         make_(Fields {
             background: ::star_script_runtime::Field::new(crate::classes::Color::new(0.0, 0.0, 0.0, 1.0)),
             camera: ::star_script_runtime::Field::new(::std::option::Option::None),
+            camera_3d: ::star_script_runtime::Field::new(::std::option::Option::None),
+            ambient: ::star_script_runtime::Field::new(crate::classes::Color::new(0.0, 0.0, 0.0, 1.0)),
             quit_requested_: ::star_script_runtime::Field::new(false),
             root_: crate::classes::Node::new(::std::string::String::from(\"Game\")),
         })
@@ -104,7 +109,7 @@ pub mod Game {
 }";
 
 /// The modules of the engine classes `Color`, `Body`, `Node`, `Sprite`,
-/// `Camera`, `Scene` and `Sound`.
+/// `Camera`, `Scene` and `Sound`, and of the 3D nodes.
 pub(super) fn node_modules(out: &mut Writer) {
     let modules = [
         COLOR_MODULE,
@@ -123,6 +128,7 @@ pub(super) fn node_modules(out: &mut Writer) {
             out.line(line);
         }
     }
+    native_3d::node_3d_modules(out);
 }
 
 const COLOR_MODULE: &str = "/// `class Color`, provided by the engine.
@@ -190,15 +196,17 @@ pub mod Body {
         pub radius: ::star_script_runtime::Field<f32>,
         pub width: ::star_script_runtime::Field<f32>,
         pub height: ::star_script_runtime::Field<f32>,
+        pub depth: ::star_script_runtime::Field<f32>,
         pub gravity_scale: ::star_script_runtime::Field<f32>,
         pub friction: ::star_script_runtime::Field<f32>,
         pub bounciness: ::star_script_runtime::Field<f32>,
         pub density: ::star_script_runtime::Field<f32>,
         pub velocity_x: ::star_script_runtime::Field<f32>,
         pub velocity_y: ::star_script_runtime::Field<f32>,
+        pub velocity_z: ::star_script_runtime::Field<f32>,
         pub fixed_rotation: ::star_script_runtime::Field<bool>,
         pub sensor: ::star_script_runtime::Field<bool>,
-        pub impulse_: ::std::cell::Cell<(f32, f32)>,
+        pub impulse_: ::std::cell::Cell<(f32, f32, f32)>,
         pub touching_: Contacts_,
         pub just_touched_: Contacts_,
         pub just_separated_: Contacts_,
@@ -212,6 +220,7 @@ pub mod Body {
     /// What a body can do.
     pub trait Object: crate::AnyObject + HasFields {
         fn apply_impulse(self: ::std::rc::Rc<Self>, x: f32, y: f32);
+        fn apply_impulse_3d(self: ::std::rc::Rc<Self>, x: f32, y: f32, z: f32);
         fn touching(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref>;
         fn just_touched(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref>;
         fn just_separated(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref>;
@@ -223,9 +232,14 @@ pub mod Body {
     impl Methods {
         /// `func apply_impulse`: pushes the body once the frame ends.
         pub fn apply_impulse(this_: &Ref, x: f32, y: f32) {
+            Self::apply_impulse_3d(this_, x, y, 0.0);
+        }
+
+        /// `func apply_impulse_3d`: pushes the body once the frame ends.
+        pub fn apply_impulse_3d(this_: &Ref, x: f32, y: f32, z: f32) {
             let impulse_ = &HasFields::fields(&**this_).impulse_;
-            let (old_x_, old_y_) = impulse_.get();
-            impulse_.set((old_x_ + x, old_y_ + y));
+            let (old_x_, old_y_, old_z_) = impulse_.get();
+            impulse_.set((old_x_ + x, old_y_ + y, old_z_ + z));
         }
 
         /// `func touching`
@@ -264,13 +278,14 @@ pub mod Body {
 
     impl Object for Instance {
         fn apply_impulse(self: ::std::rc::Rc<Self>, x: f32, y: f32) { Methods::apply_impulse(&(self as Ref), x, y) }
+        fn apply_impulse_3d(self: ::std::rc::Rc<Self>, x: f32, y: f32, z: f32) { Methods::apply_impulse_3d(&(self as Ref), x, y, z) }
         fn touching(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { Methods::touching(&(self as Ref)) }
         fn just_touched(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { Methods::just_touched(&(self as Ref)) }
         fn just_separated(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { Methods::just_separated(&(self as Ref)) }
     }
 
     /// A body of `kind` and `shape` at rest, with the engine's surface.
-    pub fn new_(kind: ::std::string::String, shape: &str, radius: f32, width: f32, height: f32) -> Ref {
+    pub fn new_(kind: ::std::string::String, shape: &str, radius: f32, width: f32, height: f32, depth: f32) -> Ref {
         let contacts_ = || ::std::cell::RefCell::new(::std::vec::Vec::new());
         ::std::rc::Rc::new(Instance {
             Body: Fields {
@@ -279,15 +294,17 @@ pub mod Body {
                 radius: ::star_script_runtime::Field::new(radius),
                 width: ::star_script_runtime::Field::new(width),
                 height: ::star_script_runtime::Field::new(height),
+                depth: ::star_script_runtime::Field::new(depth),
                 gravity_scale: ::star_script_runtime::Field::new(1.0),
                 friction: ::star_script_runtime::Field::new(0.5),
                 bounciness: ::star_script_runtime::Field::new(0.0),
                 density: ::star_script_runtime::Field::new(1.0),
                 velocity_x: ::star_script_runtime::Field::new(0.0),
                 velocity_y: ::star_script_runtime::Field::new(0.0),
+                velocity_z: ::star_script_runtime::Field::new(0.0),
                 fixed_rotation: ::star_script_runtime::Field::new(false),
                 sensor: ::star_script_runtime::Field::new(false),
-                impulse_: ::std::cell::Cell::new((0.0, 0.0)),
+                impulse_: ::std::cell::Cell::new((0.0, 0.0, 0.0)),
                 touching_: contacts_(),
                 just_touched_: contacts_(),
                 just_separated_: contacts_(),
@@ -297,17 +314,27 @@ pub mod Body {
 
     /// `static func circle`
     pub fn circle(kind: ::std::string::String, radius: f32) -> Ref {
-        new_(kind, \"circle\", radius, 1.0, 1.0)
+        new_(kind, \"circle\", radius, 1.0, 1.0, 1.0)
     }
 
     /// `static func rectangle`
     pub fn rectangle(kind: ::std::string::String, width: f32, height: f32) -> Ref {
-        new_(kind, \"rectangle\", 0.5, width, height)
+        new_(kind, \"rectangle\", 0.5, width, height, 1.0)
     }
 
     /// `static func capsule`
     pub fn capsule(kind: ::std::string::String, height: f32, radius: f32) -> Ref {
-        new_(kind, \"capsule\", radius, 1.0, height)
+        new_(kind, \"capsule\", radius, 1.0, height, 1.0)
+    }
+
+    /// `static func sphere`
+    pub fn sphere(kind: ::std::string::String, radius: f32) -> Ref {
+        new_(kind, \"sphere\", radius, 1.0, 1.0, 1.0)
+    }
+
+    /// `static func box`
+    pub fn box_(kind: ::std::string::String, width: f32, height: f32, depth: f32) -> Ref {
+        new_(kind, \"box\", 0.5, width, height, depth)
     }
 }";
 
@@ -663,17 +690,28 @@ pub mod Scene {
     /// with what the scene writes on top.
     fn build_node_(node_: &::star_script_runtime::scenes::SceneNode) -> ::std::result::Result<crate::classes::Node::Ref, ::std::string::String> {
         let name_ = node_.name.clone();
-        let object_: crate::classes::Node::Ref = match (node_.class.as_deref(), &node_.sprite) {
-            (::std::option::Option::None | ::std::option::Option::Some(\"Sprite\"), ::std::option::Option::Some(image_)) => {
-                crate::classes::Sprite::new(name_, image_.texture.clone())
-            }
-            (::std::option::Option::None | ::std::option::Option::Some(\"Node\"), _) => crate::classes::Node::new(name_),
-            (::std::option::Option::Some(\"Camera\"), _) => crate::classes::Camera::new(name_),
-            (::std::option::Option::Some(\"Sprite\"), ::std::option::Option::None) => {
-                return ::std::result::Result::Err(::std::string::String::from(\"a `Sprite` needs a `[node.sprite]` with its image\"));
-            }
-            (::std::option::Option::Some(class_), _) => crate::new_scene_object_(class_)?,
+        let missing_ = |what_: &str| ::std::result::Result::Err(::std::format!(\"a `{what_}` needs a `[node.{}]`\", what_.to_lowercase()));
+        let object_: crate::classes::Node::Ref = match node_.class.as_deref() {
+            ::std::option::Option::None => default_object_(node_, name_),
+            ::std::option::Option::Some(\"Node\") => crate::classes::Node::new(name_),
+            ::std::option::Option::Some(\"Sprite\") => match &node_.sprite {
+                ::std::option::Option::Some(image_) => crate::classes::Sprite::new(name_, image_.texture.clone()),
+                ::std::option::Option::None => return missing_(\"Sprite\"),
+            },
+            ::std::option::Option::Some(\"Camera\") => crate::classes::Camera::new(name_),
+            ::std::option::Option::Some(\"Node3D\") => crate::classes::Node3D::new(name_),
+            ::std::option::Option::Some(\"Mesh\") => match &node_.mesh {
+                ::std::option::Option::Some(mesh_) => crate::classes::Mesh::new(name_, mesh_.shape.clone()),
+                ::std::option::Option::None => return missing_(\"Mesh\"),
+            },
+            ::std::option::Option::Some(\"Light\") => match &node_.light {
+                ::std::option::Option::Some(light_) => crate::classes::Light::new(name_, light_.kind.clone()),
+                ::std::option::Option::None => return missing_(\"Light\"),
+            },
+            ::std::option::Option::Some(\"Camera3D\") => crate::classes::Camera3D::new(name_),
+            ::std::option::Option::Some(class_) => crate::new_scene_object_(class_)?,
         };
+        let class_ = node_.class.as_deref().unwrap_or(\"Node\");
         let fields_ = crate::classes::Node::HasFields::fields(&*object_);
         fields_.name.set(node_.name.clone());
         if let ::std::option::Option::Some(place_) = &node_.transform {
@@ -683,8 +721,21 @@ pub mod Scene {
             fields_.scale_x.set(place_.scale_x);
             fields_.scale_y.set(place_.scale_y);
         }
+        if let ::std::option::Option::Some(place_) = &node_.transform_3d {
+            let node_3d_ = crate::AnyObject::Node3D(::std::rc::Rc::clone(&object_))
+                .ok_or_else(|| ::std::format!(\"it is placed in 3D, but `{class_}` is not a `Node3D`\"))?;
+            fields_.x.set(place_.x);
+            fields_.y.set(place_.y);
+            fields_.rotation.set(place_.roll);
+            fields_.scale_x.set(place_.scale_x);
+            fields_.scale_y.set(place_.scale_y);
+            let depth_ = crate::classes::Node3D::HasFields::fields(&*node_3d_);
+            depth_.z.set(place_.z);
+            depth_.pitch.set(place_.pitch);
+            depth_.yaw.set(place_.yaw);
+            depth_.scale_z.set(place_.scale_z);
+        }
         if let ::std::option::Option::Some(image_) = &node_.sprite {
-            let class_ = node_.class.as_deref().unwrap_or(\"Node\");
             let sprite_ = crate::AnyObject::Sprite(::std::rc::Rc::clone(&object_))
                 .ok_or_else(|| ::std::format!(\"it shows an image, but `{class_}` is not a `Sprite`\"))?;
             let look_ = crate::classes::Sprite::HasFields::fields(&*sprite_);
@@ -696,8 +747,34 @@ pub mod Scene {
             let [r_, g_, b_, a_] = image_.color;
             look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
         }
+        if let ::std::option::Option::Some(shown_) = &node_.mesh {
+            let mesh_ = crate::AnyObject::Mesh(::std::rc::Rc::clone(&object_))
+                .ok_or_else(|| ::std::format!(\"it shows a mesh, but `{class_}` is not a `Mesh`\"))?;
+            let look_ = crate::classes::Mesh::HasFields::fields(&*mesh_);
+            look_.shape.set(shown_.shape.clone());
+            look_.width.set(shown_.width);
+            look_.height.set(shown_.height);
+            look_.depth.set(shown_.depth);
+            look_.radius.set(shown_.radius);
+            let [r_, g_, b_, a_] = shown_.color;
+            look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
+            look_.metallic.set(shown_.metallic);
+            look_.roughness.set(shown_.roughness);
+            look_.texture.set(shown_.texture.clone());
+            look_.pixelated.set(shown_.pixelated);
+        }
+        if let ::std::option::Option::Some(shone_) = &node_.light {
+            let light_ = crate::AnyObject::Light(::std::rc::Rc::clone(&object_))
+                .ok_or_else(|| ::std::format!(\"it shines a light, but `{class_}` is not a `Light`\"))?;
+            let look_ = crate::classes::Light::HasFields::fields(&*light_);
+            look_.kind.set(shone_.kind.clone());
+            let [r_, g_, b_, a_] = shone_.color;
+            look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
+            look_.intensity.set(shone_.intensity);
+            look_.range.set(shone_.range);
+        }
         if let ::std::option::Option::Some(solid_) = &node_.body {
-            let body_ = crate::classes::Body::new_(solid_.kind.clone(), &solid_.shape, solid_.radius, solid_.width, solid_.height);
+            let body_ = crate::classes::Body::new_(solid_.kind.clone(), &solid_.shape, solid_.radius, solid_.width, solid_.height, solid_.depth);
             let surface_ = crate::classes::Body::HasFields::fields(&*body_);
             surface_.gravity_scale.set(solid_.gravity_scale);
             surface_.fixed_rotation.set(solid_.fixed_rotation);
@@ -708,6 +785,22 @@ pub mod Scene {
             fields_.body.set(::std::option::Option::Some(body_));
         }
         ::std::result::Result::Ok(object_)
+    }
+
+    /// The object of a node whose class the scene does not name: of the
+    /// engine class that can show what it has.
+    fn default_object_(node_: &::star_script_runtime::scenes::SceneNode, name_: ::std::string::String) -> crate::classes::Node::Ref {
+        if let ::std::option::Option::Some(image_) = &node_.sprite {
+            crate::classes::Sprite::new(name_, image_.texture.clone())
+        } else if let ::std::option::Option::Some(mesh_) = &node_.mesh {
+            crate::classes::Mesh::new(name_, mesh_.shape.clone())
+        } else if let ::std::option::Option::Some(light_) = &node_.light {
+            crate::classes::Light::new(name_, light_.kind.clone())
+        } else if node_.transform_3d.is_some() {
+            crate::classes::Node3D::new(name_)
+        } else {
+            crate::classes::Node::new(name_)
+        }
     }
 }";
 
@@ -894,6 +987,8 @@ impl ::star_engine::game::Game for EngineGame_ {{
     fn draw(&self, world: &::star_engine::star_ecs::World, frame: &mut ::star_engine::star_render::Frame) {{
         let fields_ = crate::classes::Game::HasFields::fields(&*self.game);
         frame.set_clear_color(fields_.background.read(|color_| engine_color_(&**color_)));
+        let ambient_ = fields_.ambient.read(|color_| engine_color_(&**color_));
+        frame.set_ambient_light(::star_engine::star_render::AmbientLight::new(ambient_, 1.0));
         frame.set_camera(self.view_(world));
     }}
 
@@ -903,9 +998,14 @@ impl ::star_engine::game::Game for EngineGame_ {{
 }}
 
 impl EngineGame_ {{
-    /// The engine's camera that shows the game from its `camera`.
+    /// The engine's camera that shows the game from its `camera_3d`, or
+    /// else from its `camera`.
     fn view_(&self, world: &::star_engine::star_ecs::World) -> ::star_engine::star_render::Camera {{
-        crate::classes::Game::HasFields::fields(&*self.game).camera.read(|camera_| match camera_ {{
+        let fields_ = crate::classes::Game::HasFields::fields(&*self.game);
+        if let ::std::option::Option::Some(camera_) = fields_.camera_3d.get() {{
+            return self.mirror.camera_3d(world, &script_camera_3d_(&*camera_));
+        }}
+        fields_.camera.read(|camera_| match camera_ {{
             ::std::option::Option::Some(camera_) => self.mirror.camera(world, &script_camera_(&**camera_)),
             ::std::option::Option::None => ::star_engine::star_render::Camera::default(),
         }})
@@ -965,21 +1065,34 @@ fn mirror_nodes_(
             rotation: fields_.rotation.get(),
             scale: ::star_engine::star_math::Vec2::new(fields_.scale_x.get(), fields_.scale_y.get()),
         };
+        let transform_3d_ = crate::AnyObject::Node3D(::std::rc::Rc::clone(&node_)).map(|node_3d_| {
+            let depth_ = crate::classes::Node3D::HasFields::fields(&*node_3d_);
+            let angles_ = ::star_engine::star_math::Vec3::new(depth_.pitch.get(), depth_.yaw.get(), fields_.rotation.get());
+            ::star_engine::star_scene::Transform3D {
+                position: ::star_engine::star_math::Vec3::new(fields_.x.get(), fields_.y.get(), depth_.z.get()),
+                rotation: ::star_engine::star_math::Quat::from_euler(angles_),
+                scale: ::star_engine::star_math::Vec3::new(fields_.scale_x.get(), fields_.scale_y.get(), depth_.scale_z.get()),
+            }
+        });
         fields_.name.read(|name_| {
             with_sprite_(&node_, |sprite_| {
                 with_body_(fields_, |body_| {
-                    let described_ = ::star_engine::script_nodes::ScriptNode {
-                        id: fields_.id_,
-                        parent: parent_,
-                        name: name_,
-                        transform: transform_,
-                        transform_3d: ::std::option::Option::None,
-                        sprite: sprite_,
-                        body: body_,
-                        mesh: ::std::option::Option::None,
-                        light: ::std::option::Option::None,
-                    };
-                    mirror_.mirror(world_, &described_);
+                    with_mesh_(&node_, |mesh_| {
+                        with_light_(&node_, |light_| {
+                            let described_ = ::star_engine::script_nodes::ScriptNode {
+                                id: fields_.id_,
+                                parent: parent_,
+                                name: name_,
+                                transform: transform_,
+                                transform_3d: transform_3d_,
+                                sprite: sprite_,
+                                body: body_,
+                                mesh: mesh_,
+                                light: light_,
+                            };
+                            mirror_.mirror(world_, &described_);
+                        });
+                    });
                 });
             });
         });
@@ -1022,7 +1135,7 @@ fn with_body_(
         return then_(::std::option::Option::None);
     };
     let body_ = crate::classes::Body::HasFields::fields(&*body_);
-    let (impulse_x_, impulse_y_) = body_.impulse_.replace((0.0, 0.0));
+    let (impulse_x_, impulse_y_, impulse_z_) = body_.impulse_.replace((0.0, 0.0, 0.0));
     body_.kind.read(|kind_| {
         body_.shape.read(|shape_| {
             then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptBody {
@@ -1031,17 +1144,65 @@ fn with_body_(
                 radius: body_.radius.get(),
                 width: body_.width.get(),
                 height: body_.height.get(),
-                depth: 1.0,
+                depth: body_.depth.get(),
                 gravity_scale: body_.gravity_scale.get(),
                 fixed_rotation: body_.fixed_rotation.get(),
                 friction: body_.friction.get(),
                 bounciness: body_.bounciness.get(),
                 density: body_.density.get(),
                 sensor: body_.sensor.get(),
-                velocity: ::star_engine::star_math::Vec3::new(body_.velocity_x.get(), body_.velocity_y.get(), 0.0),
-                impulse: ::star_engine::star_math::Vec3::new(impulse_x_, impulse_y_, 0.0),
+                velocity: ::star_engine::star_math::Vec3::new(body_.velocity_x.get(), body_.velocity_y.get(), body_.velocity_z.get()),
+                impulse: ::star_engine::star_math::Vec3::new(impulse_x_, impulse_y_, impulse_z_),
             }));
         });
+    });
+}
+
+/// Runs `then_` with what the engine needs to know about the mesh `node_`
+/// shows, if it is a `Mesh`.
+fn with_mesh_(
+    node_: &crate::classes::Node::Ref,
+    then_: impl FnOnce(::std::option::Option<::star_engine::script_nodes::ScriptMesh<'_>>),
+) {
+    let ::std::option::Option::Some(mesh_) = crate::AnyObject::Mesh(::std::rc::Rc::clone(node_)) else {
+        return then_(::std::option::Option::None);
+    };
+    let look_ = crate::classes::Mesh::HasFields::fields(&*mesh_);
+    look_.shape.read(|shape_| {
+        look_.texture.read(|texture_| {
+            then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptMesh {
+                shape: shape_,
+                width: look_.width.get(),
+                height: look_.height.get(),
+                depth: look_.depth.get(),
+                radius: look_.radius.get(),
+                color: look_.color.read(|color_| engine_color_(&**color_)),
+                metallic: look_.metallic.get(),
+                roughness: look_.roughness.get(),
+                texture: texture_,
+                pixelated: look_.pixelated.get(),
+            }));
+        });
+    });
+}
+
+/// Runs `then_` with what the engine needs to know about the light `node_`
+/// shines, if it is a `Light`.
+fn with_light_(
+    node_: &crate::classes::Node::Ref,
+    then_: impl FnOnce(::std::option::Option<::star_engine::script_nodes::ScriptLight<'_>>),
+) {
+    let ::std::option::Option::Some(light_) = crate::AnyObject::Light(::std::rc::Rc::clone(node_)) else {
+        return then_(::std::option::Option::None);
+    };
+    let look_ = crate::classes::Light::HasFields::fields(&*light_);
+    look_.kind.read(|kind_| {
+        then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptLight {
+            kind: kind_,
+            color: look_.color.read(|color_| engine_color_(&**color_)),
+            intensity: look_.intensity.get(),
+            range: look_.range.get(),
+        }));
     });
 }
 
@@ -1074,9 +1235,16 @@ fn sync_bodies_(
         fields_.x.set(state_.position.x);
         fields_.y.set(state_.position.y);
         fields_.rotation.set(state_.angles.z);
+        if let (true, ::std::option::Option::Some(node_3d_)) = (state_.is_3d, crate::AnyObject::Node3D(::std::rc::Rc::clone(node_))) {
+            let depth_ = crate::classes::Node3D::HasFields::fields(&*node_3d_);
+            depth_.z.set(state_.position.z);
+            depth_.pitch.set(state_.angles.x);
+            depth_.yaw.set(state_.angles.y);
+        }
         let body_ = crate::classes::Body::HasFields::fields(&*body_);
         body_.velocity_x.set(state_.velocity.x);
         body_.velocity_y.set(state_.velocity.y);
+        body_.velocity_z.set(state_.velocity.z);
         let contacts_ = [
             (&body_.touching_, state_.touching),
             (&body_.just_touched_, state_.just_touched),
@@ -1105,11 +1273,23 @@ fn script_camera_(camera_: &dyn crate::classes::Camera::Object) -> ::star_engine
         position: ::star_engine::star_math::Vec2::new(node_.x.get(), node_.y.get()),
         view_height: crate::classes::Camera::HasFields::fields(camera_).view_height.get(),
     }
+}
+
+/// What the engine needs to know about the game's 3D camera.
+fn script_camera_3d_(camera_: &dyn crate::classes::Camera3D::Object) -> ::star_engine::script_nodes::ScriptCamera3D {
+    let node_ = crate::classes::Node::HasFields::fields(camera_);
+    let depth_ = crate::classes::Node3D::HasFields::fields(camera_);
+    ::star_engine::script_nodes::ScriptCamera3D {
+        id: node_.id_,
+        position: ::star_engine::star_math::Vec3::new(node_.x.get(), node_.y.get(), depth_.z.get()),
+        angles: ::star_engine::star_math::Vec3::new(depth_.pitch.get(), depth_.yaw.get(), node_.rotation.get()),
+        field_of_view: crate::classes::Camera3D::HasFields::fields(camera_).fov.get(),
+    }
 }";
 
 const READ_SCENE: &str = "/// Reads a scene of the game's asset folder for `Scene.load`. Parts of a
 /// scene that scripts have no field for yet (a sprite's region and anchor,
-/// 3D nodes) are left out.
+/// the divisions of a sphere) are left out.
 fn read_scene_(
     folder_: &::star_engine::star_assets::AssetFolder,
     path_: &str,
@@ -1138,25 +1318,70 @@ fn read_scene_(
                 pixelated: image_.filter == ::star_engine::star_render::TextureFilter::Pixelated,
                 color: [image_.color.r, image_.color.g, image_.color.b, image_.color.a],
             }),
-            body: node_.body.map(|settings_| {
-                let body_ = ::star_engine::script_nodes::ScriptBody::from_settings(&settings_);
-                ::star_script_runtime::scenes::SceneBody {
-                    kind: ::std::string::String::from(body_.kind),
-                    shape: ::std::string::String::from(body_.shape),
-                    radius: body_.radius,
-                    width: body_.width,
-                    height: body_.height,
-                    gravity_scale: body_.gravity_scale,
-                    fixed_rotation: body_.fixed_rotation,
-                    friction: body_.friction,
-                    bounciness: body_.bounciness,
-                    density: body_.density,
-                    sensor: body_.sensor,
+            body: match (node_.transform_3d.is_some(), node_.body_3d, node_.body) {
+                (true, ::std::option::Option::Some(settings_), _) => ::std::option::Option::Some(scene_body_(&::star_engine::script_nodes::ScriptBody::from_settings_3d(&settings_))),
+                (_, _, ::std::option::Option::Some(settings_)) => ::std::option::Option::Some(scene_body_(&::star_engine::script_nodes::ScriptBody::from_settings(&settings_))),
+                _ => ::std::option::Option::None,
+            },
+            transform_3d: node_.transform_3d.map(|place_| {
+                let angles_ = place_.rotation.to_euler();
+                ::star_script_runtime::scenes::SceneTransform3D {
+                    x: place_.position.x,
+                    y: place_.position.y,
+                    z: place_.position.z,
+                    pitch: angles_.x,
+                    yaw: angles_.y,
+                    roll: angles_.z,
+                    scale_x: place_.scale.x,
+                    scale_y: place_.scale.y,
+                    scale_z: place_.scale.z,
+                }
+            }),
+            mesh: node_.mesh.as_ref().map(|outline_| {
+                let mesh_ = ::star_engine::script_nodes::ScriptMesh::from_outline(outline_);
+                ::star_script_runtime::scenes::SceneMesh {
+                    shape: ::std::string::String::from(mesh_.shape),
+                    width: mesh_.width,
+                    height: mesh_.height,
+                    depth: mesh_.depth,
+                    radius: mesh_.radius,
+                    color: [mesh_.color.r, mesh_.color.g, mesh_.color.b, mesh_.color.a],
+                    metallic: mesh_.metallic,
+                    roughness: mesh_.roughness,
+                    texture: ::std::string::String::from(mesh_.texture),
+                    pixelated: mesh_.pixelated,
+                }
+            }),
+            light: node_.light.map(|shone_| {
+                let light_ = ::star_engine::script_nodes::ScriptLight::from_light(&shone_);
+                ::star_script_runtime::scenes::SceneLight {
+                    kind: ::std::string::String::from(light_.kind),
+                    color: [light_.color.r, light_.color.g, light_.color.b, light_.color.a],
+                    intensity: light_.intensity,
+                    range: light_.range,
                 }
             }),
         }
     });
     ::std::result::Result::Ok(nodes_.collect())
+}
+
+/// The body of a scene node, with the words of StarScript's `Body`.
+fn scene_body_(body_: &::star_engine::script_nodes::ScriptBody<'_>) -> ::star_script_runtime::scenes::SceneBody {
+    ::star_script_runtime::scenes::SceneBody {
+        kind: ::std::string::String::from(body_.kind),
+        shape: ::std::string::String::from(body_.shape),
+        radius: body_.radius,
+        width: body_.width,
+        height: body_.height,
+        depth: body_.depth,
+        gravity_scale: body_.gravity_scale,
+        fixed_rotation: body_.fixed_rotation,
+        friction: body_.friction,
+        bounciness: body_.bounciness,
+        density: body_.density,
+        sensor: body_.sensor,
+    }
 }";
 
 const ENGINE_AUDIO: &str = "/// Loads and plays the sounds of StarScript's `Sound` with the engine.

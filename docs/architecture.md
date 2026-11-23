@@ -94,6 +94,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 47 | A StarScript body is a **`Body` object in a field of `Node`**, synced both ways | A node of any class (a `Sprite` too) can have one, as with `Body2D` and `[node.body]`. The simulation runs after the scripts, so before their next frame the generated game copies back the position and rotation of each node with a body, its velocity and what it touches (by `ScriptNodes::read_bodies` and `body_state`); a velocity the script changed and the impulses it gave are passed on through `Body2D`, which keeps them until the body exists. Kinds and shapes are words (`"dynamic"`, `"circle"`), since StarScript has no enums yet; a body the physics cannot simulate is left out with one warning, so a typo never stops the game. Contacts are polled lists (`touching`, `just_touched`, `just_separated`), like `Input`'s actions, and hold their nodes weakly. Rejected: a `Body` node class (a sprite could not be a body, and scenes put both on one node), callbacks on `Node` (every node class would grow), and calls into the physics from scripts (the world is only lent to the engine's code) |
 | 48 | 3D materials are **PBR metallic-roughness**, lit by a few lights per frame in one pass | The model of glTF, Unity, Godot and Unreal, so imported models will look as their authors made them; the cost over Blinn-Phong is a few shader lines. Lights are a uniform array of 16 read by every 3D draw (forward shading): simple, every backend runs it, and enough for the games of this phase. Rejected: Blinn-Phong (models would need converting later), deferred shading and clustered lights (worth it with hundreds of lights; they can come behind the same `Frame` API), and shadows for now |
 | 49 | 3D physics with **rapier3d** (Apache-2.0), beside rapier2d in `star_physics` | The 3D sibling of rapier2d, of the same authors and version: it shares parry, glamx and nalgebra, so the dependency tree barely grows, and `Physics3d` can have the same API as `Physics2d` (`BodySettings` and `Contact` are generic over the shape and the body id; the fixed-step clock and the contact bookkeeping are shared code). Rejected: avian3d (built on Bevy's ECS) and an own solver (as in decision 46) |
+| 50 | StarScript's 3D nodes are **`Node3D` extends `Node`**, and bodies stay one `Body` class | A 3D node keeps `x`, `y`, the scales and the whole tree API of `Node` (`add_child`, `children`, `find_child`, `Scene.load`), with `rotation` as its roll; `Node3D` adds `z`, `pitch`, `yaw`, `scale_z` and `look_at`, and `Mesh`, `Light` and `Camera3D` extend it. A `Body` is a 2D body on a 2D node and a 3D one on a `Node3D` (`Body.sphere`, `Body.box`, `depth`, `velocity_z`, `apply_impulse_3d`); a shape of the other dimension is left out with one warning. Rejected: a separate 3D hierarchy (the game and every node would need a second `add_child`, and scenes could not mix them) and a `Body3D` class (the whole API of `Body` twice, and two body fields on 3D nodes) |
 
 ## ECS
 
@@ -196,12 +197,19 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   again when the path or filter change), so code without the renderer, such
   as systems and StarScript nodes, can give nodes images. An image that
   cannot be loaded logs one warning and is not drawn.
+- A `MeshFile` does the same for 3D: a `MeshShape` with its sizes, a PBR
+  surface and an optional image path, built and loaded by the engine when
+  it draws it. Every shape of a kind is drawn from one mesh of size 1,
+  scaled, so sizes that change every frame build nothing new.
 - StarScript nodes (`Node`, `Sprite`) live in the script; after the scripts
   ran each frame, the generated game describes its tree to `ScriptNodes`
   (`star_engine::script_nodes`), which keeps one world node per script node
   (decision 35). A script node's `Body` becomes a `Body2D`, and what the
   simulation did is copied back before the scripts' next frame (decision
-  47).
+  47). A `Node3D` gets a `Transform3D` (its pitch, yaw and roll make a
+  `Quat`), a `Body3D` for its `Body`, a `MeshFile` if it is a `Mesh` and a
+  `LightNode` if it is a `Light`; the game is seen from `Game.camera_3d`
+  when it has one (decision 50).
 
 ## Assets
 
@@ -394,8 +402,8 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   along each axis and turned, the rotation is only approximate. Scenes
   keep them in a `[node.body_3d]` table, like `[node.body]` with the
   shapes `sphere` (`radius`), `box` (`size` of three numbers) and
-  `capsule` (`height` and `radius`). StarScript does not see 3D bodies
-  yet.
+  `capsule` (`height` and `radius`). StarScript nodes get them through
+  `Body` (decision 50).
 
 ## Rendering
 

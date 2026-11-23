@@ -21,6 +21,7 @@ mod conversions;
 mod expressions;
 mod names;
 mod native;
+mod native_3d;
 mod program;
 mod statements;
 mod writer;

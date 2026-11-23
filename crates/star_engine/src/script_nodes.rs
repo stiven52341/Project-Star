@@ -32,7 +32,7 @@ use star_scene::{
 };
 
 pub use crate::script_3d::{
-    CUBE, DIRECTIONAL, PLANE, POINT, ScriptCamera3D, ScriptLight, ScriptMesh,
+    CUBE, DEFAULT_RANGE, DIRECTIONAL, PLANE, POINT, ScriptCamera3D, ScriptLight, ScriptMesh,
 };
 pub use crate::script_body::{
     BOX, CAPSULE, CIRCLE, DEFAULT_RADIUS, DEFAULT_SIZE, DYNAMIC, KINEMATIC, RECTANGLE, SPHERE,

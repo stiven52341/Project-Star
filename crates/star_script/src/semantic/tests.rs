@@ -944,6 +944,31 @@ fn games_are_seen_from_their_camera() {
 }
 
 #[test]
+fn games_show_3d_nodes_from_their_3d_camera() {
+    assert_valid(
+        "class Crate extends Mesh {\n init() {\n super.init(\"Crate\", \"cube\")\n \
+         z = 2.0\n yaw = 0.5\n metallic = 1.0\n color = Color(1.0, 0.5, 0.0, 1.0)\n \
+         body = Body.box(\"dynamic\", 1.0, 1.0, 1.0)\n }\n}\n\
+         class G extends Game {\n override func start() {\n \
+         const eye = Camera3D(\"Eye\")\n eye.look_at(0.0, 0.0, 0.0)\n eye.fov = 1.2\n \
+         camera_3d = eye\n ambient = Color(0.2, 0.2, 0.2, 1.0)\n \
+         const sun = Light(\"Sun\", \"directional\")\n sun.intensity = 2.0\n \
+         const crate_mesh = Crate()\n crate_mesh.body?.apply_impulse_3d(0.0, 1.0, 0.0)\n \
+         add_child(eye)\n add_child(sun)\n add_child(crate_mesh)\n \
+         const ball = Node3D(\"Ball\")\n ball.body = Body.sphere(\"dynamic\", 0.5)\n \
+         crate_mesh.add_child(ball)\n }\n}",
+    );
+    assert_eq!(
+        body_errors("const eye: Camera3D = Camera(\"Eye\")"),
+        [mismatch("Camera3D", "Camera")]
+    );
+    assert_eq!(
+        body_errors("const flat: Node3D = Node(\"Flat\")"),
+        [mismatch("Node3D", "Node")]
+    );
+}
+
+#[test]
 fn scenes_load_trees_that_may_be_missing() {
     assert_valid(
         "class G extends Game {\n override func start() {\n \

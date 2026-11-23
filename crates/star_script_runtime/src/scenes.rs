@@ -30,8 +30,79 @@ pub struct SceneNode {
     pub transform: Option<SceneTransform>,
     /// The image it shows; only `Sprite` objects can show one.
     pub sprite: Option<SceneSprite>,
-    /// Its physics body.
+    /// Its physics body: of the 3D physics if the node is placed in 3D.
     pub body: Option<SceneBody>,
+    /// Where it is in 3D, relative to its parent; only `Node3D` objects can
+    /// be placed so.
+    pub transform_3d: Option<SceneTransform3D>,
+    /// The mesh it shows; only `Mesh` objects can show one.
+    pub mesh: Option<SceneMesh>,
+    /// The light it shines; only `Light` objects can shine one.
+    pub light: Option<SceneLight>,
+}
+
+/// Where a [`SceneNode`] is in 3D, relative to its parent.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SceneTransform3D {
+    /// Position along x.
+    pub x: f32,
+    /// Position along y.
+    pub y: f32,
+    /// Position along z.
+    pub z: f32,
+    /// Rotation around x, in radians.
+    pub pitch: f32,
+    /// Rotation around y, in radians.
+    pub yaw: f32,
+    /// Rotation around z, in radians.
+    pub roll: f32,
+    /// Scale along x.
+    pub scale_x: f32,
+    /// Scale along y.
+    pub scale_y: f32,
+    /// Scale along z.
+    pub scale_z: f32,
+}
+
+/// The mesh a [`SceneNode`] shows, with the words and values of
+/// StarScript's `Mesh`. Every size is given, also those its shape does not
+/// use.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SceneMesh {
+    /// `"cube"`, `"sphere"` or `"plane"`.
+    pub shape: String,
+    /// Of cubes and planes.
+    pub width: f32,
+    /// Of cubes.
+    pub height: f32,
+    /// Of cubes and planes.
+    pub depth: f32,
+    /// Of spheres.
+    pub radius: f32,
+    /// Red, green, blue and opacity, from `0.0` to `1.0`.
+    pub color: [f32; 4],
+    /// How metallic the surface is.
+    pub metallic: f32,
+    /// How rough the surface is.
+    pub roughness: f32,
+    /// Asset path of its image; empty for none.
+    pub texture: String,
+    /// Whether the image's pixels are kept sharp.
+    pub pixelated: bool,
+}
+
+/// The light a [`SceneNode`] shines, with the words and values of
+/// StarScript's `Light`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SceneLight {
+    /// `"directional"` or `"point"`.
+    pub kind: String,
+    /// Red, green, blue and opacity, from `0.0` to `1.0`.
+    pub color: [f32; 4],
+    /// How bright it is.
+    pub intensity: f32,
+    /// How far a point light reaches.
+    pub range: f32,
 }
 
 /// Where a [`SceneNode`] is, relative to its parent.
@@ -73,14 +144,17 @@ pub struct SceneSprite {
 pub struct SceneBody {
     /// `"dynamic"`, `"static"` or `"kinematic"`.
     pub kind: String,
-    /// `"circle"`, `"rectangle"` or `"capsule"`.
+    /// `"circle"`, `"rectangle"` or `"capsule"` in 2D; `"sphere"`, `"box"`
+    /// or `"capsule"` in 3D.
     pub shape: String,
-    /// Of circles and capsules.
+    /// Of circles, spheres and capsules.
     pub radius: f32,
-    /// Of rectangles.
+    /// Of rectangles and boxes.
     pub width: f32,
-    /// Of rectangles and capsules.
+    /// Of rectangles, boxes and capsules.
     pub height: f32,
+    /// Of boxes.
+    pub depth: f32,
     /// How much gravity pulls it.
     pub gravity_scale: f32,
     /// Whether collisions never turn it.
@@ -181,6 +255,9 @@ mod tests {
             transform: None,
             sprite: None,
             body: None,
+            transform_3d: None,
+            mesh: None,
+            light: None,
         }
     }
 

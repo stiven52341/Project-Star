@@ -1,0 +1,9 @@
+cube 1.0 0.5 0.8
+0.0 1.0 true
+box 3.0 0.0
+sphere 0.25
+true true true
+true true
+directional 1.0 10.0
+2 Pivot
+true false true

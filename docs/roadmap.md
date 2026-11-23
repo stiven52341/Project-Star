@@ -81,8 +81,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         rough to polished, a checkered cube, the sun and an orbiting lamp.
   - [x] 9d 3D nodes: `Transform3D` (with quaternions), `MeshNode` and
         `LightNode`, drawn by the engine and kept in `.scene` files
-        (`[node.transform_3d]`, `[node.mesh]`, `[node.light]`). StarScript
-        does not see them yet.
+        (`[node.transform_3d]`, `[node.mesh]`, `[node.light]`); StarScript
+        has them since 13.5k.
 - [x] **Phase 10 — 3D physics** (rapier3d):
   - [x] 10a `Physics3d`: spheres, boxes and capsules; dynamic, static and
         kinematic bodies; sensors and contacts, in fixed steps as in 2D.
@@ -90,7 +90,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         (`[node.body_3d]`).
   - [x] 10c Example `physics_3d`: balls and crates dropped into an arena,
         a kinematic bar sweeping the floor and a sensor plate that paints
-        green what goes through it. StarScript does not see 3D bodies yet.
+        green what goes through it. StarScript has 3D bodies since 13.5k.
 - [ ] **Phase 11 — Mobile**: Android and iOS packaging.
 - [ ] **Phase 12 — Visual editor** (egui):
   - [x] Project manager: new project (name, location, 2D/3D, platforms),
@@ -134,6 +134,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           positive)`.
     - [x] 13.5i Sounds in StarScript: `Sound` and `Audio` (step 7d).
     - [x] 13.5j Physics in StarScript: `Body` (step 8c).
+    - [x] 13.5k 3D in StarScript: `Node3D` (extends `Node`: `z`, `pitch`,
+          `yaw`, `scale_z`, `look_at`), `Mesh`, `Light` and `Camera3D`;
+          `Game.camera_3d` and `Game.ambient`; 3D bodies with `Body.sphere`
+          and `Body.box`; `Scene.load` builds 3D nodes.
   - [x] 13.6 Editor integration: compiling and an error panel.
     - [x] 13.6a Programs of several files (`SourceSet`): each file is read
           on its own and their classes are checked as one program; errors

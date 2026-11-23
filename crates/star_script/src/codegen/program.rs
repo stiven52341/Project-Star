@@ -11,22 +11,47 @@ use super::{
 use crate::Span;
 use crate::ast::{ClassDecl, ConstructorDecl, Expr, MemberKind, MethodDecl, VariableKind};
 use crate::semantic::{
-    BODY_CLASS, CAMERA_CLASS, COLOR_CLASS, ClassId, ClassOrigin, GAME_CLASS, MethodInfo,
-    NODE_CLASS, ParameterInfo, SOUND_CLASS, SPRITE_CLASS, SceneClassError, Type,
+    BODY_CLASS, CAMERA_3D_CLASS, CAMERA_CLASS, COLOR_CLASS, ClassId, ClassOrigin, GAME_CLASS,
+    LIGHT_CLASS, MESH_CLASS, MethodInfo, NODE_3D_CLASS, NODE_CLASS, ParameterInfo, SOUND_CLASS,
+    SPRITE_CLASS, SceneClassError, Type,
 };
 
-/// The engine classes that scripts can extend.
-const EXTENDABLE_NATIVE_CLASSES: [&str; 4] = [GAME_CLASS, NODE_CLASS, SPRITE_CLASS, CAMERA_CLASS];
+/// The engine classes of nodes, which `Scene.load` creates itself.
+const NATIVE_NODE_CLASSES: [&str; 7] = [
+    NODE_CLASS,
+    SPRITE_CLASS,
+    CAMERA_CLASS,
+    NODE_3D_CLASS,
+    MESH_CLASS,
+    LIGHT_CLASS,
+    CAMERA_3D_CLASS,
+];
+
+/// The engine classes that scripts can extend: the game and the nodes.
+const EXTENDABLE_NATIVE_CLASSES: [&str; 8] = [
+    GAME_CLASS,
+    NODE_CLASS,
+    SPRITE_CLASS,
+    CAMERA_CLASS,
+    NODE_3D_CLASS,
+    MESH_CLASS,
+    LIGHT_CLASS,
+    CAMERA_3D_CLASS,
+];
 
 /// The engine classes that have objects, and so a module and a conversion
 /// in `AnyObject`.
-const NATIVE_OBJECT_CLASSES: [&str; 7] = [
+const NATIVE_OBJECT_CLASSES: [&str; 11] = [
     GAME_CLASS,
     COLOR_CLASS,
     BODY_CLASS,
     NODE_CLASS,
     SPRITE_CLASS,
     CAMERA_CLASS,
+    NODE_3D_CLASS,
+    MESH_CLASS,
+    LIGHT_CLASS,
+    CAMERA_3D_CLASS,
     SOUND_CLASS,
 ];
 
@@ -172,7 +197,7 @@ fn any_object(context: Context<'_>, out: &mut Writer, classes: &[ClassId]) {
 /// `new_scene_object_`, which `Scene.load` calls to create a node of the
 /// class a scene names: the program's classes that extend `Node` and are
 /// created without arguments. The others get the reason they cannot be used.
-/// `Node`, `Sprite` and `Camera` are created by the `Scene` module itself.
+/// The engine's node classes are created by the `Scene` module itself.
 fn scene_classes(context: Context<'_>, out: &mut Writer) {
     let classes = context.analysis.classes();
     out.line("");
@@ -183,7 +208,7 @@ fn scene_classes(context: Context<'_>, out: &mut Writer) {
     ));
     out.open(&format!("match {UNKNOWN_CLASS_ARGUMENT} {{"));
     for (id, class) in classes.iter() {
-        if [NODE_CLASS, SPRITE_CLASS, CAMERA_CLASS].contains(&class.name.as_str()) {
+        if NATIVE_NODE_CLASSES.contains(&class.name.as_str()) {
             continue;
         }
         let outcome = match classes.check_scene_class(id) {

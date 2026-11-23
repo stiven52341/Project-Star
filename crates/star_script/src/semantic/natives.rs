@@ -36,6 +36,18 @@ pub const SPRITE_CLASS: &str = "Sprite";
 /// Name of the engine class of the nodes the game is seen from.
 pub const CAMERA_CLASS: &str = "Camera";
 
+/// Name of the engine class of the nodes placed in 3D.
+pub const NODE_3D_CLASS: &str = "Node3D";
+
+/// Name of the engine class of the 3D nodes that show a mesh.
+pub const MESH_CLASS: &str = "Mesh";
+
+/// Name of the engine class of the 3D nodes that shine a light.
+pub const LIGHT_CLASS: &str = "Light";
+
+/// Name of the engine class of the 3D nodes the game is seen from.
+pub const CAMERA_3D_CLASS: &str = "Camera3D";
+
 /// Name of the engine class that loads `.scene` files.
 pub const SCENE_CLASS: &str = "Scene";
 
@@ -52,11 +64,13 @@ pub const AUDIO_CLASS: &str = "Audio";
 pub const BODY_CLASS: &str = "Body";
 
 /// The static methods of `Body` that make one, with the sizes of their
-/// shape after the kind.
-pub(super) const BODY_SHAPES: [(&str, &[&str]); 3] = [
+/// shape after the kind: of 2D, of 3D, and the capsule of both.
+pub(super) const BODY_SHAPES: [(&str, &[&str]); 5] = [
     ("circle", &["radius"]),
     ("rectangle", &["width", "height"]),
     ("capsule", &["height", "radius"]),
+    ("sphere", &["radius"]),
+    ("box", &["width", "height", "depth"]),
 ];
 
 /// The methods of `Body` that list the nodes it touches.
@@ -121,6 +135,10 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     add_body_methods(classes, body, node);
     add_sprite_class(classes, node, color);
     let camera = add_camera_class(classes, node);
+    let node_3d = add_node_3d_class(classes, node);
+    add_mesh_class(classes, node_3d, color);
+    add_light_class(classes, node_3d, color);
+    let camera_3d = add_camera_3d_class(classes, node_3d);
 
     // Builds the nodes of a `.scene` file, or gives `null` if it cannot.
     let mut scene = ClassInfo::new(SCENE_CLASS.to_owned(), ClassOrigin::Native);
@@ -147,6 +165,8 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     game.fields = vec![
         native_field("background", Type::Class(color)),
         native_field("camera", Type::Class(camera).nullable()),
+        native_field("camera_3d", Type::Class(camera_3d).nullable()),
+        native_field("ambient", Type::Class(color)),
     ];
     game.methods
         .push(native_method("start", &[], Type::Void, false));
@@ -225,20 +245,23 @@ fn add_node_class(classes: &mut ClassTable, body: ClassId) -> ClassId {
 }
 
 /// `Body`: the physics body of a node, made with `Body.circle`,
-/// `Body.rectangle` or `Body.capsule` (there is no `init`). Its kind and
-/// shape are words, and it keeps the sizes of every shape.
+/// `Body.rectangle` or `Body.capsule` for 2D nodes, and `Body.sphere`,
+/// `Body.box` or `Body.capsule` for 3D nodes (there is no `init`). Its kind
+/// and shape are words, and it keeps the sizes of every shape.
 fn add_body_class(classes: &mut ClassTable) -> ClassId {
     let mut body = ClassInfo::new(BODY_CLASS.to_owned(), ClassOrigin::Native);
     let floats = [
         "radius",
         "width",
         "height",
+        "depth",
         "gravity_scale",
         "friction",
         "bounciness",
         "density",
         "velocity_x",
         "velocity_y",
+        "velocity_z",
     ];
     body.fields = [("kind", Type::String), ("shape", Type::String)]
         .into_iter()
@@ -269,6 +292,12 @@ fn add_body_methods(classes: &mut ClassTable, body: ClassId, node: ClassId) {
     methods.push(native_method(
         "apply_impulse",
         &[("x", Type::Float), ("y", Type::Float)],
+        Type::Void,
+        false,
+    ));
+    methods.push(native_method(
+        "apply_impulse_3d",
+        &[("x", Type::Float), ("y", Type::Float), ("z", Type::Float)],
         Type::Void,
         false,
     ));
@@ -304,6 +333,79 @@ fn add_camera_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
     let mut camera = ClassInfo::new(CAMERA_CLASS.to_owned(), ClassOrigin::Native);
     camera.base = Some(node);
     camera.fields = vec![native_field("view_height", Type::Float)];
+    camera.constructor = Some(native_constructor(&[("name", Type::String)]));
+    classes.add(camera)
+}
+
+/// `Node3D`: a node placed in 3D. Its `x`, `y`, `rotation` (the roll,
+/// around z) and scales are those of `Node`; it adds the depth and the
+/// other two angles.
+fn add_node_3d_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
+    let mut node_3d = ClassInfo::new(NODE_3D_CLASS.to_owned(), ClassOrigin::Native);
+    node_3d.base = Some(node);
+    node_3d.fields = ["z", "pitch", "yaw", "scale_z"]
+        .into_iter()
+        .map(|name| native_field(name, Type::Float))
+        .collect();
+    node_3d.constructor = Some(native_constructor(&[("name", Type::String)]));
+    node_3d.methods = vec![native_method(
+        "look_at",
+        &[("x", Type::Float), ("y", Type::Float), ("z", Type::Float)],
+        Type::Void,
+        false,
+    )];
+    classes.add(node_3d)
+}
+
+/// `Mesh`: a 3D node that shows a basic shape with a PBR surface.
+fn add_mesh_class(classes: &mut ClassTable, node_3d: ClassId, color: ClassId) -> ClassId {
+    let mut mesh = ClassInfo::new(MESH_CLASS.to_owned(), ClassOrigin::Native);
+    mesh.base = Some(node_3d);
+    let floats = ["width", "height", "depth", "radius"]
+        .into_iter()
+        .map(|name| (name, Type::Float));
+    mesh.fields = [("shape", Type::String)]
+        .into_iter()
+        .chain(floats)
+        .chain([
+            ("color", Type::Class(color)),
+            ("metallic", Type::Float),
+            ("roughness", Type::Float),
+            ("texture", Type::String),
+            ("pixelated", Type::Bool),
+        ])
+        .map(|(name, ty)| native_field(name, ty))
+        .collect();
+    mesh.constructor = Some(native_constructor(&[
+        ("name", Type::String),
+        ("shape", Type::String),
+    ]));
+    classes.add(mesh)
+}
+
+/// `Light`: a 3D node that lights the meshes.
+fn add_light_class(classes: &mut ClassTable, node_3d: ClassId, color: ClassId) -> ClassId {
+    let mut light = ClassInfo::new(LIGHT_CLASS.to_owned(), ClassOrigin::Native);
+    light.base = Some(node_3d);
+    light.fields = vec![
+        native_field("kind", Type::String),
+        native_field("color", Type::Class(color)),
+        native_field("intensity", Type::Float),
+        native_field("range", Type::Float),
+    ];
+    light.constructor = Some(native_constructor(&[
+        ("name", Type::String),
+        ("kind", Type::String),
+    ]));
+    classes.add(light)
+}
+
+/// `Camera3D`: a 3D node the game is seen from, when it is the game's
+/// `camera_3d`.
+fn add_camera_3d_class(classes: &mut ClassTable, node_3d: ClassId) -> ClassId {
+    let mut camera = ClassInfo::new(CAMERA_3D_CLASS.to_owned(), ClassOrigin::Native);
+    camera.base = Some(node_3d);
+    camera.fields = vec![native_field("fov", Type::Float)];
     camera.constructor = Some(native_constructor(&[("name", Type::String)]));
     classes.add(camera)
 }

@@ -7,10 +7,10 @@
 
 use star_core::{EngineError, EngineResult};
 use star_math::{Quat, Vec2, Vec3};
-use star_render::{Color, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MeshShape};
-use star_scene::LightNode;
+use star_render::{Color, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MeshShape, TextureFilter};
+use star_scene::{LightNode, MeshOutline};
 
-use crate::script_body::SPHERE;
+use crate::script_body::{DEFAULT_RADIUS, DEFAULT_SIZE, SPHERE};
 
 /// How StarScript names cubes (boxes, of any size).
 pub const CUBE: &str = "cube";
@@ -20,6 +20,9 @@ pub const PLANE: &str = "plane";
 pub const DIRECTIONAL: &str = "directional";
 /// How StarScript names point lights.
 pub const POINT: &str = "point";
+
+/// How far a script light reaches when its kind gives no range.
+pub const DEFAULT_RANGE: f32 = 10.0;
 
 /// The narrowest view a script camera shows, in radians: a zero, negative
 /// or not-a-number field of view shows nothing.
@@ -54,7 +57,40 @@ pub struct ScriptMesh<'a> {
     pub pixelated: bool,
 }
 
-impl ScriptMesh<'_> {
+impl<'a> ScriptMesh<'a> {
+    /// The script mesh that a scene's `mesh` describes: how scenes give
+    /// meshes to script nodes. The divisions of spheres are not kept.
+    #[must_use]
+    pub fn from_outline(mesh: &'a MeshOutline) -> Self {
+        let (shape, size, radius) = match mesh.shape {
+            MeshShape::Cube { size } => (CUBE, size, DEFAULT_RADIUS),
+            MeshShape::Plane { size } => (
+                PLANE,
+                Vec3::new(size.x, DEFAULT_SIZE, size.y),
+                DEFAULT_RADIUS,
+            ),
+            MeshShape::Sphere { radius, .. } => (SPHERE, Vec3::ONE * DEFAULT_SIZE, radius),
+        };
+        let (texture, filter) = mesh
+            .texture
+            .as_ref()
+            .map_or(("", TextureFilter::Smooth), |(path, filter)| {
+                (path.as_str(), *filter)
+            });
+        Self {
+            shape,
+            width: size.x,
+            height: size.y,
+            depth: size.z,
+            radius,
+            color: mesh.color,
+            metallic: mesh.metallic,
+            roughness: mesh.roughness,
+            texture,
+            pixelated: filter == TextureFilter::Pixelated,
+        }
+    }
+
     /// The shape the mesh shows.
     ///
     /// # Errors
@@ -91,6 +127,31 @@ pub struct ScriptLight<'a> {
     pub intensity: f32,
     /// How far a point light reaches.
     pub range: f32,
+}
+
+impl ScriptLight<'static> {
+    /// The script light that a scene's `light` describes.
+    #[must_use]
+    pub const fn from_light(light: &LightNode) -> Self {
+        match *light {
+            LightNode::Directional { color, intensity } => Self {
+                kind: DIRECTIONAL,
+                color,
+                intensity,
+                range: DEFAULT_RANGE,
+            },
+            LightNode::Point {
+                color,
+                intensity,
+                range,
+            } => Self {
+                kind: POINT,
+                color,
+                intensity,
+                range,
+            },
+        }
+    }
 }
 
 impl ScriptLight<'_> {
@@ -191,6 +252,32 @@ mod tests {
             mesh("teapot").to_shape(),
             Err(EngineError::Rendering(_))
         ));
+    }
+
+    #[test]
+    fn scene_meshes_and_lights_read_back_the_same() {
+        let outline = MeshOutline {
+            shape: MeshShape::Plane {
+                size: Vec2::new(4.0, 5.0),
+            },
+            color: Color::rgb(0.1, 0.2, 0.3),
+            metallic: 1.0,
+            roughness: 0.3,
+            texture: Some((
+                star_assets::AssetPath::new("floor.png").unwrap(),
+                TextureFilter::Pixelated,
+            )),
+        };
+        let mesh = ScriptMesh::from_outline(&outline);
+
+        assert_eq!(mesh.to_shape().unwrap(), outline.shape);
+        assert_eq!((mesh.texture, mesh.pixelated), ("floor.png", true));
+        let lamp = LightNode::Point {
+            color: Color::WHITE,
+            intensity: 2.0,
+            range: 3.0,
+        };
+        assert_eq!(ScriptLight::from_light(&lamp).to_light().unwrap(), lamp);
     }
 
     #[test]

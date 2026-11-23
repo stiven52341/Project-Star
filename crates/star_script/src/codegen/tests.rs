@@ -271,7 +271,28 @@ fn games_move_bodies_with_the_engine() {
     assert!(code.contains("pub mod Body {"));
     assert!(code.contains("crate::classes::Body::circle("));
     assert!(code.contains("sync_bodies_(world, &mut self.mirror, &root_"));
-    assert!(code.contains("body: node_.body.map(|settings_| {"));
+    assert!(
+        code.contains("body: match (node_.transform_3d.is_some(), node_.body_3d, node_.body) {")
+    );
+}
+
+#[test]
+fn games_mirror_their_3d_nodes() {
+    let code = rust(
+        "class G extends Game {\n override func start() {\n const eye = Camera3D(\"Eye\")\n \
+         camera_3d = eye\n const crate_mesh = Mesh(\"Crate\", \"cube\")\n \
+         crate_mesh.body = Body.box(\"static\", 1.0, 1.0, 1.0)\n crate_mesh.look_at(1.0, 0.0, 0.0)\n \
+         add_child(crate_mesh)\n add_child(Light(\"Sun\", \"directional\"))\n }\n}",
+    );
+
+    for module in ["Node3D", "Mesh", "Light", "Camera3D"] {
+        assert!(code.contains(&format!("pub mod {module} {{")), "{module}");
+    }
+    assert!(code.contains("crate::classes::Body::box_("));
+    assert!(code.contains("with_mesh_(&node_, |mesh_| {"));
+    assert!(code.contains("transform_3d: transform_3d_,"));
+    assert!(code.contains("self.mirror.camera_3d(world, &script_camera_3d_(&*camera_))"));
+    assert!(code.contains("frame.set_ambient_light("));
 }
 
 #[test]
