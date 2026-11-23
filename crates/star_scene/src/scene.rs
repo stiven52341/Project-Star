@@ -3,16 +3,11 @@
 use star_assets::AssetPath;
 use star_core::{EngineError, EngineResult};
 use star_ecs::{Entity, World};
-use star_math::Vec2;
 use star_physics::{BodySettings, Shape3d};
-use star_render::{
-    Color, Material, Mesh3dId, MeshShape, Sprite, TextureFilter, TextureId, TextureRegion,
-};
+use star_render::{Material, Mesh3dId, MeshShape, TextureFilter, TextureId};
 
-use crate::body_data::{Body3dData, BodyData};
-use crate::node_3d_data::{LightData, MeshOutline, MeshTable, Transform3dData};
-use crate::scene_file::{FORMAT_VERSION, FilterData, NodeData, SceneFile, SpriteData};
-use crate::scene_outline::{NodeOutline, SceneOutline};
+use crate::node_3d_data::MeshOutline;
+use crate::scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
 use crate::{
     Body2D, Body3D, Children, Hierarchy, LightNode, MeshNode, Name, SpriteNode, Transform2D,
     Transform3D,
@@ -108,13 +103,9 @@ impl Scene {
         let nodes = self
             .nodes
             .iter()
-            .map(|node| write_node(node, sources))
+            .map(|node| outline_node(node, sources))
             .collect::<EngineResult<_>>()?;
-        SceneFile {
-            format: FORMAT_VERSION,
-            nodes,
-        }
-        .to_text()
+        SceneOutline::from_nodes(nodes).to_text()
     }
 
     /// The scene made of `root` and its whole subtree in `world`.
@@ -269,60 +260,49 @@ fn load_mesh(mesh: &MeshOutline, assets: &mut impl SceneAssets) -> EngineResult<
     Ok(MeshNode::new(assets.mesh(mesh.shape)?, material))
 }
 
-fn write_node(node: &SceneNode, sources: &impl SceneSources) -> EngineResult<NodeData> {
+/// The outline of `node`, naming by file what it shows.
+fn outline_node(node: &SceneNode, sources: &impl SceneSources) -> EngineResult<NodeOutline> {
     let named = |error: EngineError| EngineError::Scene(format!("node \"{}\": {error}", node.name));
     let sprite = node
         .sprite
-        .map(|sprite| write_sprite(sprite, sources))
+        .map(|sprite| outline_sprite(sprite, sources))
         .transpose()
         .map_err(named)?;
     let mesh = node
         .mesh
-        .map(|mesh| write_mesh(mesh, sources))
+        .map(|mesh| outline_mesh(mesh, sources))
         .transpose()
         .map_err(named)?;
-    Ok(NodeData {
+    Ok(NodeOutline {
         name: node.name.clone(),
         class: node.class.clone(),
         parent: node.parent,
-        position: node.transform.map(|transform| array(transform.position)),
-        rotation: node.transform.map(|transform| transform.rotation),
-        scale: node.transform.map(|transform| array(transform.scale)),
+        transform: node.transform,
         sprite,
-        body: node.body.as_ref().map(BodyData::from_settings),
-        transform_3d: node
-            .transform_3d
-            .as_ref()
-            .map(Transform3dData::from_transform),
+        body: node.body,
+        transform_3d: node.transform_3d,
         mesh,
-        light: node.light.as_ref().map(LightData::from_light),
-        body_3d: node.body_3d.as_ref().map(Body3dData::from_settings),
+        light: node.light,
+        body_3d: node.body_3d,
     })
 }
 
-fn write_sprite(sprite: SpriteNode, sources: &impl SceneSources) -> EngineResult<SpriteData> {
-    let (path, filter) = sources
+fn outline_sprite(sprite: SpriteNode, sources: &impl SceneSources) -> EngineResult<SpriteOutline> {
+    let (texture, filter) = sources
         .texture_source(sprite.texture)
         .ok_or_else(|| not_from_a_file("texture"))?;
-    let region = sprite.region;
-    let color = sprite.color;
-    Ok(SpriteData {
-        texture: path.as_str().to_owned(),
-        filter: filter.into(),
-        size: array(sprite.size),
-        region: (region != TextureRegion::FULL).then_some([
-            region.min.x,
-            region.min.y,
-            region.max.x,
-            region.max.y,
-        ]),
-        anchor: (sprite.anchor != Sprite::CENTER).then(|| array(sprite.anchor)),
-        color: (color != Color::WHITE).then_some([color.r, color.g, color.b, color.a]),
+    Ok(SpriteOutline {
+        texture,
+        filter,
+        size: sprite.size,
+        region: sprite.region,
+        anchor: sprite.anchor,
+        color: sprite.color,
         layer: sprite.layer,
     })
 }
 
-fn write_mesh(mesh: MeshNode, sources: &impl SceneSources) -> EngineResult<MeshTable> {
+fn outline_mesh(mesh: MeshNode, sources: &impl SceneSources) -> EngineResult<MeshOutline> {
     let shape = sources
         .mesh_source(mesh.mesh)
         .ok_or_else(|| not_from_a_file("mesh"))?;
@@ -335,13 +315,13 @@ fn write_mesh(mesh: MeshNode, sources: &impl SceneSources) -> EngineResult<MeshT
                 .ok_or_else(|| not_from_a_file("texture"))
         })
         .transpose()?;
-    Ok(MeshTable::from_outline(&MeshOutline {
+    Ok(MeshOutline {
         shape,
         color: material.base_color,
         metallic: material.metallic,
         roughness: material.roughness,
         texture,
-    }))
+    })
 }
 
 fn not_from_a_file(what: &str) -> EngineError {
@@ -368,31 +348,12 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
     }
 }
 
-const fn array(vector: Vec2) -> [f32; 2] {
-    [vector.x, vector.y]
-}
-
-impl From<FilterData> for TextureFilter {
-    fn from(filter: FilterData) -> Self {
-        match filter {
-            FilterData::Smooth => Self::Smooth,
-            FilterData::Pixelated => Self::Pixelated,
-        }
-    }
-}
-
-impl From<TextureFilter> for FilterData {
-    fn from(filter: TextureFilter) -> Self {
-        match filter {
-            TextureFilter::Smooth => Self::Smooth,
-            TextureFilter::Pixelated => Self::Pixelated,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
+
+    use star_math::Vec2;
+    use star_render::Color;
 
     use super::*;
 

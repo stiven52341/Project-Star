@@ -8,14 +8,15 @@ use star_render::{Color, Sprite, TextureFilter, TextureRegion};
 use star_physics::{BodySettings, Shape3d};
 
 use crate::body_data::{Body3dData, BodyData};
-use crate::node_3d_data::MeshOutline;
-use crate::scene_file::{NodeData, SceneFile, SpriteData};
+use crate::node_3d_data::{LightData, MeshOutline, MeshTable, Transform3dData};
+use crate::scene_file::{FORMAT_VERSION, NodeData, SceneFile, SpriteData};
 use crate::{LightNode, Transform2D, Transform3D};
 
 /// The nodes of a `.scene` file, checked to form one tree, with their images
 /// named by asset path instead of loaded. A [`Scene`](crate::Scene) is built
 /// from it by loading those images; code that builds its own nodes, such as
-/// StarScript games, reads it directly.
+/// StarScript games, reads it directly, and the editor changes it and
+/// writes it back.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneOutline {
     nodes: Vec<NodeOutline>,
@@ -112,6 +113,102 @@ impl SceneOutline {
     pub fn into_nodes(self) -> Vec<NodeOutline> {
         self.nodes
     }
+
+    /// The outline of `nodes`, which [`SceneOutline::to_text`] checks.
+    pub(crate) const fn from_nodes(nodes: Vec<NodeOutline>) -> Self {
+        Self { nodes }
+    }
+
+    /// The node at `index`, to change it. Its [`NodeOutline::parent`] is
+    /// best left alone: a parent that does not come before it breaks the
+    /// tree, which [`SceneOutline::to_text`] then refuses to write.
+    pub fn node_mut(&mut self, index: usize) -> Option<&mut NodeOutline> {
+        self.nodes.get_mut(index)
+    }
+
+    /// Adds `node` as the last child of the node at `parent`. Returns its
+    /// position.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Scene`] if there is no node at `parent`.
+    pub fn add_node(&mut self, parent: usize, mut node: NodeOutline) -> EngineResult<usize> {
+        if parent >= self.nodes.len() {
+            return Err(EngineError::Scene(format!(
+                "cannot add \"{}\": the scene has no node {parent}",
+                node.name
+            )));
+        }
+        node.parent = Some(parent);
+        // After every node, so its parent comes before it.
+        self.nodes.push(node);
+        Ok(self.nodes.len() - 1)
+    }
+
+    /// Removes the node at `index` with all its descendants; the nodes
+    /// after them move back to fill their places.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Scene`] if `index` is the root, which every
+    /// scene needs, or there is no node there.
+    pub fn remove_node(&mut self, index: usize) -> EngineResult<()> {
+        if index == 0 || index >= self.nodes.len() {
+            return Err(EngineError::Scene(format!(
+                "cannot remove node {index}: it is the root or it does not exist"
+            )));
+        }
+        // Parents come first, so one pass finds every descendant.
+        let mut removed = vec![false; self.nodes.len()];
+        for position in index..self.nodes.len() {
+            removed[position] = position == index
+                || self.nodes[position]
+                    .parent
+                    .is_some_and(|parent| removed[parent]);
+        }
+        let new_positions = new_positions(&removed);
+        let mut position = 0;
+        self.nodes.retain(|_| {
+            position += 1;
+            !removed[position - 1]
+        });
+        for node in &mut self.nodes {
+            node.parent = node
+                .parent
+                .and_then(|parent| new_positions.get(parent).copied().flatten());
+        }
+        Ok(())
+    }
+
+    /// Writes the outline as the text of a `.scene` file.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Scene`] if its nodes no longer form one tree
+    /// (see [`SceneOutline::node_mut`]).
+    pub fn to_text(&self) -> EngineResult<String> {
+        let nodes: Vec<NodeData> = self.nodes.iter().map(write_node).collect();
+        validate_tree(&nodes)?;
+        SceneFile {
+            format: FORMAT_VERSION,
+            nodes,
+        }
+        .to_text()
+    }
+}
+
+/// Where each node ends up once those marked in `removed` are taken out.
+fn new_positions(removed: &[bool]) -> Vec<Option<usize>> {
+    let mut kept = 0;
+    removed
+        .iter()
+        .map(|&removed| {
+            (!removed).then(|| {
+                kept += 1;
+                kept - 1
+            })
+        })
+        .collect()
 }
 
 /// Checks that the first node is the only root and that parents come first,
@@ -231,8 +328,51 @@ fn read_sprite(sprite: &SpriteData) -> EngineResult<SpriteOutline> {
     })
 }
 
+fn write_node(node: &NodeOutline) -> NodeData {
+    NodeData {
+        name: node.name.clone(),
+        class: node.class.clone(),
+        parent: node.parent,
+        position: node.transform.map(|transform| array(transform.position)),
+        rotation: node.transform.map(|transform| transform.rotation),
+        scale: node.transform.map(|transform| array(transform.scale)),
+        sprite: node.sprite.as_ref().map(write_sprite),
+        body: node.body.as_ref().map(BodyData::from_settings),
+        transform_3d: node
+            .transform_3d
+            .as_ref()
+            .map(Transform3dData::from_transform),
+        mesh: node.mesh.as_ref().map(MeshTable::from_outline),
+        light: node.light.as_ref().map(LightData::from_light),
+        body_3d: node.body_3d.as_ref().map(Body3dData::from_settings),
+    }
+}
+
+fn write_sprite(sprite: &SpriteOutline) -> SpriteData {
+    let region = sprite.region;
+    let color = sprite.color;
+    SpriteData {
+        texture: sprite.texture.as_str().to_owned(),
+        filter: sprite.filter.into(),
+        size: array(sprite.size),
+        region: (region != TextureRegion::FULL).then_some([
+            region.min.x,
+            region.min.y,
+            region.max.x,
+            region.max.y,
+        ]),
+        anchor: (sprite.anchor != Sprite::CENTER).then(|| array(sprite.anchor)),
+        color: (color != Color::WHITE).then_some([color.r, color.g, color.b, color.a]),
+        layer: sprite.layer,
+    }
+}
+
 pub(crate) const fn vec2([x, y]: [f32; 2]) -> Vec2 {
     Vec2::new(x, y)
+}
+
+const fn array(vector: Vec2) -> [f32; 2] {
+    [vector.x, vector.y]
 }
 
 #[cfg(test)]
@@ -330,6 +470,74 @@ mod tests {
         let settings = outline.nodes()[0].body.unwrap();
         assert_eq!(settings.kind, star_physics::BodyKind::Dynamic);
         assert!(error.to_string().contains("node \"Ball\""), "{error}");
+    }
+
+    const TREE: &str = "format = 1\n\
+        [[node]]\nname = \"Root\"\n\
+        [[node]]\nname = \"A\"\nparent = 0\nposition = [1.0, 2.0]\n\
+        [[node]]\nname = \"B\"\nparent = 0\n\
+        [[node]]\nname = \"A1\"\nparent = 1\n\
+        [[node]]\nname = \"B1\"\nparent = 2\n\
+        [node.sprite]\ntexture = \"b.png\"\nsize = [1.0, 1.0]\ncolor = [1.0, 0.0, 0.0, 1.0]\n";
+
+    fn names_and_parents(outline: &SceneOutline) -> Vec<(&str, Option<usize>)> {
+        outline
+            .nodes()
+            .iter()
+            .map(|node| (node.name.as_str(), node.parent))
+            .collect()
+    }
+
+    #[test]
+    fn written_outlines_read_back_the_same() {
+        let outline = SceneOutline::from_text(TREE).unwrap();
+
+        let text = outline.to_text().unwrap();
+
+        assert_eq!(SceneOutline::from_text(&text).unwrap(), outline);
+    }
+
+    #[test]
+    fn nodes_are_added_as_the_last_child_of_their_parent() {
+        let mut outline = SceneOutline::from_text(TREE).unwrap();
+        let mut node = outline.nodes()[3].clone();
+        node.name = "B2".to_owned();
+
+        let index = outline.add_node(2, node.clone()).unwrap();
+
+        assert_eq!(index, 5);
+        assert_eq!(outline.nodes()[5].parent, Some(2));
+        assert!(outline.add_node(9, node).is_err());
+        assert!(SceneOutline::from_text(&outline.to_text().unwrap()).is_ok());
+    }
+
+    #[test]
+    fn removing_a_node_removes_its_descendants_and_renumbers_the_rest() {
+        let mut outline = SceneOutline::from_text(TREE).unwrap();
+
+        outline.remove_node(1).unwrap();
+
+        assert_eq!(
+            names_and_parents(&outline),
+            vec![("Root", None), ("B", Some(0)), ("B1", Some(1))]
+        );
+    }
+
+    #[test]
+    fn the_root_cannot_be_removed() {
+        let mut outline = SceneOutline::from_text(TREE).unwrap();
+
+        assert!(outline.remove_node(0).is_err());
+        assert!(outline.remove_node(5).is_err());
+        assert_eq!(outline.nodes().len(), 5);
+    }
+
+    #[test]
+    fn broken_trees_are_not_written() {
+        let mut outline = SceneOutline::from_text(TREE).unwrap();
+        outline.node_mut(1).unwrap().parent = Some(4);
+
+        assert!(outline.to_text().is_err());
     }
 
     #[test]

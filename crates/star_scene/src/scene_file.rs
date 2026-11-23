@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use star_core::{EngineError, EngineResult};
+use star_render::TextureFilter;
 
 use crate::body_data::{Body3dData, BodyData};
 use crate::node_3d_data::{LightData, MeshTable, Transform3dData};
@@ -106,6 +107,24 @@ impl SceneFile {
     pub(crate) fn to_text(&self) -> EngineResult<String> {
         toml::to_string(self)
             .map_err(|error| EngineError::Scene(format!("cannot write the scene: {error}")))
+    }
+}
+
+impl From<FilterData> for TextureFilter {
+    fn from(filter: FilterData) -> Self {
+        match filter {
+            FilterData::Smooth => Self::Smooth,
+            FilterData::Pixelated => Self::Pixelated,
+        }
+    }
+}
+
+impl From<TextureFilter> for FilterData {
+    fn from(filter: TextureFilter) -> Self {
+        match filter {
+            TextureFilter::Smooth => Self::Smooth,
+            TextureFilter::Pixelated => Self::Pixelated,
+        }
     }
 }
 
