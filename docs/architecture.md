@@ -707,8 +707,10 @@ line of only indentation goes one level back. `Tab` types one level (four
 spaces, as blueprints are translated) or indents the selected lines, and
 `Shift+Tab` takes a level out; `Ctrl+/` comments out the selected lines,
 or uncomments them if they all are. Once the `TextEdit` has to handle a
-key, it handles the keys after it in that frame too, so typing order is
-kept.
+key (editing and moving keys, or shortcuts), it handles the keys after it
+in that frame too, so typing order is kept; pressing the key of a
+character is not such a key, as the character comes after it in an event
+of its own (a `Text`, or an input method's `Commit`).
 
 Blueprints and scripts are saved with `Ctrl+S` or “File” → “Save”, and
 all of them before “Compile”, which reads the files. Tabs with unsaved changes

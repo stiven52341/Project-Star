@@ -254,17 +254,39 @@ fn action_of(event: &egui::Event) -> Option<Action> {
     }
 }
 
-/// Whether the text edit would change the text for `event`.
-const fn changes_text(event: &egui::Event) -> bool {
-    matches!(
-        event,
-        egui::Event::Text(_)
-            | egui::Event::Ime(_)
-            | egui::Event::Paste(_)
-            | egui::Event::Cut
-            | egui::Event::Key { pressed: true, .. }
-    )
+/// Whether the text edit would change the text or move the cursor for
+/// `event`. Pressing the key of a character does not: the character comes
+/// in an event of its own, after it.
+fn changes_text(event: &egui::Event) -> bool {
+    match event {
+        egui::Event::Text(_) | egui::Event::Ime(_) | egui::Event::Paste(_) | egui::Event::Cut => {
+            true
+        }
+        egui::Event::Key {
+            key,
+            pressed: true,
+            modifiers,
+            ..
+        } => modifiers.command || EDITING_KEYS.contains(key),
+        _ => false,
+    }
 }
+
+/// Keys the text edit changes the text or moves the cursor with.
+const EDITING_KEYS: [egui::Key; 12] = [
+    egui::Key::Enter,
+    egui::Key::Tab,
+    egui::Key::Backspace,
+    egui::Key::Delete,
+    egui::Key::ArrowLeft,
+    egui::Key::ArrowRight,
+    egui::Key::ArrowUp,
+    egui::Key::ArrowDown,
+    egui::Key::Home,
+    egui::Key::End,
+    egui::Key::PageUp,
+    egui::Key::PageDown,
+];
 
 /// Puts the cursor of the text edit `id` before the character at `index`,
 /// and gives it the keyboard.
@@ -362,6 +384,27 @@ mod tests {
         assert_eq!(action_of(&typed), Some(Action::Type('(')));
         assert_eq!(action_of(&committed), Some(Action::Type('{')));
         assert_eq!(action_of(&pasted), None);
+    }
+
+    fn key(key: egui::Key, modifiers: egui::Modifiers) -> egui::Event {
+        egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers,
+        }
+    }
+
+    #[test]
+    fn keys_that_type_characters_leave_them_to_the_writing_aids() {
+        // `(` on a Spanish keyboard: the key comes first, then the text.
+        assert!(!changes_text(&key(egui::Key::Num8, egui::Modifiers::SHIFT)));
+        assert!(changes_text(&key(
+            egui::Key::Backspace,
+            egui::Modifiers::NONE
+        )));
+        assert!(changes_text(&key(egui::Key::V, egui::Modifiers::COMMAND)));
     }
 
     #[test]
