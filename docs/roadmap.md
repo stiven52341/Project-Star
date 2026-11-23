@@ -194,7 +194,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.8c Edit the class (variables, graphs and their signature),
           create new blueprints, and mark on their nodes the mistakes
           “Compile” finds.
-  - [ ] 13.9 StarScript code editor (egui's `TextEdit`, in tabs of the
+  - [x] 13.9 StarScript code editor (egui's `TextEdit`, in tabs of the
         central area):
     - [x] 13.9a Open `.star` files from “Assets” in a tab: colors from the
           compiler's lexer, line numbers, the cursor's line and column,
@@ -219,10 +219,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           lists (`"a".length()`), and use the types the check inferred.
     - [x] 13.9i The check while writing also reports what only the
           translation to Rust finds.
-    - [ ] Known limits to improve: while the list of suggestions is
-          shown, the up and down arrows choose in it; chains inside
-          parentheses (`(a + b).`) or after list literals suggest
-          nothing.
+    - [x] 13.9j The list of suggestions is faint and the arrows move the
+          cursor until `Ctrl+Space` makes it active. Chains inside
+          parentheses (`(a + b).`) or after list literals suggest nothing,
+          by decision (see `docs/architecture.md`).
 - [ ] **Editor ideas, not planned yet**: undo and redo in the scene
       editor (`Ctrl+Z`); moving nodes to another parent by dragging them in
       the tree; dropping a `.star` on a node to give it its class; “Show in

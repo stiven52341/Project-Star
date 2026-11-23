@@ -1,7 +1,8 @@
 //! Suggestions shown while writing: the rest of the chosen name in faint
-//! text after the cursor, and the other names in a list under it. `Tab`
-//! writes the chosen one, the up and down arrows choose another, `Esc` hides them
-//! until the word changes.
+//! text after the cursor, and the other names in a faint list under it.
+//! `Tab` writes the chosen one and `Esc` hides them until the word changes.
+//! The arrows keep moving the cursor until `Ctrl+Space` makes the list
+//! active: then they choose in it, while that word is written.
 
 use eframe::egui;
 use egui::text::{CCursor, CCursorRange};
@@ -14,6 +15,12 @@ use crate::texts;
 const SHOWN_CANDIDATES: usize = 8;
 /// How visible the faint rest of the chosen name is, from 0 to 255.
 const GHOST_ALPHA: u8 = 110;
+/// How visible the list is until `Ctrl+Space` makes it active, from 0 to 1.
+const INACTIVE_LIST_OPACITY: f32 = 0.55;
+/// The keys that make the list active, or show hidden suggestions again.
+/// `Ctrl` on every system: `Cmd+Space` opens the search of macOS.
+pub(super) const CHOOSE_SHORTCUT: egui::KeyboardShortcut =
+    egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::Space);
 
 /// What the user chose among the suggestions, kept between frames.
 #[derive(Default)]
@@ -24,6 +31,11 @@ pub(super) struct Suggestions {
     selected: usize,
     /// Whether `Esc` hid the suggestions for this word.
     dismissed: bool,
+    /// Whether `Ctrl+Space` was pressed since the last frame.
+    asked: bool,
+    /// Where the word whose list is active starts: the arrows choose in it
+    /// while that word is written.
+    active_at: Option<usize>,
 }
 
 /// What a key did to the suggestions.
@@ -34,6 +46,13 @@ enum KeyUse {
 }
 
 impl Suggestions {
+    /// Shows the suggestions hidden with `Esc` again, and makes their list
+    /// active: what `Ctrl+Space` does.
+    pub(super) const fn ask(&mut self) {
+        self.dismissed = false;
+        self.asked = true;
+    }
+
     /// The suggestions for the word that ends at `cursor` of `text`, unless
     /// they were hidden for it.
     pub(super) fn find(
@@ -42,6 +61,7 @@ impl Suggestions {
         cursor: Option<usize>,
         knows: Known<'_>,
     ) -> Option<Completion> {
+        let asked = std::mem::take(&mut self.asked);
         let Some(completion) = cursor.and_then(|cursor| complete(text, cursor, knows)) else {
             self.word = None;
             return None;
@@ -51,6 +71,9 @@ impl Suggestions {
             self.word = Some(word);
             self.selected = 0;
             self.dismissed = false;
+        }
+        if asked {
+            self.active_at = Some(completion.start);
         }
         self.selected = self.selected.min(completion.candidates.len() - 1);
         (!self.dismissed).then_some(completion)
@@ -65,7 +88,7 @@ impl Suggestions {
         id: egui::Id,
         completion: &Completion,
     ) -> bool {
-        let several = completion.candidates.len() > 1;
+        let choosing = completion.candidates.len() > 1 && self.is_active(completion);
         let mut used = None;
         context.input_mut(|input| {
             input.events.retain(|event| {
@@ -81,13 +104,7 @@ impl Suggestions {
                 if used.is_some() || !modifiers.is_none() {
                     return true;
                 }
-                used = match key {
-                    egui::Key::Tab => Some(KeyUse::Accept),
-                    egui::Key::ArrowDown if several => Some(KeyUse::Choose(1)),
-                    egui::Key::ArrowUp if several => Some(KeyUse::Choose(-1)),
-                    egui::Key::Escape => Some(KeyUse::Dismiss),
-                    _ => None,
-                };
+                used = key_use(*key, choosing);
                 used.is_none()
             });
         });
@@ -152,8 +169,15 @@ impl Suggestions {
         }
     }
 
-    /// The names around the chosen one, under the word.
+    /// Whether the arrows choose in the list of `completion`.
+    fn is_active(&self, completion: &Completion) -> bool {
+        self.active_at == Some(completion.start)
+    }
+
+    /// The names around the chosen one, under the word; faint until the
+    /// list is active.
     fn show_list(&self, ui: &egui::Ui, id: egui::Id, at: egui::Pos2, completion: &Completion) {
+        let active = self.is_active(completion);
         let first = self
             .selected
             .saturating_sub(SHOWN_CANDIDATES / 2)
@@ -163,6 +187,9 @@ impl Suggestions {
             .fixed_pos(at)
             .interactable(false)
             .show(ui.ctx(), |ui| {
+                if !active {
+                    ui.multiply_opacity(INACTIVE_LIST_OPACITY);
+                }
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
                     egui::Grid::new(id.with("suggestion_rows")).show(ui, |ui| {
                         let shown = completion.candidates.iter().enumerate();
@@ -170,9 +197,21 @@ impl Suggestions {
                             show_row(ui, candidate, index == self.selected);
                         }
                     });
-                    ui.weak(texts::current().suggestion_keys());
+                    ui.weak(texts::current().suggestion_keys(active));
                 });
             });
+    }
+}
+
+/// What `key` does to the suggestions, if anything; the arrows only while
+/// `choosing` in a list.
+const fn key_use(key: egui::Key, choosing: bool) -> Option<KeyUse> {
+    match key {
+        egui::Key::Tab => Some(KeyUse::Accept),
+        egui::Key::ArrowDown if choosing => Some(KeyUse::Choose(1)),
+        egui::Key::ArrowUp if choosing => Some(KeyUse::Choose(-1)),
+        egui::Key::Escape => Some(KeyUse::Dismiss),
+        _ => None,
     }
 }
 
@@ -220,6 +259,57 @@ mod tests {
 
         assert_eq!(text, "var a = rock + 1");
         assert_eq!(cursor, 12);
+    }
+
+    #[test]
+    fn arrows_move_the_cursor_until_the_list_is_active() {
+        assert!(key_use(egui::Key::ArrowDown, false).is_none());
+        assert!(matches!(
+            key_use(egui::Key::ArrowDown, true),
+            Some(KeyUse::Choose(1))
+        ));
+        assert!(matches!(
+            key_use(egui::Key::Tab, false),
+            Some(KeyUse::Accept)
+        ));
+    }
+
+    #[test]
+    fn asking_makes_the_list_of_the_word_active_while_it_is_written() {
+        let mut suggestions = Suggestions::default();
+        let text = "var counter = 1
+var country = 2
+co";
+        let end = text.chars().count();
+
+        suggestions.ask();
+        let asked = suggestions.find(text, Some(end), Known::default()).unwrap();
+        assert!(suggestions.is_active(&asked));
+
+        let longer = format!("{text}u");
+        let typed = suggestions
+            .find(&longer, Some(end + 1), Known::default())
+            .unwrap();
+        assert!(suggestions.is_active(&typed));
+
+        let other = format!("{text} + co");
+        let another = suggestions
+            .find(&other, Some(end + 5), Known::default())
+            .unwrap();
+        assert!(!suggestions.is_active(&another));
+    }
+
+    #[test]
+    fn asking_shows_hidden_suggestions_again() {
+        let mut suggestions = Suggestions::default();
+        let text = "var counter = 1
+co";
+        suggestions.find(text, Some(18), Known::default());
+        suggestions.dismissed = true;
+
+        suggestions.ask();
+
+        assert!(suggestions.find(text, Some(18), Known::default()).is_some());
     }
 
     #[test]

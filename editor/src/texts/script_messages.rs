@@ -44,12 +44,19 @@ impl Texts {
         }
     }
 
-    /// The keys of the list of suggestions.
-    pub(crate) const fn suggestion_keys(&self) -> &'static str {
-        self.pick(
-            "Tab: write · Up/Down: choose · Esc: hide",
-            "Tab: escribir · Arriba/Abajo: elegir · Esc: ocultar",
-        )
+    /// The keys of the list of suggestions, `active` or not yet.
+    pub(crate) const fn suggestion_keys(&self, active: bool) -> &'static str {
+        if active {
+            self.pick(
+                "Tab: write · Up/Down: choose · Esc: hide",
+                "Tab: escribir · Arriba/Abajo: elegir · Esc: ocultar",
+            )
+        } else {
+            self.pick(
+                "Tab: write · Ctrl+Space: choose · Esc: hide",
+                "Tab: escribir · Ctrl+Espacio: elegir · Esc: ocultar",
+            )
+        }
     }
 
     /// The hint of the field of the text to find.

@@ -16,7 +16,7 @@ use super::hover::{NameType, name_type_at};
 use super::mistakes::{Mark, Mistake, marks, paint_marks};
 use super::navigation::{Definition, definition_at};
 use super::scope::Known;
-use super::suggestions::Suggestions;
+use super::suggestions::{CHOOSE_SHORTCUT, Suggestions};
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -76,6 +76,9 @@ impl CodeView {
         let footer_height = ui.spacing().interact_size.y;
         let mut go_to = None;
         let cursor = cursor_while_writing(ui.ctx(), id);
+        if cursor.is_some() && ui.input_mut(|input| input.consume_shortcut(&CHOOSE_SHORTCUT)) {
+            self.suggestions.ask();
+        }
         if let Some(completion) = self.suggestions.find(text, cursor, knows) {
             changed |= self
                 .suggestions

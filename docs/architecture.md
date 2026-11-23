@@ -759,10 +759,18 @@ chains the same way. Elsewhere, the names written in the text, the members of th
 being written, the classes, the keywords and the basic types. The chosen
 name's rest is painted in faint text after the cursor and the others are
 listed under it (with their signatures); `Tab` writes it (a method with its
-parentheses, the cursor inside if it takes parameters), the up and down arrows choose
-another while there are several, and `Esc` hides them until the word
-changes. These keys are taken before the writing aids, so `Tab` indents
-only when nothing is suggested.
+parentheses, the cursor inside if it takes parameters), and `Esc` hides them
+until the word changes. Suggestions show by themselves while writing, so
+the list is faint and the up and down arrows keep moving the cursor until
+`Ctrl+Space` (`Ctrl` on macOS too, where `Cmd+Space` is the system's
+search) makes it active: then the arrows choose in it while that word is
+written (the list remembers where the word starts, so typing more of it
+keeps it active). `Ctrl+Space` also shows suggestions hidden with `Esc`.
+These keys are taken before the writing aids, so `Tab` indents only when
+nothing is suggested. A chain whose value is an expression in
+parentheses (`(a + b).`) or a list written as it is (`[1, 2].`) suggests
+nothing: knowing it would need the check to keep the type of every
+expression by its place, for a way of writing that games rarely use.
 
 “Go to definition” (`navigation.rs`, tested): `Ctrl`+click (`Cmd` on
 macOS; the pointer becomes a hand while `Ctrl` is held over the text) or
