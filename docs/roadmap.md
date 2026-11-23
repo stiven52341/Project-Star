@@ -223,6 +223,25 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           cursor until `Ctrl+I` makes it active. Chains inside
           parentheses (`(a + b).`) or after list literals suggest nothing,
           by decision (see `docs/architecture.md`).
+  - [ ] 13.10 Concurrency and parallelism (`docs/starscript.md`, section 7;
+        decision 54):
+    - [ ] 13.10a Syntax: the keywords `async`, `await` and `parallel`;
+          `async` and `parallel` as modifiers of methods, `await` before
+          an expression.
+    - [ ] 13.10b Coroutines in the analysis: `async` methods and their
+          overrides, where `await` goes, starting coroutines, and
+          `Time.wait` and `Time.next_frame`.
+    - [ ] 13.10c Coroutines in Rust: `async` methods as futures, run once
+          per frame by the runtime; those of nodes end when their node
+          leaves the tree; console programs wait for theirs.
+    - [ ] 13.10d Parallel functions in the analysis: only `static`, only
+          values in and out, and only values and other `parallel`
+          functions inside.
+    - [ ] 13.10e Parallel functions in Rust: threads of the runtime,
+          values copied in and out, and runtime errors on those threads
+          stopping the game.
+    - [ ] 13.10f The code editor and an example: suggestions and types
+          show `async` and `parallel`; an example game that uses both.
 - [ ] **Editor ideas, not planned yet**: undo and redo in the scene
       editor (`Ctrl+Z`); moving nodes to another parent by dragging them in
       the tree; dropping a `.star` on a node to give it its class; “Show in

@@ -40,6 +40,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes), sounds (`Sound`, `Audio`), physics (`Body`) and 3D (`Node3D`, `Mesh`, `Light`, `Camera3D`) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; “Play” builds and runs the game; the editor has a code editor for `.star` files (colors, writing aids, mistakes while writing, suggestions) |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
+| 9 | Concurrency and parallelism | In progress: designed (section 7) |
 
 ## 1. Lexicon (final)
 
@@ -78,6 +79,7 @@ Convention: `PascalCase` for classes, `snake_case` for variables and methods,
 | Use | Words |
 |-----|-------|
 | Classes | `class` `extends` `init` `self` `super` `override` `private` `static` |
+| Concurrency | `async` `await` `parallel` |
 | Declarations | `var` `const` `func` |
 | Control flow | `if` `else` `while` `for` `in` `break` `continue` `return` |
 | Types | `as` `is` |
@@ -957,3 +959,92 @@ in red in the blueprint editor.
 A game can write classes in Rust by implementing the engine's traits, and
 StarScript can use them like any other class. The exact mechanism will be
 defined in phase 5.
+
+## 7. Concurrency and parallelism (in progress)
+
+Objects, lists and nodes live on the game's thread (they are `Rc`, see
+section 4), so StarScript has two separate tools:
+
+- **Coroutines** (`async` and `await`): code that waits across frames, on
+  the game's thread. It can use everything: objects, nodes, the input.
+- **Parallel functions** (`parallel`): heavy work on the other cores of the
+  processor. It only sees values (numbers, `bool`, `string` and lists of
+  them), copied in and out, so two threads never share anything.
+
+### Coroutines
+
+```
+class Lamp extends Sprite {
+    async func blink(times: int) {
+        for i in 0..times {
+            visible = false
+            await Time.wait(0.25)
+            visible = true
+            await Time.wait(0.25)
+        }
+    }
+
+    override func start() {
+        blink(3)            // starts it; start() goes on at once
+    }
+}
+```
+
+- `async` is a modifier of methods (also `static` ones), like `private`.
+  `init` cannot be `async`. An `override` is `async` exactly when the method
+  it redefines is. The engine's methods (`start`, `update`…) are not, so
+  they start coroutines instead of waiting.
+- `await call` waits until an `async` method finishes and gives its value:
+  `var path = await find_path()`. It can only be written inside an `async`
+  method, and only before a call of something that waits.
+- **An `async` method called without `await`** starts a **coroutine**: it
+  runs at once until its first `await`, and the caller goes on. That call
+  can only be a statement on its own (its value, if any, is lost).
+- What waits, from the engine: `Time.wait(seconds: float)` (time of the
+  game, the sum of the `delta`s) and `Time.next_frame()`.
+- **When they continue**: once per frame, after every `update` of the
+  frame, each coroutine whose wait is over goes on until its next `await`.
+  A wait of `0.5` continues in the first frame at least `0.5` seconds later.
+- **Coroutines of nodes end with them**: a coroutine started by calling a
+  method of a node (`blink(3)` above, or `lamp.blink(3)`) ends, without
+  continuing, if that node is not in the game's tree when its wait is over.
+  The rest (static methods, objects that are not nodes) run until they
+  finish.
+- In console programs (`static func main`), the coroutines that are still
+  waiting when `main` returns continue until all of them finish, and
+  `Time.wait` waits for real.
+
+### Parallel functions
+
+```
+class Paths {
+    parallel static func find(tiles: [int], from: int, to: int) -> [int] {
+        // only values here: no objects, no nodes, no engine classes
+    }
+}
+
+class Walker extends Node {
+    async func walk() {
+        var route = await Paths.find(map, 0, 99)   // the game keeps playing
+    }
+}
+```
+
+- `parallel` only goes with `static func`: such a function has no `self`.
+- Its parameters and its result can only be **values**: `int`, `float`,
+  `bool`, `string`, lists of values and nullable values. Never classes.
+- Inside it, only its parameters, its local variables, the constants of
+  classes, the methods of values (`abs`, `push`…) and other `parallel`
+  functions (which run directly on the same thread) can be used.
+- It is called with `await`, from an `async` method: the call runs on
+  another thread and the coroutine continues in the first frame after the
+  result is ready. Calling it without `await` is an error, since its result
+  is its only effect.
+- **Copies**: the arguments are copied when it starts and the result when it
+  ends, so changing a list it received does not change the caller's.
+- A runtime error inside it (an index out of range…) stops the game, as
+  anywhere else, when its result is awaited.
+- If the coroutine that waits for it ends first, the work finishes anyway
+  and its result is dropped: a thread cannot be stopped halfway safely.
+
+Blueprints have neither yet.
