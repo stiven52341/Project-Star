@@ -15,7 +15,7 @@ mod jpeg_image;
 mod png_image;
 mod sound_format;
 
-pub use asset_folder::{AssetFolder, DEFAULT_ASSET_FOLDER};
+pub use asset_folder::{AssetFolder, DEFAULT_ASSET_FOLDER, PackagedFiles};
 pub use asset_path::AssetPath;
 pub use file_watcher::{DEFAULT_CHECK_INTERVAL, FileWatcher};
 pub use image_format::ImageFormat;

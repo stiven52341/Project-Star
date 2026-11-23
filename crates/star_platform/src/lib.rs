@@ -12,6 +12,7 @@ mod entry;
 mod event_loop;
 mod gilrs_input;
 mod input_event;
+mod packaged_assets;
 mod target;
 pub mod user_directories;
 mod window;
@@ -21,5 +22,6 @@ pub use event_loop::{WindowEventHandler, run_event_loop};
 pub use input_event::{
     ButtonState, GamepadAxis, GamepadButton, InputEvent, Key, MouseButton, TouchPhase,
 };
+pub use packaged_assets::PackagedAssets;
 pub use target::TargetPlatform;
 pub use window::{Window, WindowConfig, WindowSize};

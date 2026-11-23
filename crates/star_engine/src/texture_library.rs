@@ -50,13 +50,14 @@ impl<Id: Copy> TextureLibrary<Id> {
             return Ok(id);
         }
         let id = upload(&key.0)?;
-        if let Some(watcher) = &mut self.watcher {
+        // Packaged assets have no file to watch.
+        if let (Some(watcher), Some(file)) = (&mut self.watcher, folder.file_of(&key.0)) {
             let texture = LoadedTexture {
                 path: key.0.clone(),
                 filter,
                 id,
             };
-            watcher.watch(texture, folder.file_of(&key.0));
+            watcher.watch(texture, file);
         }
         self.loaded.insert(key, id);
         Ok(id)

@@ -1,6 +1,8 @@
 //! The folder a game's assets are read from.
 
+use std::fmt::Debug;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use star_core::{EngineError, EngineResult, Image, Sound};
 
@@ -9,18 +11,60 @@ use crate::{AssetPath, ImageFormat, SoundFormat};
 /// Name of the asset folder of a game, next to its executable or its project.
 pub const DEFAULT_ASSET_FOLDER: &str = "assets";
 
-/// The folder with a game's images, sounds and scenes, from which assets are
-/// read by [`AssetPath`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AssetFolder {
-    root: PathBuf,
+/// Asset files packaged with the game instead of lying in a folder, such
+/// as the assets of an Android package. The platform provides them.
+pub trait PackagedFiles: Debug + Send + Sync {
+    /// The bytes of the file at `path`, relative to the packaged asset
+    /// folder, with `/` between its parts.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error of the system if the file is not packaged or
+    /// cannot be read.
+    fn read(&self, path: &str) -> std::io::Result<Vec<u8>>;
 }
+
+/// The folder with a game's images, sounds and scenes, from which assets are
+/// read by [`AssetPath`]: a folder on disk, or the files packaged with the
+/// game.
+#[derive(Debug, Clone)]
+pub struct AssetFolder {
+    source: Source,
+}
+
+#[derive(Debug, Clone)]
+enum Source {
+    Directory(PathBuf),
+    Packaged(Arc<dyn PackagedFiles>),
+}
+
+impl PartialEq for AssetFolder {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.source, &other.source) {
+            (Source::Directory(mine), Source::Directory(theirs)) => mine == theirs,
+            (Source::Packaged(mine), Source::Packaged(theirs)) => Arc::ptr_eq(mine, theirs),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for AssetFolder {}
 
 impl AssetFolder {
     /// The asset folder at `root`.
     #[must_use]
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        Self {
+            source: Source::Directory(root.into()),
+        }
+    }
+
+    /// The assets packaged with the game in `files`.
+    #[must_use]
+    pub fn packaged(files: Arc<dyn PackagedFiles>) -> Self {
+        Self {
+            source: Source::Packaged(files),
+        }
     }
 
     /// The folder a game uses when it does not choose one:
@@ -35,16 +79,20 @@ impl AssetFolder {
         Self::new(next_to_executable.unwrap_or_else(|| PathBuf::from(DEFAULT_ASSET_FOLDER)))
     }
 
-    /// Where the folder is.
+    /// Where the folder is on disk; `None` for packaged assets.
     #[must_use]
-    pub fn root(&self) -> &Path {
-        &self.root
+    pub fn root(&self) -> Option<&Path> {
+        match &self.source {
+            Source::Directory(root) => Some(root),
+            Source::Packaged(_) => None,
+        }
     }
 
-    /// Where the file of the asset at `path` is.
+    /// Where the file of the asset at `path` is on disk; `None` for
+    /// packaged assets, which have no file to watch.
     #[must_use]
-    pub fn file_of(&self, path: &AssetPath) -> PathBuf {
-        self.root.join(path.to_relative_path())
+    pub fn file_of(&self, path: &AssetPath) -> Option<PathBuf> {
+        self.root().map(|root| root.join(path.to_relative_path()))
     }
 
     /// The bytes of the asset at `path`.
@@ -53,13 +101,22 @@ impl AssetFolder {
     ///
     /// Returns [`EngineError::Asset`] if the file does not exist or cannot be read.
     pub fn read(&self, path: &AssetPath) -> EngineResult<Vec<u8>> {
-        let file = self.file_of(path);
-        std::fs::read(&file).map_err(|error| {
-            EngineError::Asset(format!(
-                "cannot read \"{path}\" ({}): {error}",
-                file.display()
-            ))
-        })
+        match &self.source {
+            Source::Directory(root) => {
+                let file = root.join(path.to_relative_path());
+                std::fs::read(&file).map_err(|error| {
+                    EngineError::Asset(format!(
+                        "cannot read \"{path}\" ({}): {error}",
+                        file.display()
+                    ))
+                })
+            }
+            Source::Packaged(files) => files.read(path.as_str()).map_err(|error| {
+                EngineError::Asset(format!(
+                    "cannot read \"{path}\" from the game's package: {error}"
+                ))
+            }),
+        }
     }
 
     /// The text of the asset at `path`, e.g. a scene file.
@@ -123,7 +180,7 @@ pub(crate) mod test_support {
 
         /// Writes `bytes` to the file at `path`, creating its folders.
         pub(crate) fn write(&self, path: &str, bytes: &[u8]) {
-            let file = self.0.root().join(path);
+            let file = self.0.root().unwrap().join(path);
             std::fs::create_dir_all(file.parent().unwrap()).unwrap();
             std::fs::write(file, bytes).unwrap();
         }
@@ -131,7 +188,7 @@ pub(crate) mod test_support {
 
     impl Drop for TemporaryFolder {
         fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(self.0.root());
+            let _ = self.0.root().map(std::fs::remove_dir_all);
         }
     }
 }
@@ -177,7 +234,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains(&folder.0.root().display().to_string()),
+                .contains(&folder.0.root().unwrap().display().to_string()),
             "{error}"
         );
     }
@@ -230,7 +287,40 @@ mod tests {
         assert!(
             AssetFolder::find_default()
                 .root()
+                .unwrap()
                 .ends_with(DEFAULT_ASSET_FOLDER)
         );
+    }
+
+    /// Files packaged in memory, as a platform could give them.
+    #[derive(Debug)]
+    struct InMemory(Vec<(&'static str, &'static [u8])>);
+
+    impl PackagedFiles for InMemory {
+        fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+            self.0
+                .iter()
+                .find(|(name, _)| *name == path)
+                .map(|(_, bytes)| bytes.to_vec())
+                .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::NotFound))
+        }
+    }
+
+    #[test]
+    fn packaged_assets_are_read_from_the_package() {
+        let files: Arc<dyn PackagedFiles> =
+            Arc::new(InMemory(vec![("levels/one.scene", b"format = 1")]));
+        let folder = AssetFolder::packaged(Arc::clone(&files));
+
+        assert_eq!(
+            folder.read_text(&path("levels/one.scene")).unwrap(),
+            "format = 1"
+        );
+        assert_eq!(folder.root(), None);
+        assert_eq!(folder.file_of(&path("levels/one.scene")), None);
+        let error = folder.read(&path("levels/two.scene")).unwrap_err();
+        assert!(error.to_string().contains("package"), "{error}");
+        assert_eq!(folder, AssetFolder::packaged(files));
+        assert_ne!(folder, AssetFolder::new("assets"));
     }
 }

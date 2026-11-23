@@ -42,7 +42,7 @@ impl App {
             clear_color: Color::BLACK,
             actions: ActionMap::new(),
             schedule: Schedule::new(),
-            assets: AssetFolder::find_default(),
+            assets: default_asset_folder(),
             hot_reload: cfg!(debug_assertions),
             gravity: DEFAULT_GRAVITY,
             platform: TargetPlatform::current(),
@@ -105,7 +105,8 @@ impl App {
     }
 
     /// Reads the game's assets from the folder at `root`, instead of the
-    /// default one (see [`AssetFolder::find_default`]).
+    /// default one: the assets packaged with the game where the system
+    /// packages them (Android), [`AssetFolder::find_default`] elsewhere.
     #[must_use]
     pub fn with_asset_folder(mut self, root: impl Into<PathBuf>) -> Self {
         self.assets = AssetFolder::new(root);
@@ -216,6 +217,24 @@ fn open_audio() -> Option<AudioOutput> {
         .ok()
 }
 
+/// The assets packaged with the game if the system packages them, or else
+/// the default folder on disk.
+fn default_asset_folder() -> AssetFolder {
+    star_platform::PackagedAssets::of_this_game().map_or_else(AssetFolder::find_default, |files| {
+        AssetFolder::packaged(std::sync::Arc::new(PlatformPackage(files)))
+    })
+}
+
+/// The platform's packaged assets, as files of an [`AssetFolder`].
+#[derive(Debug)]
+struct PlatformPackage(star_platform::PackagedAssets);
+
+impl star_assets::PackagedFiles for PlatformPackage {
+    fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        self.0.read(path)
+    }
+}
+
 impl Default for App {
     fn default() -> Self {
         Self::new()
@@ -256,7 +275,7 @@ mod tests {
 
         assert_eq!(
             app.asset_folder().root(),
-            std::path::Path::new("my_game/assets")
+            Some(std::path::Path::new("my_game/assets"))
         );
     }
 

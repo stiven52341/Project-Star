@@ -117,10 +117,10 @@ mod tests {
         folder.write("hero.png", b"old");
         folder.write("enemy.png", b"old");
         let mut watcher = FileWatcher::new(INTERVAL);
-        watcher.watch("hero", folder.0.root().join("hero.png"));
-        watcher.watch("enemy", folder.0.root().join("enemy.png"));
+        watcher.watch("hero", folder.0.root().unwrap().join("hero.png"));
+        watcher.watch("enemy", folder.0.root().unwrap().join("enemy.png"));
 
-        touch(&folder.0.root().join("hero.png"), 1);
+        touch(&folder.0.root().unwrap().join("hero.png"), 1);
 
         assert_eq!(changes(&mut watcher, INTERVAL), ["hero"]);
         assert_eq!(changes(&mut watcher, INTERVAL), Vec::<&str>::new());
@@ -132,8 +132,8 @@ mod tests {
         let folder = TemporaryFolder::new("watch_interval");
         folder.write("hero.png", b"old");
         let mut watcher = FileWatcher::new(INTERVAL);
-        watcher.watch("hero", folder.0.root().join("hero.png"));
-        touch(&folder.0.root().join("hero.png"), 1);
+        watcher.watch("hero", folder.0.root().unwrap().join("hero.png"));
+        touch(&folder.0.root().unwrap().join("hero.png"), 1);
 
         assert_eq!(changes(&mut watcher, INTERVAL / 2), Vec::<&str>::new());
         assert_eq!(changes(&mut watcher, INTERVAL / 2), ["hero"]);
@@ -143,7 +143,7 @@ mod tests {
     fn removed_files_are_reported_when_they_come_back() {
         let folder = TemporaryFolder::new("watch_removed");
         folder.write("hero.png", b"old");
-        let file = folder.0.root().join("hero.png");
+        let file = folder.0.root().unwrap().join("hero.png");
         let mut watcher = FileWatcher::new(INTERVAL);
         watcher.watch("hero", &file);
 
