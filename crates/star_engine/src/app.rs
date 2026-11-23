@@ -7,13 +7,15 @@ use star_audio::{Audio, AudioOutput};
 use star_core::{EngineError, EngineResult};
 use star_ecs::{Schedule, Stage, World};
 use star_input::{ActionMap, Input};
+use star_math::Vec2;
+use star_physics::DEFAULT_GRAVITY;
 use star_platform::{TargetPlatform, WindowConfig, WindowSize, run_event_loop};
 use star_render::{Color, GraphicsBackend, RendererConfig};
 
 use crate::fallback_logger;
 use crate::game::{EmptyGame, Game};
 use crate::game_assets::GameAssets;
-use crate::runtime::Runtime;
+use crate::runtime::{Runtime, engine_world};
 
 /// A game application, configured with a builder and started with
 /// [`App::run_game`] (or [`App::run`] for an empty window).
@@ -26,6 +28,7 @@ pub struct App {
     schedule: Schedule,
     assets: AssetFolder,
     hot_reload: bool,
+    gravity: Vec2,
     platform: TargetPlatform,
 }
 
@@ -41,6 +44,7 @@ impl App {
             schedule: Schedule::new(),
             assets: AssetFolder::find_default(),
             hot_reload: cfg!(debug_assertions),
+            gravity: DEFAULT_GRAVITY,
             platform: TargetPlatform::current(),
         }
     }
@@ -118,6 +122,21 @@ impl App {
         self
     }
 
+    /// Sets the pull on the bodies of the 2D physics, in world units per
+    /// second squared: Earth's downwards by default ([`DEFAULT_GRAVITY`]),
+    /// zero for games seen from above.
+    #[must_use]
+    pub const fn with_gravity(mut self, gravity: Vec2) -> Self {
+        self.gravity = gravity;
+        self
+    }
+
+    /// The pull on the bodies of the 2D physics.
+    #[must_use]
+    pub const fn gravity(&self) -> Vec2 {
+        self.gravity
+    }
+
     /// Whether asset files are reloaded when they change.
     #[must_use]
     pub fn hot_reload(&self) -> bool {
@@ -181,10 +200,9 @@ impl App {
             game,
             self.renderer_config,
             self.clear_color,
-            input,
+            engine_world(input, audio, self.gravity),
             self.schedule,
             GameAssets::new(self.assets, self.hot_reload),
-            audio,
         );
         run_event_loop(self.window_config, &mut runtime)
     }

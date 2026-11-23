@@ -158,11 +158,12 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   (the script class it is built as; Rust games ignore it, but scenes keep
   it when written again), the position of its `parent` in the
   list (parents come first; the first node is the only root), an optional
-  transform (`position`, `rotation`, `scale`) and an optional
+  transform (`position`, `rotation`, `scale`), an optional
   `[node.sprite]` (`texture` as an asset path, `filter`, `size`, `region`,
-  `anchor`, `color`, `layer`). Unknown fields are errors, so typos are not
-  silently ignored. Scenes keep names, classes, transforms and sprites;
-  other components will join them later.
+  `anchor`, `color`, `layer`) and an optional `[node.body]` (see
+  [Physics](#physics)). Unknown fields are errors, so typos are not
+  silently ignored. Scenes keep names, classes, transforms, sprites and
+  bodies; other components will join them later.
 - A `SpriteFile` names a sprite's image by its asset path instead of a
   `TextureId`: the engine loads the texture the first time it draws it (and
   again when the path or filter change), so code without the renderer, such
@@ -316,6 +317,28 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   reported, so a kinematic character notices a static sensor. A removed
   body's contacts end with the next step: `Physics2d` keeps which body each
   collider was until then.
+- **Nodes with bodies**: a `Body2D` component (`star_scene`) makes a node
+  with a `Transform2D` a body. The engine owns a `Physics2d` (gravity from
+  `App::with_gravity`, `DEFAULT_GRAVITY` otherwise) and a `PhysicsNodes`
+  as resources of the world (`world.physics()`, `physics_mut()` and
+  `physics_nodes()`). Each frame, after `Stage::Update` and before
+  `Stage::Physics`, the engine propagates the transforms and runs
+  `step_node_physics`: it removes the bodies of nodes that are gone (or
+  whose `Body2D` was replaced), adds the bodies of new `Body2D`s where their
+  nodes are, moves a body to its node when the game changed the node's
+  `Transform2D` (the component remembers the transform it last wrote),
+  advances the simulation by the frame's time, writes the dynamic and
+  kinematic bodies back into their nodes' `Transform2D` (in the space of
+  the closest ancestor with a global transform), and turns the bodies'
+  contacts into `NodeContact`s between nodes. Shapes are not scaled with
+  their nodes. Cloning a `Body2D` gives a new body, so copied nodes never
+  share one.
+- Scenes keep bodies: a `[node.body]` table has the `kind` (`dynamic` by
+  default, `static`, `kinematic`), the `shape` (`circle` with `radius`,
+  `rectangle` with `size`, `capsule` with `height` and `radius`; a size of
+  another shape is an error) and, only when they are not the defaults,
+  `gravity_scale`, `fixed_rotation`, `friction`, `bounciness`, `density`
+  and `sensor`.
 
 ## Rendering
 

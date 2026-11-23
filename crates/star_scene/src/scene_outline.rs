@@ -5,7 +5,10 @@ use star_core::{EngineError, EngineResult};
 use star_math::Vec2;
 use star_render::{Color, Sprite, TextureFilter, TextureRegion};
 
+use star_physics::BodySettings;
+
 use crate::Transform2D;
+use crate::body_data::BodyData;
 use crate::scene_file::{NodeData, SceneFile, SpriteData};
 
 /// The nodes of a `.scene` file, checked to form one tree, with their images
@@ -32,6 +35,8 @@ pub struct NodeOutline {
     pub transform: Option<Transform2D>,
     /// The image it shows, if any.
     pub sprite: Option<SpriteOutline>,
+    /// Its body in the 2D physics, if any.
+    pub body: Option<BodySettings>,
 }
 
 /// The image a node of a [`SceneOutline`] shows.
@@ -146,6 +151,12 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         .map(read_sprite)
         .transpose()
         .map_err(|error| EngineError::Scene(format!("node \"{}\": {error}", node.name)))?;
+    let body = node
+        .body
+        .as_ref()
+        .map(BodyData::to_settings)
+        .transpose()
+        .map_err(|error| EngineError::Scene(format!("node \"{}\": {error}", node.name)))?;
     if node
         .class
         .as_deref()
@@ -162,6 +173,7 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         parent: node.parent,
         transform,
         sprite,
+        body,
     })
 }
 
@@ -271,6 +283,18 @@ mod tests {
         ] {
             assert!(SceneOutline::from_text(text).is_err(), "{text}");
         }
+    }
+
+    #[test]
+    fn bodies_are_read_and_their_errors_name_their_node() {
+        let body = "format = 1\n[[node]]\nname = \"Ball\"\n[node.body]\nshape = \"circle\"\n";
+
+        let outline = SceneOutline::from_text(&format!("{body}radius = 0.5")).unwrap();
+        let error = SceneOutline::from_text(body).unwrap_err();
+
+        let settings = outline.nodes()[0].body.unwrap();
+        assert_eq!(settings.kind, star_physics::BodyKind::Dynamic);
+        assert!(error.to_string().contains("node \"Ball\""), "{error}");
     }
 
     #[test]

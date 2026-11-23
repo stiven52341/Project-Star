@@ -6,9 +6,11 @@ use star_audio::Audio;
 use star_core::{EngineResult, Time};
 use star_ecs::{Schedule, Stage, World};
 use star_input::Input;
+use star_math::Vec2;
+use star_physics::Physics2d;
 use star_platform::{InputEvent, Window, WindowEventHandler, WindowSize};
 use star_render::{Color, Frame, Renderer, RendererConfig};
-use star_scene::{TransformPropagation, draw_sprite_nodes};
+use star_scene::{PhysicsNodes, TransformPropagation, draw_sprite_nodes, step_node_physics};
 
 use crate::EngineWorld as _;
 use crate::game::{Game, GameContext};
@@ -21,8 +23,8 @@ pub(crate) struct Runtime<G: Game> {
     clear_color: Color,
     renderer: Option<Renderer>,
     frame: Frame,
-    /// Holds the game's entities and the engine's resources: [`Time`],
-    /// [`Input`], the [`WindowSize`] and the [`Audio`].
+    /// Holds the game's entities and the engine's resources (see
+    /// [`engine_world`]).
     world: World,
     schedule: Schedule,
     transforms: TransformPropagation,
@@ -31,19 +33,15 @@ pub(crate) struct Runtime<G: Game> {
 }
 
 impl<G: Game> Runtime<G> {
+    /// Runs `game` in `world`, made by [`engine_world`].
     pub(crate) fn new(
         game: G,
         renderer_config: RendererConfig,
         clear_color: Color,
-        input: Input,
+        world: World,
         schedule: Schedule,
         assets: GameAssets,
-        audio: Audio,
     ) -> Self {
-        let mut world = World::new();
-        world.insert_resource(Time::new());
-        world.insert_resource(input);
-        world.insert_resource(audio);
         Self {
             game,
             renderer_config,
@@ -77,12 +75,17 @@ impl<G: Game> Runtime<G> {
     }
 
     /// One step of the simulation: the systems by stage, with the game's
-    /// update right after the first stage, and then the global transforms
-    /// of the nodes, ready to draw.
+    /// update right after the first stage and the physics of the nodes
+    /// right before the physics stage, and then the global transforms of
+    /// the nodes, ready to draw.
     fn simulate(&mut self) -> EngineResult<()> {
         self.schedule.run_stage(Stage::First, &mut self.world)?;
         self.game.update(&mut self.world);
-        for stage in [Stage::Update, Stage::Physics, Stage::Last] {
+        self.schedule.run_stage(Stage::Update, &mut self.world)?;
+        // Bodies are placed where their parents are now.
+        self.transforms.run(&mut self.world)?;
+        step_node_physics(&self.world, self.world.time().delta().as_secs_f32())?;
+        for stage in [Stage::Physics, Stage::Last] {
             self.schedule.run_stage(stage, &mut self.world)?;
         }
         self.transforms.run(&mut self.world)?;
@@ -91,6 +94,20 @@ impl<G: Game> Runtime<G> {
         }
         Ok(())
     }
+}
+
+/// A world with the engine's resources: the [`Time`], the `input`, the
+/// `audio`, and the 2D physics ([`Physics2d`] with `gravity`, and the
+/// [`PhysicsNodes`] of its bodies). The [`WindowSize`] comes when the window
+/// opens.
+pub(crate) fn engine_world(input: Input, audio: Audio, gravity: Vec2) -> World {
+    let mut world = World::new();
+    world.insert_resource(Time::new());
+    world.insert_resource(input);
+    world.insert_resource(audio);
+    world.insert_resource(Physics2d::new(gravity));
+    world.insert_resource(PhysicsNodes::new());
+    world
 }
 
 impl<G: Game> WindowEventHandler for Runtime<G> {
@@ -152,8 +169,8 @@ mod tests {
     use star_assets::AssetFolder;
     use star_core::EngineError;
     use star_input::{ActionMap, ButtonState, Key};
-    use star_math::Vec2;
-    use star_scene::{GlobalTransform2D, Hierarchy, Transform2D};
+    use star_physics::{BodyKind, BodySettings, DEFAULT_GRAVITY, Shape2d};
+    use star_scene::{Body2D, GlobalTransform2D, Hierarchy, Transform2D};
 
     use super::*;
     use crate::game::EmptyGame;
@@ -191,10 +208,9 @@ mod tests {
             game,
             RendererConfig::default(),
             Color::BLACK,
-            input,
+            engine_world(input, Audio::silent(), DEFAULT_GRAVITY),
             schedule,
             GameAssets::new(AssetFolder::new("assets"), false),
-            Audio::silent(),
         )
     }
 
@@ -289,6 +305,24 @@ mod tests {
 
         let global = *runtime.world.get::<GlobalTransform2D>(hero).unwrap();
         assert_eq!(global.position(), Vec2::new(1.0, 0.0));
+    }
+
+    #[test]
+    fn bodies_of_nodes_move_with_the_frames() {
+        let mut runtime = runtime(EmptyGame, Input::new(), Schedule::new());
+        let ball = runtime.world.spawn_node("Ball", None).unwrap();
+        let settings = BodySettings::new(BodyKind::Dynamic, Shape2d::circle(0.5).unwrap());
+        runtime.world.insert(ball, Transform2D::IDENTITY).unwrap();
+        runtime.world.insert(ball, Body2D::new(settings)).unwrap();
+        let mut time = Time::new();
+        time.advance(Duration::from_millis(100));
+        runtime.world.insert_resource(time);
+
+        runtime.simulate().unwrap();
+
+        assert!(runtime.world.get::<Body2D>(ball).unwrap().id().is_some());
+        let global = *runtime.world.get::<GlobalTransform2D>(ball).unwrap();
+        assert!(global.position().y < 0.0, "{global:?}");
     }
 
     #[test]

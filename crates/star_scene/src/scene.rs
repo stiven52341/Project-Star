@@ -4,18 +4,21 @@ use star_assets::AssetPath;
 use star_core::{EngineError, EngineResult};
 use star_ecs::{Entity, World};
 use star_math::Vec2;
+use star_physics::BodySettings;
 use star_render::{Color, Sprite, TextureFilter, TextureId, TextureRegion};
 
+use crate::body_data::BodyData;
 use crate::scene_file::{FORMAT_VERSION, FilterData, NodeData, SceneFile, SpriteData};
 use crate::scene_outline::{NodeOutline, SceneOutline};
-use crate::{Children, Hierarchy, Name, SpriteNode, Transform2D};
+use crate::{Body2D, Children, Hierarchy, Name, SpriteNode, Transform2D};
 
 /// A tree of nodes that can be added to a world as many times as needed:
 /// a level, an enemy, a bullet. Read from the text of a `.scene` file, or
 /// captured from a world to be saved in one.
 ///
-/// It keeps, for each node, its name, its [`Transform2D`] and its
-/// [`SpriteNode`]; other components are not part of scenes yet.
+/// It keeps, for each node, its name, its [`Transform2D`], its
+/// [`SpriteNode`] and its [`Body2D`]; other components are not part of
+/// scenes yet.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scene {
     /// Parents always come before their children; the first node is the root.
@@ -31,6 +34,7 @@ struct SceneNode {
     parent: Option<usize>,
     transform: Option<Transform2D>,
     sprite: Option<SpriteNode>,
+    body: Option<BodySettings>,
 }
 
 /// Gives the texture of an image of the asset folder, drawn with a filter.
@@ -151,6 +155,9 @@ impl Scene {
             if let Some(sprite) = node.sprite {
                 world.insert(entity, sprite)?;
             }
+            if let Some(body) = node.body {
+                world.insert(entity, Body2D::new(body))?;
+            }
         }
         Ok(())
     }
@@ -190,6 +197,7 @@ fn load_node(
         parent: outline.parent,
         transform: outline.transform,
         sprite,
+        body: outline.body,
     })
 }
 
@@ -210,6 +218,7 @@ fn write_node(
         rotation: node.transform.map(|transform| transform.rotation),
         scale: node.transform.map(|transform| array(transform.scale)),
         sprite,
+        body: node.body.as_ref().map(BodyData::from_settings),
     })
 }
 
@@ -250,6 +259,7 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
         parent,
         transform: world.get::<Transform2D>(entity).map(|transform| *transform),
         sprite: world.get::<SpriteNode>(entity).map(|sprite| *sprite),
+        body: world.get::<Body2D>(entity).map(|body| *body.settings()),
     }
 }
 
@@ -308,6 +318,12 @@ mod tests {
         [[node]]
         name = "Enemy"
         parent = 0
+        position = [5.0, 0.0]
+
+        [node.body]
+        shape = "rectangle"
+        size = [1.0, 1.0]
+        bounciness = 0.5
     "#;
 
     /// Gives textures in the order they are asked for, and remembers them.
@@ -374,8 +390,11 @@ mod tests {
             world.get::<Transform2D>(sword).unwrap().scale,
             Vec2::new(2.0, 2.0)
         );
+        assert!(!world.has::<Body2D>(hero));
         let enemy = world.find_child(root, "Enemy").unwrap();
-        assert!(!world.has::<Transform2D>(enemy));
+        let body = world.get::<Body2D>(enemy).unwrap();
+        assert!((body.settings().bounciness - 0.5).abs() < f32::EPSILON);
+        assert_eq!(body.id(), None);
     }
 
     #[test]
@@ -421,6 +440,7 @@ mod tests {
         assert_eq!(read_back.node_count(), scene.node_count());
         assert!(text.contains("texture = \"sprites/hero.png\""), "{text}");
         assert!(!text.contains("region"), "{text}");
+        assert!(text.contains("[node.body]"), "{text}");
     }
 
     #[test]

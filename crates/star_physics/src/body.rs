@@ -1,6 +1,4 @@
-//! How a body moves and what its surface is like, when it is added.
-
-use star_math::Vec2;
+//! What a body is: how it moves, its outline and its surface.
 
 use crate::Shape2d;
 
@@ -22,20 +20,14 @@ pub const DEFAULT_FRICTION: f32 = 0.5;
 /// Mass per square world unit when none is given.
 pub const DEFAULT_DENSITY: f32 = 1.0;
 
-/// Everything about a body when it is added to a
-/// [`Physics2d`](crate::Physics2d).
+/// What a body is: how it moves, its outline and its surface. Where it is
+/// is given when it is added to a [`Physics2d`](crate::Physics2d).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BodySettings {
     /// How it moves.
     pub kind: BodyKind,
     /// Its outline.
     pub shape: Shape2d,
-    /// Where its center starts, in world units.
-    pub position: Vec2,
-    /// Its starting angle, in radians, counterclockwise.
-    pub rotation: f32,
-    /// Its starting velocity, in world units per second.
-    pub velocity: Vec2,
     /// How much gravity pulls it: 0 floats, 1 falls normally.
     pub gravity_scale: f32,
     /// Whether collisions never turn it (characters that stay upright).
@@ -52,16 +44,13 @@ pub struct BodySettings {
 }
 
 impl BodySettings {
-    /// A body of `kind` and `shape` at the origin, at rest, with the
-    /// default surface.
+    /// A body of `kind` and `shape`, pulled by gravity, with the default
+    /// surface.
     #[must_use]
     pub const fn new(kind: BodyKind, shape: Shape2d) -> Self {
         Self {
             kind,
             shape,
-            position: Vec2::ZERO,
-            rotation: 0.0,
-            velocity: Vec2::ZERO,
             gravity_scale: 1.0,
             fixed_rotation: false,
             friction: DEFAULT_FRICTION,
@@ -69,12 +58,5 @@ impl BodySettings {
             density: DEFAULT_DENSITY,
             is_sensor: false,
         }
-    }
-
-    /// The same body, starting at `position`.
-    #[must_use]
-    pub const fn at(mut self, position: Vec2) -> Self {
-        self.position = position;
-        self
     }
 }

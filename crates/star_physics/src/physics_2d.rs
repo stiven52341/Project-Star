@@ -85,18 +85,25 @@ impl Physics2d {
         self.world.wake_up_all(true);
     }
 
-    /// Adds a body and gives its id.
+    /// Adds a body at rest with its center at `position`, turned `rotation`
+    /// radians counterclockwise, and gives its id.
     ///
     /// # Errors
     ///
-    /// [`EngineError::Physics`] if a number of `settings` is not finite,
-    /// the friction or bounciness is negative, or the density is not
-    /// positive.
-    pub fn add_body(&mut self, settings: &BodySettings) -> EngineResult<BodyId> {
-        check_settings(settings)?;
-        let (body, collider) = self
-            .world
-            .insert(body_builder(settings), collider_builder(settings));
+    /// [`EngineError::Physics`] if the position, the rotation or the gravity
+    /// scale is not finite, the friction or bounciness is negative, or the
+    /// density is not positive.
+    pub fn add_body(
+        &mut self,
+        settings: &BodySettings,
+        position: Vec2,
+        rotation: f32,
+    ) -> EngineResult<BodyId> {
+        check_settings(settings, position, rotation)?;
+        let body = body_builder(settings)
+            .translation(to_vector(position))
+            .rotation(rotation);
+        let (body, collider) = self.world.insert(body, collider_builder(settings));
         let id = BodyId(body);
         self.owners.insert(collider, id);
         Ok(id)
@@ -225,11 +232,7 @@ fn body_builder(settings: &BodySettings) -> RigidBodyBuilder {
         BodyKind::Static => RigidBodyBuilder::fixed(),
         BodyKind::Kinematic => RigidBodyBuilder::kinematic_velocity_based(),
     };
-    let builder = builder
-        .translation(to_vector(settings.position))
-        .rotation(settings.rotation)
-        .linvel(to_vector(settings.velocity))
-        .gravity_scale(settings.gravity_scale);
+    let builder = builder.gravity_scale(settings.gravity_scale);
     if settings.fixed_rotation {
         builder.lock_rotations()
     } else {
@@ -256,13 +259,11 @@ fn collider_builder(settings: &BodySettings) -> ColliderBuilder {
         .active_collision_types(ActiveCollisionTypes::all())
 }
 
-fn check_settings(settings: &BodySettings) -> EngineResult<()> {
+fn check_settings(settings: &BodySettings, position: Vec2, rotation: f32) -> EngineResult<()> {
     let numbers = [
-        ("position", settings.position.x),
-        ("position", settings.position.y),
-        ("rotation", settings.rotation),
-        ("velocity", settings.velocity.x),
-        ("velocity", settings.velocity.y),
+        ("position", position.x),
+        ("position", position.y),
+        ("rotation", rotation),
         ("gravity scale", settings.gravity_scale),
     ];
     if let Some((what, value)) = numbers.iter().find(|(_, value)| !value.is_finite()) {
@@ -308,8 +309,12 @@ mod tests {
     const FRAME: f32 = 1.0 / 60.0;
     const TOLERANCE: f32 = 1e-3;
 
-    fn ball(kind: BodyKind, position: Vec2) -> BodySettings {
-        BodySettings::new(kind, Shape2d::circle(0.5).unwrap()).at(position)
+    fn ball(kind: BodyKind) -> BodySettings {
+        BodySettings::new(kind, Shape2d::circle(0.5).unwrap())
+    }
+
+    fn add(physics: &mut Physics2d, settings: &BodySettings, position: Vec2) -> BodyId {
+        physics.add_body(settings, position, 0.0).unwrap()
     }
 
     fn floor() -> BodySettings {
@@ -333,12 +338,8 @@ mod tests {
     #[test]
     fn dynamic_bodies_fall_and_static_ones_stay() {
         let mut physics = Physics2d::default();
-        let falling = physics
-            .add_body(&ball(BodyKind::Dynamic, Vec2::new(0.0, 10.0)))
-            .unwrap();
-        let fixed = physics
-            .add_body(&ball(BodyKind::Static, Vec2::new(5.0, 10.0)))
-            .unwrap();
+        let falling = add(&mut physics, &ball(BodyKind::Dynamic), Vec2::new(0.0, 10.0));
+        let fixed = add(&mut physics, &ball(BodyKind::Static), Vec2::new(5.0, 10.0));
 
         run(&mut physics, 1.0);
 
@@ -351,10 +352,8 @@ mod tests {
     #[test]
     fn a_body_lands_on_the_floor_and_the_contact_is_reported() {
         let mut physics = Physics2d::default();
-        let floor = physics.add_body(&floor()).unwrap();
-        let falling = physics
-            .add_body(&ball(BodyKind::Dynamic, Vec2::new(0.0, 3.0)))
-            .unwrap();
+        let floor = add(&mut physics, &floor(), Vec2::ZERO);
+        let falling = add(&mut physics, &ball(BodyKind::Dynamic), Vec2::new(0.0, 3.0));
 
         let contacts = run(&mut physics, 2.0);
 
@@ -377,10 +376,8 @@ mod tests {
             Shape2d::rectangle(Vec2::new(4.0, 1.0)).unwrap(),
         );
         area.is_sensor = true;
-        let area = physics.add_body(&area).unwrap();
-        let falling = physics
-            .add_body(&ball(BodyKind::Dynamic, Vec2::new(0.0, 2.0)))
-            .unwrap();
+        let area = add(&mut physics, &area, Vec2::ZERO);
+        let falling = add(&mut physics, &ball(BodyKind::Dynamic), Vec2::new(0.0, 2.0));
 
         let contacts = run(&mut physics, 2.0);
 
@@ -399,9 +396,7 @@ mod tests {
     #[test]
     fn kinematic_bodies_follow_their_velocity_only() {
         let mut physics = Physics2d::default();
-        let platform = physics
-            .add_body(&ball(BodyKind::Kinematic, Vec2::ZERO))
-            .unwrap();
+        let platform = add(&mut physics, &ball(BodyKind::Kinematic), Vec2::ZERO);
         physics.set_velocity(platform, Vec2::new(2.0, 0.0));
 
         run(&mut physics, 1.0);
@@ -414,12 +409,14 @@ mod tests {
     #[test]
     fn kinematic_bodies_notice_static_sensors() {
         let mut physics = Physics2d::new(Vec2::ZERO);
-        let mut coin = ball(BodyKind::Static, Vec2::new(1.0, 0.0));
+        let mut coin = ball(BodyKind::Static);
         coin.is_sensor = true;
-        let coin = physics.add_body(&coin).unwrap();
-        let player = physics
-            .add_body(&ball(BodyKind::Kinematic, Vec2::new(-1.0, 0.0)))
-            .unwrap();
+        let coin = add(&mut physics, &coin, Vec2::new(1.0, 0.0));
+        let player = add(
+            &mut physics,
+            &ball(BodyKind::Kinematic),
+            Vec2::new(-1.0, 0.0),
+        );
         physics.set_velocity(player, Vec2::new(2.0, 0.0));
 
         let contacts = run(&mut physics, 1.0);
@@ -434,9 +431,7 @@ mod tests {
     #[test]
     fn impulses_push_dynamic_bodies() {
         let mut physics = Physics2d::new(Vec2::ZERO);
-        let body = physics
-            .add_body(&ball(BodyKind::Dynamic, Vec2::ZERO))
-            .unwrap();
+        let body = add(&mut physics, &ball(BodyKind::Dynamic), Vec2::ZERO);
 
         physics.apply_impulse(body, Vec2::new(0.0, 1.0));
         physics.advance(FRAME);
@@ -447,9 +442,7 @@ mod tests {
     #[test]
     fn teleporting_moves_and_turns_a_body() {
         let mut physics = Physics2d::new(Vec2::ZERO);
-        let body = physics
-            .add_body(&ball(BodyKind::Dynamic, Vec2::ZERO))
-            .unwrap();
+        let body = add(&mut physics, &ball(BodyKind::Dynamic), Vec2::ZERO);
 
         physics.set_position(body, Vec2::new(3.0, 4.0));
         physics.set_rotation(body, 1.0);
@@ -480,10 +473,8 @@ mod tests {
     #[test]
     fn removed_bodies_end_their_contacts_and_ids() {
         let mut physics = Physics2d::default();
-        let floor = physics.add_body(&floor()).unwrap();
-        let falling = physics
-            .add_body(&ball(BodyKind::Dynamic, Vec2::new(0.0, 1.0)))
-            .unwrap();
+        let floor = add(&mut physics, &floor(), Vec2::ZERO);
+        let falling = add(&mut physics, &ball(BodyKind::Dynamic), Vec2::new(0.0, 1.0));
         run(&mut physics, 0.5);
 
         physics.remove_body(falling);
@@ -500,25 +491,31 @@ mod tests {
     #[test]
     fn invalid_settings_are_rejected() {
         let mut physics = Physics2d::default();
-        let mut settings = ball(BodyKind::Dynamic, Vec2::new(f32::NAN, 0.0));
-        assert!(physics.add_body(&settings).is_err());
+        let mut settings = ball(BodyKind::Dynamic);
+        assert!(
+            physics
+                .add_body(&settings, Vec2::new(f32::NAN, 0.0), 0.0)
+                .is_err()
+        );
+        assert!(
+            physics
+                .add_body(&settings, Vec2::ZERO, f32::INFINITY)
+                .is_err()
+        );
 
-        settings = ball(BodyKind::Dynamic, Vec2::ZERO);
         settings.friction = -1.0;
-        assert!(physics.add_body(&settings).is_err());
+        assert!(physics.add_body(&settings, Vec2::ZERO, 0.0).is_err());
 
-        settings = ball(BodyKind::Dynamic, Vec2::ZERO);
+        settings = ball(BodyKind::Dynamic);
         settings.density = 0.0;
-        assert!(physics.add_body(&settings).is_err());
+        assert!(physics.add_body(&settings, Vec2::ZERO, 0.0).is_err());
         assert_eq!(physics.body_count(), 0);
     }
 
     #[test]
     fn gravity_can_change() {
         let mut physics = Physics2d::default();
-        let body = physics
-            .add_body(&ball(BodyKind::Dynamic, Vec2::ZERO))
-            .unwrap();
+        let body = add(&mut physics, &ball(BodyKind::Dynamic), Vec2::ZERO);
 
         physics.set_gravity(Vec2::new(0.0, 5.0));
         run(&mut physics, 0.5);

@@ -12,12 +12,15 @@ pub use star_input::{
     Key, Keyboard, Mouse, MouseButton, Touch, TouchId, Touches,
 };
 pub use star_math::{Affine2, Mat4, Vec2, Vec3};
+pub use star_physics::{
+    BodyId, BodyKind, BodySettings, Contact, ContactPhase, Physics2d, Shape2d, ShapeKind,
+};
 pub use star_platform::TargetPlatform;
 pub use star_render::{
     Camera, Color, Frame, GraphicsBackend, Image, MeshId, Projection, Sprite, TextureFilter,
     TextureId, TextureRegion, Vertex,
 };
 pub use star_scene::{
-    Children, GlobalTransform2D, Hierarchy, Name, Parent, Scene, SceneOutline, SpriteNode,
-    Transform2D,
+    Body2D, Children, GlobalTransform2D, Hierarchy, Name, NodeContact, Parent, PhysicsNodes, Scene,
+    SceneOutline, SpriteNode, Transform2D,
 };

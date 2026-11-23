@@ -75,6 +75,28 @@ impl Affine2 {
             },
         )
     }
+
+    /// The transform that undoes this one, or `None` if this one flattens
+    /// the plane (a scale of zero), which cannot be undone.
+    #[must_use]
+    pub fn inverse(self) -> Option<Self> {
+        let determinant = self.x_axis.x * self.y_axis.y - self.x_axis.y * self.y_axis.x;
+        if determinant == 0.0 || !determinant.is_finite() {
+            return None;
+        }
+        let inverse_determinant = determinant.recip();
+        let x_axis = Vec2::new(self.y_axis.y, -self.x_axis.y) * inverse_determinant;
+        let y_axis = Vec2::new(-self.y_axis.x, self.x_axis.x) * inverse_determinant;
+        let linear = Self {
+            x_axis,
+            y_axis,
+            translation: Vec2::ZERO,
+        };
+        Some(Self {
+            translation: -linear.transform_vector(self.translation),
+            ..linear
+        })
+    }
 }
 
 impl Default for Affine2 {
@@ -161,5 +183,30 @@ mod tests {
 
         assert!((transform.rotation() - 0.5).abs() < EPSILON);
         assert_close(transform.scale(), Vec2::new(2.0, -3.0));
+    }
+
+    #[test]
+    fn the_inverse_undoes_the_transform() {
+        let transform = Affine2::from_scale_rotation_translation(
+            Vec2::new(2.0, -0.5),
+            0.7,
+            Vec2::new(3.0, -1.0),
+        );
+        let point = Vec2::new(-4.0, 2.5);
+
+        let inverse = transform.inverse().unwrap();
+
+        assert_close(
+            inverse.transform_point(transform.transform_point(point)),
+            point,
+        );
+        assert_close((transform * inverse).translation(), Vec2::ZERO);
+    }
+
+    #[test]
+    fn a_flattening_transform_has_no_inverse() {
+        let flat = Affine2::from_scale_rotation_translation(Vec2::new(0.0, 1.0), 0.0, Vec2::ZERO);
+
+        assert_eq!(flat.inverse(), None);
     }
 }

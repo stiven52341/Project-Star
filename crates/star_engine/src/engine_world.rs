@@ -1,16 +1,19 @@
 //! Shortcuts to the resources the engine keeps in the world.
 
-use std::cell::Ref;
+use std::cell::{Ref, RefMut};
 
 use star_audio::Audio;
 use star_core::Time;
 use star_ecs::World;
 use star_input::Input;
+use star_physics::Physics2d;
 use star_platform::WindowSize;
+use star_scene::PhysicsNodes;
 
 /// Quick access to the engine's resources in a [`World`]: the [`Time`] and
-/// the [`Input`] of the current frame, the [`WindowSize`] and the [`Audio`]. The engine
-/// adds them before the game starts and keeps them updated.
+/// the [`Input`] of the current frame, the [`WindowSize`], the [`Audio`] and
+/// the 2D physics. The engine adds them before the game starts and keeps
+/// them updated.
 pub trait EngineWorld {
     /// The timing of the current frame (zero before the first one).
     fn time(&self) -> Time;
@@ -25,6 +28,19 @@ pub trait EngineWorld {
     /// Where the game plays its sounds. It is silent on machines without an
     /// audio device, and in a world the engine does not run.
     fn audio(&self) -> Audio;
+
+    /// The 2D physics, to read where bodies are and how fast they move.
+    /// `None` in a world the engine does not run, or while a system holds
+    /// it to change it.
+    fn physics(&self) -> Option<Ref<'_, Physics2d>>;
+
+    /// The 2D physics, to change velocities, push bodies or change gravity.
+    /// `None` like [`physics`](Self::physics).
+    fn physics_mut(&self) -> Option<RefMut<'_, Physics2d>>;
+
+    /// Which node each body is, and the contacts between nodes of the last
+    /// frame. `None` like [`physics`](Self::physics).
+    fn physics_nodes(&self) -> Option<Ref<'_, PhysicsNodes>>;
 }
 
 impl EngineWorld for World {
@@ -46,6 +62,18 @@ impl EngineWorld for World {
     fn audio(&self) -> Audio {
         self.resource::<Audio>()
             .map_or_else(Audio::silent, |audio| audio.clone())
+    }
+
+    fn physics(&self) -> Option<Ref<'_, Physics2d>> {
+        self.resource::<Physics2d>()
+    }
+
+    fn physics_mut(&self) -> Option<RefMut<'_, Physics2d>> {
+        self.resource_mut::<Physics2d>()
+    }
+
+    fn physics_nodes(&self) -> Option<Ref<'_, PhysicsNodes>> {
+        self.resource::<PhysicsNodes>()
     }
 }
 
@@ -77,5 +105,7 @@ mod tests {
         assert!(world.input().is_none());
         assert!(world.window_size().is_empty());
         assert!(!world.audio().has_output());
+        assert!(world.physics().is_none());
+        assert!(world.physics_nodes().is_none());
     }
 }

@@ -62,8 +62,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         static and kinematic bodies; circles, rectangles and capsules;
         friction, bounciness, density; sensors; fixed steps; contacts that
         start and end.
-  - [ ] 8b Physics in the engine: bodies of entities and scene nodes, moved
-        by the engine's world, with an example.
+  - [x] 8b Physics in the engine: `Body2D` nodes moved by the engine's
+        `Physics2d` (a resource, with `App::with_gravity`), contacts between
+        nodes, bodies in `.scene` files (`[node.body]`), and an example
+        (`physics_2d`).
   - [ ] 8c Physics in StarScript (part of 13.5).
 - [ ] **Phase 9 — 3D rendering**: materials, lights, indexed meshes. (`Mat4`
       and a perspective camera already exist.)
