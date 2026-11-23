@@ -44,18 +44,18 @@ impl Texts {
         }
     }
 
-    /// The keys of the list of suggestions, `active` or not yet.
-    pub(crate) const fn suggestion_keys(&self, active: bool) -> &'static str {
-        if active {
-            self.pick(
-                "Tab: write · Up/Down: choose · Esc: hide",
-                "Tab: escribir · Arriba/Abajo: elegir · Esc: ocultar",
-            )
-        } else {
-            self.pick(
-                "Tab: write · Ctrl+Space: choose · Esc: hide",
-                "Tab: escribir · Ctrl+Espacio: elegir · Esc: ocultar",
-            )
+    /// The keys of the list of suggestions, `active` or not yet; `choose`
+    /// makes it active.
+    pub(crate) fn suggestion_keys(&self, active: bool, choose: &str) -> String {
+        match (self.language, active) {
+            (Language::English, true) => "Tab: write · Up/Down: choose · Esc: hide".to_owned(),
+            (Language::Spanish, true) => {
+                "Tab: escribir · Arriba/Abajo: elegir · Esc: ocultar".to_owned()
+            }
+            (Language::English, false) => format!("Tab: write · {choose}: choose · Esc: hide"),
+            (Language::Spanish, false) => {
+                format!("Tab: escribir · {choose}: elegir · Esc: ocultar")
+            }
         }
     }
 

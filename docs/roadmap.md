@@ -220,7 +220,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.9i The check while writing also reports what only the
           translation to Rust finds.
     - [x] 13.9j The list of suggestions is faint and the arrows move the
-          cursor until `Ctrl+Space` makes it active. Chains inside
+          cursor until `Ctrl+I` makes it active. Chains inside
           parentheses (`(a + b).`) or after list literals suggest nothing,
           by decision (see `docs/architecture.md`).
 - [ ] **Editor ideas, not planned yet**: undo and redo in the scene

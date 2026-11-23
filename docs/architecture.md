@@ -762,10 +762,10 @@ listed under it (with their signatures); `Tab` writes it (a method with its
 parentheses, the cursor inside if it takes parameters), and `Esc` hides them
 until the word changes. Suggestions show by themselves while writing, so
 the list is faint and the up and down arrows keep moving the cursor until
-`Ctrl+Space` (`Ctrl` on macOS too, where `Cmd+Space` is the system's
-search) makes it active: then the arrows choose in it while that word is
+`Ctrl+I` (`Cmd+I` on macOS; not `Ctrl+Space`, which input methods such
+as IBus use to change the keyboard's language) makes it active: then the arrows choose in it while that word is
 written (the list remembers where the word starts, so typing more of it
-keeps it active). `Ctrl+Space` also shows suggestions hidden with `Esc`.
+keeps it active). `Ctrl+I` also shows suggestions hidden with `Esc`.
 These keys are taken before the writing aids, so `Tab` indents only when
 nothing is suggested. A chain whose value is an expression in
 parentheses (`(a + b).`) or a list written as it is (`[1, 2].`) suggests

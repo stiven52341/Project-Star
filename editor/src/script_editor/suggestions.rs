@@ -1,7 +1,7 @@
 //! Suggestions shown while writing: the rest of the chosen name in faint
 //! text after the cursor, and the other names in a faint list under it.
 //! `Tab` writes the chosen one and `Esc` hides them until the word changes.
-//! The arrows keep moving the cursor until `Ctrl+Space` makes the list
+//! The arrows keep moving the cursor until `Ctrl+I` makes the list
 //! active: then they choose in it, while that word is written.
 
 use eframe::egui;
@@ -15,12 +15,13 @@ use crate::texts;
 const SHOWN_CANDIDATES: usize = 8;
 /// How visible the faint rest of the chosen name is, from 0 to 255.
 const GHOST_ALPHA: u8 = 110;
-/// How visible the list is until `Ctrl+Space` makes it active, from 0 to 1.
+/// How visible the list is until `Ctrl+I` makes it active, from 0 to 1.
 const INACTIVE_LIST_OPACITY: f32 = 0.55;
-/// The keys that make the list active, or show hidden suggestions again.
-/// `Ctrl` on every system: `Cmd+Space` opens the search of macOS.
+/// The keys that make the list active, or show hidden suggestions again
+/// (`Cmd+I` on macOS). Not `Ctrl+Space`: input methods (as `IBus` on
+/// Linux) use it to change the keyboard's language.
 pub(super) const CHOOSE_SHORTCUT: egui::KeyboardShortcut =
-    egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::Space);
+    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::I);
 
 /// What the user chose among the suggestions, kept between frames.
 #[derive(Default)]
@@ -31,7 +32,7 @@ pub(super) struct Suggestions {
     selected: usize,
     /// Whether `Esc` hid the suggestions for this word.
     dismissed: bool,
-    /// Whether `Ctrl+Space` was pressed since the last frame.
+    /// Whether `Ctrl+I` was pressed since the last frame.
     asked: bool,
     /// Where the word whose list is active starts: the arrows choose in it
     /// while that word is written.
@@ -47,7 +48,7 @@ enum KeyUse {
 
 impl Suggestions {
     /// Shows the suggestions hidden with `Esc` again, and makes their list
-    /// active: what `Ctrl+Space` does.
+    /// active: what `Ctrl+I` does.
     pub(super) const fn ask(&mut self) {
         self.dismissed = false;
         self.asked = true;
@@ -197,7 +198,8 @@ impl Suggestions {
                             show_row(ui, candidate, index == self.selected);
                         }
                     });
-                    ui.weak(texts::current().suggestion_keys(active));
+                    let choose_keys = ui.ctx().format_shortcut(&CHOOSE_SHORTCUT);
+                    ui.weak(texts::current().suggestion_keys(active, &choose_keys));
                 });
             });
     }
