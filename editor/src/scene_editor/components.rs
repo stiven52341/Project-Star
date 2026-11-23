@@ -7,7 +7,7 @@ use star_engine::prelude::{
     TextureRegion, Transform2D, Transform3D, Vec2, Vec3,
 };
 use star_engine::star_assets::AssetPath;
-use star_engine::star_render::DEFAULT_ROUGHNESS;
+use star_engine::star_render::{DEFAULT_ROUGHNESS, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS};
 use star_engine::star_scene::{MeshOutline, NodeOutline, SpriteOutline};
 
 use crate::project::ProjectDimension;
@@ -92,6 +92,95 @@ pub(super) fn add_component_menu(
         }
     });
     added
+}
+
+/// What “Create” in the menus of the scene's tree adds: a node that shows
+/// something right away, placed as the project's kind asks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum NodeTemplate {
+    Empty,
+    Sprite,
+    Cube,
+    Sphere,
+    Plane,
+    DirectionalLight,
+    PointLight,
+}
+
+impl NodeTemplate {
+    /// The templates of a project of `dimension`, in the menu's order.
+    pub(super) const fn of(dimension: ProjectDimension) -> &'static [Self] {
+        match dimension {
+            ProjectDimension::TwoD => &[Self::Empty, Self::Sprite],
+            ProjectDimension::ThreeD => &[
+                Self::Empty,
+                Self::Cube,
+                Self::Sphere,
+                Self::Plane,
+                Self::DirectionalLight,
+                Self::PointLight,
+            ],
+        }
+    }
+
+    /// What the menu calls it.
+    pub(super) fn label(self) -> &'static str {
+        let texts = texts::current();
+        match self {
+            Self::Empty => texts.empty_node,
+            Self::Sprite => texts.sprite_section,
+            Self::Cube => texts.cube,
+            Self::Sphere => texts.sphere,
+            Self::Plane => texts.plane,
+            Self::DirectionalLight => texts.directional_light,
+            Self::PointLight => texts.point_light,
+        }
+    }
+
+    /// The name its nodes start with, before a number makes it unique.
+    pub(super) fn node_name(self) -> &'static str {
+        match self {
+            Self::Empty => texts::current().new_node_name,
+            _ => self.label(),
+        }
+    }
+
+    /// Whether it can be made: sprites need an image to show.
+    pub(super) const fn is_available(self, images: &[String]) -> bool {
+        !matches!(self, Self::Sprite) || !images.is_empty()
+    }
+
+    /// A node of it named `name`, for a project of `dimension`; sprites
+    /// show the first of `images`.
+    pub(super) fn build(
+        self,
+        name: String,
+        dimension: ProjectDimension,
+        images: &[String],
+    ) -> NodeOutline {
+        let mut node = new_node(name, dimension);
+        let shape = match self {
+            Self::Cube => Some(MeshShape::Cube { size: Vec3::ONE }),
+            Self::Sphere => Some(MeshShape::Sphere {
+                radius: DEFAULT_RADIUS,
+                segments: DEFAULT_SPHERE_SEGMENTS,
+                rings: DEFAULT_SPHERE_RINGS,
+            }),
+            Self::Plane => Some(MeshShape::Plane { size: Vec2::ONE }),
+            _ => None,
+        };
+        node.mesh = shape.map(|shape| MeshOutline {
+            shape,
+            ..new_mesh()
+        });
+        match self {
+            Self::Sprite => node.sprite = new_sprite(images),
+            Self::DirectionalLight => node.light = Some(new_light(true)),
+            Self::PointLight => node.light = Some(new_light(false)),
+            _ => {}
+        }
+        node
+    }
 }
 
 /// A node named `name` with the place in space of the project's kind.
@@ -192,6 +281,26 @@ mod tests {
 
         assert_eq!(sprite.texture.as_str(), "sprites/hero.png");
         assert!(new_sprite(&[]).is_none());
+    }
+
+    #[test]
+    fn templates_show_what_they_are_named_after() {
+        let images = ["hero.png".to_owned()];
+        let build = |template: NodeTemplate, dimension| {
+            template.build("Thing".to_owned(), dimension, &images)
+        };
+
+        let sprite = build(NodeTemplate::Sprite, ProjectDimension::TwoD);
+        let sphere = build(NodeTemplate::Sphere, ProjectDimension::ThreeD);
+        let sun = build(NodeTemplate::DirectionalLight, ProjectDimension::ThreeD);
+
+        assert!(sprite.sprite.is_some() && sprite.transform.is_some());
+        assert!(matches!(
+            sphere.mesh.map(|mesh| mesh.shape),
+            Some(MeshShape::Sphere { .. })
+        ));
+        assert!(matches!(sun.light, Some(LightNode::Directional { .. })));
+        assert!(!NodeTemplate::Sprite.is_available(&[]));
     }
 
     #[test]

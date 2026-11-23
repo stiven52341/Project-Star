@@ -2,7 +2,8 @@
 //! whole panel, with stripes so long lists can be followed, guides down
 //! to the children of every node, an icon for what the node is and its
 //! class on the right. A search field narrows the list to the nodes whose
-//! name matches.
+//! name matches. Right clicks open menus to create, duplicate and delete
+//! nodes.
 
 use std::collections::HashSet;
 use std::f32::consts::FRAC_1_SQRT_2;
@@ -12,8 +13,10 @@ use eframe::egui;
 use star_engine::star_scene::NodeOutline;
 
 use super::ROOT;
+use super::components::NodeTemplate;
 use super::dropping::ImageDrop;
 use super::tree::children_of;
+use crate::project::ProjectDimension;
 use crate::texts;
 
 const ROW_HEIGHT: f32 = 22.0;
@@ -27,6 +30,9 @@ const ICON_GAP: f32 = 6.0;
 const ARROW_HALF: f32 = 3.5;
 const GUIDE_WIDTH: f32 = 1.0;
 const CLASS_TEXT_SIZE: f32 = 11.0;
+/// The keys shown next to the menu entries they also do.
+const DUPLICATE_SHORTCUT: &str = "Ctrl+D";
+const DELETE_SHORTCUT: &str = "Del";
 /// The width of the outline of a row an image would be dropped on.
 const DROP_TARGET_WIDTH: f32 = 2.0;
 
@@ -107,6 +113,36 @@ impl NodeKind {
     }
 }
 
+/// What the user asked the tree to change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum TreeAction {
+    /// Add a node of `template` under `parent`.
+    Create {
+        parent: usize,
+        template: NodeTemplate,
+    },
+    /// Copy the node, with its descendants, next to it.
+    Duplicate(usize),
+    /// Delete the node with its descendants.
+    Delete(usize),
+}
+
+/// What happened in the tree this frame.
+#[derive(Default)]
+pub(super) struct TreeOutcome {
+    /// An image dropped on a row, with that row's node.
+    pub(super) dropped: Option<(usize, Arc<ImageDrop>)>,
+    pub(super) action: Option<TreeAction>,
+}
+
+/// What the menus offer: the templates of the project's kind, sprites
+/// only if there are images.
+#[derive(Clone, Copy)]
+pub(super) struct MenuContext<'images> {
+    pub(super) dimension: ProjectDimension,
+    pub(super) images: &'images [String],
+}
+
 /// The tree of a scene's nodes for one frame.
 pub(super) struct TreeView<'scene> {
     nodes: &'scene [NodeOutline],
@@ -118,8 +154,8 @@ pub(super) struct TreeView<'scene> {
     selected: &'scene mut Option<usize>,
     /// Rows drawn so far, to stripe every other one.
     rows: usize,
-    /// An image dropped on a row this frame, with that row's node.
-    dropped: Option<(usize, Arc<ImageDrop>)>,
+    menu: MenuContext<'scene>,
+    outcome: TreeOutcome,
 }
 
 impl<'scene> TreeView<'scene> {
@@ -127,6 +163,7 @@ impl<'scene> TreeView<'scene> {
         nodes: &'scene [NodeOutline],
         state: &'scene mut TreeState,
         selected: &'scene mut Option<usize>,
+        menu: MenuContext<'scene>,
     ) -> Self {
         Self {
             nodes,
@@ -135,13 +172,14 @@ impl<'scene> TreeView<'scene> {
             state,
             selected,
             rows: 0,
-            dropped: None,
+            menu,
+            outcome: TreeOutcome::default(),
         }
     }
 
     /// The search field and, under it, the tree, or the nodes that match.
-    /// Returns the image dropped on a row, if one was, with its node.
-    pub(super) fn show(mut self, ui: &mut egui::Ui) -> Option<(usize, Arc<ImageDrop>)> {
+    /// Returns what the user dropped on it or chose in its menus.
+    pub(super) fn show(mut self, ui: &mut egui::Ui) -> TreeOutcome {
         let texts = texts::current();
         ui.add(
             egui::TextEdit::singleline(&mut self.state.search)
@@ -167,9 +205,23 @@ impl<'scene> TreeView<'scene> {
                         self.show_row(ui, index, 0, None);
                     }
                 }
+                self.show_background(ui);
             });
         self.state.reveal = false;
-        self.dropped
+        self.outcome
+    }
+
+    /// The space under the rows: a click there selects nothing, and its
+    /// menu creates nodes under the root.
+    fn show_background(&mut self, ui: &mut egui::Ui) {
+        let space = ui.available_size().max(egui::vec2(0.0, ROW_HEIGHT));
+        let background = ui.allocate_response(space, egui::Sense::click());
+        if background.clicked() {
+            *self.selected = None;
+        }
+        let mut action = None;
+        background.context_menu(|ui| create_menu(ui, ROOT, self.menu, &mut action));
+        self.outcome.action = self.outcome.action.or(action);
     }
 
     fn open_parents_of_selected(&mut self) {
@@ -282,9 +334,12 @@ impl<'scene> TreeView<'scene> {
             );
         }
 
-        if response.clicked() && !toggled {
+        if (response.clicked() || response.secondary_clicked()) && !toggled {
             *self.selected = Some(index);
         }
+        let mut action = None;
+        response.context_menu(|ui| node_menu(ui, index, self.menu, &mut action));
+        self.outcome.action = self.outcome.action.or(action);
         if response.dnd_hover_payload::<ImageDrop>().is_some() {
             painter.rect_stroke(
                 rect,
@@ -294,13 +349,66 @@ impl<'scene> TreeView<'scene> {
             );
         }
         if let Some(image) = response.dnd_release_payload::<ImageDrop>() {
-            self.dropped = Some((index, image));
+            self.outcome.dropped = Some((index, image));
         }
         if selected && self.state.reveal {
             response.scroll_to_me(Some(egui::Align::Center));
         }
         toggled
     }
+}
+
+/// The menu of a node's row: create a child, duplicate it or delete it.
+/// The root can be neither duplicated nor deleted.
+fn node_menu(
+    ui: &mut egui::Ui,
+    index: usize,
+    menu: MenuContext<'_>,
+    action: &mut Option<TreeAction>,
+) {
+    let texts = texts::current();
+    create_menu(ui, index, menu, action);
+    ui.separator();
+    let is_root = index == ROOT;
+    let duplicate = egui::Button::new(texts.duplicate).shortcut_text(DUPLICATE_SHORTCUT);
+    if ui
+        .add_enabled(!is_root, duplicate)
+        .on_disabled_hover_text(texts.root_cannot_be_duplicated)
+        .clicked()
+    {
+        *action = Some(TreeAction::Duplicate(index));
+    }
+    let delete = egui::Button::new(texts.delete).shortcut_text(DELETE_SHORTCUT);
+    if ui
+        .add_enabled(!is_root, delete)
+        .on_disabled_hover_text(texts.root_cannot_be_deleted)
+        .clicked()
+    {
+        *action = Some(TreeAction::Delete(index));
+    }
+}
+
+/// “Create”, with the templates of the project's kind, to add under
+/// `parent`.
+fn create_menu(
+    ui: &mut egui::Ui,
+    parent: usize,
+    menu: MenuContext<'_>,
+    action: &mut Option<TreeAction>,
+) {
+    let texts = texts::current();
+    ui.menu_button(texts.create, |ui| {
+        for &template in NodeTemplate::of(menu.dimension) {
+            let available = template.is_available(menu.images);
+            if ui
+                .add_enabled(available, egui::Button::new(template.label()))
+                .on_disabled_hover_text(texts.no_images_hint)
+                .clicked()
+            {
+                *action = Some(TreeAction::Create { parent, template });
+            }
+        }
+    });
 }
 
 /// Fills a row: the selection color if it is selected, a lighter one
@@ -529,7 +637,16 @@ mod tests {
         state.collapsed.insert("Level/Player".to_owned());
         let mut selected = Some(2);
 
-        TreeView::new(&nodes, &mut state, &mut selected).open_parents_of_selected();
+        TreeView::new(
+            &nodes,
+            &mut state,
+            &mut selected,
+            MenuContext {
+                dimension: ProjectDimension::TwoD,
+                images: &[],
+            },
+        )
+        .open_parents_of_selected();
 
         assert!(state.collapsed.is_empty());
     }

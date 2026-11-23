@@ -555,10 +555,14 @@ The **scene editor** (`scene_editor/`) opens one `.scene` file at a time
 in the “Scene” tab, read as a `SceneOutline` (the nodes as the file
 describes them, images named by path: nothing is loaded to show them).
 The “Scene” panel draws its tree from the parent each node names, every
-branch open at first, under two buttons: “Add node” (a child of the
-selected node, or of the root, named `Node`, `Node2`… among its siblings,
-placed in 2D or 3D as the project is) and “Delete node” (with its
-descendants; never the root). The tree (`tree_view.rs`) draws one row
+branch open at first. A right click on a row opens “Create” (a child of
+that node from a template of the project's kind: an empty node or a
+sprite of the first image in 2D; an empty node, a cube, a sphere, a
+plane, a directional or a point light in 3D; named after the template,
+`Cube`, `Cube2`… among its siblings), “Duplicate” (`Ctrl+D`: the node
+and its descendants, under the same parent) and “Delete” (`Delete`: with
+its descendants); the root can be neither duplicated nor deleted. A right
+click under the rows creates under the root. The tree (`tree_view.rs`) draws one row
 per node across the panel, striped, with guides down to the children, an
 arrow to close and open them (closed nodes are kept by path, so they stay
 closed while others come and go), an icon for what the node shows most

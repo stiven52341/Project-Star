@@ -1,6 +1,6 @@
 //! The scene editor: a `.scene` file of the assets folder, open in the
-//! “Scene” tab. The “Scene” panel shows its nodes as a tree, with buttons
-//! to add and delete nodes, and the inspector edits the node selected in
+//! “Scene” tab. The “Scene” panel shows its nodes as a tree, whose menus
+//! create, duplicate and delete nodes, and the inspector edits the node selected in
 //! it. Changes are kept until the scene is saved.
 
 mod components;
@@ -18,8 +18,9 @@ use std::path::{Path, PathBuf};
 
 use eframe::egui;
 use star_engine::prelude::{Frame, SceneOutline, Vec3};
+use star_engine::star_scene::NodeOutline;
 
-use self::components::new_node;
+use self::components::NodeTemplate;
 pub(crate) use self::drawing::{Marks, SceneGpu, cross_lines, cube_lines, square_lines};
 pub(crate) use self::dropping::ImageDrop;
 pub(crate) use self::gizmo::{
@@ -27,7 +28,7 @@ pub(crate) use self::gizmo::{
 };
 pub(crate) use self::picking::Ray;
 use self::properties::{NodeContext, edit_node};
-use self::tree_view::{TreeState, TreeView};
+use self::tree_view::{MenuContext, TreeAction, TreeState, TreeView};
 use crate::project::ProjectDimension;
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -213,28 +214,68 @@ impl SceneDocument {
 
     /// The tree of its nodes, where the user selects one, with buttons to
     /// add a node and delete the one selected.
-    pub(crate) fn show_tree(&mut self, ui: &mut egui::Ui) {
+    pub(crate) fn show_tree(&mut self, ui: &mut egui::Ui, images: &[String]) {
         if let Some(error) = &self.save_error {
             ui.colored_label(ERROR_COLOR, error);
         }
-        let outline = match &mut self.content {
+        let outline = match &self.content {
             Ok(outline) => outline,
             Err(error) => {
                 ui.colored_label(ERROR_COLOR, texts::current().scene_unreadable(error));
                 return;
             }
         };
+        let menu = MenuContext {
+            dimension: self.dimension,
+            images,
+        };
+        let outcome =
+            TreeView::new(outline.nodes(), &mut self.tree, &mut self.selected, menu).show(ui);
+        if let Some(action) = outcome.action.or_else(|| self.action_from_keys(ui)) {
+            self.change_tree(action, images);
+        }
+        if let Some((parent, image)) = outcome.dropped {
+            self.add_image(&image, parent, None);
+        }
+    }
+
+    /// `Delete` deletes the node selected and `Ctrl+D` duplicates it,
+    /// while the pointer is over the tree and no text is being typed.
+    fn action_from_keys(&self, ui: &egui::Ui) -> Option<TreeAction> {
+        if !ui.ui_contains_pointer() || ui.ctx().egui_wants_keyboard_input() {
+            return None;
+        }
+        let selected = self.selected.filter(|&selected| selected != ROOT)?;
+        ui.input(|input| {
+            if input.key_pressed(egui::Key::Delete) {
+                Some(TreeAction::Delete(selected))
+            } else if input.modifiers.command && input.key_pressed(egui::Key::D) {
+                Some(TreeAction::Duplicate(selected))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Does what the user asked of the tree, making images of `images`
+    /// available to new sprites.
+    fn change_tree(&mut self, action: TreeAction, images: &[String]) {
+        let Ok(outline) = &mut self.content else {
+            return;
+        };
         let mut editor = TreeEditor {
             outline,
             selected: &mut self.selected,
             dimension: self.dimension,
         };
-        self.unsaved |= editor.show_buttons(ui);
-        ui.separator();
-        let dropped =
-            TreeView::new(editor.outline.nodes(), &mut self.tree, editor.selected).show(ui);
-        if let Some((parent, image)) = dropped {
-            self.add_image(&image, parent, None);
+        let changed = match action {
+            TreeAction::Create { parent, template } => editor.add_child(parent, template, images),
+            TreeAction::Duplicate(index) => editor.duplicate(index),
+            TreeAction::Delete(index) => editor.delete(index),
+        };
+        if changed {
+            self.unsaved = true;
+            self.tree.reveal_selected();
         }
     }
 
@@ -269,36 +310,11 @@ struct TreeEditor<'scene> {
 }
 
 impl TreeEditor<'_> {
-    /// “Add node” and “Delete node”. Returns whether the tree changed.
-    fn show_buttons(&mut self, ui: &mut egui::Ui) -> bool {
-        let texts = texts::current();
-        let mut changed = false;
-        ui.horizontal(|ui| {
-            if ui
-                .button(texts.add_node)
-                .on_hover_text(texts.add_child_node_hint)
-                .clicked()
-            {
-                changed |= self.add_child(self.selected.unwrap_or(ROOT));
-            }
-            let deletable = self.selected.is_some_and(|selected| selected != ROOT);
-            let delete = ui
-                .add_enabled(deletable, egui::Button::new(texts.delete_node))
-                .on_disabled_hover_text(texts.root_cannot_be_deleted);
-            if delete.clicked() {
-                changed |= self.delete_selected();
-            }
-        });
-        changed
-    }
-
-    /// Adds a node under `parent` and selects it.
-    fn add_child(&mut self, parent: usize) -> bool {
-        let name = unique_child_name(self.outline, parent, texts::current().new_node_name);
-        match self
-            .outline
-            .add_node(parent, new_node(name, self.dimension))
-        {
+    /// Adds a node of `template` under `parent` and selects it.
+    fn add_child(&mut self, parent: usize, template: NodeTemplate, images: &[String]) -> bool {
+        let name = unique_child_name(self.outline, parent, template.node_name());
+        let node = template.build(name, self.dimension, images);
+        match self.outline.add_node(parent, node) {
             Ok(index) => {
                 *self.selected = Some(index);
                 true
@@ -310,18 +326,52 @@ impl TreeEditor<'_> {
         }
     }
 
-    /// Deletes the node selected with its descendants, and selects its
-    /// parent.
-    fn delete_selected(&mut self) -> bool {
-        let Some(selected) = *self.selected else {
+    /// Copies the node at `index` with its descendants under the same
+    /// parent, with a free name, and selects the copy.
+    fn duplicate(&mut self, index: usize) -> bool {
+        let nodes = self.outline.nodes();
+        let Some(parent) = nodes.get(index).and_then(|node| node.parent) else {
             return false;
         };
-        let parent = self
-            .outline
-            .nodes()
-            .get(selected)
-            .and_then(|node| node.parent);
-        match self.outline.remove_node(selected) {
+        let originals = subtree(nodes, index);
+        let copies: Vec<_> = originals
+            .iter()
+            .filter_map(|&original| nodes.get(original).cloned())
+            .collect();
+        // Where each original's copy went, to place the copies' children.
+        let mut placed: Vec<(usize, usize)> = Vec::with_capacity(copies.len());
+        for (original, mut copy) in originals.into_iter().zip(copies) {
+            let copy_parent = if original == index {
+                copy.name = unique_child_name(self.outline, parent, &copy.name);
+                Some(parent)
+            } else {
+                copy.parent.and_then(|old_parent| {
+                    placed
+                        .iter()
+                        .find(|(old, _)| *old == old_parent)
+                        .map(|(_, new)| *new)
+                })
+            };
+            let Some(copy_parent) = copy_parent else {
+                continue;
+            };
+            match self.outline.add_node(copy_parent, copy) {
+                Ok(new) => placed.push((original, new)),
+                Err(error) => log::warn!("{error}"),
+            }
+        }
+        let Some(&(_, copy)) = placed.first() else {
+            return false;
+        };
+        *self.selected = Some(copy);
+        true
+    }
+
+    /// Deletes the node at `index` with its descendants, and selects its
+    /// parent.
+    fn delete(&mut self, index: usize) -> bool {
+        let parent = self.outline.nodes().get(index).and_then(|node| node.parent);
+        match self.outline.remove_node(index) {
             Ok(()) => {
                 // Nodes before the one removed keep their place.
                 *self.selected = parent;
@@ -333,6 +383,17 @@ impl TreeEditor<'_> {
             }
         }
     }
+}
+
+/// The node at `index` and its descendants, parents first.
+fn subtree(nodes: &[NodeOutline], index: usize) -> Vec<usize> {
+    let mut inside = vec![index];
+    for (position, node) in nodes.iter().enumerate().skip(index + 1) {
+        if node.parent.is_some_and(|parent| inside.contains(&parent)) {
+            inside.push(position);
+        }
+    }
+    inside
 }
 
 /// `base`, or `base2`, `base3`… : the first that no child of `parent` has.
@@ -414,8 +475,8 @@ mod tests {
         let (_assets, mut scene) = open_level("scene_document_add");
         let mut editor = tree_editor(&mut scene);
 
-        assert!(editor.add_child(ROOT));
-        assert!(editor.add_child(ROOT));
+        assert!(editor.add_child(ROOT, NodeTemplate::Empty, &[]));
+        assert!(editor.add_child(ROOT, NodeTemplate::Empty, &[]));
 
         let names: Vec<_> = editor
             .outline
@@ -431,18 +492,43 @@ mod tests {
     fn deleting_a_node_selects_its_parent() {
         let (_assets, mut scene) = open_level("scene_document_delete");
         let mut editor = tree_editor(&mut scene);
-        editor.add_child(ROOT);
+        editor.add_child(ROOT, NodeTemplate::Empty, &[]);
 
-        assert!(editor.delete_selected());
+        assert!(editor.delete(1));
 
         assert_eq!(editor.outline.nodes().len(), 1);
         assert_eq!(scene.selected, Some(ROOT));
     }
 
     #[test]
+    fn duplicates_copy_the_descendants_under_the_same_parent() {
+        let (_assets, mut scene) = open_level("scene_document_duplicate");
+        let mut editor = tree_editor(&mut scene);
+        editor.add_child(ROOT, NodeTemplate::Empty, &[]);
+        editor.add_child(1, NodeTemplate::Sprite, &["hero.png".to_owned()]);
+
+        assert!(editor.duplicate(1));
+
+        let nodes = editor.outline.nodes();
+        let names: Vec<_> = nodes.iter().map(|node| node.name.as_str()).collect();
+        assert_eq!(names, ["One", "Node", "Sprite", "Node2", "Sprite"]);
+        assert_eq!(nodes[3].parent, Some(ROOT));
+        assert_eq!(nodes[4].parent, Some(3));
+        assert!(nodes[4].sprite.is_some());
+        assert_eq!(scene.selected, Some(3));
+    }
+
+    #[test]
+    fn the_root_is_never_duplicated() {
+        let (_assets, mut scene) = open_level("scene_document_duplicate_root");
+
+        assert!(!tree_editor(&mut scene).duplicate(ROOT));
+    }
+
+    #[test]
     fn saving_writes_the_changes_and_clears_the_mark() {
         let (assets, mut scene) = open_level("scene_document_save");
-        tree_editor(&mut scene).add_child(ROOT);
+        tree_editor(&mut scene).add_child(ROOT, NodeTemplate::Empty, &[]);
         scene.unsaved = true;
 
         assert!(scene.save());

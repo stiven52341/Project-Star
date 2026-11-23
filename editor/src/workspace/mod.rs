@@ -402,7 +402,7 @@ impl EditorWindow {
         ui.strong(texts::current().hierarchy);
         ui.separator();
         match self.documents.scene_mut() {
-            Some(scene) => scene.show_tree(ui),
+            Some(scene) => scene.show_tree(ui, self.assets.images()),
             None => {
                 ui.weak(texts::current().no_scene_open);
             }
