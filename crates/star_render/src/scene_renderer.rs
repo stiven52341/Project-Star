@@ -8,9 +8,10 @@ use crate::mesh::{GpuMesh, Topology, primitive_vertex_count};
 use crate::mesh_pipeline::MeshPipeline;
 use crate::sprite_pipeline::SpritePipeline;
 use crate::store::Store;
+use crate::surface_pipeline::{GpuSurfaceMesh, SurfacePipeline, SurfaceUniforms};
 use crate::texture::{GpuTexture, TextureBindings};
 use crate::vertex::encode_vertices;
-use crate::{Color, Frame, Image, MeshId, TextureFilter, TextureId, Vertex};
+use crate::{Color, Frame, Image, Mesh3dId, MeshData, MeshId, TextureFilter, TextureId, Vertex};
 
 /// GPU resources shared by every render target: device, pipelines, meshes
 /// and textures.
@@ -20,9 +21,11 @@ pub(crate) struct SceneRenderer {
     target_format: wgpu::TextureFormat,
     depth_buffer: DepthBuffer,
     mesh_pipeline: MeshPipeline,
+    surface_pipeline: SurfacePipeline,
     sprite_pipeline: SpritePipeline,
     texture_bindings: TextureBindings,
     meshes: Store<GpuMesh>,
+    surface_meshes: Store<GpuSurfaceMesh>,
     textures: Store<GpuTexture>,
 }
 
@@ -39,9 +42,11 @@ impl SceneRenderer {
         Self {
             depth_buffer: DepthBuffer::new(&device, width, height),
             mesh_pipeline: MeshPipeline::new(&device, target_format),
+            surface_pipeline: SurfacePipeline::new(&device, target_format),
             sprite_pipeline: SpritePipeline::new(&device, target_format, texture_bindings.layout()),
             texture_bindings,
             meshes: Store::default(),
+            surface_meshes: Store::default(),
             textures: Store::default(),
             device,
             queue,
@@ -82,6 +87,12 @@ impl SceneRenderer {
             vertex_count,
             topology,
         })))
+    }
+
+    /// Uploads the 3D `mesh` to the GPU.
+    pub(crate) fn create_mesh_3d(&mut self, mesh: &MeshData) -> EngineResult<Mesh3dId> {
+        let uploaded = GpuSurfaceMesh::upload(&self.device, mesh)?;
+        Ok(Mesh3dId(self.surface_meshes.insert(uploaded)))
     }
 
     /// Uploads `image` to the GPU, to be drawn with `filter`.
@@ -134,6 +145,13 @@ impl SceneRenderer {
                 .map(|draw| view_projection * draw.transform),
         )?;
         let target_format = self.target_format;
+        self.surface_pipeline.upload_draws(
+            &self.queue,
+            frame.surfaces().iter().map(|draw| SurfaceUniforms {
+                model_view_projection: view_projection * draw.transform,
+                base_color: draw.material.base_color.in_target_space(target_format),
+            }),
+        )?;
         self.sprite_pipeline.prepare(
             &self.device,
             &self.queue,
@@ -163,6 +181,10 @@ impl SceneRenderer {
             });
         {
             let mut pass = self.begin_main_pass(&mut encoder, target, frame.clear_color());
+            for (slot, draw) in (0..).zip(frame.surfaces()) {
+                let mesh = self.mesh_3d(draw.mesh)?;
+                self.surface_pipeline.draw(&mut pass, slot, mesh);
+            }
             for (slot, draw) in (0..).zip(frame.draws()) {
                 let mesh = self.mesh(draw.mesh)?;
                 self.mesh_pipeline.draw(&mut pass, slot, mesh);
@@ -178,6 +200,12 @@ impl SceneRenderer {
         self.meshes
             .get(id.0)
             .ok_or_else(|| EngineError::Rendering(format!("unknown mesh {id:?}")))
+    }
+
+    fn mesh_3d(&self, id: Mesh3dId) -> EngineResult<&GpuSurfaceMesh> {
+        self.surface_meshes
+            .get(id.0)
+            .ok_or_else(|| EngineError::Rendering(format!("unknown 3D mesh {id:?}")))
     }
 
     fn texture(&self, id: TextureId) -> EngineResult<&GpuTexture> {

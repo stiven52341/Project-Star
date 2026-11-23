@@ -3,10 +3,12 @@
 //! Ignored by default, since CI machines may have no GPU; run them with
 //! `cargo test -p star_render -- --ignored`.
 
-use star_math::Vec2;
+use std::f32::consts::FRAC_PI_2;
+
+use star_math::{Mat4, Vec2, Vec3};
 
 use crate::scene_renderer::SceneRenderer;
-use crate::{Camera, Color, Frame, Image, Sprite, TextureFilter, TextureId};
+use crate::{Camera, Color, Frame, Image, Material, MeshData, Sprite, TextureFilter, TextureId};
 
 /// Width and height of the target, in pixels.
 const SIZE: u32 = 8;
@@ -62,10 +64,15 @@ impl Gpu {
         for sprite in sprites {
             frame.draw_sprite(*sprite);
         }
+        self.render(&frame)
+    }
+
+    /// Draws `frame` and returns the pixels of the target, row by row.
+    fn render(&mut self, frame: &Frame) -> Vec<[u8; 4]> {
         let view = self
             .target
             .create_view(&wgpu::TextureViewDescriptor::default());
-        self.scene.render(&view, 1.0, &frame).unwrap();
+        self.scene.render(&view, 1.0, frame).unwrap();
         self.read_target()
     }
 
@@ -217,4 +224,54 @@ fn unknown_textures_are_an_error() {
         .create_view(&wgpu::TextureViewDescriptor::default());
 
     assert!(gpu.scene.render(&view, 1.0, &frame).is_err());
+}
+
+const BLACK: [u8; 4] = [0, 0, 0, 255];
+
+/// A frame that looks at the origin from 5 units away along z.
+fn frame_3d() -> Frame {
+    let mut frame = Frame::new();
+    frame.set_camera(Camera::new_3d(Vec3::new(0.0, 0.0, 5.0), Vec3::ZERO));
+    frame
+}
+
+#[test]
+#[ignore = "needs a GPU"]
+fn meshes_3d_show_their_material() {
+    let mut gpu = Gpu::new();
+    let cube = gpu
+        .scene
+        .create_mesh_3d(&MeshData::cube(Vec3::ONE).unwrap())
+        .unwrap();
+    let mut frame = frame_3d();
+    frame.draw_mesh_3d(
+        cube,
+        Material::new(Color::rgb(1.0, 0.0, 0.0)),
+        Mat4::from_rotation_y(0.5),
+    );
+
+    let pixels = gpu.render(&frame);
+
+    assert_eq!(pixel(&pixels, SIZE / 2, SIZE / 2), RED);
+    assert_eq!(pixel(&pixels, 0, 0), BLACK);
+}
+
+#[test]
+#[ignore = "needs a GPU"]
+fn the_back_of_3d_meshes_is_not_drawn() {
+    let mut gpu = Gpu::new();
+    let plane = gpu
+        .scene
+        .create_mesh_3d(&MeshData::plane(Vec2::new(2.0, 2.0)).unwrap())
+        .unwrap();
+    let green = Material::new(Color::rgb(0.0, 1.0, 0.0));
+    let mut center = |turn: f32| {
+        let mut frame = frame_3d();
+        frame.draw_mesh_3d(plane, green, Mat4::from_rotation_x(turn));
+        pixel(&gpu.render(&frame), SIZE / 2, SIZE / 2)
+    };
+
+    // Turned to face the camera, then away from it.
+    assert_eq!(center(FRAC_PI_2), GREEN);
+    assert_eq!(center(-FRAC_PI_2), BLACK);
 }

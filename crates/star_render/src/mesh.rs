@@ -27,6 +27,13 @@ impl Topology {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MeshId(pub(crate) usize);
 
+/// Handle to a 3D mesh uploaded with
+/// [`Renderer::create_mesh_3d`](crate::Renderer::create_mesh_3d).
+///
+/// Only valid for the renderer that created it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Mesh3dId(pub(crate) usize);
+
 /// Vertex buffer of a mesh, ready to be drawn.
 pub(crate) struct GpuMesh {
     pub(crate) vertex_buffer: wgpu::Buffer,

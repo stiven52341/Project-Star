@@ -17,8 +17,8 @@ pub use star_physics::{
 };
 pub use star_platform::TargetPlatform;
 pub use star_render::{
-    Camera, Color, Frame, GraphicsBackend, Image, MeshId, Projection, Sprite, TextureFilter,
-    TextureId, TextureRegion, Vertex,
+    Camera, Color, Frame, GraphicsBackend, Image, Material, Mesh3dId, MeshData, MeshId, MeshVertex,
+    Projection, Sprite, TextureFilter, TextureId, TextureRegion, Vertex,
 };
 pub use star_scene::{
     Body2D, Children, GlobalTransform2D, Hierarchy, Name, NodeContact, Parent, PhysicsNodes, Scene,

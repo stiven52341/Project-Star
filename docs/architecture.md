@@ -372,6 +372,17 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
 - `SceneRenderer` (internal) draws a `Frame` into any target; `Renderer`
   (window) and `interop::OffscreenRenderer` (texture, for the editor) use it.
 - Triangle meshes (`create_mesh`) and line meshes (`create_lines`).
+- **3D meshes** (`MeshData`) share their corners between triangles through
+  `u32` indices, and each corner (`MeshVertex`) has a position, a normal
+  and texture coordinates. `MeshData::new` checks whole triangles, indices
+  that exist and finite numbers; `cube`, `plane` (facing up) and `sphere`
+  (segments and rings, 3 to 1024 and 2 to 1024) build primitives with
+  outward normals. `GameContext::create_mesh_3d` uploads one and gives a
+  `Mesh3dId`; `Frame::draw_mesh_3d(mesh, Material, transform)` draws it.
+  Their triangles are counterclockwise seen from the side they show, and
+  the other side is not drawn (back-face culling), so closed meshes cost
+  half. They are drawn before colored meshes and sprites. A `Material` has
+  a base color for now (step 9a); lights and PBR come with 9b.
 - Each draw has its transform (projection·view·model) in a slot of a single
   uniform buffer with a dynamic offset: it works on every backend, OpenGL
   included, and uploads all the matrices of the frame in a single copy.

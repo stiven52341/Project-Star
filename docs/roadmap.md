@@ -70,8 +70,16 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `body` field of nodes (`Body.circle`, `rectangle`, `capsule`), with
         their surface, velocity, `apply_impulse` and the nodes they touch;
         bodies in scenes loaded by scripts.
-- [ ] **Phase 9 — 3D rendering**: materials, lights, indexed meshes. (`Mat4`
-      and a perspective camera already exist.)
+- [ ] **Phase 9 — 3D rendering**:
+  - [x] 9a Indexed 3D meshes (`MeshData`: positions, normals, texture
+        coordinates), primitives (cube, plane, sphere), uploaded with
+        `GameContext::create_mesh_3d` and drawn with a `Material` (base
+        color) by `Frame::draw_mesh_3d`, with back-face culling.
+  - [ ] 9b PBR materials (metallic-roughness, base color texture) and
+        lights: ambient, directional and point lights.
+  - [ ] 9c Example `scene_3d`.
+  - [ ] 9d 3D nodes: `Transform3D` (with quaternions) and mesh nodes, in
+        the engine and in `.scene` files.
 - [ ] **Phase 10 — 3D physics**.
 - [ ] **Phase 11 — Mobile**: Android and iOS packaging.
 - [ ] **Phase 12 — Visual editor** (egui):

@@ -124,7 +124,7 @@ impl MeshPipeline {
 }
 
 /// Smallest multiple of `alignment` that fits `size` bytes.
-fn slot_stride(size: u32, alignment: u32) -> u32 {
+pub(crate) fn slot_stride(size: u32, alignment: u32) -> u32 {
     size.next_multiple_of(alignment)
 }
 

@@ -2,12 +2,20 @@
 
 use star_math::Mat4;
 
-use crate::{Camera, Color, MeshId, Sprite};
+use crate::{Camera, Color, Material, Mesh3dId, MeshId, Sprite};
 
 /// One mesh to draw, placed in the world by `transform`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct DrawCommand {
     pub(crate) mesh: MeshId,
+    pub(crate) transform: Mat4,
+}
+
+/// One 3D mesh to draw with a material, placed in the world by `transform`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct SurfaceDraw {
+    pub(crate) mesh: Mesh3dId,
+    pub(crate) material: Material,
     pub(crate) transform: Mat4,
 }
 
@@ -20,6 +28,7 @@ pub struct Frame {
     clear_color: Color,
     camera: Camera,
     draws: Vec<DrawCommand>,
+    surfaces: Vec<SurfaceDraw>,
     sprites: Vec<Sprite>,
 }
 
@@ -35,6 +44,7 @@ impl Frame {
     pub fn begin(&mut self, clear_color: Color) {
         self.clear_color = clear_color;
         self.draws.clear();
+        self.surfaces.clear();
         self.sprites.clear();
     }
 
@@ -51,6 +61,17 @@ impl Frame {
     /// Draws `mesh` placed in the world by `transform` (position, rotation, scale).
     pub fn draw(&mut self, mesh: MeshId, transform: Mat4) {
         self.draws.push(DrawCommand { mesh, transform });
+    }
+
+    /// Draws the 3D `mesh` with `material`, placed in the world by
+    /// `transform`. 3D meshes are drawn first, then colored meshes, then
+    /// sprites.
+    pub fn draw_mesh_3d(&mut self, mesh: Mesh3dId, material: Material, transform: Mat4) {
+        self.surfaces.push(SurfaceDraw {
+            mesh,
+            material,
+            transform,
+        });
     }
 
     /// Draws `sprite`. Sprites are drawn after the meshes, by layer and, in
@@ -79,6 +100,12 @@ impl Frame {
         self.draws.len()
     }
 
+    /// Number of 3D meshes drawn in this frame.
+    #[must_use]
+    pub fn mesh_3d_count(&self) -> usize {
+        self.surfaces.len()
+    }
+
     /// Number of sprites drawn in this frame.
     #[must_use]
     pub fn sprite_count(&self) -> usize {
@@ -87,6 +114,10 @@ impl Frame {
 
     pub(crate) fn draws(&self) -> &[DrawCommand] {
         &self.draws
+    }
+
+    pub(crate) fn surfaces(&self) -> &[SurfaceDraw] {
+        &self.surfaces
     }
 
     /// The sprites drawn in this frame, in the order they were added.
@@ -134,11 +165,13 @@ mod tests {
     fn begin_discards_previous_draws_and_sets_background() {
         let mut frame = Frame::new();
         frame.draw(any_mesh_id(), Mat4::IDENTITY);
+        frame.draw_mesh_3d(Mesh3dId(0), Material::default(), Mat4::IDENTITY);
         frame.draw_sprite(any_sprite());
 
         frame.begin(Color::WHITE);
 
         assert_eq!(frame.draw_count(), 0);
+        assert_eq!(frame.mesh_3d_count(), 0);
         assert_eq!(frame.sprite_count(), 0);
         assert_eq!(frame.clear_color(), Color::WHITE);
     }

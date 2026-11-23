@@ -5,7 +5,10 @@ use star_platform::{Window, WindowSize};
 
 use crate::mesh::Topology;
 use crate::scene_renderer::SceneRenderer;
-use crate::{Frame, GpuInfo, GraphicsBackend, Image, MeshId, TextureFilter, TextureId, Vertex};
+use crate::{
+    Frame, GpuInfo, GraphicsBackend, Image, Mesh3dId, MeshData, MeshId, TextureFilter, TextureId,
+    Vertex,
+};
 
 /// Settings that control how the renderer is created.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,6 +100,17 @@ impl Renderer {
     /// Returns [`EngineError::Rendering`] if `vertices` is empty or odd.
     pub fn create_lines(&mut self, vertices: &[Vertex]) -> EngineResult<MeshId> {
         self.scene.create_mesh(vertices, Topology::Lines)
+    }
+
+    /// Uploads a 3D mesh to the GPU, to be drawn with
+    /// [`Frame::draw_mesh_3d`](crate::Frame::draw_mesh_3d).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::CapacityExceeded`](star_core::EngineError::CapacityExceeded)
+    /// if the mesh has more indices than the GPU can count.
+    pub fn create_mesh_3d(&mut self, mesh: &MeshData) -> EngineResult<Mesh3dId> {
+        self.scene.create_mesh_3d(mesh)
     }
 
     /// Uploads `image` to the GPU, to be drawn with `filter`.

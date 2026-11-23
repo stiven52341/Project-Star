@@ -5,7 +5,9 @@ use std::sync::Arc;
 use star_assets::AssetFolder;
 use star_core::{EngineResult, Sound};
 use star_ecs::World;
-use star_render::{Frame, Image, MeshId, Renderer, TextureFilter, TextureId, Vertex};
+use star_render::{
+    Frame, Image, Mesh3dId, MeshData, MeshId, Renderer, TextureFilter, TextureId, Vertex,
+};
 use star_scene::Scene;
 
 use crate::game_assets::GameAssets;
@@ -80,6 +82,16 @@ impl<'a> GameContext<'a> {
     /// Returns an error if `vertices` is empty or not a multiple of 3.
     pub fn create_mesh(&mut self, vertices: &[Vertex]) -> EngineResult<MeshId> {
         self.renderer.create_mesh(vertices)
+    }
+
+    /// Uploads a 3D mesh to the GPU, to be drawn with
+    /// [`Frame::draw_mesh_3d`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the mesh has more indices than the GPU can count.
+    pub fn create_mesh_3d(&mut self, mesh: &MeshData) -> EngineResult<Mesh3dId> {
+        self.renderer.create_mesh_3d(mesh)
     }
 
     /// Uploads line segments to the GPU: every 2 vertices form a segment.
