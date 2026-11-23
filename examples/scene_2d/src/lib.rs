@@ -16,6 +16,8 @@ use std::f32::consts::TAU;
 
 use star_engine::prelude::*;
 
+/// The example's assets, found wherever it is run from.
+const ASSET_FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets");
 const SOLAR_SYSTEM: &str = "scenes/solar_system.scene";
 const BACKGROUND: Color = Color::rgb(0.02, 0.02, 0.06);
 /// World units visible from the bottom to the top of the window.
@@ -122,23 +124,22 @@ fn spin(world: &mut World) -> EngineResult<()> {
     })
 }
 
-/// Runs the scene with the default backend and assets: on Android, those
-/// packaged in its APK.
+/// Runs the scene with the default backend.
 ///
 /// # Errors
 ///
 /// Returns an error if the actions are invalid or the engine cannot run.
 pub fn run() -> Result<(), Box<dyn Error>> {
-    run_with(GraphicsBackend::Auto, None)
+    run_with(GraphicsBackend::Auto)
 }
 
-/// Runs the scene with `backend`, reading its assets from the folder
-/// `assets` if given, or else from the default place.
+/// Runs the scene with `backend`, reading its assets from the example's
+/// folder (on Android, from its APK).
 ///
 /// # Errors
 ///
 /// Returns an error if the actions are invalid or the engine cannot run.
-pub fn run_with(backend: GraphicsBackend, assets: Option<&str>) -> Result<(), Box<dyn Error>> {
+pub fn run_with(backend: GraphicsBackend) -> Result<(), Box<dyn Error>> {
     let mut actions = ActionMap::new();
     actions.add(
         ADD_SYSTEM,
@@ -150,16 +151,14 @@ pub fn run_with(backend: GraphicsBackend, assets: Option<&str>) -> Result<(), Bo
         ],
     )?;
 
-    let mut app = App::new()
+    App::new()
         .with_title(format!("Scene 2D — {backend}"))
         .with_actions(actions)
+        .with_development_assets(ASSET_FOLDER)
         .with_system(Stage::Update, spin)
         .with_graphics_backend(backend)
-        .with_clear_color(BACKGROUND);
-    if let Some(folder) = assets {
-        app = app.with_asset_folder(folder);
-    }
-    app.run_game(SceneDemo::default())?;
+        .with_clear_color(BACKGROUND)
+        .run_game(SceneDemo::default())?;
     Ok(())
 }
 

@@ -28,3 +28,40 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+
+  android:
+    name: android
+    runs-on: ubuntu-latest
+    env:
+      # The engine and the examples that run on Android (`android_main!`).
+      ANDROID_PACKAGES: >-
+        -p star_engine -p hello_star -p triangle_2d -p triangle_3d -p scene_2d
+        -p scene_3d -p sprites_2d -p sounds_2d -p physics_2d -p physics_3d
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: aarch64-linux-android, x86_64-linux-android
+      # The runner has the Android SDK and NDK; C code (audio) is compiled
+      # and the libraries linked with the NDK's clang.
+      - name: Use the NDK's compilers
+        run: |
+          tools="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for target in aarch64-linux-android x86_64-linux-android; do
+            env_name="${target//-/_}"
+            upper="${env_name^^}"
+            {
+              echo "CC_${env_name}=$tools/${target}26-clang"
+              echo "AR_${env_name}=$tools/llvm-ar"
+              echo "CARGO_TARGET_${upper}_LINKER=$tools/${target}26-clang"
+            } >> "$GITHUB_ENV"
+          done
+          echo "ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+      - run: cargo clippy $ANDROID_PACKAGES --lib --target aarch64-linux-android -- -D warnings
+      # Packaging catches what compiling does not: the manifest, the assets
+      # and the signature of an APK.
+      - run: cargo install cargo-apk2 --locked
+      - name: Build an APK with assets
+        working-directory: examples/scene_2d
+        run: cargo apk2 build --lib

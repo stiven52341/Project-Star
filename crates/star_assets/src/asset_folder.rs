@@ -79,6 +79,13 @@ impl AssetFolder {
         Self::new(next_to_executable.unwrap_or_else(|| PathBuf::from(DEFAULT_ASSET_FOLDER)))
     }
 
+    /// Whether the assets are packaged with the game rather than in a
+    /// folder on disk.
+    #[must_use]
+    pub const fn is_packaged(&self) -> bool {
+        matches!(self.source, Source::Packaged(_))
+    }
+
     /// Where the folder is on disk; `None` for packaged assets.
     #[must_use]
     pub fn root(&self) -> Option<&Path> {
@@ -317,6 +324,7 @@ mod tests {
             "format = 1"
         );
         assert_eq!(folder.root(), None);
+        assert!(folder.is_packaged() && !AssetFolder::new("assets").is_packaged());
         assert_eq!(folder.file_of(&path("levels/one.scene")), None);
         let error = folder.read(&path("levels/two.scene")).unwrap_err();
         assert!(error.to_string().contains("package"), "{error}");

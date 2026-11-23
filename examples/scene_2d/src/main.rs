@@ -6,8 +6,6 @@ use std::process::ExitCode;
 use star_engine::prelude::GraphicsBackend;
 
 const DEFAULT_LOG_FILTER: &str = "info";
-/// The example's assets, found wherever it is run from.
-const ASSET_FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets");
 
 fn main() -> ExitCode {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(DEFAULT_LOG_FILTER))
@@ -27,5 +25,5 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some(name) => name.parse()?,
         None => GraphicsBackend::Auto,
     };
-    scene_2d::run_with(backend, Some(ASSET_FOLDER))
+    scene_2d::run_with(backend)
 }

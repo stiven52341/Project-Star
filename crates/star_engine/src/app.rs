@@ -113,6 +113,18 @@ impl App {
         self
     }
 
+    /// Reads the game's assets from the folder at `root` while it is
+    /// developed, but keeps the assets packaged with the game where the
+    /// system packages them (Android), since that folder is not there.
+    /// Examples use it to find their assets wherever they are run from.
+    #[must_use]
+    pub fn with_development_assets(mut self, root: impl Into<PathBuf>) -> Self {
+        if !self.assets.is_packaged() {
+            self.assets = AssetFolder::new(root);
+        }
+        self
+    }
+
     /// Enables or disables hot-reload: while the game runs, the textures
     /// loaded from files are updated when their files change. Enabled by
     /// default in debug builds, to see changes without restarting the game,
@@ -272,6 +284,16 @@ mod tests {
     #[test]
     fn builder_sets_the_asset_folder() {
         let app = App::new().with_asset_folder("my_game/assets");
+
+        assert_eq!(
+            app.asset_folder().root(),
+            Some(std::path::Path::new("my_game/assets"))
+        );
+    }
+
+    #[test]
+    fn development_assets_are_read_from_their_folder_off_android() {
+        let app = App::new().with_development_assets("my_game/assets");
 
         assert_eq!(
             app.asset_folder().root(),

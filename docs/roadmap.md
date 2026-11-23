@@ -102,7 +102,11 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         and used by `App` by default. `scene_2d` ships its scene and images
         in its APK (`assets = "assets"`) and adds systems with a tap; both
         tried on the emulator.
-  - [ ] 11c Android in CI, and the other examples as APKs.
+  - [x] 11c Android in CI (clippy of the engine and the examples for
+        `aarch64-linux-android`, and an APK of `scene_2d`), and every
+        example as an APK: a library with `android_main!` and a desktop
+        `main`. `App::with_development_assets` keeps the packaged assets
+        on Android; `physics_2d` and `sounds_2d` also answer taps.
   - [ ] 11d iOS (needs macOS and Xcode).
 - [ ] **Phase 12 — Visual editor** (egui):
   - [x] Project manager: new project (name, location, 2D/3D, platforms),
