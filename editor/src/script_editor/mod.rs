@@ -7,6 +7,7 @@ mod editing;
 mod find;
 mod find_bar;
 mod highlight;
+mod hover;
 mod mistakes;
 mod navigation;
 mod scope;
@@ -17,14 +18,13 @@ use std::path::{Path, PathBuf};
 
 use eframe::egui;
 use star_script::Position;
-use star_script::semantic::ClassTable;
 
-use self::code_view::CodeView;
 pub(crate) use self::code_view::Edited;
+use self::code_view::{CodeView, Known};
 pub(crate) use self::completion::CandidateKind;
 use self::mistakes::Mistake;
 use crate::project::ASSETS_DIRECTORY;
-use crate::project_check::Problem;
+use crate::project_check::{Problem, ProgramOutline};
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -111,14 +111,14 @@ impl ScriptTab {
     }
 
     /// Shows the text to edit, with the mistakes among `problems` that are
-    /// in it marked, and suggestions from the program's `classes`, if
-    /// known. Returns whether the user changed it, and the place of the
-    /// program they asked to go to.
+    /// in it marked, and suggestions and the types of names from the
+    /// `outline` of the program, if known. Returns whether the user changed
+    /// it, and the place of the program they asked to go to.
     pub(crate) fn show(
         &mut self,
         ui: &mut egui::Ui,
         problems: &[Problem],
-        classes: Option<&ClassTable>,
+        outline: Option<&ProgramOutline>,
     ) -> Edited {
         let texts = texts::current();
         let text = match &mut self.text {
@@ -143,7 +143,11 @@ impl ScriptTab {
             })
             .collect();
         let id = ui.make_persistent_id(("script", &self.path));
-        let edited = self.view.show(ui, text, id, &mistakes, classes);
+        let knows = Known {
+            classes: outline.map(|outline| &outline.classes),
+            locals: outline.and_then(|outline| outline.locals_of(&self.path)),
+        };
+        let edited = self.view.show(ui, text, id, &mistakes, knows);
         self.unsaved |= edited.changed;
         edited
     }

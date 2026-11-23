@@ -290,3 +290,26 @@ fn open_texts_are_checked_instead_of_their_files() {
         ["assets/rock.star:2:11: unexpected character `@`"]
     );
 }
+
+#[test]
+fn the_outline_knows_the_locals_of_each_script() {
+    let directory = project(
+        "check_locals",
+        &[
+            (MANIFEST_FILE_NAME, MANIFEST),
+            ("assets/demo.star", GAME),
+            ("assets/enemies/rock.star", ROCK),
+        ],
+    );
+
+    let check = check_project_with(directory.path(), &OpenTexts::new(), CheckGoal::Writing);
+
+    let outline = check.outline.expect("the program was read");
+    let delta = GAME.find("delta").expect("a parameter");
+    let local = outline
+        .locals_of("demo.star")
+        .and_then(|locals| locals.get(&delta))
+        .expect("the parameter is known");
+    assert_eq!(local.name, "delta");
+    assert_eq!(outline.classes.type_name(&local.ty), "float");
+}

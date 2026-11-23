@@ -13,9 +13,11 @@ use star_script::{Position, Span};
 use super::editing::{Action, Selection, apply};
 use super::find_bar::{FIND_SHORTCUT, FindBar, Found};
 use super::highlight::colored;
+use super::hover::{NameType, name_type_at};
 use super::mistakes::{Mark, Mistake, marks, paint_marks};
 use super::navigation::{Definition, definition_at};
 use super::suggestions::Suggestions;
+use crate::project_check::ScriptLocals;
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -49,18 +51,19 @@ impl CodeView {
         self.jump = Some(position);
     }
 
-    /// Shows `text` to edit, with `mistakes` marked on it and suggestions
-    /// from the program's `classes`, if known. Returns whether the user
-    /// changed it, and the place of the program to go to if they asked for
-    /// a definition in another part of it.
+    /// Shows `text` to edit, with `mistakes` marked on it, and suggestions
+    /// and the types of names from what the last check `knows`. Returns
+    /// whether the user changed it, and the place of the program to go to
+    /// if they asked for a definition in another part of it.
     pub(super) fn show(
         &mut self,
         ui: &mut egui::Ui,
         text: &mut String,
         id: egui::Id,
         mistakes: &[Mistake<'_>],
-        classes: Option<&ClassTable>,
+        knows: Known<'_>,
     ) -> Edited {
+        let Known { classes, locals } = knows;
         let font = egui::TextStyle::Monospace.resolve(ui.style());
         let mut scroll_to = self.jump.take().map(|position| {
             let index = char_index_of(text, position);
@@ -93,6 +96,7 @@ impl CodeView {
                     marks: &marks,
                     found: found.as_ref(),
                     classes,
+                    locals,
                 };
                 let lines = self.show_lines(ui, text, id, &shown);
                 changed |= lines.changed;
@@ -167,6 +171,7 @@ impl CodeView {
             marks,
             found,
             classes,
+            locals,
         } = *shown;
         let digits = digit_count(text.lines().count()).max(MIN_GUTTER_DIGITS);
         let digit_width = ui.fonts_mut(|fonts| fonts.glyph_width(font, '0'));
@@ -213,6 +218,11 @@ impl CodeView {
                 .kind(egui::PopupKind::Tooltip)
                 .at_pointer()
                 .show(|ui| ui.colored_label(ERROR_COLOR, message));
+        } else if let Some(name_type) = hovered_name_type(&output, text, classes, locals) {
+            let response: &egui::Response = &output.response;
+            response.clone().on_hover_ui_at_pointer(|ui| {
+                ui.monospace(name_type.description);
+            });
         }
         let cursor = cursor_while_writing(ui.ctx(), id);
         if let Some(completion) = self.suggestions.find(text, cursor, classes) {
@@ -241,6 +251,37 @@ impl CodeView {
             go_to,
         }
     }
+}
+
+/// What the last check that could read the program knows, for one script.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct Known<'known> {
+    /// The classes of the program and the engine.
+    pub(crate) classes: Option<&'known ClassTable>,
+    /// The local variables of the script.
+    pub(crate) locals: Option<&'known ScriptLocals>,
+}
+
+/// The type of the name under the pointer in the text laid out in
+/// `output`, if it is known.
+fn hovered_name_type(
+    output: &egui::text_edit::TextEditOutput,
+    text: &str,
+    classes: Option<&ClassTable>,
+    locals: Option<&ScriptLocals>,
+) -> Option<NameType> {
+    let pointer = output.response.hover_pos()?;
+    let cursor = output
+        .galley
+        .cursor_from_pos(pointer - output.galley_pos)
+        .index
+        .0;
+    let found = name_type_at(text, cursor, classes, locals)?;
+    // The cursor nearest the pointer may touch a name the pointer is not on,
+    // as past the end of a line.
+    text_areas(output, found.range.clone())
+        .any(|area| area.contains(pointer))
+        .then_some(found)
 }
 
 /// What the user did to the text.
@@ -285,6 +326,7 @@ struct Shown<'shown, 'message> {
     /// What the find bar found, if it is open.
     found: Option<&'shown Found>,
     classes: Option<&'shown ClassTable>,
+    locals: Option<&'shown ScriptLocals>,
 }
 
 /// Where the cursor of the text edit `id` is while it has the keyboard and
@@ -520,7 +562,7 @@ fn match_shapes(
             } else {
                 OTHER_MATCH_OPACITY
             };
-            match_areas(output, range.clone())
+            text_areas(output, range.clone())
                 .map(move |area| egui::Shape::rect_filled(area, 0.0, color.gamma_multiply(opacity)))
         })
         .collect();
@@ -529,7 +571,7 @@ fn match_shapes(
 
 /// The areas the characters `range` cover in the text laid out in
 /// `output`: one, or two when the row wraps inside them.
-fn match_areas(
+fn text_areas(
     output: &egui::text_edit::TextEditOutput,
     range: Range<usize>,
 ) -> impl Iterator<Item = egui::Rect> {

@@ -6,6 +6,8 @@
 //! compiler's lexer (which keeps going after mistakes) and the class table
 //! of the last check that could read the program are used.
 
+use std::ops::Range;
+
 use star_script::semantic::{ClassId, ClassTable, Type};
 use star_script::{Keyword, Token, TokenKind, scan};
 
@@ -18,6 +20,24 @@ pub(super) fn trailing_word(text: &str) -> &str {
         .last()
         .map_or(text.len(), |(index, _)| index);
     &text[start..]
+}
+
+/// The bytes of the name around the character `cursor` of `text` (before
+/// it, after it, or both), if there is one: numbers are not names.
+pub(super) fn name_around(text: &str, cursor: usize) -> Option<Range<usize>> {
+    let byte = text
+        .char_indices()
+        .nth(cursor)
+        .map_or(text.len(), |(byte, _)| byte);
+    let start = byte - trailing_word(&text[..byte]).len();
+    let end = byte
+        + text[byte..]
+            .find(|character: char| !is_name_character(character))
+            .unwrap_or(text.len() - byte);
+    let name = &text[start..end];
+    let is_name =
+        !name.is_empty() && !name.starts_with(|character: char| character.is_ascii_digit());
+    is_name.then_some(start..end)
 }
 
 pub(super) const fn is_name_character(character: char) -> bool {

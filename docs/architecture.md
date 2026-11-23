@@ -763,6 +763,20 @@ of the last check that could read the program, with their places
 that check read: a script opens with the cursor there; a blueprint opens
 (its StarScript is never shown). Names of the engine go nowhere.
 
+The type of the name under the pointer (`hover.rs`, tested): resting the
+pointer on a name shows a tooltip with its type written as code, unless a
+mistake is marked there (its message is shown instead). A variable,
+parameter or loop variable shows `turns: int`, even when its type is
+inferred: the live check keeps the locals of each script
+(`Analysis::declared_locals`, by the byte where each declaration writes its
+name, in `ProgramOutline`), and the editor finds the declaration in the
+text as “Go to definition” does and looks it up there, only if the name
+there is still the same (the text may be newer than the check); without
+it, the class the text writes for it (`rock: Rock`). A member shows the
+class that declares it: `Rock.size: int`, `Rock.roll(speed: float) ->
+bool`; a class, `class Rock extends Node`; `self` and `super`, their class.
+Names in comments and strings, numbers and unknown names show nothing.
+
 Find and replace (`find.rs`, the search itself, and `find_bar.rs`, the bar;
 both tested): `Ctrl+F` (`Cmd+F` on macOS) opens a bar over the code with
 the selected text, if it is one line. Matches are character ranges, found

@@ -211,7 +211,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.9f Find and replace in a script (`Ctrl+F`): the matches
           painted, the next and previous one, case, and replacing one
           or all.
-    - [ ] 13.9g The type of a name under the pointer.
+    - [x] 13.9g The type of a name under the pointer: variables (even
+          inferred), members with their class, and classes with their
+          base.
     - [ ] Known limits to improve: suggestions only follow chains of names
           (not `make().`), and do not list the methods of basic types
           (`"a".length()`) nor go into lists; while the list of

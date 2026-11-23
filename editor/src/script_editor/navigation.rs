@@ -6,7 +6,7 @@
 use star_script::Span;
 use star_script::semantic::{ClassId, ClassOrigin, ClassTable, MemberRef};
 
-use super::scope::{Scope, is_name_character, receiver_chain, trailing_word};
+use super::scope::{Scope, name_around, receiver_chain};
 
 /// Where a name is declared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,19 +25,9 @@ pub(super) fn definition_at(
     cursor: usize,
     classes: Option<&ClassTable>,
 ) -> Option<Definition> {
-    let byte = text
-        .char_indices()
-        .nth(cursor)
-        .map_or(text.len(), |(byte, _)| byte);
-    let start = byte - trailing_word(&text[..byte]).len();
-    let end = byte
-        + text[byte..]
-            .find(|character: char| !is_name_character(character))
-            .unwrap_or(text.len() - byte);
-    let name = &text[start..end];
-    if name.is_empty() || name.starts_with(|character: char| character.is_ascii_digit()) {
-        return None;
-    }
+    let range = name_around(text, cursor)?;
+    let name = &text[range.clone()];
+    let start = range.start;
     let before = &text[..start];
     let scope = Scope::of(before, classes);
     let in_text = |byte: usize| Definition::InText(text[..byte].chars().count());
@@ -87,6 +77,7 @@ mod tests {
     use star_script::{GameSettings, SourceSet, analyze_program_with};
 
     use super::*;
+    use crate::script_editor::scope::is_name_character;
 
     const ROCK: &str = "class Rock extends Node {\n  var size: int = 1\n  func roll(speed: float) {\n    var turns = 2\n    turns = size\n  }\n}\n";
     const GAME: &str = "class Demo {\n  func play(rock: Rock) {\n    rock.roll(1.0)\n    var other = Rock()\n  }\n}\n";

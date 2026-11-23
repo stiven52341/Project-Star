@@ -10,7 +10,6 @@ use std::time::{Duration, Instant};
 
 use eframe::egui;
 
-use star_script::semantic::ClassTable;
 use star_script::{Position, Span};
 
 use crate::project_check::{CheckWorker, OpenTexts, Problem, ProgramOutline};
@@ -47,10 +46,10 @@ impl LiveCheck {
         self.changed_at = Some(Instant::now());
     }
 
-    /// The classes of the program and the engine, as the last check that
-    /// could read them found them.
-    pub(super) fn classes(&self) -> Option<&ClassTable> {
-        self.outline.as_ref().map(|outline| &outline.classes)
+    /// What the program declares, as the last check that could read it
+    /// found it.
+    pub(super) const fn outline(&self) -> Option<&ProgramOutline> {
+        self.outline.as_ref()
     }
 
     /// The file (inside the assets folder), line and column of the

@@ -5,7 +5,7 @@
 //! being written, the classes, keywords and basic types.
 //! What names mean there is the `scope` module's.
 
-use star_script::semantic::{BASIC_TYPE_NAMES, ClassTable, Type};
+use star_script::semantic::{BASIC_TYPE_NAMES, ClassTable, MethodInfo, Type};
 use star_script::{Keyword, LexErrorKind, TokenKind, scan};
 
 use super::scope::{Receiver, Scope, receiver_chain, trailing_word};
@@ -117,7 +117,7 @@ pub(super) fn complete(
 }
 
 /// Whether the end of `before` is inside a comment or a string.
-fn is_inside_comment_or_string(before: &str) -> bool {
+pub(super) fn is_inside_comment_or_string(before: &str) -> bool {
     let found = scan(before);
     let in_comment = found.comments.last().is_some_and(|span| {
         let comment = span.text(before);
@@ -213,25 +213,28 @@ fn members(classes: &ClassTable, receiver: Receiver, everything: bool) -> Vec<Ca
             .iter()
             .filter(|method| wanted(method.is_static, method.is_private))
         {
-            let parameters: Vec<String> = method
-                .parameters
-                .iter()
-                .map(|parameter| {
-                    format!("{}: {}", parameter.name, classes.type_name(&parameter.ty))
-                })
-                .collect();
-            let result = match method.return_type {
-                Type::Void => String::new(),
-                ref ty => format!(" -> {}", classes.type_name(ty)),
-            };
             candidates.push(Candidate {
-                signature: Some(format!("({}){result}", parameters.join(", "))),
+                signature: Some(method_signature(classes, method)),
                 takes_parameters: !method.parameters.is_empty(),
                 ..plain(method.name.clone(), CandidateKind::Method)
             });
         }
     }
     candidates
+}
+
+/// The parameters of `method` and what it gives: `(speed: float) -> bool`.
+pub(super) fn method_signature(classes: &ClassTable, method: &MethodInfo) -> String {
+    let parameters: Vec<String> = method
+        .parameters
+        .iter()
+        .map(|parameter| format!("{}: {}", parameter.name, classes.type_name(&parameter.ty)))
+        .collect();
+    let result = match method.return_type {
+        Type::Void => String::new(),
+        ref ty => format!(" -> {}", classes.type_name(ty)),
+    };
+    format!("({}){result}", parameters.join(", "))
 }
 
 #[cfg(test)]

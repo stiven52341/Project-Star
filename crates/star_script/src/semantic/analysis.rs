@@ -109,6 +109,15 @@ impl Analysis {
         self.declarations.get(&name.span).copied()
     }
 
+    /// Every local of the program (variable, parameter or loop variable),
+    /// with the place where its declaration writes its name. Tools use it to
+    /// tell the type of a name written in a script.
+    pub fn declared_locals(&self) -> impl Iterator<Item = (Span, &LocalInfo)> {
+        self.declarations
+            .iter()
+            .filter_map(|(span, id)| Some((*span, self.local(*id)?)))
+    }
+
     /// The local with that identifier.
     #[must_use]
     pub fn local(&self, id: LocalId) -> Option<&LocalInfo> {

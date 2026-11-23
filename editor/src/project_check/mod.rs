@@ -17,7 +17,7 @@ use std::fs;
 use std::path::Path;
 
 use star_script::codegen::{self, GeneratedProgram};
-use star_script::semantic::ClassTable;
+use star_script::semantic::{Analysis, ClassTable, LocalInfo};
 use star_script::{
     CompileError, GameSettings, Position, SourceSet, Span, analyze_program_with, check_program_with,
 };
@@ -47,25 +47,66 @@ pub(crate) struct ProjectCheck {
 }
 
 /// The classes a program declares (with the engine's) and their members,
-/// and the texts they were read from, to find where each is written: what
-/// suggestions and “Go to definition” need.
+/// its local variables, and the texts they were read from, to find where
+/// each is written: what suggestions, “Go to definition” and the types
+/// under the pointer need.
 #[derive(Debug, Clone)]
 pub(crate) struct ProgramOutline {
     pub(crate) classes: ClassTable,
     sources: SourceSet,
+    /// The locals of each script, by its path inside the assets folder.
+    locals: HashMap<String, ScriptLocals>,
 }
 
+/// The local variables, parameters and loop variables of a script, by the
+/// byte of its text where their declarations write their names.
+pub(crate) type ScriptLocals = HashMap<usize, LocalInfo>;
+
 impl ProgramOutline {
+    /// What `analysis` found in the program read from `sources`.
+    fn of(analysis: &Analysis, sources: &SourceSet) -> Self {
+        let mut outline = Self {
+            classes: analysis.classes().clone(),
+            sources: sources.clone(),
+            locals: HashMap::new(),
+        };
+        for (span, local) in analysis.declared_locals() {
+            if let Some((path, offset)) = outline.locate_offset(span) {
+                outline
+                    .locals
+                    .entry(path)
+                    .or_default()
+                    .insert(offset, local.clone());
+            }
+        }
+        outline
+    }
+
+    /// The locals of the script at `path` inside the assets folder.
+    pub(crate) fn locals_of(&self, path: &str) -> Option<&ScriptLocals> {
+        self.locals.get(path)
+    }
+
+    /// The file (as a path inside the assets folder) and the byte of its
+    /// text where the program's place `span` is.
+    fn locate_offset(&self, span: Span) -> Option<(String, usize)> {
+        let location = self.sources.locate(span)?;
+        let path = asset_path(location.file)?;
+        Some((path.to_owned(), location.offset))
+    }
+
     /// The file (as a path inside the assets folder) and the line and
     /// column where the program's place `span` is.
     pub(crate) fn locate(&self, span: Span) -> Option<(String, Position)> {
         let location = self.sources.locate(span)?;
-        let path = location
-            .file
-            .strip_prefix(ASSETS_DIRECTORY)?
-            .strip_prefix('/')?;
+        let path = asset_path(location.file)?;
         Some((path.to_owned(), location.position))
     }
+}
+
+/// The path inside the assets folder of the program's `file`.
+fn asset_path(file: &str) -> Option<&str> {
+    file.strip_prefix(ASSETS_DIRECTORY)?.strip_prefix('/')
 }
 
 /// The texts of files open in the editor, by their path inside the assets
@@ -117,16 +158,12 @@ pub(crate) fn check_project_with(
             }
         }
     }
-    let classes = match &checked {
-        Some(checked) => Some(checked.analysis.classes().clone()),
+    let outline = match &checked {
+        Some(checked) => Some(ProgramOutline::of(&checked.analysis, program.sources())),
         None if readable => analyze_program_with(program.sources(), &settings)
-            .map(|analysis| analysis.classes().clone()),
+            .map(|analysis| ProgramOutline::of(&analysis, program.sources())),
         None => None,
     };
-    let outline = classes.map(|classes| ProgramOutline {
-        classes,
-        sources: program.sources().clone(),
-    });
     let program = generated.filter(|_| problems.is_empty());
     ProjectCheck {
         scripts,

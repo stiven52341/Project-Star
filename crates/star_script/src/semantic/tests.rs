@@ -231,6 +231,20 @@ fn inferred_types_are_recorded() {
 }
 
 #[test]
+fn declared_locals_are_listed_where_their_names_are_written() {
+    let source = format!("{PRELUDE}{}", in_method("var turns = 2"));
+    let analysis = check_text(&source).expect("valid");
+
+    let turns = analysis
+        .declared_locals()
+        .find(|(_, local)| local.name == "turns")
+        .expect("declared");
+
+    assert_eq!(turns.0.text(&source), "turns");
+    assert_eq!(turns.1.ty, Type::Int);
+}
+
+#[test]
 fn conditions_must_be_bool() {
     assert_eq!(body_errors("if n { }"), [mismatch("bool", "int")]);
     assert_eq!(body_errors("while e { }"), [mismatch("bool", "Enemy?")]);
