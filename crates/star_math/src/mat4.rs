@@ -2,7 +2,7 @@
 
 use std::ops::Mul;
 
-use crate::Vec3;
+use crate::{Quat, Vec3};
 
 /// Column-major 4x4 matrix.
 ///
@@ -152,6 +152,27 @@ impl Mat4 {
         Vec3::new(x / w, y / w, z / w)
     }
 
+    /// Scales by `scale`, then rotates by `rotation`, then moves by
+    /// `translation`: where a 3D node is relative to its parent.
+    #[must_use]
+    pub fn from_scale_rotation_translation(scale: Vec3, rotation: Quat, translation: Vec3) -> Self {
+        let [x_axis, y_axis, z_axis, _] = rotation.to_mat4().columns;
+        let scaled = |axis: [f32; 4], factor: f32| axis.map(|value| value * factor);
+        Self::from_columns([
+            scaled(x_axis, scale.x),
+            scaled(y_axis, scale.y),
+            scaled(z_axis, scale.z),
+            [translation.x, translation.y, translation.z, 1.0],
+        ])
+    }
+
+    /// Where the matrix moves the origin (without perspective).
+    #[must_use]
+    pub const fn translation(self) -> Vec3 {
+        let [x, y, z, _] = self.columns[3];
+        Vec3::new(x, y, z)
+    }
+
     /// The matrix with its rows as columns.
     #[must_use]
     pub fn transposed(self) -> Self {
@@ -265,6 +286,21 @@ mod tests {
             (actual - expected).length() < EPSILON,
             "expected {expected:?}, got {actual:?}"
         );
+    }
+
+    #[test]
+    fn scale_rotation_translation_apply_in_that_order() {
+        let transform = Mat4::from_scale_rotation_translation(
+            Vec3::new(2.0, 1.0, 1.0),
+            Quat::from_rotation_z(FRAC_PI_2),
+            Vec3::new(0.0, 0.0, 5.0),
+        );
+
+        assert_close(
+            transform.transform_point(Vec3::new(1.0, 0.0, 0.0)),
+            Vec3::new(0.0, 2.0, 5.0),
+        );
+        assert_eq!(transform.translation(), Vec3::new(0.0, 0.0, 5.0));
     }
 
     #[test]

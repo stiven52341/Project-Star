@@ -27,4 +27,6 @@ pub use node_physics::{NodeContact, PhysicsNodes, step_node_physics};
 pub use scene::{Scene, TextureLoader};
 pub use scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
 pub use sprite_node::{SpriteNode, draw_sprite_nodes};
-pub use transform::{GlobalTransform2D, Transform2D, TransformPropagation};
+pub use transform::{
+    GlobalTransform2D, GlobalTransform3D, Transform2D, Transform3D, TransformPropagation,
+};

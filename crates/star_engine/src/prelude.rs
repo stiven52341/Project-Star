@@ -11,7 +11,7 @@ pub use star_input::{
     ActionMap, Actions, Binding, Gamepad, GamepadAxis, GamepadButton, GamepadId, Gamepads, Input,
     Key, Keyboard, Mouse, MouseButton, Touch, TouchId, Touches,
 };
-pub use star_math::{Affine2, Mat4, Vec2, Vec3};
+pub use star_math::{Affine2, Mat4, Quat, Vec2, Vec3};
 pub use star_physics::{
     BodyId, BodyKind, BodySettings, Contact, ContactPhase, Physics2d, Shape2d, ShapeKind,
 };
@@ -22,6 +22,6 @@ pub use star_render::{
     TextureFilter, TextureId, TextureRegion, Vertex,
 };
 pub use star_scene::{
-    Body2D, Children, GlobalTransform2D, Hierarchy, Name, NodeContact, Parent, PhysicsNodes, Scene,
-    SceneOutline, SpriteNode, Transform2D,
+    Body2D, Children, GlobalTransform2D, GlobalTransform3D, Hierarchy, Name, NodeContact, Parent,
+    PhysicsNodes, Scene, SceneOutline, SpriteNode, Transform2D, Transform3D,
 };
