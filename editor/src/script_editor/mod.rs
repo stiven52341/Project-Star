@@ -2,17 +2,21 @@
 //! of the central area, its text colored and its lines numbered.
 
 mod code_view;
+mod completion;
 mod editing;
 mod highlight;
 mod mistakes;
+mod suggestions;
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use eframe::egui;
 use star_script::Position;
+use star_script::semantic::ClassTable;
 
 use self::code_view::CodeView;
+pub(crate) use self::completion::CandidateKind;
 use self::mistakes::Mistake;
 use crate::project::ASSETS_DIRECTORY;
 use crate::project_check::Problem;
@@ -102,8 +106,14 @@ impl ScriptTab {
     }
 
     /// Shows the text to edit, with the mistakes among `problems` that are
-    /// in it marked. Returns whether the user changed it.
-    pub(crate) fn show(&mut self, ui: &mut egui::Ui, problems: &[Problem]) -> bool {
+    /// in it marked, and suggestions from the program's `classes`, if
+    /// known. Returns whether the user changed it.
+    pub(crate) fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        problems: &[Problem],
+        classes: Option<&ClassTable>,
+    ) -> bool {
         let texts = texts::current();
         let text = match &mut self.text {
             Ok(text) => text,
@@ -127,7 +137,7 @@ impl ScriptTab {
             })
             .collect();
         let id = ui.make_persistent_id(("script", &self.path));
-        let changed = self.view.show(ui, text, id, &mistakes);
+        let changed = self.view.show(ui, text, id, &mistakes, classes);
         self.unsaved |= changed;
         changed
     }

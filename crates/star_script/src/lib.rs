@@ -148,6 +148,18 @@ pub fn check_program_with(
     check_syntax(parse_program(sources)?, settings)
 }
 
+/// What the meaning of a program of a game with `settings` tells, even
+/// with mistakes in it (see [`semantic::analyze_with`]); `None` if a file
+/// has lexical or syntax mistakes, as there is no syntax tree to analyze.
+#[must_use]
+pub fn analyze_program_with(
+    sources: &SourceSet,
+    settings: &GameSettings,
+) -> Option<semantic::Analysis> {
+    let syntax = parse_program(sources).ok()?;
+    Some(semantic::analyze_with(&syntax, settings).0)
+}
+
 fn check_syntax(
     syntax: ast::SourceFile,
     settings: &GameSettings,
@@ -232,6 +244,29 @@ mod tests {
         let checked = check_program_with(&sources, &GameSettings::default());
 
         assert!(checked.is_ok(), "{:?}", checked.err());
+    }
+
+    #[test]
+    fn programs_with_mistakes_still_tell_their_classes() {
+        let sources = program(&[(
+            "rock.star",
+            "class Rock {\n  var size: int = \"big\"\n  func roll() {}\n}\n",
+        )]);
+
+        let analysis = analyze_program_with(&sources, &GameSettings::default()).unwrap();
+
+        let rock = analysis.classes().find("Rock").unwrap();
+        let class = analysis.classes().class(rock);
+        assert_eq!(class.fields[0].name, "size");
+        assert_eq!(class.methods[0].name, "roll");
+        assert!(check_program_with(&sources, &GameSettings::default()).is_err());
+    }
+
+    #[test]
+    fn programs_that_do_not_parse_tell_nothing() {
+        let sources = program(&[("rock.star", "class Rock {\n")]);
+
+        assert!(analyze_program_with(&sources, &GameSettings::default()).is_none());
     }
 
     /// Regression: every file numbered its expressions from zero, so the

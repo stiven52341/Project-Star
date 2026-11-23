@@ -194,7 +194,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.8c Edit the class (variables, graphs and their signature),
           create new blueprints, and mark on their nodes the mistakes
           “Compile” finds.
-  - [ ] 13.9 StarScript code editor (egui's `TextEdit`, in tabs of the
+  - [x] 13.9 StarScript code editor (egui's `TextEdit`, in tabs of the
         central area):
     - [x] 13.9a Open `.star` files from “Assets” in a tab: colors from the
           compiler's lexer, line numbers, the cursor's line and column,
@@ -203,6 +203,6 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           new lines, `Tab`/`Shift+Tab` over lines, `Ctrl+/` comments.
     - [x] 13.9c Mistakes while writing: checked in the background and
           marked on their lines.
-    - [ ] 13.9d Suggestions: names in scope and members, shown as faint
-          text and accepted with `Tab`.
+    - [x] 13.9d Suggestions: names in scope and members, shown as faint
+          text and accepted with `Tab`, with a list of the others.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

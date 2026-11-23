@@ -7,10 +7,12 @@ use std::hash::{Hash, Hasher};
 use eframe::egui;
 use egui::text::{CCursor, CCursorRange, LayoutJob};
 use star_script::Position;
+use star_script::semantic::ClassTable;
 
 use super::editing::{Action, Selection, apply};
 use super::highlight::colored;
 use super::mistakes::{Mark, Mistake, marks, paint_marks};
+use super::suggestions::Suggestions;
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -29,6 +31,7 @@ pub(super) struct CodeView {
     cursor: Option<Position>,
     /// The colored text last laid out, by a hash of the text and the theme.
     colors: Option<(u64, LayoutJob)>,
+    suggestions: Suggestions,
 }
 
 impl CodeView {
@@ -38,14 +41,16 @@ impl CodeView {
         self.jump = Some(position);
     }
 
-    /// Shows `text` to edit, with `mistakes` marked on it. Returns whether
-    /// the user changed it.
+    /// Shows `text` to edit, with `mistakes` marked on it and suggestions
+    /// from the program's `classes`, if known. Returns whether the user
+    /// changed it.
     pub(super) fn show(
         &mut self,
         ui: &mut egui::Ui,
         text: &mut String,
         id: egui::Id,
         mistakes: &[Mistake<'_>],
+        classes: Option<&ClassTable>,
     ) -> bool {
         let font = egui::TextStyle::Monospace.resolve(ui.style());
         let jumped = self.jump.take().map(|position| {
@@ -54,14 +59,27 @@ impl CodeView {
             index
         });
         let footer_height = ui.spacing().interact_size.y;
-        let mut changed = apply_writing_aids(ui.ctx(), text, id);
+        let mut changed = false;
+        let cursor = cursor_while_writing(ui.ctx(), id);
+        if let Some(completion) = self.suggestions.find(text, cursor, classes) {
+            changed |= self
+                .suggestions
+                .handle_keys(ui.ctx(), text, id, &completion);
+        }
+        changed |= apply_writing_aids(ui.ctx(), text, id);
         let marks = marks(text, mistakes);
         egui::ScrollArea::vertical()
             .id_salt(id)
             .auto_shrink(false)
             .max_height((ui.available_height() - footer_height).max(0.0))
             .show(ui, |ui| {
-                changed |= self.show_lines(ui, text, id, &font, jumped, &marks);
+                let shown = Shown {
+                    font: &font,
+                    jumped,
+                    marks: &marks,
+                    classes,
+                };
+                changed |= self.show_lines(ui, text, id, &shown);
             });
         ui.separator();
         self.show_footer(ui, &marks);
@@ -88,17 +106,21 @@ impl CodeView {
         });
     }
 
-    /// The column of line numbers and the text beside it; `jumped` is where
-    /// the cursor was just put, to scroll to.
+    /// The column of line numbers and the text beside it, with what is
+    /// `shown` on them.
     fn show_lines(
         &mut self,
         ui: &mut egui::Ui,
         text: &mut String,
         id: egui::Id,
-        font: &egui::FontId,
-        jumped: Option<usize>,
-        marks: &[Mark<'_>],
+        shown: &Shown<'_, '_>,
     ) -> bool {
+        let Shown {
+            font,
+            jumped,
+            marks,
+            classes,
+        } = *shown;
         let digits = digit_count(text.lines().count()).max(MIN_GUTTER_DIGITS);
         let digit_width = ui.fonts_mut(|fonts| fonts.glyph_width(font, '0'));
         #[allow(clippy::cast_precision_loss)] // A few digits.
@@ -139,6 +161,10 @@ impl CodeView {
                 .at_pointer()
                 .show(|ui| ui.colored_label(ERROR_COLOR, message));
         }
+        let cursor = cursor_while_writing(ui.ctx(), id);
+        if let Some(completion) = self.suggestions.find(text, cursor, classes) {
+            self.suggestions.paint(ui, &output, font, text, &completion);
+        }
         if let Some(index) = jumped {
             let rect = output
                 .galley
@@ -148,6 +174,27 @@ impl CodeView {
         }
         output.response.changed()
     }
+}
+
+/// What is shown on the text besides it.
+struct Shown<'shown, 'message> {
+    font: &'shown egui::FontId,
+    /// Where the cursor was just put, to scroll to.
+    jumped: Option<usize>,
+    marks: &'shown [Mark<'message>],
+    classes: Option<&'shown ClassTable>,
+}
+
+/// Where the cursor of the text edit `id` is while it has the keyboard and
+/// nothing is selected.
+fn cursor_while_writing(context: &egui::Context, id: egui::Id) -> Option<usize> {
+    if !context.memory(|memory| memory.has_focus(id)) {
+        return None;
+    }
+    let range = egui::text_edit::TextEditState::load(context, id)?
+        .cursor
+        .char_range()?;
+    (range.primary == range.secondary).then_some(range.primary.index.0)
 }
 
 /// The colored layout of `text`, made again only when the text or the

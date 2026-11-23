@@ -1,6 +1,7 @@
 //! Texts of the code editor, in each language.
 
 use super::{Language, Texts};
+use crate::script_editor::CandidateKind;
 
 impl Texts {
     pub(crate) fn script_unreadable(&self, reason: &str) -> String {
@@ -40,6 +41,26 @@ impl Texts {
             (Language::English, _) => format!("{count} mistakes in this script"),
             (Language::Spanish, 1) => "1 error en este script".to_owned(),
             (Language::Spanish, _) => format!("{count} errores en este script"),
+        }
+    }
+
+    /// The keys of the list of suggestions.
+    pub(crate) const fn suggestion_keys(&self) -> &'static str {
+        self.pick(
+            "Tab: write · ↑↓: choose · Esc: hide",
+            "Tab: escribir · ↑↓: elegir · Esc: ocultar",
+        )
+    }
+
+    /// What a suggested name is, when it has no signature to show.
+    pub(crate) const fn candidate_kind(&self, kind: CandidateKind) -> &'static str {
+        match kind {
+            CandidateKind::Value => self.pick("value", "valor"),
+            CandidateKind::Method => self.pick("method", "método"),
+            CandidateKind::Name => self.pick("name", "nombre"),
+            CandidateKind::Class => self.pick("class", "clase"),
+            CandidateKind::Keyword => self.pick("keyword", "palabra clave"),
+            CandidateKind::BasicType => self.pick("type", "tipo"),
         }
     }
 }

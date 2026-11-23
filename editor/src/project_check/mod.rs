@@ -16,7 +16,8 @@ use std::fs;
 use std::path::Path;
 
 use star_script::codegen::{self, GeneratedProgram};
-use star_script::{CompileError, GameSettings, check_program_with};
+use star_script::semantic::ClassTable;
+use star_script::{CompileError, GameSettings, analyze_program_with, check_program_with};
 
 pub(crate) use self::job::{CheckJob, CheckStatus};
 pub(crate) use self::problem::Problem;
@@ -27,7 +28,7 @@ use crate::project::{
 };
 
 /// What checking a project found.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ProjectCheck {
     /// How many StarScript files and blueprints were checked.
     pub(crate) scripts: usize,
@@ -36,6 +37,9 @@ pub(crate) struct ProjectCheck {
     pub(crate) problems: Vec<Problem>,
     /// The Rust code of the game, if there are scripts and no problems.
     pub(crate) program: Option<GeneratedProgram>,
+    /// The program's classes (the engine's too) and their members, if its
+    /// files could be read, even with mistakes in their meaning.
+    pub(crate) classes: Option<ClassTable>,
 }
 
 /// The texts of files open in the editor, by their path inside the assets
@@ -56,10 +60,11 @@ pub(crate) fn check_project_with(directory: &Path, open: &OpenTexts) -> ProjectC
     let assets = list_assets(directory, &mut problems);
     let program = read_program(&assets_folder, &assets, &mut problems);
     let scripts = assets.iter().filter(|path| is_program_file(path)).count();
-    let (checked, generated) = if program.sources().is_empty() || !program.is_complete() {
-        (None, None)
-    } else {
+    let readable = !program.sources().is_empty() && program.is_complete();
+    let (checked, generated) = if readable {
         check_program(&program, &settings, &mut problems)
+    } else {
+        (None, None)
     };
     if scripts > 0 {
         let classes = checked.as_ref().map(|checked| checked.analysis.classes());
@@ -69,11 +74,18 @@ pub(crate) fn check_project_with(directory: &Path, open: &OpenTexts) -> ProjectC
             }
         }
     }
+    let classes = match &checked {
+        Some(checked) => Some(checked.analysis.classes().clone()),
+        None if readable => analyze_program_with(program.sources(), &settings)
+            .map(|analysis| analysis.classes().clone()),
+        None => None,
+    };
     let program = generated.filter(|_| problems.is_empty());
     ProjectCheck {
         scripts,
         problems,
         program,
+        classes,
     }
 }
 

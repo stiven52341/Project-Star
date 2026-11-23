@@ -10,6 +10,8 @@ use std::time::{Duration, Instant};
 
 use eframe::egui;
 
+use star_script::semantic::ClassTable;
+
 use crate::project_check::{CheckJob, CheckStatus, OpenTexts, Problem};
 
 /// How long after the last change the check starts, so it does not run on
@@ -22,6 +24,10 @@ pub(super) struct LiveCheck {
     changed_at: Option<Instant>,
     job: Option<CheckJob>,
     problems: Vec<Problem>,
+    /// The classes of the last check that could read the program: while a
+    /// line is half written the program cannot be read, and suggestions
+    /// still need them.
+    classes: Option<ClassTable>,
 }
 
 impl LiveCheck {
@@ -30,12 +36,19 @@ impl LiveCheck {
             changed_at: None,
             job: None,
             problems: Vec::new(),
+            classes: None,
         }
     }
 
     /// Checks again once the user stops changing the texts.
     pub(super) fn request(&mut self) {
         self.changed_at = Some(Instant::now());
+    }
+
+    /// The classes of the program and the engine, as the last check that
+    /// could read them found them.
+    pub(super) const fn classes(&self) -> Option<&ClassTable> {
+        self.classes.as_ref()
     }
 
     /// The problems the last check found.
@@ -55,7 +68,12 @@ impl LiveCheck {
         if let Some(job) = &self.job {
             match job.status() {
                 CheckStatus::Running => return,
-                CheckStatus::Finished(check) => self.problems = check.problems,
+                CheckStatus::Finished(check) => {
+                    self.problems = check.problems;
+                    if check.classes.is_some() {
+                        self.classes = check.classes;
+                    }
+                }
                 CheckStatus::Lost => {}
             }
             self.job = None;

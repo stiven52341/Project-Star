@@ -347,7 +347,7 @@ impl EditorWindow {
             },
             ActiveDocument::Blueprint(tab) => tab.show(ui, self.problems.problems()),
             ActiveDocument::Script(tab) => {
-                if tab.show(ui, self.live_check.problems()) {
+                if tab.show(ui, self.live_check.problems(), self.live_check.classes()) {
                     self.live_check.request();
                 }
             }

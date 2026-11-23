@@ -55,6 +55,20 @@ pub fn check_with(
     file: &SourceFile,
     settings: &GameSettings,
 ) -> Result<Analysis, Vec<SemanticError>> {
+    let (analysis, errors) = analyze_with(file, settings);
+    if errors.is_empty() {
+        Ok(analysis)
+    } else {
+        Err(errors)
+    }
+}
+
+/// Checks the meaning of `file` as [`check_with`] does, but keeps what the
+/// analysis learned even when it finds mistakes (the classes and their
+/// members, and the types of the code without mistakes): what tools that
+/// help write code, such as suggestions, need.
+#[must_use]
+pub fn analyze_with(file: &SourceFile, settings: &GameSettings) -> (Analysis, Vec<SemanticError>) {
     let mut analysis = Analysis {
         settings: settings.clone(),
         ..Analysis::default()
@@ -62,11 +76,7 @@ pub fn check_with(
     natives::add_native_classes(&mut analysis.classes);
     let mut checker = Checker::new(file, analysis);
     checker.check_file();
-    if checker.errors.is_empty() {
-        Ok(checker.analysis)
-    } else {
-        Err(checker.errors)
-    }
+    (checker.analysis, checker.errors)
 }
 
 #[cfg(test)]

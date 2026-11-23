@@ -724,6 +724,27 @@ tests), with its message under the pointer; its line number turns red, and
 below the text the mistake of the cursor's line is written, or how many the
 script has.
 
+Suggestions (`completion.rs`, free of egui and tested; `suggestions.rs`
+shows them): the text is half written while they are needed, so it is
+never parsed. The word at the cursor (not inside a comment, a string or a
+number) is completed from the compiler's lexer and the class table of the
+last check that could read the program, which the live check keeps
+(`star_script::analyze_program_with` keeps the classes even when their
+code has mistakes of meaning; while a line is half written the program
+cannot be read at all, so the previous table is used). After a `.` (or
+`?.`), the members of what is before it: `self` and `super`, a class (its
+static members), a variable declared before in the text (`name: Class` or
+`var name = Class(…)`), or a field of the class being written, followed
+through chains such as `self.friend?.`; private members only inside their
+class. Elsewhere, the names written in the text, the members of the class
+being written, the classes, the keywords and the basic types. The chosen
+name's rest is painted in faint text after the cursor and the others are
+listed under it (with their signatures); `Tab` writes it (a method with its
+parentheses, the cursor inside if it takes parameters), `↑`/`↓` choose
+another while there are several, and `Esc` hides them until the word
+changes. These keys are taken before the writing aids, so `Tab` indents
+only when nothing is suggested.
+
 Blueprints and scripts are saved with `Ctrl+S` or “File” → “Save”, and
 all of them before “Compile”, which reads the files. Tabs with unsaved changes
 show `●`; closing one, the project or the window asks first (“Save”,

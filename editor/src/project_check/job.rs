@@ -18,7 +18,7 @@ pub(crate) struct CheckJob {
 }
 
 /// Where a [`CheckJob`] is.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum CheckStatus {
     /// Still checking.
     Running,
