@@ -76,6 +76,25 @@ impl Documents {
         self.scene.as_mut()
     }
 
+    /// Closes, saved or not, the scene and blueprints at `path` or inside
+    /// the folder at `path`: their files are gone or moved.
+    pub(crate) fn forget(&mut self, path: &str) {
+        while let Some(index) = self
+            .blueprints
+            .iter()
+            .position(|tab| is_within(tab.path(), path))
+        {
+            self.close(index);
+        }
+        if self
+            .scene
+            .as_ref()
+            .is_some_and(|scene| is_within(scene.path(), path))
+        {
+            self.scene = None;
+        }
+    }
+
     fn position_of(&self, path: &str) -> Option<usize> {
         self.blueprints.iter().position(|tab| tab.path() == path)
     }
@@ -178,6 +197,12 @@ impl Documents {
     }
 }
 
+/// Whether `file` is `path` or inside the folder at `path`.
+fn is_within(file: &str, path: &str) -> bool {
+    file.strip_prefix(path)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,5 +288,15 @@ mod tests {
         documents.close(0);
 
         assert_eq!(active_path(&mut documents).as_deref(), Some("c.blueprint"));
+    }
+
+    #[test]
+    fn files_are_within_themselves_and_their_folders() {
+        assert!(is_within("enemies/boss.blueprint", "enemies"));
+        assert!(is_within(
+            "enemies/boss.blueprint",
+            "enemies/boss.blueprint"
+        ));
+        assert!(!is_within("enemies2/boss.blueprint", "enemies"));
     }
 }

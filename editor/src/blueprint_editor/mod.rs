@@ -23,7 +23,7 @@ use eframe::egui;
 use star_blueprint::{Blueprint, Origin};
 
 use self::canvas::{CanvasState, NodeMistakes};
-pub(crate) use self::creation::{NewBlueprintError, create_blueprint};
+pub(crate) use self::creation::{new_blueprint_text, new_script_text};
 use self::names::BlueprintNames;
 use crate::project::ASSETS_DIRECTORY;
 use crate::project_check::Problem;

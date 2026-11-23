@@ -525,7 +525,13 @@ of the StarScript compiler and of the project check stay in English:
    above it and “Refresh”: folders and pages tagged by kind are painted
    by `asset_icons.rs`, images show a copy shrunk to 96 pixels made once
    by `thumbnails.rs`; a click selects, a double click goes into a folder
-   or opens a `.blueprint` or a `.scene`), **Problems** (what the last
+   or opens a `.blueprint` or a `.scene`. A right click on the background
+   opens “Create” (folder, scene with its root, blueprint, StarScript
+   script —the same a new blueprint translates to, so it compiles— or
+   Rust script) and “Refresh”; on a tile, also “Open”, “Rename” (`F2`),
+   “Delete” (`Delete`, asked first) and “Copy path”. Names are given in a
+   row over the grid; `asset_files.rs` checks them and never overwrites.
+   What is renamed or deleted closes the tabs open from it), **Problems** (what the last
    “Compile” found, as `file:line:column` and a message; it opens by itself
    when there are problems), **Output** (what Cargo and the game write
    while playing) and **Console** (the editor's own log), and a status bar (with the result of the last
@@ -659,10 +665,11 @@ and the **signature** of the graph shown (name, parameters, return type,
 `override`, privacy) (`class_properties.rs`). Renaming a variable, a method
 or a parameter renames it in the nodes that use it (`edit.rs`), and a
 change that takes pins away takes their wires. “Graphs” in the tab adds a
-graph (with its entry) or deletes the one shown. “New blueprint…” in
-“Assets” asks for a class name and writes `assets/<Class>.blueprint`
-(`creation.rs`, never overwriting): a `Node` that redefines `start` and
-`update`, empty, which compiles as it is.
+graph (with its entry) or deletes the one shown. “Create › Blueprint” in
+the right-click menu of “Assets” asks for a class name and writes
+`<Class>.blueprint` in the folder shown (`creation.rs` gives the text,
+`workspace/asset_files.rs` writes it, never overwriting): a `Node` that
+redefines `start` and `update`, empty, which compiles as it is.
 
 The mistakes of the last “Compile” are shown in their blueprint: each
 `Problem` of a blueprint keeps its `Origin` (graph and node, graph, or

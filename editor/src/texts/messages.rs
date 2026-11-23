@@ -6,7 +6,6 @@ use star_blueprint::{
 };
 
 use super::{Language, Texts};
-use crate::blueprint_editor::NewBlueprintError;
 use crate::project::{
     CreateProjectError, MAX_NAME_LENGTH, OpenProjectError, ProjectDimension, ProjectNameError,
     ProjectSettingsError,
@@ -59,29 +58,6 @@ impl Texts {
         match self.language {
             Language::English => format!("Could not save the blueprint: {reason}"),
             Language::Spanish => format!("No se pudo guardar el blueprint: {reason}"),
-        }
-    }
-
-    pub(crate) fn new_blueprint_error(&self, error: &NewBlueprintError) -> String {
-        match (error, self.language) {
-            (NewBlueprintError::InvalidName, _) => self
-                .pick(
-                    "The name must start with a letter or _ and have only letters, digits and _.",
-                    "El nombre debe empezar por una letra o _ y tener solo letras, números y _.",
-                )
-                .to_owned(),
-            (NewBlueprintError::AlreadyExists(path), Language::English) => {
-                format!("{path} already exists.")
-            }
-            (NewBlueprintError::AlreadyExists(path), Language::Spanish) => {
-                format!("Ya existe {path}.")
-            }
-            (NewBlueprintError::Io(error), Language::English) => {
-                format!("Could not create the blueprint: {error}")
-            }
-            (NewBlueprintError::Io(error), Language::Spanish) => {
-                format!("No se pudo crear el blueprint: {error}")
-            }
         }
     }
 

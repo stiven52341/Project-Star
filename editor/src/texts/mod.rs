@@ -4,6 +4,7 @@
 //! values are methods of [`Texts`] (see `messages`, `scene_messages` and
 //! `console_messages`).
 
+mod asset_messages;
 mod console_messages;
 mod english;
 mod messages;
@@ -266,8 +267,10 @@ pub(crate) struct Texts {
     pub(crate) returns: &'static str,
     pub(crate) overrides: &'static str,
     pub(crate) override_hint: &'static str,
-    pub(crate) new_blueprint: &'static str,
-    pub(crate) class_name_hint: &'static str,
+    pub(crate) rename: &'static str,
+    pub(crate) delete: &'static str,
+    pub(crate) copy_path: &'static str,
+    pub(crate) rename_to: &'static str,
     pub(crate) create: &'static str,
     pub(crate) show_in_blueprint: &'static str,
     pub(crate) no_graphs: &'static str,

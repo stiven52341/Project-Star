@@ -1,14 +1,9 @@
 //! New blueprints: a node that does nothing yet, ready to be added to a
 //! scene or to the game.
 
-use std::fs;
-use std::io;
-use std::path::Path;
-
 use star_blueprint::{Blueprint, Literal, Parameter, is_valid_name};
 
 use super::edit;
-use crate::project::BLUEPRINT_EXTENSION;
 
 /// The class new blueprints extend.
 const NEW_BLUEPRINT_BASE: &str = "Node";
@@ -18,39 +13,28 @@ const UPDATE_EVENT: &str = "update";
 const DELTA_PARAMETER: &str = "delta";
 const DELTA_TYPE: &str = "float";
 
-/// Why a blueprint could not be created.
-#[derive(Debug)]
-pub(crate) enum NewBlueprintError {
-    /// StarScript would not accept the class's name.
-    InvalidName,
-    /// A file with the blueprint's name already exists.
-    AlreadyExists(String),
-    /// The file could not be written.
-    Io(io::Error),
+/// The text of the blueprint of a new class called `class`: a node that
+/// does nothing yet. `None` if StarScript would not accept the name.
+pub(crate) fn new_blueprint_text(class: &str) -> Option<String> {
+    if !is_valid_name(class) {
+        return None;
+    }
+    new_blueprint(class)
+        .to_text()
+        .inspect_err(|error| log::warn!("{error}"))
+        .ok()
 }
 
-/// Creates the blueprint of the class `class` in the `assets` folder, as
-/// `<class>.blueprint`, and returns that path inside the folder. It never
-/// overwrites a file.
-pub(crate) fn create_blueprint(assets: &Path, class: &str) -> Result<String, NewBlueprintError> {
+/// The StarScript of a new class called `class`, the same a new blueprint
+/// of it translates to. `None` if StarScript would not accept the name.
+pub(crate) fn new_script_text(class: &str) -> Option<String> {
     if !is_valid_name(class) {
-        return Err(NewBlueprintError::InvalidName);
+        return None;
     }
-    let path = format!("{class}{BLUEPRINT_EXTENSION}");
-    let text = new_blueprint(class)
-        .to_text()
-        .map_err(|error| NewBlueprintError::Io(io::Error::other(error)))?;
-    fs::create_dir_all(assets).map_err(NewBlueprintError::Io)?;
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(assets.join(&path))
-        .map_err(|error| match error.kind() {
-            io::ErrorKind::AlreadyExists => NewBlueprintError::AlreadyExists(path.clone()),
-            _ => NewBlueprintError::Io(error),
-        })?;
-    io::Write::write_all(&mut file, text.as_bytes()).map_err(NewBlueprintError::Io)?;
-    Ok(path)
+    star_blueprint::translate(&new_blueprint(class))
+        .inspect_err(|errors| log::warn!("{errors:?}"))
+        .ok()
+        .map(|translation| translation.source().to_owned())
 }
 
 /// A node called `class` that redefines `start` and `update`, empty.
@@ -77,7 +61,6 @@ fn new_blueprint(class: &str) -> Blueprint {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::project::TestDirectory;
 
     #[test]
     fn new_blueprints_compile() {
@@ -89,13 +72,9 @@ mod tests {
     }
 
     #[test]
-    fn new_blueprints_are_written_in_the_assets_folder() {
-        let assets = TestDirectory::new("new_blueprint");
+    fn new_blueprint_texts_read_back_as_the_new_class() {
+        let text = new_blueprint_text("Rock").unwrap();
 
-        let path = create_blueprint(assets.path(), "Rock").expect("created");
-
-        assert_eq!(path, "Rock.blueprint");
-        let text = fs::read_to_string(assets.path().join(&path)).expect("written");
         assert_eq!(
             Blueprint::from_text(&text).ok(),
             Some(new_blueprint("Rock"))
@@ -103,24 +82,18 @@ mod tests {
     }
 
     #[test]
-    fn existing_files_are_not_overwritten() {
-        let assets = TestDirectory::new("new_blueprint_exists");
-        fs::create_dir_all(assets.path()).expect("folder");
-        fs::write(assets.path().join("Rock.blueprint"), "mine").expect("file");
+    fn new_scripts_compile() {
+        let source = new_script_text("Rock").unwrap();
 
-        let result = create_blueprint(assets.path(), "Rock");
+        let checked = star_script::check_source(&source);
 
-        assert!(matches!(result, Err(NewBlueprintError::AlreadyExists(_))));
-        let text = fs::read_to_string(assets.path().join("Rock.blueprint")).expect("kept");
-        assert_eq!(text, "mine");
+        assert!(checked.is_ok(), "{source}\n{checked:?}");
+        assert!(source.contains("class Rock"));
     }
 
     #[test]
     fn class_names_must_be_valid() {
-        let assets = TestDirectory::new("new_blueprint_name");
-
-        let result = create_blueprint(assets.path(), "big rock");
-
-        assert!(matches!(result, Err(NewBlueprintError::InvalidName)));
+        assert_eq!(new_blueprint_text("big rock"), None);
+        assert_eq!(new_script_text("big rock"), None);
     }
 }

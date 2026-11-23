@@ -1,5 +1,7 @@
 //! Main editor window: menu, scene hierarchy, viewport, inspector and assets.
 
+mod asset_actions;
+mod asset_files;
 mod asset_icons;
 mod assets_panel;
 mod console_panel;
@@ -19,7 +21,8 @@ mod viewport_tools;
 use eframe::{egui, egui_wgpu};
 use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
 
-use self::assets_panel::{AssetsPanel, OpenedAsset};
+pub(crate) use self::asset_files::{AssetFileError, NewAsset};
+use self::assets_panel::{AssetEvent, AssetsPanel, OpenedAsset};
 use self::console_panel::ConsolePanel;
 use self::documents::{ActiveDocument, Documents};
 use self::inspector_panel::show_inspector;
@@ -98,8 +101,8 @@ impl EditorWindow {
         render_state: Option<&egui_wgpu::RenderState>,
         log_history: LogHistory,
     ) -> Self {
-        let assets = AssetsPanel::new(project.directory());
         let dimension = project.settings().dimension();
+        let assets = AssetsPanel::new(project.directory(), dimension);
         let viewport = render_state
             .ok_or_else(|| texts::current().no_gpu_for_viewport.to_owned())
             .and_then(|state| {
@@ -357,12 +360,13 @@ impl EditorWindow {
         ui.separator();
         match self.bottom_tab {
             BottomTab::Assets => match self.assets.show(ui) {
-                Some(OpenedAsset::Blueprint(path)) => {
+                Some(AssetEvent::Opened(OpenedAsset::Blueprint(path))) => {
                     self.documents.open_blueprint(self.assets.directory(), path);
                 }
-                Some(OpenedAsset::Scene(path)) => {
+                Some(AssetEvent::Opened(OpenedAsset::Scene(path))) => {
                     self.leave(Leaving::OpenScene(path));
                 }
+                Some(AssetEvent::Gone(path)) => self.documents.forget(&path),
                 None => {}
             },
             BottomTab::Problems => {

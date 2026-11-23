@@ -6,3 +6,5 @@ pub(crate) const SCRIPT_EXTENSION: &str = ".star";
 pub(crate) const BLUEPRINT_EXTENSION: &str = ".blueprint";
 /// Extension of scene files.
 pub(crate) const SCENE_EXTENSION: &str = ".scene";
+/// Extension of Rust source files.
+pub(crate) const RUST_EXTENSION: &str = ".rs";

@@ -942,8 +942,8 @@ class Player extends Sprite {
 In the editor, a double click on a `.blueprint` of “Assets” opens it in a
 tab: its graphs are drawn as nodes and wires, built with the mouse (drag
 between pins, right button to add nodes), and the inspector edits the
-selected node, or the class and the graph shown. “New blueprint…” creates
-one. Saving rewrites the file from the model, so comments written by hand
+selected node, or the class and the graph shown. “Create › Blueprint”, in
+the right-click menu of “Assets”, creates one. Saving rewrites the file from the model, so comments written by hand
 are not kept.
 
 The editor's “Compile” checks every `.blueprint` of `assets/` together with

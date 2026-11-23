@@ -6,10 +6,8 @@ use eframe::egui;
 use star_engine::prelude::AssetPath;
 use star_engine::star_assets::{ImageFormat, SoundFormat};
 
-use crate::project::{BLUEPRINT_EXTENSION, SCENE_EXTENSION, SCRIPT_EXTENSION};
+use crate::project::{BLUEPRINT_EXTENSION, RUST_EXTENSION, SCENE_EXTENSION, SCRIPT_EXTENSION};
 
-/// Extension of Rust source files.
-const RUST_EXTENSION: &str = ".rs";
 /// Most letters of an extension shown on a page's tag.
 const MAX_TAG_LETTERS: usize = 5;
 
