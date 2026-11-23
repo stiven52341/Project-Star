@@ -21,6 +21,32 @@ const BYTE_ORDER_MARK: char = '\u{FEFF}';
 ///
 /// Returns every lexical mistake found, in source order.
 pub fn tokenize(source: &str) -> Result<Vec<Token>, Vec<LexError>> {
+    let scan = scan(source);
+    if scan.errors.is_empty() {
+        Ok(scan.tokens)
+    } else {
+        Err(scan.errors)
+    }
+}
+
+/// Everything the lexer finds in a source, mistakes included: what tools
+/// that show code being written (such as a code editor) need.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Scan {
+    /// The tokens, ending with [`TokenKind::EndOfFile`]. A literal with a
+    /// mistake still gets a token where it is: an empty string, or the
+    /// integer `0` for a number.
+    pub tokens: Vec<Token>,
+    /// Where the comments are, in source order.
+    pub comments: Vec<Span>,
+    /// Every lexical mistake, in source order.
+    pub errors: Vec<LexError>,
+}
+
+/// Splits `source` into tokens as [`tokenize`] does, keeping going after
+/// mistakes and noting where its comments are.
+#[must_use]
+pub fn scan(source: &str) -> Scan {
     Lexer::new(source).run()
 }
 
@@ -35,6 +61,7 @@ enum Delimiter {
 struct Lexer<'source> {
     cursor: Cursor<'source>,
     tokens: Vec<Token>,
+    comments: Vec<Span>,
     errors: Vec<LexError>,
     open_delimiters: Vec<Delimiter>,
 }
@@ -44,22 +71,23 @@ impl<'source> Lexer<'source> {
         Self {
             cursor: Cursor::new(source),
             tokens: Vec::new(),
+            comments: Vec::new(),
             errors: Vec::new(),
             open_delimiters: Vec::new(),
         }
     }
 
-    fn run(mut self) -> Result<Vec<Token>, Vec<LexError>> {
+    fn run(mut self) -> Scan {
         self.cursor.eat(BYTE_ORDER_MARK);
         while let Some(character) = self.cursor.peek() {
             self.lex_next(character);
         }
         let end = self.cursor.position();
         self.push(TokenKind::EndOfFile, end);
-        if self.errors.is_empty() {
-            Ok(self.tokens)
-        } else {
-            Err(self.errors)
+        Scan {
+            tokens: self.tokens,
+            comments: self.comments,
+            errors: self.errors,
         }
     }
 
@@ -83,7 +111,9 @@ impl<'source> Lexer<'source> {
     }
 
     fn skip_line_comment(&mut self) {
+        let start = self.cursor.position();
         self.cursor.eat_while(|character| character != '\n');
+        self.comments.push(Span::new(start, self.cursor.position()));
     }
 
     /// Skips a possibly nested `/* … */`. A comment spanning several lines
@@ -98,6 +128,7 @@ impl<'source> Lexer<'source> {
             match self.cursor.advance() {
                 None => {
                     let span = Span::new(start, self.cursor.position());
+                    self.comments.push(span);
                     self.error(LexErrorKind::UnterminatedBlockComment, span);
                     return;
                 }
@@ -107,6 +138,7 @@ impl<'source> Lexer<'source> {
                 Some(_) => {}
             }
         }
+        self.comments.push(Span::new(start, self.cursor.position()));
         if contains_newline {
             self.push_newline(start);
         }
@@ -115,14 +147,20 @@ impl<'source> Lexer<'source> {
     fn lex_string(&mut self, start: usize) {
         match string::lex_string(&mut self.cursor) {
             Ok(value) => self.push(TokenKind::String(value), start),
-            Err(error) => self.errors.push(error),
+            Err(error) => {
+                self.errors.push(error);
+                self.push(TokenKind::String(String::new()), start);
+            }
         }
     }
 
     fn lex_number(&mut self, start: usize) {
         match number::lex_number(&mut self.cursor) {
             Ok(kind) => self.push(kind, start),
-            Err(kind) => self.error(kind, Span::new(start, self.cursor.position())),
+            Err(kind) => {
+                self.error(kind, Span::new(start, self.cursor.position()));
+                self.push(TokenKind::Integer(0), start);
+            }
         }
     }
 

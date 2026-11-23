@@ -32,7 +32,7 @@ mod source_set;
 mod token;
 
 pub use diagnostic::CompileError;
-pub use lexer::{LexError, LexErrorKind, tokenize};
+pub use lexer::{LexError, LexErrorKind, Scan, scan, tokenize};
 pub use parser::{ParseError, ParseErrorKind, parse};
 pub use settings::{GameSettings, InputAction};
 pub use source::{LineIndex, Position, Span};

@@ -9,6 +9,7 @@ mod console_messages;
 mod english;
 mod messages;
 mod scene_messages;
+mod script_messages;
 mod spanish;
 
 use std::path::Path;
@@ -215,7 +216,7 @@ pub(crate) struct Texts {
     // Saving.
     pub(crate) save: &'static str,
     pub(crate) unsaved_changes: &'static str,
-    pub(crate) unsaved_blueprint_question: &'static str,
+    pub(crate) unsaved_tab_question: &'static str,
     pub(crate) unsaved_files_question: &'static str,
     pub(crate) discard_changes: &'static str,
     pub(crate) cancel: &'static str,

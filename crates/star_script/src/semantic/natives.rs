@@ -8,7 +8,7 @@ use super::{
 use crate::Span;
 
 /// Names of the basic types; they cannot be used as class names.
-pub(super) const BASIC_TYPE_NAMES: [&str; 4] = ["int", "float", "bool", "string"];
+pub const BASIC_TYPE_NAMES: [&str; 4] = ["int", "float", "bool", "string"];
 
 /// The basic type called `name`.
 pub(super) fn basic_type(name: &str) -> Option<Type> {

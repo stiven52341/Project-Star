@@ -138,7 +138,7 @@ pub(super) static ENGLISH: Texts = Texts {
     // Saving.
     save: "Save",
     unsaved_changes: "Unsaved changes",
-    unsaved_blueprint_question: "This blueprint has unsaved changes. Save them before closing it?",
+    unsaved_tab_question: "This file has unsaved changes. Save them before closing it?",
     unsaved_files_question: "Some files have unsaved changes. Save them before closing?",
     discard_changes: "Don't save",
     cancel: "Cancel",

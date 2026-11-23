@@ -14,6 +14,7 @@ mod project;
 mod project_check;
 mod recent_projects;
 mod scene_editor;
+mod script_editor;
 mod style;
 mod texts;
 mod workspace;

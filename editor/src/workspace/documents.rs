@@ -1,5 +1,6 @@
 //! The tabs of the central area: the scene, always there (with the scene
-//! file open in it, if any), and the blueprints the user opened.
+//! file open in it, if any), and the blueprints and scripts the user
+//! opened.
 
 use std::path::Path;
 
@@ -8,28 +9,66 @@ use eframe::egui;
 use crate::blueprint_editor::BlueprintTab;
 use crate::project::ProjectDimension;
 use crate::scene_editor::SceneDocument;
+use crate::script_editor::ScriptTab;
 use crate::texts;
 
-/// The open scene and blueprints, and which tab is shown.
+/// The open scene, blueprints and scripts, and which tab is shown.
 pub(crate) struct Documents {
     /// The scene of the “Scene” tab, once one is opened.
     scene: Option<SceneDocument>,
-    blueprints: Vec<BlueprintTab>,
-    /// The blueprint shown, or `None` for the scene.
+    tabs: Vec<Tab>,
+    /// The tab shown, or `None` for the scene.
     active: Option<usize>,
+}
+
+/// A file open in a tab of its own.
+enum Tab {
+    Blueprint(BlueprintTab),
+    Script(ScriptTab),
+}
+
+impl Tab {
+    fn path(&self) -> &str {
+        match self {
+            Self::Blueprint(tab) => tab.path(),
+            Self::Script(tab) => tab.path(),
+        }
+    }
+
+    fn title(&self) -> String {
+        match self {
+            Self::Blueprint(tab) => tab.title(),
+            Self::Script(tab) => tab.title(),
+        }
+    }
+
+    const fn is_unsaved(&self) -> bool {
+        match self {
+            Self::Blueprint(tab) => tab.is_unsaved(),
+            Self::Script(tab) => tab.is_unsaved(),
+        }
+    }
+
+    fn save(&mut self) -> bool {
+        match self {
+            Self::Blueprint(tab) => tab.save(),
+            Self::Script(tab) => tab.save(),
+        }
+    }
 }
 
 /// What the central area shows this frame.
 pub(crate) enum ActiveDocument<'documents> {
     Scene,
     Blueprint(&'documents mut BlueprintTab),
+    Script(&'documents mut ScriptTab),
 }
 
 impl Documents {
     pub(crate) const fn new() -> Self {
         Self {
             scene: None,
-            blueprints: Vec::new(),
+            tabs: Vec::new(),
             active: None,
         }
     }
@@ -37,9 +76,22 @@ impl Documents {
     /// Shows the blueprint at `path` of the `assets` folder, opening it if
     /// it is not open yet.
     pub(crate) fn open_blueprint(&mut self, assets: &Path, path: String) {
+        self.show_or_open(path, |path| {
+            Tab::Blueprint(BlueprintTab::open(assets, path))
+        });
+    }
+
+    /// Shows the script at `path` of the `assets` folder, opening it if it
+    /// is not open yet.
+    pub(crate) fn open_script(&mut self, assets: &Path, path: String) {
+        self.show_or_open(path, |path| Tab::Script(ScriptTab::open(assets, path)));
+    }
+
+    /// Shows the tab of `path`, opening it with `open` if there is none.
+    fn show_or_open(&mut self, path: String, open: impl FnOnce(String) -> Tab) {
         let index = self.position_of(&path).unwrap_or_else(|| {
-            self.blueprints.push(BlueprintTab::open(assets, path));
-            self.blueprints.len() - 1
+            self.tabs.push(open(path));
+            self.tabs.len() - 1
         });
         self.active = Some(index);
     }
@@ -76,14 +128,10 @@ impl Documents {
         self.scene.as_mut()
     }
 
-    /// Closes, saved or not, the scene and blueprints at `path` or inside
-    /// the folder at `path`: their files are gone or moved.
+    /// Closes, saved or not, the scene and tabs at `path` or inside the
+    /// folder at `path`: their files are gone or moved.
     pub(crate) fn forget(&mut self, path: &str) {
-        while let Some(index) = self
-            .blueprints
-            .iter()
-            .position(|tab| is_within(tab.path(), path))
-        {
+        while let Some(index) = self.tabs.iter().position(|tab| is_within(tab.path(), path)) {
             self.close(index);
         }
         if self
@@ -96,16 +144,16 @@ impl Documents {
     }
 
     fn position_of(&self, path: &str) -> Option<usize> {
-        self.blueprints.iter().position(|tab| tab.path() == path)
+        self.tabs.iter().position(|tab| tab.path() == path)
     }
 
-    /// Closes the blueprint at `index`, saved or not; the tab shown stays
-    /// shown, or the scene is shown if it was that one.
+    /// Closes the tab at `index`, saved or not; the tab shown stays shown,
+    /// or the scene is shown if it was that one.
     pub(crate) fn close(&mut self, index: usize) {
-        if index >= self.blueprints.len() {
+        if index >= self.tabs.len() {
             return;
         }
-        self.blueprints.remove(index);
+        self.tabs.remove(index);
         self.active = match self.active {
             Some(active) if active == index => None,
             Some(active) if active > index => Some(active - 1),
@@ -113,16 +161,14 @@ impl Documents {
         };
     }
 
-    /// Whether the blueprint at `index` has unsaved changes.
+    /// Whether the tab at `index` has unsaved changes.
     pub(crate) fn is_unsaved(&self, index: usize) -> bool {
-        self.blueprints
-            .get(index)
-            .is_some_and(BlueprintTab::is_unsaved)
+        self.tabs.get(index).is_some_and(Tab::is_unsaved)
     }
 
-    /// Whether the scene or any blueprint has unsaved changes.
+    /// Whether the scene or any tab has unsaved changes.
     pub(crate) fn any_unsaved(&self) -> bool {
-        self.scene_is_unsaved() || self.blueprints.iter().any(BlueprintTab::is_unsaved)
+        self.scene_is_unsaved() || self.tabs.iter().any(Tab::is_unsaved)
     }
 
     /// Whether the tab shown has unsaved changes.
@@ -133,11 +179,9 @@ impl Documents {
         }
     }
 
-    /// Saves the blueprint at `index`. Returns whether it is saved now.
+    /// Saves the tab at `index`. Returns whether it is saved now.
     pub(crate) fn save(&mut self, index: usize) -> bool {
-        self.blueprints
-            .get_mut(index)
-            .is_none_or(BlueprintTab::save)
+        self.tabs.get_mut(index).is_none_or(Tab::save)
     }
 
     /// Saves the tab shown.
@@ -148,12 +192,12 @@ impl Documents {
         };
     }
 
-    /// Saves the scene and every blueprint. Returns whether all of them are
-    /// saved now; those that are not say why.
+    /// Saves the scene and every tab. Returns whether all of them are saved
+    /// now; those that are not say why.
     pub(crate) fn save_all(&mut self) -> bool {
         // Every file is saved, even after one fails.
         let mut all_saved = self.save_scene();
-        for tab in &mut self.blueprints {
+        for tab in &mut self.tabs {
             all_saved &= tab.save();
         }
         all_saved
@@ -161,14 +205,15 @@ impl Documents {
 
     /// The tab shown.
     pub(crate) fn active(&mut self) -> ActiveDocument<'_> {
-        match self.active.and_then(|index| self.blueprints.get_mut(index)) {
-            Some(tab) => ActiveDocument::Blueprint(tab),
+        match self.active.and_then(|index| self.tabs.get_mut(index)) {
+            Some(Tab::Blueprint(tab)) => ActiveDocument::Blueprint(tab),
+            Some(Tab::Script(tab)) => ActiveDocument::Script(tab),
             None => ActiveDocument::Scene,
         }
     }
 
-    /// The row of tabs, each blueprint with a button to close it. Returns
-    /// the blueprint the user asked to close.
+    /// The row of tabs, each file with a button to close it. Returns the
+    /// tab the user asked to close.
     pub(crate) fn show_tabs(&mut self, ui: &mut egui::Ui) -> Option<usize> {
         let mut close = None;
         ui.horizontal(|ui| {
@@ -180,7 +225,7 @@ impl Documents {
             if let Some(scene) = &self.scene {
                 scene_tab.on_hover_text(scene.path());
             }
-            for (index, tab) in self.blueprints.iter().enumerate() {
+            for (index, tab) in self.tabs.iter().enumerate() {
                 ui.separator();
                 ui.selectable_value(&mut self.active, Some(index), tab.title())
                     .on_hover_text(tab.path());
@@ -212,6 +257,7 @@ mod tests {
         match documents.active() {
             ActiveDocument::Scene => None,
             ActiveDocument::Blueprint(tab) => Some(tab.path().to_owned()),
+            ActiveDocument::Script(tab) => Some(tab.path().to_owned()),
         }
     }
 
@@ -252,7 +298,7 @@ mod tests {
 
         documents.open_blueprint(assets.path(), "a.blueprint".to_owned());
 
-        assert_eq!(documents.blueprints.len(), 2);
+        assert_eq!(documents.tabs.len(), 2);
         assert_eq!(active_path(&mut documents).as_deref(), Some("a.blueprint"));
     }
 
@@ -288,6 +334,18 @@ mod tests {
         documents.close(0);
 
         assert_eq!(active_path(&mut documents).as_deref(), Some("c.blueprint"));
+    }
+
+    #[test]
+    fn scripts_open_in_tabs_beside_blueprints() {
+        let (assets, mut documents) = documents_with(&["a.blueprint"]);
+
+        documents.open_script(assets.path(), "a.star".to_owned());
+        documents.open_blueprint(assets.path(), "a.blueprint".to_owned());
+        documents.open_script(assets.path(), "a.star".to_owned());
+
+        assert_eq!(documents.tabs.len(), 2);
+        assert!(matches!(documents.active(), ActiveDocument::Script(_)));
     }
 
     #[test]

@@ -366,3 +366,49 @@ fn unmatched_closing_brackets_do_not_break_line_handling() {
         [LeftBrace, LeftParen, RightBrace, identifier("a"), EndOfFile]
     );
 }
+
+#[test]
+fn scans_note_where_comments_are() {
+    let source = "a // one\n/* two\n */ b";
+
+    let found = scan(source);
+
+    let comments: Vec<&str> = found
+        .comments
+        .iter()
+        .map(|span| span.text(source))
+        .collect();
+    assert_eq!(comments, ["// one", "/* two\n */"]);
+    assert_eq!(found.errors, []);
+}
+
+#[test]
+fn scans_keep_going_after_mistakes() {
+    let source = "\"open\n@ 0x";
+
+    let found = scan(source);
+
+    let tokens: Vec<(TokenKind, &str)> = found
+        .tokens
+        .iter()
+        .map(|token| (token.kind.clone(), token.span.text(source)))
+        .collect();
+    assert_eq!(
+        tokens,
+        [
+            (TokenKind::String(String::new()), "\"open"),
+            (Newline, "\n"),
+            (Integer(0), "0x"),
+            (EndOfFile, ""),
+        ]
+    );
+    assert_eq!(found.errors.len(), 3);
+}
+
+#[test]
+fn unterminated_comments_are_still_comments() {
+    let found = scan("a /* never closed");
+
+    assert_eq!(found.comments.len(), 1);
+    assert_eq!(found.errors[0].kind, LexErrorKind::UnterminatedBlockComment);
+}

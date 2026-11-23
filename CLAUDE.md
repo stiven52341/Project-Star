@@ -140,7 +140,7 @@ Tools    star_script                         (StarScript compiler; no dependenci
 | `star_script` | StarScript compiler (`.star` → Rust). Specification in `docs/starscript.md` |
 | `star_script_runtime` | Support for the generated Rust: shared lists, fields, equality, input actions, runtime errors |
 | `star_blueprint` | Blueprints: classes as node graphs, their `.blueprint` files (TOML) and their translation to StarScript |
-| `editor` | Visual editor (egui, in English or Spanish): project manager, main window, scene editor (node tree, inspector, scene drawn in the view), log console, blueprint editor (node graphs on a canvas) “Compile” (checks a project's StarScript and blueprints with `star_script` and `star_blueprint`) and “Play” (builds the game with Cargo and runs it) |
+| `editor` | Visual editor (egui, in English or Spanish): project manager, main window, scene editor (node tree, inspector, scene drawn in the view), log console, blueprint editor (node graphs on a canvas), code editor (StarScript scripts, colored), “Compile” (checks a project's StarScript and blueprints with `star_script` and `star_blueprint`) and “Play” (builds the game with Cargo and runs it) |
 
 More detail in `docs/architecture.md`. Roadmap in `docs/roadmap.md`.
 

@@ -97,6 +97,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 50 | StarScript's 3D nodes are **`Node3D` extends `Node`**, and bodies stay one `Body` class | A 3D node keeps `x`, `y`, the scales and the whole tree API of `Node` (`add_child`, `children`, `find_child`, `Scene.load`), with `rotation` as its roll; `Node3D` adds `z`, `pitch`, `yaw`, `scale_z` and `look_at`, and `Mesh`, `Light` and `Camera3D` extend it. A `Body` is a 2D body on a 2D node and a 3D one on a `Node3D` (`Body.sphere`, `Body.box`, `depth`, `velocity_z`, `apply_impulse_3d`); a shape of the other dimension is left out with one warning. Rejected: a separate 3D hierarchy (the game and every node would need a second `add_child`, and scenes could not mix them) and a `Body3D` class (the whole API of `Body` twice, and two body fields on 3D nodes) |
 | 51 | Android games are a **NativeActivity** library, packaged with **cargo-apk2** | winit's `android-native-activity` feature runs the event loop in the `AndroidApp` the system starts (`android_main`), with no Java code to write or Gradle to run; `cargo-apk2` (MIT/Apache-2.0, the maintained successor of `cargo-apk`) builds the `cdylib`, the manifest from `[package.metadata.android]`, and signs the APK. A game keeps its desktop `main` and adds `star_engine::android_main!(run)` to its library (the only `unsafe` the project allows, approved by its owner: `#[unsafe(no_mangle)]` on that one function, because the system looks the entry up by its plain name; see `CLAUDE.md` 3.1 and `star_platform/src/entry.rs`); `star_platform::android` keeps the app for the event loop and sends the log to logcat (`android_logger`, MIT/Apache-2.0). Assets are read from the APK's `assets` folder (`[package.metadata.android] assets`) through Android's `AssetManager`: `star_platform::PackagedAssets`, given to `star_assets` as `PackagedFiles`, which `App` uses by default on Android (there are no files to watch, so no hot-reload there); `App::with_development_assets` sets a folder on disk only where assets are not packaged, so examples find theirs both ways. Every example is a library (`cdylib` and `rlib`) with `android_main!`, plus a desktop `main`; the CI checks them for Android and builds an APK. When Android takes the window's surface away, `WindowEventHandler::on_suspended` makes the renderer drop it and `on_resumed` makes a new one, keeping textures and meshes. Rejected: GameActivity (needs a Java/Kotlin part built with Gradle), `xbuild` (less maintained) and a Gradle project per game |
 | 52 | The editor edits scenes as **`SceneOutline` data**, not as a live world | An outline is the file's own model (images and meshes named, not loaded), so what the inspector changes is exactly what is saved, with no `SceneSources` to trace back and nothing lost on the way (classes, unknown images). It also needs no GPU to edit. Its tree is kept valid by `add_node` (appended after every node) and `remove_node` (whole subtrees, renumbering the rest), and `to_text` checks it again before writing. `Scene::to_text` goes through outlines too, so there is one writer. Rejected: instancing the scene into an ECS `World` and capturing it to save (it loses what worlds do not keep, like classes, and ties editing to rendering) |
+| 53 | The code editor is **egui's `TextEdit` with a layouter**, colored by **the compiler's own lexer** (`star_script::scan`) | `scan` is `tokenize` that keeps going after mistakes and notes where the comments are, so half-written code is colored by the same rules that compile it (numbers, escapes, nested comments), with nothing to keep in step. `TextEdit` already gives the cursor, selection, clipboard, undo and input methods. Rejected: a second, hand-written highlighter in the editor, and a separate code-editor crate (one more dependency to follow egui's versions) |
 
 ## ECS
 
@@ -682,8 +683,20 @@ pointer and in the inspector, and the others are listed above the canvas.
 Clicking the place of such a problem in “Problems” opens the blueprint on
 its graph, with the node selected in the middle of the canvas.
 
-Blueprints are saved with `Ctrl+S` or “File” → “Save”, and all of
-them before “Compile”, which reads the files. Tabs with unsaved changes
+The **code editor** (`script_editor/`) opens `.star` files of “Assets”
+(double click) in tabs of the central area, beside the blueprints. The text
+is egui's `TextEdit` with a layouter that colors it (`highlight.rs`):
+keywords, `true`/`false`/`null`, types (capitalized names and the basic
+types), names that are called, numbers, strings, comments and characters
+the language does not have, from the pieces `star_script::scan` finds. The
+colored layout is kept until the text or the theme changes. The number of
+each line is painted left of its first row (`code_view.rs`), long lines
+wrap, and the line and column of the cursor are shown below the text.
+Clicking a problem of a script in “Problems” opens it with the cursor on
+the problem's line and column. Scripts are saved as blueprints are.
+
+Blueprints and scripts are saved with `Ctrl+S` or “File” → “Save”, and
+all of them before “Compile”, which reads the files. Tabs with unsaved changes
 show `●`; closing one, the project or the window asks first (“Save”,
 “Don't save”, “Cancel”). Saving writes the file again from the model, so
 comments written by hand in it are not kept.

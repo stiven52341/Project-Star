@@ -33,7 +33,7 @@ use self::unsaved_dialog::{UnsavedChoice, show_unsaved_dialog};
 use self::viewport::SceneViewport;
 use crate::editor_log::LogHistory;
 use crate::game_run::PlayRequest;
-use crate::project::{ASSETS_DIRECTORY, Project};
+use crate::project::{ASSETS_DIRECTORY, Project, SCRIPT_EXTENSION};
 use crate::project_check::Problem;
 use crate::style::ERROR_COLOR;
 use crate::texts::{self, Language};
@@ -193,6 +193,11 @@ impl EditorWindow {
                     ui.separator();
                     tab.show_inspector(ui, self.problems.problems());
                 }
+                ActiveDocument::Script(_) => {
+                    ui.strong(texts::current().inspector);
+                    ui.separator();
+                    ui.weak(texts::current().script_inspector_hint());
+                }
             });
         egui::Panel::bottom("bottom_panel")
             .resizable(true)
@@ -293,7 +298,7 @@ impl EditorWindow {
     fn ask_about_unsaved_changes(&mut self, context: &egui::Context) -> Option<EditorAction> {
         let leaving = self.leaving.clone()?;
         let question = match leaving {
-            Leaving::CloseTab(_) => texts::current().unsaved_blueprint_question,
+            Leaving::CloseTab(_) => texts::current().unsaved_tab_question,
             Leaving::OpenScene(_) => texts::current().unsaved_scene_question,
             Leaving::CloseProject | Leaving::Quit => texts::current().unsaved_files_question,
         };
@@ -331,6 +336,7 @@ impl EditorWindow {
                 }
             },
             ActiveDocument::Blueprint(tab) => tab.show(ui, self.problems.problems()),
+            ActiveDocument::Script(tab) => tab.show(ui),
         }
     }
 
@@ -366,12 +372,15 @@ impl EditorWindow {
                 Some(AssetEvent::Opened(OpenedAsset::Scene(path))) => {
                     self.leave(Leaving::OpenScene(path));
                 }
+                Some(AssetEvent::Opened(OpenedAsset::Script(path))) => {
+                    self.documents.open_script(self.assets.directory(), path);
+                }
                 Some(AssetEvent::Gone(path)) => self.documents.forget(&path),
                 None => {}
             },
             BottomTab::Problems => {
                 if let Some(problem) = self.problems.show(ui) {
-                    self.show_problem_in_blueprint(&problem);
+                    self.show_problem(&problem);
                 }
             }
             BottomTab::Output => self.output.show(ui),
@@ -379,21 +388,28 @@ impl EditorWindow {
         }
     }
 
-    /// Opens the blueprint of `problem` where the problem is.
-    fn show_problem_in_blueprint(&mut self, problem: &Problem) {
-        let (Some(origin), Some(path)) = (
-            &problem.origin,
-            problem
-                .file
-                .strip_prefix(ASSETS_DIRECTORY)
-                .and_then(|path| path.strip_prefix('/')),
-        ) else {
+    /// Opens the blueprint or script of `problem` where the problem is.
+    fn show_problem(&mut self, problem: &Problem) {
+        let Some(path) = problem
+            .file
+            .strip_prefix(ASSETS_DIRECTORY)
+            .and_then(|path| path.strip_prefix('/'))
+        else {
             return;
         };
-        self.documents
-            .open_blueprint(self.assets.directory(), path.to_owned());
-        if let ActiveDocument::Blueprint(tab) = self.documents.active() {
-            tab.reveal(origin);
+        let assets = self.assets.directory();
+        if let Some(origin) = &problem.origin {
+            self.documents.open_blueprint(assets, path.to_owned());
+            if let ActiveDocument::Blueprint(tab) = self.documents.active() {
+                tab.reveal(origin);
+            }
+        } else if path.ends_with(SCRIPT_EXTENSION) {
+            self.documents.open_script(assets, path.to_owned());
+            if let (ActiveDocument::Script(tab), Some(position)) =
+                (self.documents.active(), problem.position)
+            {
+                tab.reveal(position);
+            }
         }
     }
 

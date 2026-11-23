@@ -16,7 +16,9 @@ use super::asset_files::NewAsset;
 use super::asset_icons::{AssetKind, paint_icon};
 use super::thumbnails::Thumbnails;
 use crate::file_tree::{FileNode, file_paths, scan_directory};
-use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, ProjectDimension, SCENE_EXTENSION};
+use crate::project::{
+    ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, ProjectDimension, SCENE_EXTENSION, SCRIPT_EXTENSION,
+};
 use crate::scene_editor::ImageDrop;
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -25,6 +27,7 @@ use crate::texts;
 pub(crate) enum OpenedAsset {
     Blueprint(String),
     Scene(String),
+    Script(String),
 }
 
 impl OpenedAsset {
@@ -34,6 +37,8 @@ impl OpenedAsset {
             Some(Self::Blueprint(path))
         } else if path.ends_with(SCENE_EXTENSION) {
             Some(Self::Scene(path))
+        } else if path.ends_with(SCRIPT_EXTENSION) {
+            Some(Self::Script(path))
         } else {
             None
         }

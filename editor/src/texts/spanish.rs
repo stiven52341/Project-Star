@@ -138,7 +138,7 @@ pub(super) static SPANISH: Texts = Texts {
     // Saving.
     save: "Guardar",
     unsaved_changes: "Cambios sin guardar",
-    unsaved_blueprint_question: "Este blueprint tiene cambios sin guardar. ¿Guardarlos antes de cerrarlo?",
+    unsaved_tab_question: "Este archivo tiene cambios sin guardar. ¿Guardarlos antes de cerrarlo?",
     unsaved_files_question: "Hay archivos con cambios sin guardar. ¿Guardarlos antes de cerrar?",
     discard_changes: "No guardar",
     cancel: "Cancelar",
