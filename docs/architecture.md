@@ -520,9 +520,12 @@ of the StarScript compiler and of the project check stay in English:
    drag = pan in 2D / orbit in 3D, wheel = zoom), always there and named
    after the open scene file, and one tab per open **blueprint** (see
    below), **Inspector** (the node selected in the scene, or the project's
-   properties), a bottom panel with four tabs, **Assets** (tree of
-   `assets/`, with “Refresh”; a double click on a `.blueprint` or a
-   `.scene` opens it), **Problems** (what the last
+   properties), a bottom panel with four tabs, **Assets** (one
+   folder of `assets/` at a time as a grid of tiles, with the way back up
+   above it and “Refresh”: folders and pages tagged by kind are painted
+   by `asset_icons.rs`, images show a copy shrunk to 96 pixels made once
+   by `thumbnails.rs`; a click selects, a double click goes into a folder
+   or opens a `.blueprint` or a `.scene`), **Problems** (what the last
    “Compile” found, as `file:line:column` and a message; it opens by itself
    when there are problems), **Output** (what Cargo and the game write
    while playing) and **Console** (the editor's own log), and a status bar (with the result of the last

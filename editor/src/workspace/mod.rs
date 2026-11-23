@@ -1,5 +1,6 @@
 //! Main editor window: menu, scene hierarchy, viewport, inspector and assets.
 
+mod asset_icons;
 mod assets_panel;
 mod console_panel;
 mod documents;
@@ -9,6 +10,7 @@ mod inspector_panel;
 mod menu_bar;
 mod output_panel;
 mod problems_panel;
+mod thumbnails;
 mod unsaved_dialog;
 mod viewport;
 mod viewport_assets;
