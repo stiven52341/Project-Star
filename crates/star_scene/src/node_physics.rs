@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use star_core::{EngineError, EngineResult};
 use star_ecs::{Entity, World};
-use star_math::Affine2;
+use star_math::{Affine2, Vec2};
 use star_physics::{BodyId, BodyKind, ContactPhase, Physics2d};
 
 use crate::{Body2D, GlobalTransform2D, Parent, Transform2D};
@@ -93,10 +93,12 @@ impl PhysicsNodes {
 /// 1. removes the bodies of nodes that are gone or lost their [`Body2D`];
 /// 2. adds the bodies of new [`Body2D`]s where their nodes are, and moves
 ///    to their nodes the bodies whose node the game moved;
-/// 3. advances the simulation;
-/// 4. writes where the dynamic and kinematic bodies ended up into their
-///    nodes' [`Transform2D`];
-/// 5. turns the contacts of the bodies into contacts of their nodes.
+/// 3. gives the bodies the velocities and impulses set on their
+///    [`Body2D`]s;
+/// 4. advances the simulation;
+/// 5. writes where the dynamic and kinematic bodies ended up into their
+///    nodes' [`Transform2D`], and their velocities into their [`Body2D`];
+/// 6. turns the contacts of the bodies into contacts of their nodes.
 ///
 /// It places bodies with the [`GlobalTransform2D`]s of their parents, so
 /// those must be up to date.
@@ -114,6 +116,7 @@ pub fn step_node_physics(world: &World, elapsed: f32) -> EngineResult<()> {
     };
     remove_departed_bodies(world, &mut physics, &mut nodes);
     place_bodies(world, &mut physics, &mut nodes)?;
+    push_bodies(world, &mut physics)?;
     physics.advance(elapsed);
     follow_bodies(world, &physics)?;
     collect_contacts(&physics, &mut nodes);
@@ -167,6 +170,21 @@ fn place_bodies(
     failure.map_or(Ok(()), Err)
 }
 
+fn push_bodies(world: &World, physics: &mut Physics2d) -> EngineResult<()> {
+    world.each::<&mut Body2D>(|_, body| {
+        let Some(id) = body.id() else {
+            return;
+        };
+        let (velocity, impulse) = body.take_motion();
+        if let Some(velocity) = velocity {
+            physics.set_velocity(id, velocity);
+        }
+        if impulse != Vec2::ZERO {
+            physics.apply_impulse(id, impulse);
+        }
+    })
+}
+
 fn follow_bodies(world: &World, physics: &Physics2d) -> EngineResult<()> {
     world.each::<(&mut Body2D, &mut Transform2D)>(|node, (body, local)| {
         let Some(id) = body.id() else {
@@ -175,9 +193,14 @@ fn follow_bodies(world: &World, physics: &Physics2d) -> EngineResult<()> {
         if body.settings().kind == BodyKind::Static {
             return;
         }
-        let (Some(position), Some(rotation)) = (physics.position(id), physics.rotation(id)) else {
+        let (Some(position), Some(rotation), Some(velocity)) = (
+            physics.position(id),
+            physics.rotation(id),
+            physics.velocity(id),
+        ) else {
             return;
         };
+        body.measured(velocity);
         let parent = parent_global(world, node);
         // A parent scaled to nothing has no inside to place the node in.
         if let Some(to_parent) = parent.inverse() {
@@ -227,7 +250,6 @@ fn named_error(world: &World, node: Entity, error: &EngineError) -> EngineError 
 
 #[cfg(test)]
 mod tests {
-    use star_math::Vec2;
     use star_physics::{BodySettings, Shape2d};
 
     use super::*;
@@ -396,6 +418,38 @@ mod tests {
         let ids = [first, second].map(|node| world.get::<Body2D>(node).unwrap().id().unwrap());
         assert_ne!(ids[0], ids[1]);
         assert_eq!(world.resource::<Physics2d>().unwrap().body_count(), 2);
+    }
+
+    #[test]
+    fn velocities_and_impulses_reach_bodies_not_added_yet() {
+        let mut world = world();
+        world
+            .resource_mut::<Physics2d>()
+            .unwrap()
+            .set_gravity(Vec2::ZERO);
+        let paddle = body_node(&mut world, "Paddle", BodyKind::Kinematic, Vec2::ZERO);
+        let ball = body_node(&mut world, "Ball", BodyKind::Dynamic, Vec2::new(0.0, 5.0));
+        world
+            .get_mut::<Body2D>(paddle)
+            .unwrap()
+            .set_velocity(Vec2::new(2.0, 0.0));
+        world
+            .get_mut::<Body2D>(ball)
+            .unwrap()
+            .apply_impulse(Vec2::new(0.0, 3.0));
+        assert_eq!(
+            world.get::<Body2D>(paddle).unwrap().velocity(),
+            Vec2::new(2.0, 0.0)
+        );
+
+        frames(&mut world, 30);
+
+        let paddle_body = world.get::<Body2D>(paddle).unwrap();
+        assert!((paddle_body.velocity().x - 2.0).abs() < TOLERANCE);
+        assert!((position(&world, paddle).x - 1.0).abs() < TOLERANCE);
+        let ball_body = world.get::<Body2D>(ball).unwrap();
+        assert!(ball_body.velocity().y > 0.0);
+        assert!(position(&world, ball).y > 5.0);
     }
 
     #[test]

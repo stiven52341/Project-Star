@@ -264,32 +264,13 @@ fn check_settings(settings: &BodySettings, position: Vec2, rotation: f32) -> Eng
         ("position", position.x),
         ("position", position.y),
         ("rotation", rotation),
-        ("gravity scale", settings.gravity_scale),
     ];
     if let Some((what, value)) = numbers.iter().find(|(_, value)| !value.is_finite()) {
         return Err(EngineError::Physics(format!(
             "the {what} of a body must be a finite number, not {value}"
         )));
     }
-    let not_negative = [
-        ("friction", settings.friction),
-        ("bounciness", settings.bounciness),
-    ];
-    if let Some((what, value)) = not_negative
-        .iter()
-        .find(|(_, value)| !(value.is_finite() && *value >= 0.0))
-    {
-        return Err(EngineError::Physics(format!(
-            "the {what} of a body cannot be negative: {value}"
-        )));
-    }
-    if !(settings.density.is_finite() && settings.density > 0.0) {
-        return Err(EngineError::Physics(format!(
-            "the density of a body must be positive, not {}",
-            settings.density
-        )));
-    }
-    Ok(())
+    settings.check()
 }
 
 fn to_vector(vector: Vec2) -> Vector {

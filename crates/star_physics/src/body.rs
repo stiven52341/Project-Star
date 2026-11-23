@@ -1,5 +1,7 @@
 //! What a body is: how it moves, its outline and its surface.
 
+use star_core::{EngineError, EngineResult};
+
 use crate::Shape2d;
 
 /// How a body moves.
@@ -57,6 +59,68 @@ impl BodySettings {
             bounciness: 0.0,
             density: DEFAULT_DENSITY,
             is_sensor: false,
+        }
+    }
+
+    /// Checks that a [`Physics2d`](crate::Physics2d) can simulate the body.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Physics`] if the gravity scale is not a finite
+    /// number, the friction or bounciness are negative or not finite, or
+    /// the density is not positive.
+    pub fn check(&self) -> EngineResult<()> {
+        if !self.gravity_scale.is_finite() {
+            return Err(EngineError::Physics(format!(
+                "the gravity scale of a body must be a finite number, not {}",
+                self.gravity_scale
+            )));
+        }
+        let not_negative = [("friction", self.friction), ("bounciness", self.bounciness)];
+        if let Some((what, value)) = not_negative
+            .iter()
+            .find(|(_, value)| !(value.is_finite() && *value >= 0.0))
+        {
+            return Err(EngineError::Physics(format!(
+                "the {what} of a body cannot be negative: {value}"
+            )));
+        }
+        if !(self.density.is_finite() && self.density > 0.0) {
+            return Err(EngineError::Physics(format!(
+                "the density of a body must be positive, not {}",
+                self.density
+            )));
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn settings() -> BodySettings {
+        BodySettings::new(BodyKind::Dynamic, Shape2d::circle(1.0).unwrap())
+    }
+
+    #[test]
+    fn default_settings_can_be_simulated() {
+        assert!(settings().check().is_ok());
+    }
+
+    #[test]
+    fn impossible_surfaces_are_physics_errors() {
+        let broken: [fn(&mut BodySettings); 4] = [
+            |body| body.gravity_scale = f32::NAN,
+            |body| body.friction = -1.0,
+            |body| body.bounciness = f32::INFINITY,
+            |body| body.density = 0.0,
+        ];
+        for change in broken {
+            let mut body = settings();
+            change(&mut body);
+
+            assert!(matches!(body.check(), Err(EngineError::Physics(_))));
         }
     }
 }

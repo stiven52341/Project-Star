@@ -1,5 +1,6 @@
 //! Nodes that are bodies of the 2D physics.
 
+use star_math::Vec2;
 use star_physics::{BodyId, BodySettings};
 
 use crate::Transform2D;
@@ -12,7 +13,11 @@ use crate::Transform2D;
 /// simulation moved it into the node's [`Transform2D`]; a game that changes
 /// that transform itself moves the body there at once. The body's shape is
 /// not scaled with the node. Removing the component or the node removes
-/// the body. A clone is a new body, added again where its node is.
+/// the body. A clone is a new body, added again where its node is, at
+/// rest.
+///
+/// Its velocity can be set and impulses given through it even before the
+/// body exists: the engine passes them on before the next step.
 #[derive(Debug, PartialEq)]
 pub struct Body2D {
     settings: BodySettings,
@@ -21,6 +26,12 @@ pub struct Body2D {
     /// The node's transform as the engine last left it, to notice when the
     /// game moves the node.
     written: Option<Transform2D>,
+    /// The body's velocity after the last step.
+    velocity: Vec2,
+    /// The velocity the game gave it, still to pass on.
+    new_velocity: Option<Vec2>,
+    /// The impulses the game gave it, added up, still to pass on.
+    impulse: Vec2,
 }
 
 impl Clone for Body2D {
@@ -37,6 +48,9 @@ impl Body2D {
             settings,
             body: None,
             written: None,
+            velocity: Vec2::ZERO,
+            new_velocity: None,
+            impulse: Vec2::ZERO,
         }
     }
 
@@ -51,6 +65,39 @@ impl Body2D {
     #[must_use]
     pub const fn id(&self) -> Option<BodyId> {
         self.body
+    }
+
+    /// How fast the body moves, in world units per second: the velocity
+    /// the game set, if the engine did not pass it on yet, or the one it
+    /// had after the last step.
+    #[must_use]
+    pub fn velocity(&self) -> Vec2 {
+        self.new_velocity.unwrap_or(self.velocity)
+    }
+
+    /// Makes the body move at `velocity`, in world units per second, from
+    /// the next step on. Kinematic bodies move only this way.
+    pub const fn set_velocity(&mut self, velocity: Vec2) {
+        self.new_velocity = Some(velocity);
+    }
+
+    /// Pushes the body by `impulse` (mass times velocity) before the next
+    /// step, like a jump or a hit. Only dynamic bodies are pushed.
+    pub fn apply_impulse(&mut self, impulse: Vec2) {
+        self.impulse = self.impulse + impulse;
+    }
+
+    /// The velocity and impulse the game gave the body since the engine
+    /// last passed them on, leaving none.
+    pub(crate) fn take_motion(&mut self) -> (Option<Vec2>, Vec2) {
+        (
+            self.new_velocity.take(),
+            std::mem::replace(&mut self.impulse, Vec2::ZERO),
+        )
+    }
+
+    pub(crate) const fn measured(&mut self, velocity: Vec2) {
+        self.velocity = velocity;
     }
 
     pub(crate) const fn placed(&mut self, body: BodyId, transform: Transform2D) {
