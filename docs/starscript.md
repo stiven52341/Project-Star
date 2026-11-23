@@ -40,7 +40,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes), sounds (`Sound`, `Audio`), physics (`Body`) and 3D (`Node3D`, `Mesh`, `Light`, `Camera3D`) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; “Play” builds and runs the game; the editor has a code editor for `.star` files (colors, writing aids, mistakes while writing, suggestions) |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
-| 9 | Concurrency and parallelism | In progress: coroutines done (`async`, `await`, `Time`; section 7); `parallel` functions are checked but not translated to Rust yet |
+| 9 | Concurrency and parallelism | In progress: coroutines (`async`, `await`, `Time`) and `parallel` functions done (section 7); the code editor and an example remain |
 
 ## 1. Lexicon (final)
 
@@ -1062,5 +1062,13 @@ class Walker extends Node {
   anywhere else, when its result is awaited.
 - If the coroutine that waits for it ends first, the work finishes anyway
   and its result is dropped: a thread cannot be stopped halfway safely.
+- **In Rust**, a `parallel` function is a plain static function. Awaited
+  from a coroutine, the call becomes `parallel::run(arguments, work)` of
+  the runtime: the arguments travel as copies (the `Plain` trait: lists as
+  vectors), `work` is a function that receives them, calls it and sends
+  the result back, on one of a few threads started the first time (one
+  fewer than the cores, at least one). The coroutine checks each frame
+  whether the result arrived. On those threads `fault` only stops the
+  work, and the game's thread reports it when the result is awaited.
 
 Blueprints have neither yet.

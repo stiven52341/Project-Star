@@ -237,7 +237,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.10d Parallel functions in the analysis: only `static`, only
           values in and out, and only values and other `parallel`
           functions inside.
-    - [ ] 13.10e Parallel functions in Rust: threads of the runtime,
+    - [x] 13.10e Parallel functions in Rust: threads of the runtime,
           values copied in and out, and runtime errors on those threads
           stopping the game.
     - [ ] 13.10f The code editor and an example: suggestions and types

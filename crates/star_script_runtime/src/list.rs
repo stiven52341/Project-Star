@@ -49,6 +49,12 @@ impl<T: Clone> List<T> {
         }
     }
 
+    /// The elements, copied into a vector.
+    #[must_use]
+    pub fn to_vec(&self) -> Vec<T> {
+        self.read(Clone::clone)
+    }
+
     /// `list[index]`.
     #[must_use]
     #[track_caller]

@@ -19,6 +19,9 @@ pub(super) enum BodyKind {
     Method,
     /// A static method, a field's initial value or a constant: no object.
     Static,
+    /// A `parallel` function: static, on a thread of its own, where other
+    /// `parallel` functions are called directly.
+    Parallel,
     /// `init` before the object exists: assigning a field of the class only
     /// keeps the value, to build the object with it.
     ConstructorSetup,

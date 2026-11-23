@@ -395,15 +395,19 @@ fn async_main_runs_until_its_coroutines_finish() {
 }
 
 #[test]
-fn parallel_functions_are_not_translated_yet() {
-    let errors = compile_source(
-        "class P {\n parallel static func f(n: int) -> int { return n }\n static async func main() { Debug.print((await f(1)).to_string()) }\n}",
-    )
-    .expect_err("parallel functions are not translated");
-
-    let messages: Vec<String> = errors.iter().map(ToString::to_string).collect();
-    assert_eq!(
-        messages,
-        ["`parallel` functions cannot be translated to Rust yet"]
+fn awaited_parallel_functions_run_on_other_threads_with_copies() {
+    let code = rust(
+        "class P {\n parallel static func f(n: int, values: [int]) -> int { return g(n) }\n \
+         parallel static func g(n: int) -> int { return n }\n \
+         static async func main() { Debug.print((await f(1, [2])).to_string()) }\n}",
     );
+
+    assert!(code.contains(
+        "::star_script_runtime::parallel::run((::star_script_runtime::Plain::send(&1_i64), \
+         ::star_script_runtime::Plain::send(&::star_script_runtime::List::from_vec(::std::vec![2_i64])),), \
+         |(argument0_, argument1_,)| crate::classes::P::Methods::f(\
+         ::star_script_runtime::Plain::receive(argument0_), ::star_script_runtime::Plain::receive(argument1_)))"
+    ));
+    // Inside a parallel function, others are called directly.
+    assert!(code.contains("return crate::classes::P::Methods::g(n);"));
 }

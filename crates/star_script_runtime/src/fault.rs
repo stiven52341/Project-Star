@@ -1,5 +1,22 @@
 //! Runtime errors: what stops a game because it cannot continue correctly.
 
+use std::cell::Cell;
+
+thread_local! {
+    /// Whether this thread runs `parallel` functions, whose faults stop the
+    /// game from its own thread, when their result is awaited.
+    static ON_WORKER: Cell<bool> = const { Cell::new(false) };
+}
+
+/// A fault on a thread of `parallel` functions, on its way to the game's
+/// thread.
+pub(crate) struct WorkerFault(pub(crate) String);
+
+/// Marks the current thread as one that runs `parallel` functions.
+pub(crate) fn mark_worker_thread() {
+    ON_WORKER.with(|on_worker| on_worker.set(true));
+}
+
 /// Stops the game with `message`, explained in StarScript terms.
 ///
 /// This is the only place where the engine is allowed to panic (agreed
@@ -8,12 +25,19 @@
 /// zero, cannot be detected when compiling and leave no correct way to go on.
 /// Stopping with a clear message is safer than continuing with a made-up value.
 ///
+/// On a thread of `parallel` functions it only stops the work, silently,
+/// so the game's thread reports it once, when it awaits the result.
+///
 /// # Panics
 ///
 /// Always: that is how the game stops.
 #[cold]
 #[track_caller]
 pub fn fault(message: &str) -> ! {
+    if ON_WORKER.with(Cell::get) {
+        // Unwinds without the panic message, which the game's thread gives.
+        std::panic::resume_unwind(Box::new(WorkerFault(message.to_owned())));
+    }
     #[allow(clippy::panic)]
     {
         panic!("StarScript runtime error: {message}")

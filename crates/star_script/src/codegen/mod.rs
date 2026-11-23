@@ -96,8 +96,6 @@ pub enum CodegenErrorKind {
     GameNeedsArguments(String),
     /// A script class inherits from a class implemented by the engine.
     NativeBaseClass(String),
-    /// Valid StarScript that the translation does not cover yet.
-    NotTranslatedYet(&'static str),
     /// The analysis lacks information it always provides for valid code:
     /// a bug in the compiler, not in the program.
     Internal(&'static str),
@@ -118,9 +116,6 @@ impl fmt::Display for CodegenError {
                 formatter,
                 "classes cannot inherit from the engine class `{base}` yet"
             ),
-            CodegenErrorKind::NotTranslatedYet(what) => {
-                write!(formatter, "{what} cannot be translated to Rust yet")
-            }
             CodegenErrorKind::Internal(problem) => {
                 write!(formatter, "internal compiler error: {problem}")
             }
@@ -136,14 +131,6 @@ type Result<T> = std::result::Result<T, CodegenError>;
 const fn internal(problem: &'static str, span: Span) -> CodegenError {
     CodegenError {
         kind: CodegenErrorKind::Internal(problem),
-        span,
-    }
-}
-
-/// `parallel` functions, until the translation has them (step 13.10e).
-const fn parallel_not_translated(span: Span) -> CodegenError {
-    CodegenError {
-        kind: CodegenErrorKind::NotTranslatedYet("`parallel` functions"),
         span,
     }
 }

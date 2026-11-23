@@ -4,8 +4,8 @@
 use super::conversions::{NONE, RC, RUNTIME, SOME};
 use super::expressions::self_reference;
 use super::names::ident;
-use super::statements::Body;
-use super::{Result, internal, parallel_not_translated};
+use super::statements::{Body, BodyKind};
+use super::{Result, internal};
 use crate::ast::{Expr, ExprKind, Literal};
 use crate::semantic::{
     BuiltinMethod, ClassId, ClassOrigin, INPUT_CLASS, ParameterInfo, Resolution, Type,
@@ -63,8 +63,8 @@ impl Body<'_> {
         if info.origin == ClassOrigin::Native && info.name == INPUT_CLASS {
             return self.input_call(callee, &method.name, arguments);
         }
-        if method.is_parallel() {
-            return Err(parallel_not_translated(callee.span));
+        if method.is_parallel() && self.kind != BodyKind::Parallel {
+            return self.parallel_call(class, &method.name, &method.parameters, arguments);
         }
         let arguments = self.arguments(&method.parameters, arguments)?;
         // Static methods of the engine are functions of the runtime; the
@@ -128,6 +128,41 @@ impl Body<'_> {
             }
             _ => Err(internal("method called through an expression", callee.span)),
         }
+    }
+
+    /// A `parallel` function called from a coroutine: a task that runs it
+    /// on another thread, with copies of the arguments, and copies its
+    /// result back. The work is a plain function, so nothing else crosses.
+    fn parallel_call(
+        &self,
+        class: ClassId,
+        name: &str,
+        parameters: &[ParameterInfo],
+        arguments: &[Expr],
+    ) -> Result<String> {
+        let sent = parameters
+            .iter()
+            .zip(arguments)
+            .map(|(parameter, argument)| {
+                let value = self.value_as(argument, &parameter.ty)?;
+                Ok(format!("{RUNTIME}::Plain::send(&{value})"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let names: Vec<String> = (0..arguments.len())
+            .map(|position| format!("argument{position}_"))
+            .collect();
+        let received: Vec<String> = names
+            .iter()
+            .map(|name| format!("{RUNTIME}::Plain::receive({name})"))
+            .collect();
+        Ok(format!(
+            "{RUNTIME}::parallel::run({}, |{}| {}::Methods::{}({}))",
+            tuple(&sent),
+            tuple(&names),
+            self.context.class_path(class),
+            ident(name),
+            received.join(", ")
+        ))
     }
 
     /// The class that declared `method` first: `class` itself, or the base
@@ -217,6 +252,15 @@ impl Body<'_> {
             ExprKind::Literal(Literal::String(text)) => format!("{text:?}"),
             _ => format!("&({})", self.value_as(argument, &Type::String)?),
         })
+    }
+}
+
+/// `(a, b,)`: a tuple of any length, one included.
+fn tuple(items: &[String]) -> String {
+    if items.is_empty() {
+        "()".to_owned()
+    } else {
+        format!("({},)", items.join(", "))
     }
 }
 
