@@ -9,15 +9,26 @@ use crate::scene_editor::SceneDocument;
 use crate::style::{PROPERTY_SPACING, property_row};
 use crate::texts;
 
-pub(crate) fn show_inspector(ui: &mut egui::Ui, project: &Project, scene: Option<&SceneDocument>) {
+/// The node selected in `scene`, to edit with the `images` of the assets
+/// folder, or the project if none is.
+pub(crate) fn show_inspector(
+    ui: &mut egui::Ui,
+    project: &Project,
+    scene: Option<&mut SceneDocument>,
+    images: &[String],
+) {
     ui.strong(texts::current().inspector);
     ui.separator();
-    if scene.is_some_and(|scene| scene.show_selected_node(ui)) {
-        return;
-    }
-    egui::CollapsingHeader::new(texts::current().project)
-        .default_open(true)
-        .show(ui, |ui| show_project_properties(ui, project));
+    egui::ScrollArea::vertical()
+        .auto_shrink(false)
+        .show(ui, |ui| {
+            let edited = scene.is_some_and(|scene| scene.edit_selected_node(ui, images));
+            if !edited {
+                egui::CollapsingHeader::new(texts::current().project)
+                    .default_open(true)
+                    .show(ui, |ui| show_project_properties(ui, project));
+            }
+        });
 }
 
 fn show_project_properties(ui: &mut egui::Ui, project: &Project) {

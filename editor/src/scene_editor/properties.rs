@@ -1,187 +1,432 @@
-//! The inspector of a scene node: every part the file gives it, shown in
-//! its own section.
+//! The inspector of a scene node: every part it has, in its own section,
+//! with its values to edit, and a menu to add the parts it lacks.
 
 use eframe::egui;
-use star_engine::prelude::{BodySettings, Color, LightNode, Transform2D, Transform3D};
+use star_engine::prelude::{
+    BodyKind, BodySettings, LightNode, MeshShape, Quat, Shape2d, Shape3d, ShapeKind, ShapeKind3d,
+    TextureFilter, Transform2D, Transform3D, Vec2, Vec3,
+};
+use star_engine::star_assets::AssetPath;
+use star_engine::star_render::{
+    DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MAX_SPHERE_DIVISIONS, MIN_SPHERE_RINGS,
+    MIN_SPHERE_SEGMENTS,
+};
 use star_engine::star_scene::{MeshOutline, NodeOutline, SpriteOutline};
 
-use crate::style::{PROPERTY_SPACING, property_row};
-use crate::texts::{self, number_text, size_text};
+use super::components::{DEFAULT_CAPSULE_HEIGHT, DEFAULT_RADIUS, add_component_menu, new_light};
+use super::fields::{
+    MIN_SIZE, angle_row, angles_row, checkbox_row, choice_row, color_row, fraction_row,
+    number_from_row, number_row, size2_row, size3_row, text_row, vec2_row, vec3_row, whole_row,
+};
+use crate::project::ProjectDimension;
+use crate::style::PROPERTY_SPACING;
+use crate::texts;
 
-/// Shows the parts of `node`.
-pub(super) fn show_node_properties(ui: &mut egui::Ui, node: &NodeOutline) {
-    let texts = texts::current();
-    section(ui, texts.node_section, |ui| {
-        property_row(ui, texts.name, &node.name);
-        property_row(
-            ui,
-            texts.class,
-            node.class.as_deref().unwrap_or(texts.no_class),
-        );
-    });
-    if let Some(transform) = &node.transform {
-        section(ui, texts.transform_section, |ui| {
-            show_transform(ui, transform);
-        });
-    }
-    if let Some(transform) = &node.transform_3d {
-        section(ui, texts.transform_3d_section, |ui| {
-            show_transform_3d(ui, transform);
-        });
-    }
-    if let Some(sprite) = &node.sprite {
-        section(ui, texts.sprite_section, |ui| show_sprite(ui, sprite));
-    }
-    if let Some(mesh) = &node.mesh {
-        section(ui, texts.mesh_section, |ui| show_mesh(ui, mesh));
-    }
-    if let Some(light) = &node.light {
-        section(ui, texts.light_section, |ui| show_light(ui, light));
-    }
-    if let Some(body) = &node.body {
-        section(ui, texts.body_section, |ui| {
-            property_row(ui, texts.shape, &texts.shape_description(body.shape.kind()));
-            show_body(ui, body);
-        });
-    }
-    if let Some(body) = &node.body_3d {
-        section(ui, texts.body_3d_section, |ui| {
-            property_row(
-                ui,
-                texts.shape,
-                &texts.shape_3d_description(body.shape.kind()),
-            );
-            show_body(ui, body);
-        });
-    }
+/// What the inspector edits a node with: the project's kind and the
+/// images of the assets folder, to choose from.
+pub(super) struct NodeContext<'context> {
+    pub(super) dimension: ProjectDimension,
+    pub(super) images: &'context [String],
 }
 
-/// A section that starts open, with its properties in a grid.
-fn section(ui: &mut egui::Ui, title: &str, add_rows: impl FnOnce(&mut egui::Ui)) {
+/// Shows the parts of `node` to edit. Returns whether it changed.
+pub(super) fn edit_node(
+    ui: &mut egui::Ui,
+    node: &mut NodeOutline,
+    context: &NodeContext<'_>,
+) -> bool {
+    let texts = texts::current();
+    let mut changed = section(ui, texts.node_section, None, |ui| edit_identity(ui, node));
+    changed |= optional_section(
+        ui,
+        texts.transform_section,
+        &mut node.transform,
+        edit_transform,
+    );
+    changed |= optional_section(
+        ui,
+        texts.transform_3d_section,
+        &mut node.transform_3d,
+        edit_transform_3d,
+    );
+    changed |= optional_section(ui, texts.sprite_section, &mut node.sprite, |ui, sprite| {
+        edit_sprite(ui, sprite, context.images)
+    });
+    changed |= optional_section(ui, texts.mesh_section, &mut node.mesh, |ui, mesh| {
+        edit_mesh(ui, mesh, context.images)
+    });
+    changed |= optional_section(ui, texts.light_section, &mut node.light, edit_light);
+    changed |= optional_section(ui, texts.body_section, &mut node.body, edit_body);
+    changed |= optional_section(ui, texts.body_3d_section, &mut node.body_3d, edit_body_3d);
+    ui.separator();
+    changed | add_component_menu(ui, node, context.dimension, context.images)
+}
+
+/// A part the node may lack: its section has a button that removes it.
+fn optional_section<Part>(
+    ui: &mut egui::Ui,
+    title: &str,
+    part: &mut Option<Part>,
+    edit: impl FnOnce(&mut egui::Ui, &mut Part) -> bool,
+) -> bool {
+    let Some(value) = part.as_mut() else {
+        return false;
+    };
+    let mut remove = false;
+    let changed = section(ui, title, Some(&mut remove), |ui| edit(ui, value));
+    if remove {
+        *part = None;
+    }
+    changed || remove
+}
+
+/// A section that starts open, with its rows in a grid and, if `remove`
+/// is given, a button that sets it. Returns whether a row changed.
+fn section(
+    ui: &mut egui::Ui,
+    title: &str,
+    remove: Option<&mut bool>,
+    add_rows: impl FnOnce(&mut egui::Ui) -> bool,
+) -> bool {
     egui::CollapsingHeader::new(title)
         .default_open(true)
         .show(ui, |ui| {
-            egui::Grid::new(title)
+            let changed = egui::Grid::new(title)
                 .num_columns(2)
                 .spacing(PROPERTY_SPACING)
-                .show(ui, add_rows);
-        });
+                .show(ui, add_rows)
+                .inner;
+            if let Some(remove) = remove {
+                *remove = ui.small_button(texts::current().remove).clicked();
+            }
+            changed
+        })
+        .body_returned
+        .unwrap_or(false)
 }
 
-fn show_transform(ui: &mut egui::Ui, transform: &Transform2D) {
+fn edit_identity(ui: &mut egui::Ui, node: &mut NodeOutline) -> bool {
     let texts = texts::current();
-    property_row(
-        ui,
-        texts.position,
-        &coordinates(&[transform.position.x, transform.position.y]),
-    );
-    property_row(ui, texts.rotation, &degrees(transform.rotation));
-    property_row(
-        ui,
-        texts.scale,
-        &coordinates(&[transform.scale.x, transform.scale.y]),
-    );
-}
-
-fn show_transform_3d(ui: &mut egui::Ui, transform: &Transform3D) {
-    let texts = texts::current();
-    let position = transform.position;
-    let angles = transform.rotation.to_euler();
-    let scale = transform.scale;
-    property_row(
-        ui,
-        texts.position,
-        &coordinates(&[position.x, position.y, position.z]),
-    );
-    property_row(
-        ui,
-        texts.rotation,
-        &[angles.x, angles.y, angles.z].map(degrees).join(", "),
-    );
-    property_row(ui, texts.scale, &coordinates(&[scale.x, scale.y, scale.z]));
-}
-
-fn show_sprite(ui: &mut egui::Ui, sprite: &SpriteOutline) {
-    let texts = texts::current();
-    property_row(ui, texts.image, sprite.texture.as_str());
-    property_row(ui, texts.filter, texts.filter_name(sprite.filter));
-    property_row(ui, texts.size, &size_text(&[sprite.size.x, sprite.size.y]));
-    property_row(
-        ui,
-        texts.anchor,
-        &coordinates(&[sprite.anchor.x, sprite.anchor.y]),
-    );
-    let region = sprite.region;
-    property_row(
-        ui,
-        texts.region,
-        &coordinates(&[region.min.x, region.min.y, region.max.x, region.max.y]),
-    );
-    property_row(ui, texts.color, &color_text(sprite.color));
-    property_row(ui, texts.layer, &sprite.layer.to_string());
-}
-
-fn show_mesh(ui: &mut egui::Ui, mesh: &MeshOutline) {
-    let texts = texts::current();
-    property_row(ui, texts.shape, &texts.mesh_description(mesh.shape));
-    property_row(ui, texts.color, &color_text(mesh.color));
-    property_row(ui, texts.metallic, &number_text(mesh.metallic));
-    property_row(ui, texts.roughness, &number_text(mesh.roughness));
-    if let Some((image, filter)) = &mesh.texture {
-        property_row(ui, texts.image, image.as_str());
-        property_row(ui, texts.filter, texts.filter_name(*filter));
+    let mut changed = text_row(ui, texts.name, &mut node.name, "");
+    let mut class = node.class.clone().unwrap_or_default();
+    if text_row(ui, texts.class, &mut class, texts.no_class) {
+        // A class of blanks is no class: scene files reject it.
+        node.class = Some(class).filter(|class| !class.trim().is_empty());
+        changed = true;
     }
+    changed
 }
 
-fn show_light(ui: &mut egui::Ui, light: &LightNode) {
+fn edit_transform(ui: &mut egui::Ui, transform: &mut Transform2D) -> bool {
     let texts = texts::current();
-    property_row(ui, texts.body_kind, texts.light_kind_name(light));
+    vec2_row(ui, texts.position, &mut transform.position)
+        | angle_row(ui, texts.rotation, &mut transform.rotation)
+        | vec2_row(ui, texts.scale, &mut transform.scale)
+}
+
+fn edit_transform_3d(ui: &mut egui::Ui, transform: &mut Transform3D) -> bool {
+    let texts = texts::current();
+    let moved = vec3_row(ui, texts.position, &mut transform.position);
+    let mut angles = transform.rotation.to_euler();
+    let turned = angles_row(ui, texts.rotation, &mut angles);
+    if turned {
+        transform.rotation = Quat::from_euler(angles);
+    }
+    moved | turned | vec3_row(ui, texts.scale, &mut transform.scale)
+}
+
+fn edit_sprite(ui: &mut egui::Ui, sprite: &mut SpriteOutline, images: &[String]) -> bool {
+    let texts = texts::current();
+    let mut texture = Some(sprite.texture.clone());
+    let mut changed = image_row(ui, &mut texture, images, false);
+    if let Some(texture) = texture {
+        sprite.texture = texture;
+    }
+    changed |= filter_row(ui, &mut sprite.filter);
+    changed |= size2_row(ui, texts.size, &mut sprite.size);
+    changed |= vec2_row(ui, texts.anchor, &mut sprite.anchor);
+    changed |= vec2_row(ui, texts.region, &mut sprite.region.min);
+    changed |= vec2_row(ui, "", &mut sprite.region.max);
+    changed |= color_row(ui, texts.color, &mut sprite.color);
+    changed | whole_row(ui, texts.layer, &mut sprite.layer, i32::MIN..=i32::MAX)
+}
+
+/// The image of a sprite or a mesh, among those of the assets folder;
+/// `optional` offers “No image” too.
+fn image_row(
+    ui: &mut egui::Ui,
+    texture: &mut Option<AssetPath>,
+    images: &[String],
+    optional: bool,
+) -> bool {
+    let texts = texts::current();
+    let current = texture.as_ref().map(|path| path.as_str().to_owned());
+    let mut choices: Vec<(Option<&str>, &str)> = Vec::new();
+    if optional {
+        choices.push((None, texts.no_image));
+    }
+    // The image shown stays a choice even if it is not in the folder.
+    if let Some(current) = current.as_deref()
+        && !images.iter().any(|image| image == current)
+    {
+        choices.push((Some(current), current));
+    }
+    choices.extend(
+        images
+            .iter()
+            .map(|image| (Some(image.as_str()), image.as_str())),
+    );
+    let mut selected = current.as_deref();
+    let changed = choice_row(ui, texts.image, &mut selected, &choices);
+    if changed {
+        *texture = selected.and_then(|path| AssetPath::new(path).ok());
+    }
+    changed
+}
+
+fn filter_row(ui: &mut egui::Ui, filter: &mut TextureFilter) -> bool {
+    let texts = texts::current();
+    let choices = [TextureFilter::Smooth, TextureFilter::Pixelated]
+        .map(|choice| (choice, texts.filter_name(choice)));
+    choice_row(ui, texts.filter, filter, &choices)
+}
+
+/// The kinds of mesh shape, to choose one.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MeshChoice {
+    Cube,
+    Plane,
+    Sphere,
+}
+
+fn edit_mesh(ui: &mut egui::Ui, mesh: &mut MeshOutline, images: &[String]) -> bool {
+    let texts = texts::current();
+    let mut changed = edit_mesh_shape(ui, &mut mesh.shape);
+    changed |= color_row(ui, texts.color, &mut mesh.color);
+    changed |= fraction_row(ui, texts.metallic, &mut mesh.metallic);
+    changed |= fraction_row(ui, texts.roughness, &mut mesh.roughness);
+    let filter = mesh.texture.as_ref().map(|(_, filter)| *filter);
+    let mut texture = mesh.texture.as_ref().map(|(path, _)| path.clone());
+    if image_row(ui, &mut texture, images, true) {
+        mesh.texture = texture.map(|path| (path, filter.unwrap_or_default()));
+        changed = true;
+    }
+    if let Some((_, filter)) = &mut mesh.texture {
+        changed |= filter_row(ui, filter);
+    }
+    changed
+}
+
+fn edit_mesh_shape(ui: &mut egui::Ui, shape: &mut MeshShape) -> bool {
+    let texts = texts::current();
+    let mut choice = match shape {
+        MeshShape::Cube { .. } => MeshChoice::Cube,
+        MeshShape::Plane { .. } => MeshChoice::Plane,
+        MeshShape::Sphere { .. } => MeshChoice::Sphere,
+    };
+    let choices = [
+        (MeshChoice::Cube, texts.cube),
+        (MeshChoice::Plane, texts.plane),
+        (MeshChoice::Sphere, texts.sphere),
+    ];
+    let chosen = choice_row(ui, texts.shape, &mut choice, &choices);
+    if chosen {
+        *shape = match choice {
+            MeshChoice::Cube => MeshShape::Cube { size: Vec3::ONE },
+            MeshChoice::Plane => MeshShape::Plane { size: Vec2::ONE },
+            MeshChoice::Sphere => MeshShape::Sphere {
+                radius: DEFAULT_RADIUS,
+                segments: DEFAULT_SPHERE_SEGMENTS,
+                rings: DEFAULT_SPHERE_RINGS,
+            },
+        };
+    }
+    let resized = match shape {
+        MeshShape::Cube { size } => size3_row(ui, texts.size, size),
+        MeshShape::Plane { size } => size2_row(ui, texts.size, size),
+        MeshShape::Sphere {
+            radius,
+            segments,
+            rings,
+        } => {
+            number_from_row(ui, texts.radius, radius, MIN_SIZE)
+                | whole_row(
+                    ui,
+                    texts.segments,
+                    segments,
+                    MIN_SPHERE_SEGMENTS..=MAX_SPHERE_DIVISIONS,
+                )
+                | whole_row(
+                    ui,
+                    texts.rings,
+                    rings,
+                    MIN_SPHERE_RINGS..=MAX_SPHERE_DIVISIONS,
+                )
+        }
+    };
+    chosen | resized
+}
+
+fn edit_light(ui: &mut egui::Ui, light: &mut LightNode) -> bool {
+    let texts = texts::current();
+    let mut directional = matches!(light, LightNode::Directional { .. });
+    let choices = [true, false].map(|choice| (choice, texts.light_kind_name(choice)));
+    let mut changed = choice_row(ui, texts.body_kind, &mut directional, &choices);
+    if changed {
+        *light = new_light(directional);
+    }
     let (LightNode::Directional { color, intensity }
     | LightNode::Point {
         color, intensity, ..
-    }) = *light;
-    property_row(ui, texts.color, &color_text(color));
-    property_row(ui, texts.intensity, &number_text(intensity));
-    if let LightNode::Point { range, .. } = *light {
-        property_row(ui, texts.range, &number_text(range));
+    }) = light;
+    changed |= color_row(ui, texts.color, color);
+    changed |= number_from_row(ui, texts.intensity, intensity, 0.0);
+    if let LightNode::Point { range, .. } = light {
+        changed |= number_from_row(ui, texts.range, range, MIN_SIZE);
+    }
+    changed
+}
+
+/// The kinds of 2D body shape, to choose one.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ShapeChoice {
+    Circle,
+    Rectangle,
+    Capsule,
+}
+
+fn edit_body(ui: &mut egui::Ui, body: &mut BodySettings) -> bool {
+    edit_shape(ui, &mut body.shape) | edit_body_settings(ui, body)
+}
+
+fn edit_shape(ui: &mut egui::Ui, shape: &mut Shape2d) -> bool {
+    let texts = texts::current();
+    let mut kind = shape.kind();
+    let mut choice = match kind {
+        ShapeKind::Circle { .. } => ShapeChoice::Circle,
+        ShapeKind::Rectangle { .. } => ShapeChoice::Rectangle,
+        ShapeKind::Capsule { .. } => ShapeChoice::Capsule,
+    };
+    let choices = [
+        (ShapeChoice::Circle, texts.circle),
+        (ShapeChoice::Rectangle, texts.rectangle),
+        (ShapeChoice::Capsule, texts.capsule),
+    ];
+    if choice_row(ui, texts.shape, &mut choice, &choices) {
+        kind = match choice {
+            ShapeChoice::Circle => ShapeKind::Circle {
+                radius: DEFAULT_RADIUS,
+            },
+            ShapeChoice::Rectangle => ShapeKind::Rectangle { size: Vec2::ONE },
+            ShapeChoice::Capsule => ShapeKind::Capsule {
+                height: DEFAULT_CAPSULE_HEIGHT,
+                radius: DEFAULT_RADIUS,
+            },
+        };
+    }
+    match &mut kind {
+        ShapeKind::Circle { radius } => {
+            number_from_row(ui, texts.radius, radius, MIN_SIZE);
+        }
+        ShapeKind::Rectangle { size } => {
+            size2_row(ui, texts.size, size);
+        }
+        ShapeKind::Capsule { height, radius } => {
+            number_from_row(ui, texts.height, height, MIN_SIZE);
+            number_from_row(ui, texts.radius, radius, MIN_SIZE);
+        }
+    }
+    // The physics checks the sizes (a capsule at least as high as it is
+    // wide); sizes it refuses leave the shape as it was.
+    let rebuilt = match kind {
+        ShapeKind::Circle { radius } => Shape2d::circle(radius),
+        ShapeKind::Rectangle { size } => Shape2d::rectangle(size),
+        ShapeKind::Capsule { height, radius } => Shape2d::capsule(height, radius),
+    };
+    replace_if_valid(shape, rebuilt.ok())
+}
+
+/// The kinds of 3D body shape, to choose one.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Shape3dChoice {
+    Sphere,
+    Box,
+    Capsule,
+}
+
+fn edit_body_3d(ui: &mut egui::Ui, body: &mut BodySettings<Shape3d>) -> bool {
+    edit_shape_3d(ui, &mut body.shape) | edit_body_settings(ui, body)
+}
+
+fn edit_shape_3d(ui: &mut egui::Ui, shape: &mut Shape3d) -> bool {
+    let texts = texts::current();
+    let mut kind = shape.kind();
+    let mut choice = match kind {
+        ShapeKind3d::Sphere { .. } => Shape3dChoice::Sphere,
+        ShapeKind3d::Box { .. } => Shape3dChoice::Box,
+        ShapeKind3d::Capsule { .. } => Shape3dChoice::Capsule,
+    };
+    let choices = [
+        (Shape3dChoice::Sphere, texts.sphere),
+        (Shape3dChoice::Box, texts.box_shape),
+        (Shape3dChoice::Capsule, texts.capsule),
+    ];
+    if choice_row(ui, texts.shape, &mut choice, &choices) {
+        kind = match choice {
+            Shape3dChoice::Sphere => ShapeKind3d::Sphere {
+                radius: DEFAULT_RADIUS,
+            },
+            Shape3dChoice::Box => ShapeKind3d::Box { size: Vec3::ONE },
+            Shape3dChoice::Capsule => ShapeKind3d::Capsule {
+                height: DEFAULT_CAPSULE_HEIGHT,
+                radius: DEFAULT_RADIUS,
+            },
+        };
+    }
+    match &mut kind {
+        ShapeKind3d::Sphere { radius } => {
+            number_from_row(ui, texts.radius, radius, MIN_SIZE);
+        }
+        ShapeKind3d::Box { size } => {
+            size3_row(ui, texts.size, size);
+        }
+        ShapeKind3d::Capsule { height, radius } => {
+            number_from_row(ui, texts.height, height, MIN_SIZE);
+            number_from_row(ui, texts.radius, radius, MIN_SIZE);
+        }
+    }
+    let rebuilt = match kind {
+        ShapeKind3d::Sphere { radius } => Shape3d::sphere(radius),
+        ShapeKind3d::Box { size } => Shape3d::cuboid(size),
+        ShapeKind3d::Capsule { height, radius } => Shape3d::capsule(height, radius),
+    };
+    replace_if_valid(shape, rebuilt.ok())
+}
+
+/// Puts `new` in `value` if it is valid and different. Returns whether
+/// `value` changed.
+fn replace_if_valid<Value: PartialEq>(value: &mut Value, new: Option<Value>) -> bool {
+    match new {
+        Some(new) if new != *value => {
+            *value = new;
+            true
+        }
+        _ => false,
     }
 }
 
 /// What 2D and 3D bodies share: everything but their shape.
-fn show_body<Shape>(ui: &mut egui::Ui, body: &BodySettings<Shape>) {
+fn edit_body_settings<Shape>(ui: &mut egui::Ui, body: &mut BodySettings<Shape>) -> bool {
     let texts = texts::current();
-    property_row(ui, texts.body_kind, texts.body_kind_name(body.kind));
-    property_row(ui, texts.gravity_scale, &number_text(body.gravity_scale));
-    property_row(ui, texts.friction, &number_text(body.friction));
-    property_row(ui, texts.bounciness, &number_text(body.bounciness));
-    property_row(ui, texts.density, &number_text(body.density));
-    property_row(ui, texts.sensor, yes_or_no(body.is_sensor));
-    property_row(ui, texts.fixed_rotation, yes_or_no(body.fixed_rotation));
-}
-
-fn coordinates(values: &[f32]) -> String {
-    values
-        .iter()
-        .map(|&value| number_text(value))
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-/// An angle in radians, shown in degrees, which people read more easily.
-fn degrees(radians: f32) -> String {
-    format!("{}°", number_text(radians.to_degrees()))
-}
-
-fn color_text(color: Color) -> String {
-    coordinates(&[color.r, color.g, color.b, color.a])
-}
-
-fn yes_or_no(value: bool) -> &'static str {
-    if value {
-        texts::current().yes
-    } else {
-        texts::current().no
-    }
+    let choices = [BodyKind::Dynamic, BodyKind::Static, BodyKind::Kinematic]
+        .map(|kind| (kind, texts.body_kind_name(kind)));
+    choice_row(ui, texts.body_kind, &mut body.kind, &choices)
+        | number_row(ui, texts.gravity_scale, &mut body.gravity_scale)
+        | number_from_row(ui, texts.friction, &mut body.friction, 0.0)
+        | number_from_row(ui, texts.bounciness, &mut body.bounciness, 0.0)
+        | number_from_row(ui, texts.density, &mut body.density, MIN_SIZE)
+        | checkbox_row(ui, texts.sensor, &mut body.is_sensor)
+        | checkbox_row(ui, texts.fixed_rotation, &mut body.fixed_rotation)
 }
 
 #[cfg(test)]
@@ -189,12 +434,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn angles_are_shown_in_degrees() {
-        assert_eq!(degrees(std::f32::consts::FRAC_PI_2), "90°");
-    }
+    fn only_valid_different_values_replace_the_old_one() {
+        let mut value = 1;
 
-    #[test]
-    fn coordinates_are_separated_by_commas() {
-        assert_eq!(coordinates(&[1.0, -0.5]), "1, -0.5");
+        assert!(!replace_if_valid(&mut value, None));
+        assert!(!replace_if_valid(&mut value, Some(1)));
+        assert!(replace_if_valid(&mut value, Some(2)));
+        assert_eq!(value, 2);
     }
 }

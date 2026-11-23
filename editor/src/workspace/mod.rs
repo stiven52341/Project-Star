@@ -44,9 +44,12 @@ pub(crate) enum EditorAction {
 
 /// Something that closes blueprints, waiting for the user to say what to do
 /// with their unsaved changes.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum Leaving {
     CloseTab(usize),
+    /// Open the scene at this path of the assets folder in place of the
+    /// one open.
+    OpenScene(String),
     CloseProject,
     Quit,
 }
@@ -160,9 +163,12 @@ impl EditorWindow {
             .default_size(SIDE_PANEL_WIDTH)
             .min_size(SIDE_PANEL_MIN_WIDTH)
             .show(ui, |ui| match self.documents.active() {
-                ActiveDocument::Scene => {
-                    show_inspector(ui, &self.project, self.documents.scene());
-                }
+                ActiveDocument::Scene => show_inspector(
+                    ui,
+                    &self.project,
+                    self.documents.scene_mut(),
+                    self.assets.images(),
+                ),
                 ActiveDocument::Blueprint(tab) => {
                     ui.strong(texts::current().inspector);
                     ui.separator();
@@ -227,8 +233,11 @@ impl EditorWindow {
     /// Does what `leaving` does, or asks first if it would lose unsaved
     /// changes. Returns what the application must do.
     fn leave(&mut self, leaving: Leaving) -> Option<EditorAction> {
-        let unsaved = match leaving {
-            Leaving::CloseTab(index) => self.documents.is_unsaved(index),
+        let unsaved = match &leaving {
+            Leaving::CloseTab(index) => self.documents.is_unsaved(*index),
+            Leaving::OpenScene(path) => {
+                self.documents.scene_is_unsaved() && !self.documents.is_scene_open(path)
+            }
             Leaving::CloseProject | Leaving::Quit => self.documents.any_unsaved(),
         };
         if unsaved {
@@ -245,6 +254,14 @@ impl EditorWindow {
                 self.documents.close(index);
                 None
             }
+            Leaving::OpenScene(path) => {
+                self.documents.open_scene(
+                    self.assets.directory(),
+                    path,
+                    self.project.settings().dimension(),
+                );
+                None
+            }
             Leaving::CloseProject => Some(EditorAction::CloseProject),
             Leaving::Quit => {
                 self.quit_confirmed = true;
@@ -255,10 +272,11 @@ impl EditorWindow {
 
     /// The question about unsaved changes, while something waits for it.
     fn ask_about_unsaved_changes(&mut self, context: &egui::Context) -> Option<EditorAction> {
-        let leaving = self.leaving?;
+        let leaving = self.leaving.clone()?;
         let question = match leaving {
             Leaving::CloseTab(_) => texts::current().unsaved_blueprint_question,
-            Leaving::CloseProject | Leaving::Quit => texts::current().unsaved_blueprints_question,
+            Leaving::OpenScene(_) => texts::current().unsaved_scene_question,
+            Leaving::CloseProject | Leaving::Quit => texts::current().unsaved_files_question,
         };
         let choice = show_unsaved_dialog(context, question)?;
         self.leaving = None;
@@ -268,6 +286,7 @@ impl EditorWindow {
             UnsavedChoice::Save => {
                 let saved = match leaving {
                     Leaving::CloseTab(index) => self.documents.save(index),
+                    Leaving::OpenScene(_) => self.documents.save_scene(),
                     Leaving::CloseProject | Leaving::Quit => self.documents.save_all(),
                 };
                 // If a save fails, its tab says why and nothing is closed.
@@ -321,7 +340,7 @@ impl EditorWindow {
                     self.documents.open_blueprint(self.assets.directory(), path);
                 }
                 Some(OpenedAsset::Scene(path)) => {
-                    self.documents.open_scene(self.assets.directory(), path);
+                    self.leave(Leaving::OpenScene(path));
                 }
                 None => {}
             },

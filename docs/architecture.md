@@ -96,6 +96,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 49 | 3D physics with **rapier3d** (Apache-2.0), beside rapier2d in `star_physics` | The 3D sibling of rapier2d, of the same authors and version: it shares parry, glamx and nalgebra, so the dependency tree barely grows, and `Physics3d` can have the same API as `Physics2d` (`BodySettings` and `Contact` are generic over the shape and the body id; the fixed-step clock and the contact bookkeeping are shared code). Rejected: avian3d (built on Bevy's ECS) and an own solver (as in decision 46) |
 | 50 | StarScript's 3D nodes are **`Node3D` extends `Node`**, and bodies stay one `Body` class | A 3D node keeps `x`, `y`, the scales and the whole tree API of `Node` (`add_child`, `children`, `find_child`, `Scene.load`), with `rotation` as its roll; `Node3D` adds `z`, `pitch`, `yaw`, `scale_z` and `look_at`, and `Mesh`, `Light` and `Camera3D` extend it. A `Body` is a 2D body on a 2D node and a 3D one on a `Node3D` (`Body.sphere`, `Body.box`, `depth`, `velocity_z`, `apply_impulse_3d`); a shape of the other dimension is left out with one warning. Rejected: a separate 3D hierarchy (the game and every node would need a second `add_child`, and scenes could not mix them) and a `Body3D` class (the whole API of `Body` twice, and two body fields on 3D nodes) |
 | 51 | Android games are a **NativeActivity** library, packaged with **cargo-apk2** | winit's `android-native-activity` feature runs the event loop in the `AndroidApp` the system starts (`android_main`), with no Java code to write or Gradle to run; `cargo-apk2` (MIT/Apache-2.0, the maintained successor of `cargo-apk`) builds the `cdylib`, the manifest from `[package.metadata.android]`, and signs the APK. A game keeps its desktop `main` and adds `star_engine::android_main!(run)` to its library (the only `unsafe` the project allows, approved by its owner: `#[unsafe(no_mangle)]` on that one function, because the system looks the entry up by its plain name; see `CLAUDE.md` 3.1 and `star_platform/src/entry.rs`); `star_platform::android` keeps the app for the event loop and sends the log to logcat (`android_logger`, MIT/Apache-2.0). Assets are read from the APK's `assets` folder (`[package.metadata.android] assets`) through Android's `AssetManager`: `star_platform::PackagedAssets`, given to `star_assets` as `PackagedFiles`, which `App` uses by default on Android (there are no files to watch, so no hot-reload there); `App::with_development_assets` sets a folder on disk only where assets are not packaged, so examples find theirs both ways. Every example is a library (`cdylib` and `rlib`) with `android_main!`, plus a desktop `main`; the CI checks them for Android and builds an APK. When Android takes the window's surface away, `WindowEventHandler::on_suspended` makes the renderer drop it and `on_resumed` makes a new one, keeping textures and meshes. Rejected: GameActivity (needs a Java/Kotlin part built with Gradle), `xbuild` (less maintained) and a Gradle project per game |
+| 52 | The editor edits scenes as **`SceneOutline` data**, not as a live world | An outline is the file's own model (images and meshes named, not loaded), so what the inspector changes is exactly what is saved, with no `SceneSources` to trace back and nothing lost on the way (classes, unknown images). It also needs no GPU to edit. Its tree is kept valid by `add_node` (appended after every node) and `remove_node` (whole subtrees, renumbering the rest), and `to_text` checks it again before writing. `Scene::to_text` goes through outlines too, so there is one writer. Rejected: instancing the scene into an ECS `World` and capturing it to save (it loses what worlds do not keep, like classes, and ties editing to rendering) |
 
 ## ECS
 
@@ -169,7 +170,10 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 - A **`SceneOutline`** is a scene file read and checked, with each image
   named by its asset path instead of loaded (`SceneOutline::read(&folder,
   &path)`). `Scene::from_text` is an outline whose images were loaded; code
-  that builds its own nodes, such as StarScript games, reads outlines.
+  that builds its own nodes, such as StarScript games, reads outlines. The
+  editor changes them (`node_mut`, `add_node`, `remove_node`, which keep
+  parents first) and writes them with `SceneOutline::to_text`, which
+  `Scene::to_text` also uses once each texture is named by its file.
 - **`.scene` files** are TOML: a format version and a flat list of
   `[[node]]` tables, each with its name, an optional StarScript `class`
   (the script class it is built as; Rust games ignore it, but scenes keep
@@ -533,9 +537,19 @@ The **scene editor** (`scene_editor/`) opens one `.scene` file at a time
 in the “Scene” tab, read as a `SceneOutline` (the nodes as the file
 describes them, images named by path: nothing is loaded to show them).
 The “Scene” panel draws its tree from the parent each node names, every
-branch open at first; a click selects a node, and the inspector shows its
-parts in sections (node, transform, sprite, mesh, light, 2D and 3D body),
-angles in degrees. A file that cannot be read shows why in the panel.
+branch open at first, under two buttons: “Add node” (a child of the
+selected node, or of the root, named `Node`, `Node2`… among its siblings,
+placed in 2D or 3D as the project is) and “Delete node” (with its
+descendants; never the root). A click selects a node, and the inspector
+edits its parts in sections (node, transform, sprite, mesh, light, 2D and
+3D body): angles in degrees, colors with egui's picker, images chosen
+among those of `assets/`, shapes rebuilt through the physics' own
+constructors so sizes it refuses are never kept. Each section can be
+removed, and “Add component” adds the parts the node lacks (those of the
+project's kind). Changes mark the tab (`●`) until “Save” (`Ctrl+S`),
+“Compile” or “Play” writes the file with `SceneOutline::to_text`; opening
+another scene, closing the project or quitting ask first, as blueprints
+do. A file that cannot be read or saved shows why in the panel.
 
 The **blueprint editor** (`blueprint_editor/`) draws a graph of the open
 blueprint on a canvas of its own, painted with egui's painter (no node

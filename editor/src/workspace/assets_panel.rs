@@ -4,9 +4,11 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use eframe::egui;
+use star_engine::prelude::AssetPath;
+use star_engine::star_assets::ImageFormat;
 
 use crate::blueprint_editor::create_blueprint;
-use crate::file_tree::{FileNode, scan_directory};
+use crate::file_tree::{FileNode, file_paths, scan_directory};
 use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, SCENE_EXTENSION};
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -34,6 +36,8 @@ impl OpenedAsset {
 pub(crate) struct AssetsPanel {
     directory: PathBuf,
     contents: io::Result<Vec<FileNode>>,
+    /// The images among the contents, as paths inside the folder.
+    images: Vec<String>,
     /// The form of “New blueprint…”, while it is open.
     new_blueprint: Option<NewBlueprintForm>,
 }
@@ -50,6 +54,7 @@ impl AssetsPanel {
         let directory = project_directory.join(ASSETS_DIRECTORY);
         let contents = scan_directory(&directory);
         Self {
+            images: image_paths(&contents),
             directory,
             contents,
             new_blueprint: None,
@@ -58,6 +63,13 @@ impl AssetsPanel {
 
     fn refresh(&mut self) {
         self.contents = scan_directory(&self.directory);
+        self.images = image_paths(&self.contents);
+    }
+
+    /// The images of the folder (those the engine can load), as paths
+    /// inside it, as they were when it was last listed.
+    pub(crate) fn images(&self) -> &[String] {
+        &self.images
     }
 
     /// The folder it lists.
@@ -129,6 +141,21 @@ impl AssetsPanel {
         }
         created
     }
+}
+
+/// The paths of the images among `contents`.
+fn image_paths(contents: &io::Result<Vec<FileNode>>) -> Vec<String> {
+    let Ok(nodes) = contents else {
+        return Vec::new();
+    };
+    file_paths(nodes)
+        .into_iter()
+        .filter(|path| {
+            AssetPath::new(path)
+                .and_then(|path| ImageFormat::of(&path))
+                .is_ok()
+        })
+        .collect()
 }
 
 /// Lists `nodes`, inside the folder `prefix` (`""` or `"enemies/"`); a

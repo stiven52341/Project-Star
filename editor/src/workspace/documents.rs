@@ -6,6 +6,7 @@ use std::path::Path;
 use eframe::egui;
 
 use crate::blueprint_editor::BlueprintTab;
+use crate::project::ProjectDimension;
 use crate::scene_editor::SceneDocument;
 use crate::texts;
 
@@ -43,27 +44,36 @@ impl Documents {
         self.active = Some(index);
     }
 
-    /// Shows the scene at `path` of the `assets` folder in the “Scene”
-    /// tab, in place of the one open there.
-    pub(crate) fn open_scene(&mut self, assets: &Path, path: String) {
-        let already_open = self
-            .scene
-            .as_ref()
-            .is_some_and(|scene| scene.path() == path);
-        if !already_open {
-            self.scene = Some(SceneDocument::open(assets, path));
+    /// Shows the scene at `path` of the `assets` folder of a project of
+    /// `dimension` in the “Scene” tab, in place of the one open there,
+    /// saved or not.
+    pub(crate) fn open_scene(&mut self, assets: &Path, path: String, dimension: ProjectDimension) {
+        if !self.is_scene_open(&path) {
+            self.scene = Some(SceneDocument::open(assets, path, dimension));
         }
         self.active = None;
+    }
+
+    /// Whether the scene at `path` is the one open.
+    pub(crate) fn is_scene_open(&self, path: &str) -> bool {
+        self.scene
+            .as_ref()
+            .is_some_and(|scene| scene.path() == path)
+    }
+
+    /// Whether the open scene has unsaved changes.
+    pub(crate) fn scene_is_unsaved(&self) -> bool {
+        self.scene.as_ref().is_some_and(SceneDocument::is_unsaved)
+    }
+
+    /// Saves the open scene. Returns whether it is saved now.
+    pub(crate) fn save_scene(&mut self) -> bool {
+        self.scene.as_mut().is_none_or(SceneDocument::save)
     }
 
     /// The scene open in the “Scene” tab.
     pub(crate) fn scene_mut(&mut self) -> Option<&mut SceneDocument> {
         self.scene.as_mut()
-    }
-
-    /// The scene open in the “Scene” tab.
-    pub(crate) const fn scene(&self) -> Option<&SceneDocument> {
-        self.scene.as_ref()
     }
 
     fn position_of(&self, path: &str) -> Option<usize> {
@@ -91,14 +101,17 @@ impl Documents {
             .is_some_and(BlueprintTab::is_unsaved)
     }
 
-    /// Whether any blueprint has unsaved changes.
+    /// Whether the scene or any blueprint has unsaved changes.
     pub(crate) fn any_unsaved(&self) -> bool {
-        self.blueprints.iter().any(BlueprintTab::is_unsaved)
+        self.scene_is_unsaved() || self.blueprints.iter().any(BlueprintTab::is_unsaved)
     }
 
-    /// Whether the tab shown is a blueprint with unsaved changes.
+    /// Whether the tab shown has unsaved changes.
     pub(crate) fn active_is_unsaved(&self) -> bool {
-        self.active.is_some_and(|index| self.is_unsaved(index))
+        match self.active {
+            Some(index) => self.is_unsaved(index),
+            None => self.scene_is_unsaved(),
+        }
     }
 
     /// Saves the blueprint at `index`. Returns whether it is saved now.
@@ -108,18 +121,19 @@ impl Documents {
             .is_none_or(BlueprintTab::save)
     }
 
-    /// Saves the blueprint shown, if one is.
+    /// Saves the tab shown.
     pub(crate) fn save_active(&mut self) {
-        if let Some(index) = self.active {
-            self.save(index);
-        }
+        match self.active {
+            Some(index) => self.save(index),
+            None => self.save_scene(),
+        };
     }
 
-    /// Saves every blueprint. Returns whether all of them are saved now;
-    /// the tabs of those that are not say why.
+    /// Saves the scene and every blueprint. Returns whether all of them are
+    /// saved now; those that are not say why.
     pub(crate) fn save_all(&mut self) -> bool {
-        // Every tab is saved, even after one fails.
-        let mut all_saved = true;
+        // Every file is saved, even after one fails.
+        let mut all_saved = self.save_scene();
         for tab in &mut self.blueprints {
             all_saved &= tab.save();
         }
@@ -139,10 +153,10 @@ impl Documents {
     pub(crate) fn show_tabs(&mut self, ui: &mut egui::Ui) -> Option<usize> {
         let mut close = None;
         ui.horizontal(|ui| {
-            let scene_title = self
-                .scene
-                .as_ref()
-                .map_or(texts::current().scene_tab, SceneDocument::title);
+            let scene_title = self.scene.as_ref().map_or_else(
+                || texts::current().scene_tab.to_owned(),
+                SceneDocument::title,
+            );
             let scene_tab = ui.selectable_value(&mut self.active, None, scene_title);
             if let Some(scene) = &self.scene {
                 scene_tab.on_hover_text(scene.path());
@@ -221,13 +235,14 @@ mod tests {
     fn opening_a_scene_shows_the_scene_tab_with_it() {
         let (assets, mut documents) = documents_with(&["a.blueprint"]);
 
-        documents.open_scene(assets.path(), "level.scene".to_owned());
+        documents.open_scene(
+            assets.path(),
+            "level.scene".to_owned(),
+            ProjectDimension::TwoD,
+        );
 
         assert_eq!(active_path(&mut documents), None);
-        assert_eq!(
-            documents.scene().map(SceneDocument::path),
-            Some("level.scene")
-        );
+        assert!(documents.is_scene_open("level.scene"));
     }
 
     #[test]

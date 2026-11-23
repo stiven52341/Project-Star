@@ -8,8 +8,6 @@ mod messages;
 mod scene_messages;
 mod spanish;
 
-pub(crate) use self::scene_messages::{number_text, size_text};
-
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -122,6 +120,24 @@ pub(crate) struct Texts {
     pub(crate) no_scene_open: &'static str,
     pub(crate) node_section: &'static str,
     pub(crate) no_class: &'static str,
+    pub(crate) no_image: &'static str,
+    pub(crate) add_component: &'static str,
+    pub(crate) no_images_hint: &'static str,
+    pub(crate) add_child_node_hint: &'static str,
+    pub(crate) root_cannot_be_deleted: &'static str,
+    pub(crate) new_node_name: &'static str,
+    pub(crate) circle: &'static str,
+    pub(crate) rectangle: &'static str,
+    pub(crate) capsule: &'static str,
+    pub(crate) sphere: &'static str,
+    pub(crate) box_shape: &'static str,
+    pub(crate) cube: &'static str,
+    pub(crate) plane: &'static str,
+    pub(crate) radius: &'static str,
+    pub(crate) height: &'static str,
+    pub(crate) segments: &'static str,
+    pub(crate) rings: &'static str,
+    pub(crate) unsaved_scene_question: &'static str,
     pub(crate) transform_section: &'static str,
     pub(crate) transform_3d_section: &'static str,
     pub(crate) position: &'static str,
@@ -151,8 +167,6 @@ pub(crate) struct Texts {
     pub(crate) light_section: &'static str,
     pub(crate) intensity: &'static str,
     pub(crate) range: &'static str,
-    pub(crate) yes: &'static str,
-    pub(crate) no: &'static str,
     pub(crate) inspector: &'static str,
     pub(crate) project: &'static str,
     pub(crate) engine: &'static str,
@@ -189,7 +203,7 @@ pub(crate) struct Texts {
     pub(crate) save: &'static str,
     pub(crate) unsaved_changes: &'static str,
     pub(crate) unsaved_blueprint_question: &'static str,
-    pub(crate) unsaved_blueprints_question: &'static str,
+    pub(crate) unsaved_files_question: &'static str,
     pub(crate) discard_changes: &'static str,
     pub(crate) cancel: &'static str,
     // Blueprint editor.
