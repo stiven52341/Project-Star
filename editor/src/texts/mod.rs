@@ -287,7 +287,7 @@ pub(crate) struct Texts {
 
 /// The name of a tab with unsaved changes.
 pub(crate) fn unsaved_title(name: &str) -> String {
-    format!("{name} ●")
+    format!("{name} •")
 }
 
 /// `Player : Sprite`, or only the class if it extends nothing.
@@ -313,6 +313,37 @@ mod tests {
     fn english_is_the_default_language() {
         assert_eq!(Language::default(), Language::English);
         assert_eq!(Language::ALL[0], Language::default());
+    }
+
+    /// Regression: `●` and arrows were written with the default fonts,
+    /// which do not have them, so they were drawn as boxes and logged a
+    /// warning on every frame.
+    #[test]
+    fn every_character_the_editor_writes_can_be_drawn() {
+        let context = eframe::egui::Context::default();
+        let mut output = context.run_ui(eframe::egui::RawInput::default(), |_| {});
+        // Nothing is drawn, so the font textures are never uploaded.
+        output.textures_delta.clear();
+        let font = eframe::egui::FontId::proportional(eframe::egui::FontId::default().size);
+        let sources = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut missing = Vec::new();
+        for path in
+            crate::file_tree::file_paths(&crate::file_tree::scan_directory(&sources).unwrap())
+        {
+            let text = std::fs::read_to_string(sources.join(&path)).unwrap();
+            let code = text
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("//"));
+            for character in code
+                .flat_map(str::chars)
+                .filter(|character| !character.is_ascii())
+            {
+                if !context.fonts_mut(|fonts| fonts.has_glyph(&font, character)) {
+                    missing.push(format!("{path}: {character:?}"));
+                }
+            }
+        }
+        assert_eq!(missing, Vec::<String>::new());
     }
 
     #[test]

@@ -1,6 +1,6 @@
 //! Suggestions shown while writing: the rest of the chosen name in faint
 //! text after the cursor, and the other names in a list under it. `Tab`
-//! writes the chosen one, `↑` and `↓` choose another, `Esc` hides them
+//! writes the chosen one, the up and down arrows choose another, `Esc` hides them
 //! until the word changes.
 
 use eframe::egui;

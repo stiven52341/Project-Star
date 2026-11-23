@@ -575,7 +575,7 @@ edits its parts in sections (node, transform, sprite, mesh, light, 2D and
 among those of `assets/`, shapes rebuilt through the physics' own
 constructors so sizes it refuses are never kept. Each section can be
 removed, and “Add component” adds the parts the node lacks (those of the
-project's kind). Changes mark the tab (`●`) until “Save” (`Ctrl+S`),
+project's kind). Changes mark the tab (`•`) until “Save” (`Ctrl+S`),
 “Compile” or “Play” writes the file with `SceneOutline::to_text`; opening
 another scene, closing the project or quitting ask first, as blueprints
 do. A file that cannot be read or saved shows why in the panel.
@@ -740,14 +740,14 @@ class. Elsewhere, the names written in the text, the members of the class
 being written, the classes, the keywords and the basic types. The chosen
 name's rest is painted in faint text after the cursor and the others are
 listed under it (with their signatures); `Tab` writes it (a method with its
-parentheses, the cursor inside if it takes parameters), `↑`/`↓` choose
+parentheses, the cursor inside if it takes parameters), the up and down arrows choose
 another while there are several, and `Esc` hides them until the word
 changes. These keys are taken before the writing aids, so `Tab` indents
 only when nothing is suggested.
 
 Blueprints and scripts are saved with `Ctrl+S` or “File” → “Save”, and
 all of them before “Compile”, which reads the files. Tabs with unsaved changes
-show `●`; closing one, the project or the window asks first (“Save”,
+show `•`; closing one, the project or the window asks first (“Save”,
 “Don't save”, “Cancel”). Saving writes the file again from the model, so
 comments written by hand in it are not kept.
 

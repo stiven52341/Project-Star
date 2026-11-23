@@ -47,8 +47,8 @@ impl Texts {
     /// The keys of the list of suggestions.
     pub(crate) const fn suggestion_keys(&self) -> &'static str {
         self.pick(
-            "Tab: write · ↑↓: choose · Esc: hide",
-            "Tab: escribir · ↑↓: elegir · Esc: ocultar",
+            "Tab: write · Up/Down: choose · Esc: hide",
+            "Tab: escribir · Arriba/Abajo: elegir · Esc: ocultar",
         )
     }
 

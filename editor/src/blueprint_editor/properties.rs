@@ -67,7 +67,7 @@ fn variable_field(ui: &mut egui::Ui, variable: &mut String, names: &BlueprintNam
     ui.horizontal(|ui| {
         changed |= ui.text_edit_singleline(variable).changed();
         if !names.variables.is_empty() {
-            ui.menu_button("▾", |ui| {
+            ui.menu_button("…", |ui| {
                 for name in &names.variables {
                     if ui.button(name).clicked() {
                         name.clone_into(variable);
