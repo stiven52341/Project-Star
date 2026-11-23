@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
 
-use super::{OpenTexts, ProjectCheck, check_project_with};
+use super::{CheckGoal, OpenTexts, ProjectCheck, check_project_with};
 
 /// Name of the thread, as debuggers and crash reports show it.
 const THREAD_NAME: &str = "project check";
@@ -29,16 +29,15 @@ pub(crate) enum CheckStatus {
 }
 
 impl CheckJob {
-    /// Starts checking the project in `directory`, with the texts of the
-    /// files `open` in the editor; `on_finish` runs on the job's thread
-    /// once the result is ready (e.g. to redraw the editor).
+    /// Starts checking the project in `directory` for “Compile”;
+    /// `on_finish` runs on the job's thread once the result is ready (e.g.
+    /// to redraw the editor).
     ///
     /// # Errors
     ///
     /// Returns the error of the operating system if it refused the thread.
     pub(crate) fn start(
         directory: PathBuf,
-        open: OpenTexts,
         on_finish: impl FnOnce() + Send + 'static,
     ) -> io::Result<Self> {
         let (sender, receiver) = mpsc::channel();
@@ -47,7 +46,8 @@ impl CheckJob {
             .spawn(move || {
                 // The editor may have closed the project meanwhile: then
                 // nobody waits for the result, and that is fine.
-                let _ = sender.send(check_project_with(&directory, &open));
+                let check = check_project_with(&directory, &OpenTexts::new(), CheckGoal::Compile);
+                let _ = sender.send(check);
                 on_finish();
             })?;
         Ok(Self { receiver })
@@ -87,13 +87,9 @@ mod tests {
         .expect("script");
         let (finished, finish_signal) = mpsc::channel();
 
-        let job = CheckJob::start(
-            directory.path().to_path_buf(),
-            OpenTexts::new(),
-            move || {
-                let _ = finished.send(());
-            },
-        )
+        let job = CheckJob::start(directory.path().to_path_buf(), move || {
+            let _ = finished.send(());
+        })
         .expect("thread started");
 
         assert_ne!(

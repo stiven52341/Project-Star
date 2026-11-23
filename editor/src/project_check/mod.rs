@@ -10,6 +10,7 @@ mod job;
 mod problem;
 mod program;
 mod scenes;
+mod worker;
 
 use std::collections::HashMap;
 use std::fs;
@@ -22,6 +23,7 @@ use star_script::{CompileError, GameSettings, analyze_program_with, check_progra
 pub(crate) use self::job::{CheckJob, CheckStatus};
 pub(crate) use self::problem::Problem;
 use self::program::Program;
+pub(crate) use self::worker::CheckWorker;
 use crate::file_tree::{file_paths, scan_directory};
 use crate::project::{
     ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, MANIFEST_FILE_NAME, SCENE_EXTENSION, SCRIPT_EXTENSION,
@@ -46,14 +48,31 @@ pub(crate) struct ProjectCheck {
 /// folder: what a check reads instead of their files, which may be older.
 pub(crate) type OpenTexts = HashMap<String, String>;
 
-/// Checks the project in `directory`, reading the files of `open` from
-/// there instead of from the disk.
+/// What a check is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CheckGoal {
+    /// “Compile”: everything, and the program translated to Rust for
+    /// “Play”.
+    Compile,
+    /// Marking mistakes and suggesting names while scripts are written:
+    /// only the program's code is checked, and it is not translated (the
+    /// translation only finds constructs Rust cannot have yet, which
+    /// “Compile” reports).
+    Writing,
+}
+
+/// Checks the project in `directory` for `goal`, reading the files of
+/// `open` from there instead of from the disk.
 ///
 /// A project without scripts is a game written in Rust: its scenes are not
 /// checked against StarScript classes, which such games ignore. If a
 /// blueprint cannot become StarScript, only its problems are given for the
 /// program: the rest would only miss its class.
-pub(crate) fn check_project_with(directory: &Path, open: &OpenTexts) -> ProjectCheck {
+pub(crate) fn check_project_with(
+    directory: &Path,
+    open: &OpenTexts,
+    goal: CheckGoal,
+) -> ProjectCheck {
     let assets_folder = AssetsFolder { directory, open };
     let mut problems = Vec::new();
     let settings = read_game_settings(directory, &mut problems);
@@ -62,11 +81,11 @@ pub(crate) fn check_project_with(directory: &Path, open: &OpenTexts) -> ProjectC
     let scripts = assets.iter().filter(|path| is_program_file(path)).count();
     let readable = !program.sources().is_empty() && program.is_complete();
     let (checked, generated) = if readable {
-        check_program(&program, &settings, &mut problems)
+        check_program(&program, &settings, goal, &mut problems)
     } else {
         (None, None)
     };
-    if scripts > 0 {
+    if scripts > 0 && goal == CheckGoal::Compile {
         let classes = checked.as_ref().map(|checked| checked.analysis.classes());
         for path in assets.iter().filter(|path| path.ends_with(SCENE_EXTENSION)) {
             if let Some(text) = assets_folder.read(path, &mut problems) {
@@ -163,10 +182,11 @@ fn asset_name(path: &str) -> String {
     format!("{ASSETS_DIRECTORY}/{path}")
 }
 
-/// Checks the program, and translates it to Rust.
+/// Checks the program, and translates it to Rust if `goal` asks for it.
 fn check_program(
     program: &Program,
     settings: &GameSettings,
+    goal: CheckGoal,
     problems: &mut Vec<Problem>,
 ) -> (Option<star_script::CheckedSource>, Option<GeneratedProgram>) {
     let report = |errors: Vec<CompileError>| {
@@ -176,6 +196,7 @@ fn check_program(
             .collect::<Vec<_>>()
     };
     match check_program_with(program.sources(), settings) {
+        Ok(checked) if goal == CheckGoal::Writing => (Some(checked), None),
         Ok(checked) => match codegen::generate(&checked.syntax, &checked.analysis) {
             Ok(generated) => (Some(checked), Some(generated)),
             Err(error) => {

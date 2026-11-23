@@ -28,7 +28,7 @@ fn project(test_name: &str, files: &[(&str, &str)]) -> TestDirectory {
 }
 
 fn check_project(directory: &std::path::Path) -> ProjectCheck {
-    check_project_with(directory, &OpenTexts::new())
+    check_project_with(directory, &OpenTexts::new(), CheckGoal::Compile)
 }
 
 fn messages(check: &ProjectCheck) -> Vec<String> {
@@ -283,7 +283,7 @@ fn open_texts_are_checked_instead_of_their_files() {
         "class Rock {\n  var x = @\n}\n".to_owned(),
     )]);
 
-    let check = check_project_with(directory.path(), &open);
+    let check = check_project_with(directory.path(), &open, CheckGoal::Writing);
 
     assert_eq!(
         messages(&check),

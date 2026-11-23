@@ -1,5 +1,5 @@
 //! Checking the project while scripts are written: a moment after the user
-//! stops typing, the project is checked in the background with the texts
+//! stops typing, the project is checked by a thread of its own with the texts
 //! open in the editor, and the code editor marks the mistakes found.
 //!
 //! It is separate from “Compile”: its problems are only shown in the code,
@@ -12,7 +12,7 @@ use eframe::egui;
 
 use star_script::semantic::ClassTable;
 
-use crate::project_check::{CheckJob, CheckStatus, OpenTexts, Problem};
+use crate::project_check::{CheckWorker, OpenTexts, Problem};
 
 /// How long after the last change the check starts, so it does not run on
 /// every key.
@@ -22,7 +22,8 @@ const QUIET_TIME: Duration = Duration::from_millis(500);
 pub(super) struct LiveCheck {
     /// When the texts changed, if they did since the last check started.
     changed_at: Option<Instant>,
-    job: Option<CheckJob>,
+    /// The thread that checks, once started.
+    worker: Option<CheckWorker>,
     problems: Vec<Problem>,
     /// The classes of the last check that could read the program: while a
     /// line is half written the program cannot be read, and suggestions
@@ -34,7 +35,7 @@ impl LiveCheck {
     pub(super) const fn new() -> Self {
         Self {
             changed_at: None,
-            job: None,
+            worker: None,
             problems: Vec::new(),
             classes: None,
         }
@@ -56,27 +57,20 @@ impl LiveCheck {
         &self.problems
     }
 
-    /// Takes the result of the check that finished, and starts the next
-    /// one when it is time, with the texts `open` gives; redraws the editor
-    /// when there is something to do later.
+    /// Takes the result of the newest check that finished, and asks for
+    /// the next one when it is time, with the texts `open` gives; redraws
+    /// the editor when there is something to do later.
     pub(super) fn update(
         &mut self,
         context: &egui::Context,
         directory: &Path,
         open: impl FnOnce() -> OpenTexts,
     ) {
-        if let Some(job) = &self.job {
-            match job.status() {
-                CheckStatus::Running => return,
-                CheckStatus::Finished(check) => {
-                    self.problems = check.problems;
-                    if check.classes.is_some() {
-                        self.classes = check.classes;
-                    }
-                }
-                CheckStatus::Lost => {}
+        if let Some(check) = self.worker.as_ref().and_then(CheckWorker::latest) {
+            self.problems = check.problems;
+            if check.classes.is_some() {
+                self.classes = check.classes;
             }
-            self.job = None;
         }
         let Some(changed_at) = self.changed_at else {
             return;
@@ -86,11 +80,25 @@ impl LiveCheck {
             return;
         }
         self.changed_at = None;
-        let redraw = context.clone();
-        self.job = CheckJob::start(directory.to_path_buf(), open(), move || {
-            redraw.request_repaint();
-        })
-        .inspect_err(|error| log::warn!("Could not check the scripts while writing: {error}"))
-        .ok();
+        let asked = self
+            .worker(context, directory)
+            .is_some_and(|worker| worker.check(open()));
+        if !asked {
+            // The thread stopped: a new one is started on the next change.
+            self.worker = None;
+        }
+    }
+
+    /// The thread that checks, started the first time it is needed.
+    fn worker(&mut self, context: &egui::Context, directory: &Path) -> Option<&CheckWorker> {
+        if self.worker.is_none() {
+            let redraw = context.clone();
+            self.worker = CheckWorker::start(directory.to_path_buf(), move || {
+                redraw.request_repaint();
+            })
+            .inspect_err(|error| log::warn!("Could not check the scripts while writing: {error}"))
+            .ok();
+        }
+        self.worker.as_ref()
     }
 }

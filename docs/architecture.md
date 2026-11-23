@@ -714,9 +714,13 @@ of its own (a `Text`, or an input method's `Commit`).
 
 Mistakes are shown while writing (`workspace/live_check.rs`): half a
 second after the last change to a script (or after one is opened), the
-whole project is checked on a thread of its own, as “Compile” does, but
-reading the open scripts' texts instead of their files (`OpenTexts`,
-`check_project_with`), saved or not. Its problems are only marked in the
+project's code is checked by a thread that lives while the project is open
+(`project_check::CheckWorker`; it takes request after request, skipping to
+the newest texts if several waited), reading the open scripts' texts
+instead of their files (`OpenTexts`, `check_project_with`), saved or not.
+Its goal is `CheckGoal::Writing`: the program is not translated to Rust
+and scenes are not checked, which only “Compile” (`CheckGoal::Compile`,
+on a thread of its own each time) needs. Its problems are only marked in the
 code: “Problems” and “Play” still follow “Compile”. Each mistake of the
 script shown is marked with a wavy red line under the name, number or
 string it starts at, or under its one character (`mistakes.rs`, with
