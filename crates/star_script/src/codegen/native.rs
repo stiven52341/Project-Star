@@ -98,7 +98,7 @@ pub mod Game {
             camera_3d: ::star_script_runtime::Field::new(::std::option::Option::None),
             ambient: ::star_script_runtime::Field::new(crate::classes::Color::new(0.0, 0.0, 0.0, 1.0)),
             quit_requested_: ::star_script_runtime::Field::new(false),
-            root_: crate::classes::Node::new(::std::string::String::from(\"Game\")),
+            root_: crate::classes::Node::new_root_(),
         })
     }
 
@@ -421,6 +421,28 @@ pub mod Node {
             HasFields::fields(&**this_).children_.borrow().iter()
                 .find(|child_| HasFields::fields(&***child_).name.read(|child_name_| *child_name_ == name))
                 .cloned()
+        }
+    }
+
+    thread_local! {
+        /// The root of the game's tree, once the game exists.
+        static GAME_ROOT_: ::std::cell::RefCell<::std::option::Option<::std::rc::Weak<dyn Object>>> = const { ::std::cell::RefCell::new(::std::option::Option::None) };
+    }
+
+    /// Creates the root of the game's tree, which `in_tree_` looks for.
+    pub fn new_root_() -> Ref {
+        let root_ = new(::std::string::String::from(\"Game\"));
+        GAME_ROOT_.with(|game_root_| *game_root_.borrow_mut() = ::std::option::Option::Some(::std::rc::Rc::downgrade(&root_)));
+        root_
+    }
+
+    /// Whether `node` is in the game's tree, so its coroutines go on.
+    /// Without a game (a console program) there is no tree to leave.
+    pub fn in_tree_(node: &Ref) -> bool {
+        let root_ = GAME_ROOT_.with(|game_root_| game_root_.borrow().as_ref().and_then(::std::rc::Weak::upgrade));
+        match root_ {
+            ::std::option::Option::Some(root_) => is_same_or_ancestor_(&root_, node),
+            ::std::option::Option::None => true,
         }
     }
 
@@ -894,6 +916,83 @@ pub mod Sound {
     }
 }";
 
+/// `EngineGame_`: connects the StarScript game with the engine's game loop.
+fn engine_game_loop() -> String {
+    format!(
+        "
+/// Connects the StarScript game with the engine's game loop.
+struct EngineGame_ {{
+    /// Where `Sound`s play: silent until the engine gives the game its audio.
+    audio: ::std::rc::Rc<::std::cell::RefCell<::star_engine::star_audio::Audio>>,
+    game: crate::classes::Game::Ref,
+    /// Reused list of the nodes whose code runs in a frame.
+    nodes: ::std::vec::Vec<crate::classes::Node::Ref>,
+    /// Reused list of the nodes still to mirror, with their parent's number.
+    pending: ::std::vec::Vec<(crate::classes::Node::Ref, ::std::option::Option<u64>)>,
+    /// Reused map of the nodes of the tree by their number, to tell bodies
+    /// what they touch.
+    known: ::std::collections::HashMap<u64, crate::classes::Node::Ref>,
+    /// The node of the engine's world that mirrors each node of the game.
+    mirror: ::star_engine::script_nodes::ScriptNodes,
+}}
+
+impl ::star_engine::game::Game for EngineGame_ {{
+    fn start(
+        &mut self,
+        context: &mut ::star_engine::game::GameContext<'_>,
+    ) -> ::star_engine::star_core::EngineResult<()> {{
+        use ::star_engine::EngineWorld as _;
+        *self.audio.borrow_mut() = context.world().audio();
+        crate::classes::Game::Object::start(::std::rc::Rc::clone(&self.game));
+        ::std::result::Result::Ok(())
+    }}
+
+    fn update(&mut self, world: &mut ::star_engine::star_ecs::World) {{
+        use ::star_engine::EngineWorld as _;
+        if let ::std::option::Option::Some(input) = world.input() {{
+            share_actions_(&input);
+            share_pointer_(&input, &self.view_(world), world.window_size());
+        }}
+        let delta_ = world.time().delta_seconds();
+        let root_ = ::std::rc::Rc::clone(&crate::classes::Game::HasFields::fields(&*self.game).root_);
+        sync_bodies_(world, &mut self.mirror, &root_, &mut self.known, &mut self.nodes);
+        {RUNTIME}::tasks::frame_started(delta_);
+        crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.game), delta_);
+        crate::classes::Node::process_tree_(&root_, delta_, &mut self.nodes);
+        {RUNTIME}::tasks::resume();
+        mirror_nodes_(world, &mut self.mirror, &root_, &mut self.pending);
+    }}
+
+    fn draw(&self, world: &::star_engine::star_ecs::World, frame: &mut ::star_engine::star_render::Frame) {{
+        let fields_ = crate::classes::Game::HasFields::fields(&*self.game);
+        frame.set_clear_color(fields_.background.read(|color_| engine_color_(&**color_)));
+        let ambient_ = fields_.ambient.read(|color_| engine_color_(&**color_));
+        frame.set_ambient_light(::star_engine::star_render::AmbientLight::new(ambient_, 1.0));
+        frame.set_camera(self.view_(world));
+    }}
+
+    fn is_finished(&self) -> bool {{
+        crate::classes::Game::HasFields::fields(&*self.game).{QUIT_FIELD}.get()
+    }}
+}}
+
+impl EngineGame_ {{
+    /// The engine's camera that shows the game from its `camera_3d`, or
+    /// else from its `camera`.
+    fn view_(&self, world: &::star_engine::star_ecs::World) -> ::star_engine::star_render::Camera {{
+        let fields_ = crate::classes::Game::HasFields::fields(&*self.game);
+        if let ::std::option::Option::Some(camera_) = fields_.camera_3d.get() {{
+            return self.mirror.camera_3d(world, &script_camera_3d_(&*camera_));
+        }}
+        fields_.camera.read(|camera_| match camera_ {{
+            ::std::option::Option::Some(camera_) => self.mirror.camera(world, &script_camera_(&**camera_)),
+            ::std::option::Option::None => ::star_engine::star_render::Camera::default(),
+        }})
+    }}
+}}"
+    )
+}
+
 /// `fn main` that runs the game `class_path` in a window of the engine, with
 /// the input `actions` of the project.
 pub(super) fn game_entry_point(
@@ -942,78 +1041,11 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
     }};
     app_.run_game(game_)
 }}
-
-/// Connects the StarScript game with the engine's game loop.
-struct EngineGame_ {{
-    /// Where `Sound`s play: silent until the engine gives the game its audio.
-    audio: ::std::rc::Rc<::std::cell::RefCell<::star_engine::star_audio::Audio>>,
-    game: crate::classes::Game::Ref,
-    /// Reused list of the nodes whose code runs in a frame.
-    nodes: ::std::vec::Vec<crate::classes::Node::Ref>,
-    /// Reused list of the nodes still to mirror, with their parent's number.
-    pending: ::std::vec::Vec<(crate::classes::Node::Ref, ::std::option::Option<u64>)>,
-    /// Reused map of the nodes of the tree by their number, to tell bodies
-    /// what they touch.
-    known: ::std::collections::HashMap<u64, crate::classes::Node::Ref>,
-    /// The node of the engine's world that mirrors each node of the game.
-    mirror: ::star_engine::script_nodes::ScriptNodes,
-}}
-
-impl ::star_engine::game::Game for EngineGame_ {{
-    fn start(
-        &mut self,
-        context: &mut ::star_engine::game::GameContext<'_>,
-    ) -> ::star_engine::star_core::EngineResult<()> {{
-        use ::star_engine::EngineWorld as _;
-        *self.audio.borrow_mut() = context.world().audio();
-        crate::classes::Game::Object::start(::std::rc::Rc::clone(&self.game));
-        ::std::result::Result::Ok(())
-    }}
-
-    fn update(&mut self, world: &mut ::star_engine::star_ecs::World) {{
-        use ::star_engine::EngineWorld as _;
-        if let ::std::option::Option::Some(input) = world.input() {{
-            share_actions_(&input);
-            share_pointer_(&input, &self.view_(world), world.window_size());
-        }}
-        let delta_ = world.time().delta_seconds();
-        let root_ = ::std::rc::Rc::clone(&crate::classes::Game::HasFields::fields(&*self.game).root_);
-        sync_bodies_(world, &mut self.mirror, &root_, &mut self.known, &mut self.nodes);
-        crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.game), delta_);
-        crate::classes::Node::process_tree_(&root_, delta_, &mut self.nodes);
-        mirror_nodes_(world, &mut self.mirror, &root_, &mut self.pending);
-    }}
-
-    fn draw(&self, world: &::star_engine::star_ecs::World, frame: &mut ::star_engine::star_render::Frame) {{
-        let fields_ = crate::classes::Game::HasFields::fields(&*self.game);
-        frame.set_clear_color(fields_.background.read(|color_| engine_color_(&**color_)));
-        let ambient_ = fields_.ambient.read(|color_| engine_color_(&**color_));
-        frame.set_ambient_light(::star_engine::star_render::AmbientLight::new(ambient_, 1.0));
-        frame.set_camera(self.view_(world));
-    }}
-
-    fn is_finished(&self) -> bool {{
-        crate::classes::Game::HasFields::fields(&*self.game).{QUIT_FIELD}.get()
-    }}
-}}
-
-impl EngineGame_ {{
-    /// The engine's camera that shows the game from its `camera_3d`, or
-    /// else from its `camera`.
-    fn view_(&self, world: &::star_engine::star_ecs::World) -> ::star_engine::star_render::Camera {{
-        let fields_ = crate::classes::Game::HasFields::fields(&*self.game);
-        if let ::std::option::Option::Some(camera_) = fields_.camera_3d.get() {{
-            return self.mirror.camera_3d(world, &script_camera_3d_(&*camera_));
-        }}
-        fields_.camera.read(|camera_| match camera_ {{
-            ::std::option::Option::Some(camera_) => self.mirror.camera(world, &script_camera_(&**camera_)),
-            ::std::option::Option::None => ::star_engine::star_render::Camera::default(),
-        }})
-    }}
-}}"
+"
     );
+    let engine_game = engine_game_loop();
     let support = [SHARE_INPUT, MIRROR_NODES, READ_SCENE, ENGINE_AUDIO];
-    for line in main.lines().chain(
+    for line in main.lines().chain(engine_game.lines()).chain(
         support
             .iter()
             .flat_map(|code| [""].into_iter().chain(code.lines())),

@@ -40,7 +40,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes), sounds (`Sound`, `Audio`), physics (`Body`) and 3D (`Node3D`, `Mesh`, `Light`, `Camera3D`) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; “Play” builds and runs the game; the editor has a code editor for `.star` files (colors, writing aids, mistakes while writing, suggestions) |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
-| 9 | Concurrency and parallelism | In progress: designed (section 7); coroutines are checked (`async`, `await`, `Time`) but not translated to Rust yet; `parallel` is read but not allowed yet |
+| 9 | Concurrency and parallelism | In progress: coroutines done (`async`, `await`, `Time`; section 7); `parallel` is read but not allowed yet |
 
 ## 1. Lexicon (final)
 
@@ -1014,9 +1014,17 @@ class Lamp extends Sprite {
   continuing, if that node is not in the game's tree when its wait is over.
   The rest (static methods, objects that are not nodes) run until they
   finish.
-- In console programs (`static func main`), the coroutines that are still
-  waiting when `main` returns continue until all of them finish, and
-  `Time.wait` waits for real.
+- In console programs (`static func main`, which can be `async` too), the
+  coroutines that are still waiting when `main` returns continue until all
+  of them finish, and `Time.wait` waits for real. There is no game tree
+  there, so the coroutines of nodes never end early.
+- **In Rust**, an `async` method returns a runtime `Task<T>`: a boxed
+  future (`async move`) that owns its object and arguments; `await` is
+  Rust's `.await`. A call written alone goes to `tasks::start`, and the
+  game calls `tasks::frame_started(delta)` before the `update`s and
+  `tasks::resume()` after them. The tasks of a node carry a check of
+  `Node::in_tree_`. `?.` and `??` are translated as `match` rather than
+  closures, so an `await` may appear inside them.
 
 ### Parallel functions
 

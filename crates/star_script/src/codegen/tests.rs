@@ -349,15 +349,47 @@ fn other_engine_classes_cannot_be_extended() {
 }
 
 #[test]
-fn coroutines_are_not_translated_yet() {
-    let errors = compile_source(
-        "class Lamp {\n async func blink() { await Time.wait(1.0) }\n func start() { Time.next_frame() }\n}",
-    )
-    .expect_err("coroutines are not translated");
-
-    let messages: Vec<String> = errors.iter().map(ToString::to_string).collect();
-    assert_eq!(
-        messages,
-        ["coroutines (`async` and `await`) cannot be translated to Rust yet"]
+fn async_methods_are_tasks_of_their_object() {
+    let code = rust(
+        "class Lamp {\n async func glow() -> int { await Time.wait(1.0)\n return 2 }\n}\n\
+         class Bat extends Node {\n init() { super.init(\"Bat\") }\n async func flap() { await Time.next_frame() }\n}",
     );
+
+    assert!(
+        code.contains("fn glow(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::Task<i64>;")
+    );
+    assert!(code.contains("::star_script_runtime::Task::new(async move {"));
+    assert!(code.contains("(::star_script_runtime::tasks::wait(1.0_f32)).await;"));
+    // A node's coroutines end when it leaves the game's tree.
+    assert!(code.contains("}, move || crate::classes::Node::in_tree_(&node_))"));
+}
+
+#[test]
+fn async_calls_alone_start_coroutines() {
+    let code = rust(
+        "class Lamp {\n async func glow() {}\n func start(other: Lamp?) {\n glow()\n other?.glow()\n }\n}",
+    );
+
+    assert!(
+        code.contains("::star_script_runtime::tasks::start(crate::classes::Lamp::Object::glow(")
+    );
+    assert!(code.contains("if let ::std::option::Option::Some(task_) = match other.clone() {"));
+}
+
+#[test]
+fn games_move_the_clock_and_resume_coroutines_each_frame() {
+    let code = rust("class G extends Game {}");
+
+    assert!(code.contains("::star_script_runtime::tasks::frame_started(delta_);"));
+    assert!(code.contains("::star_script_runtime::tasks::resume();"));
+}
+
+#[test]
+fn async_main_runs_until_its_coroutines_finish() {
+    let code = rust("class M {\n static async func main() { await Time.wait(0.1) }\n}");
+
+    assert!(
+        code.contains("::star_script_runtime::tasks::start(crate::classes::M::Methods::main());")
+    );
+    assert!(code.contains("::star_script_runtime::tasks::run_until_finished();"));
 }

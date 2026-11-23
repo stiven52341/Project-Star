@@ -1,6 +1,6 @@
 //! Expressions: each becomes a Rust expression that yields an owned value.
 
-use super::conversions::{NONE, RC, RUNTIME, read_variable};
+use super::conversions::{NONE, RC, RUNTIME, SOME, read_variable};
 use super::names::ident;
 use super::statements::Body;
 use super::{Result, internal};
@@ -39,7 +39,7 @@ impl Body<'_> {
                 self.expression(index)?
             )),
             ExprKind::Array(elements) => self.array(expression, elements),
-            ExprKind::Await(_) => Err(internal("`await` outside an `async` method", span)),
+            ExprKind::Await(value) => Ok(format!("({}).await", self.expression(value)?)),
         }
     }
 
@@ -219,12 +219,15 @@ impl Body<'_> {
         let result = self.context.type_of(expression)?;
         let value = self.expression(left)?;
         let fallback = self.value_as(right, result)?;
-        let adapter = if result.is_nullable() {
-            "or_else"
+        // A `match`, not a closure: the fallback may `await`.
+        let found = if result.is_nullable() {
+            format!("{SOME}(value_)")
         } else {
-            "unwrap_or_else"
+            "value_".to_owned()
         };
-        Ok(format!("({value}).{adapter}(|| {fallback})"))
+        Ok(format!(
+            "match {value} {{ {SOME}(value_) => {found}, {NONE} => {fallback} }}"
+        ))
     }
 
     /// `left == right`: both sides as the same type, then compared as

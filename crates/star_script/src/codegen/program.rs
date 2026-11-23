@@ -6,8 +6,7 @@ use super::native;
 use super::statements::{Body, BodyKind};
 use super::writer::Writer;
 use super::{
-    CodegenError, CodegenErrorKind, Context, EntryPoint, GeneratedProgram, Result,
-    coroutines_not_translated, internal,
+    CodegenError, CodegenErrorKind, Context, EntryPoint, GeneratedProgram, Result, internal,
 };
 use crate::Span;
 use crate::ast::{ClassDecl, ConstructorDecl, Expr, MemberKind, MethodDecl, VariableKind};
@@ -276,9 +275,22 @@ fn entry_point(
     let path = context.class_path(item.id);
     out.line("");
     if kind == EntryPoint::Main {
-        out.line("/// Starts the program: runs `static func main()`.");
+        let is_async = classes
+            .class(item.id)
+            .methods
+            .iter()
+            .any(|method| is_entry_point(method) && method.is_async());
+        out.line("/// Starts the program: runs `static func main()`, and then the");
+        out.line("/// coroutines still waiting, until they finish.");
         out.open("pub fn main() {");
-        out.line(&format!("{path}::Methods::main();"));
+        if is_async {
+            out.line(&format!(
+                "{RUNTIME}::tasks::start({path}::Methods::main());"
+            ));
+        } else {
+            out.line(&format!("{path}::Methods::main();"));
+        }
+        out.line(&format!("{RUNTIME}::tasks::run_until_finished();"));
         out.close("}");
         return Ok(kind);
     }
@@ -342,6 +354,16 @@ fn return_suffix(context: Context<'_>, ty: &Type, span: Span) -> Result<String> 
     } else {
         Ok(format!(" -> {}", context.rust_type(ty, span)?))
     }
+}
+
+/// ` -> Type` of a method: its result, or for an `async` one the task
+/// that gives it.
+fn method_return_suffix(context: Context<'_>, method: &MethodInfo, span: Span) -> Result<String> {
+    if !method.is_async() {
+        return return_suffix(context, &method.return_type, span);
+    }
+    let result = context.rust_type(&method.return_type, span)?;
+    Ok(format!(" -> {RUNTIME}::Task<{result}>"))
 }
 
 /// Whether objects of subclasses may run another version of `method`.
@@ -420,7 +442,7 @@ impl Context<'_> {
         Ok(format!(
             "fn {}(self: {RC}<Self>{separator}{parameters}){}",
             ident(&method.name),
-            return_suffix(self, &method.return_type, span)?
+            method_return_suffix(self, method, span)?
         ))
     }
 
@@ -501,9 +523,6 @@ impl Context<'_> {
             .iter()
             .find(|info| info.span == Some(span))
             .ok_or_else(|| internal("method without analysis", span))?;
-        if info.is_async() {
-            return Err(coroutines_not_translated(span));
-        }
         let parameters = parameter_list(self, &info.parameters, span)?;
         let (receiver, kind) = if info.is_static {
             ("", BodyKind::Static)
@@ -516,7 +535,7 @@ impl Context<'_> {
         out.open(&format!(
             "pub fn {}({receiver}{parameters}){} {{",
             ident(&info.name),
-            return_suffix(self, &info.return_type, span)?
+            method_return_suffix(self, info, span)?
         ));
         let body = Body {
             context: self,
@@ -524,8 +543,51 @@ impl Context<'_> {
             kind,
             return_type: info.return_type.clone(),
         };
-        body.statements(out, &method.body.statements)?;
+        if info.is_async() {
+            self.coroutine_body(out, item.id, info, &body, method)?;
+        } else {
+            body.statements(out, &method.body.statements)?;
+        }
         out.close("}");
+        Ok(())
+    }
+
+    /// The body of an `async` method, as a task that owns what it uses:
+    /// its object and arguments. A node's coroutines end when it leaves the
+    /// game's tree.
+    fn coroutine_body(
+        self,
+        out: &mut Writer,
+        class: ClassId,
+        info: &MethodInfo,
+        body: &Body<'_>,
+        method: &MethodDecl,
+    ) -> Result<()> {
+        let is_node = self
+            .analysis
+            .classes()
+            .find(NODE_CLASS)
+            .is_some_and(|node| self.analysis.classes().is_subclass(class, node));
+        if info.is_static {
+            out.open(&format!("{RUNTIME}::Task::new(async move {{"));
+        } else {
+            out.line(&format!("let this_ = {RC}::clone(this_);"));
+            if is_node {
+                out.line(&format!(
+                    "let node_ = {RC}::clone(&this_) as crate::classes::Node::Ref;"
+                ));
+                out.open(&format!("{RUNTIME}::Task::owned(async move {{"));
+            } else {
+                out.open(&format!("{RUNTIME}::Task::new(async move {{"));
+            }
+            out.line("let this_ = &this_;");
+        }
+        body.statements(out, &method.body.statements)?;
+        if info.is_static || !is_node {
+            out.close("})");
+        } else {
+            out.close("}, move || crate::classes::Node::in_tree_(&node_))");
+        }
         Ok(())
     }
 

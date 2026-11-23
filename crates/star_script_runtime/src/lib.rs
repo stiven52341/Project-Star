@@ -4,7 +4,7 @@
 //! it. It provides what the language needs beyond plain Rust: shared lists,
 //! object fields that can change through shared references, equality as
 //! StarScript defines it, the state of the game's input actions, the scenes
-//! a game loads, the sounds it plays, and the few
+//! a game loads, the sounds it plays, coroutines (`async` methods), and the few
 //! runtime errors that cannot be caught at compile time.
 //!
 //! It has no dependencies, so a game built from StarScript only needs the
@@ -18,9 +18,11 @@ pub mod input;
 mod list;
 mod operations;
 pub mod scenes;
+pub mod tasks;
 
 pub use equality::StarEq;
 pub use fault::{fault, proven};
 pub use field::Field;
 pub use list::List;
 pub use operations::{concat, float_to_string, int_divide, int_remainder, print};
+pub use tasks::Task;

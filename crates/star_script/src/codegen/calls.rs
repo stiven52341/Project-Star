@@ -1,11 +1,11 @@
 //! Calls: methods (overridable or not), constructors, builtin methods and
 //! the methods of engine classes.
 
-use super::conversions::{RC, RUNTIME};
+use super::conversions::{NONE, RC, RUNTIME, SOME};
 use super::expressions::self_reference;
 use super::names::ident;
 use super::statements::Body;
-use super::{Result, coroutines_not_translated, internal};
+use super::{Result, internal};
 use crate::ast::{Expr, ExprKind, Literal};
 use crate::semantic::{
     BuiltinMethod, ClassId, ClassOrigin, INPUT_CLASS, ParameterInfo, Resolution, Type,
@@ -63,9 +63,6 @@ impl Body<'_> {
         if info.origin == ClassOrigin::Native && info.name == INPUT_CLASS {
             return self.input_call(callee, &method.name, arguments);
         }
-        if method.is_async() {
-            return Err(coroutines_not_translated(callee.span));
-        }
         let arguments = self.arguments(&method.parameters, arguments)?;
         // Static methods of the engine are functions of the runtime; the
         // others belong to an engine class with a generated module.
@@ -115,13 +112,16 @@ impl Body<'_> {
                 if !null_safe {
                     return call(&receiver, receiver_type);
                 }
+                // A `match`, not a closure: the arguments may `await`.
                 let inner = call("value_", &receiver_type.non_null())?;
-                let adapter = if method.return_type.is_nullable() {
-                    "and_then"
+                let result = if method.return_type.is_nullable() && !method.is_async() {
+                    inner
                 } else {
-                    "map"
+                    format!("{SOME}({inner})")
                 };
-                Ok(format!("({receiver}).{adapter}(|value_| {inner})"))
+                Ok(format!(
+                    "match {receiver} {{ {SOME}(value_) => {result}, {NONE} => {NONE} }}"
+                ))
             }
             _ => Err(internal("method called through an expression", callee.span)),
         }
@@ -174,12 +174,15 @@ impl Body<'_> {
         if !null_safe {
             return Ok(code);
         }
-        let adapter = if method == BuiltinMethod::Pop {
-            "and_then"
+        // A `match`, not a closure: the argument may `await`.
+        let result = if method == BuiltinMethod::Pop {
+            code
         } else {
-            "map"
+            format!("{SOME}({code})")
         };
-        Ok(format!("({receiver}).{adapter}(|value_| {code})"))
+        Ok(format!(
+            "match {receiver} {{ {SOME}(value_) => {result}, {NONE} => {NONE} }}"
+        ))
     }
 
     /// `Input.is_down(action)` reads the field `is_down` of the action's
@@ -236,6 +239,8 @@ fn native_call(class: &str, method: &str, arguments: &str) -> Option<String> {
         ("Body", "box") => Some(format!("crate::classes::Body::box_({arguments})")),
         ("Audio", "volume") => Some(format!("{RUNTIME}::audio::volume()")),
         ("Audio", "set_volume") => Some(format!("{RUNTIME}::audio::set_volume({arguments})")),
+        ("Time", "wait") => Some(format!("{RUNTIME}::tasks::wait({arguments})")),
+        ("Time", "next_frame") => Some(format!("{RUNTIME}::tasks::next_frame()")),
         _ => None,
     }
 }

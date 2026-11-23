@@ -231,7 +231,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.10b Coroutines in the analysis: `async` methods and their
           overrides, where `await` goes, starting coroutines, and
           `Time.wait` and `Time.next_frame`.
-    - [ ] 13.10c Coroutines in Rust: `async` methods as futures, run once
+    - [x] 13.10c Coroutines in Rust: `async` methods as futures, run once
           per frame by the runtime; those of nodes end when their node
           leaves the tree; console programs wait for theirs.
     - [ ] 13.10d Parallel functions in the analysis: only `static`, only

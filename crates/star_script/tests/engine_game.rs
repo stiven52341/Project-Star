@@ -205,6 +205,53 @@ class Physics3dGame extends Game {
 }
 ";
 
+/// A node whose coroutine prints every frame until it leaves the tree, and
+/// a coroutine of the game that waits for a frame.
+const COROUTINE_GAME: &str = "
+class Blinker extends Node {
+    init() {
+        super.init(\"Blinker\")
+    }
+
+    async func blink() {
+        while true {
+            Debug.print(\"blink\")
+            await Time.next_frame()
+        }
+    }
+
+    override func start() {
+        blink()
+    }
+}
+
+class CoroutineGame extends Game {
+    var frames = 0
+    var blinker = Blinker()
+
+    override func start() {
+        add_child(blinker)
+        later()
+    }
+
+    async func later() {
+        await Time.next_frame()
+        Debug.print(\"later\")
+    }
+
+    override func update(delta: float) {
+        frames += 1
+        Debug.print(\"frame \" + frames.to_string())
+        if frames == 3 {
+            blinker.remove()
+        }
+        if frames == 5 {
+            quit()
+        }
+    }
+}
+";
+
 /// The floor of the 3D physics game: a mesh with a body.
 const FLOOR_3D_SCENE: &str = r#"
 format = 1
@@ -282,6 +329,18 @@ fn settings(bindings: &[&str]) -> GameSettings {
     }
 }
 
+/// Runs the game `name` of the package in `directory`, from that folder,
+/// and gives what it wrote, once it ended well.
+fn play(directory: &Path, name: &str) -> (String, String) {
+    let output = Command::new(binary(directory, name))
+        .current_dir(directory)
+        .output()
+        .expect("the game runs");
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    assert!(output.status.success(), "{name} failed:\n{stderr}");
+    (String::from_utf8_lossy(&output.stdout).into_owned(), stderr)
+}
+
 #[test]
 #[ignore = "builds the whole engine and opens a window"]
 fn games_run_in_the_engine_until_they_quit() {
@@ -313,68 +372,47 @@ fn games_run_in_the_engine_until_they_quit() {
             compile_with("physics_3d_game", PHYSICS_3D_GAME, &valid),
         )
         .expect("valid name");
+    package
+        .add_program(
+            "coroutine_game",
+            compile_with("coroutine_game", COROUTINE_GAME, &valid),
+        )
+        .expect("valid name");
     package.write(&directory).expect("package written");
 
     build(&directory);
-    let output = Command::new(binary(&directory, "counting_game"))
-        .output()
-        .expect("the game runs");
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(output.status.success(), "the game failed:\n{stderr}");
-    assert_eq!(
-        String::from_utf8_lossy(&output.stdout),
-        "start\nframe 1 true\nframe 2 true\nframe 3 true\n"
-    );
+    let (stdout, _) = play(&directory, "counting_game");
+    assert_eq!(stdout, "start\nframe 1 true\nframe 2 true\nframe 3 true\n");
 
     let levels = directory.join("assets/levels");
     std::fs::create_dir_all(&levels).expect("asset folder created");
     std::fs::write(levels.join("fleet.scene"), FLEET_SCENE).expect("scene written");
     std::fs::write(levels.join("misspelled.scene"), MISSPELLED_SCENE).expect("scene written");
-    let output = Command::new(binary(&directory, "node_game"))
-        .current_dir(&directory)
-        .output()
-        .expect("the game runs");
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(output.status.success(), "the node game failed:\n{stderr}");
+    let (stdout, stderr) = play(&directory, "node_game");
     assert!(
         stderr.contains("node \"Drone\": there is no class \"Dron\""),
         "the misspelled class is reported:\n{stderr}"
     );
     assert_eq!(
-        String::from_utf8_lossy(&output.stdout),
+        stdout,
         "Fleet 2\nsprites/leader.png 1.5 0.5\ntrue\ntrue\n\
          game frame 1\nship start\nship x 1.0\ndrone start Wingman -2.0\ngame frame 2\nship x 2.0\n\
          game frame 3\nship x 3.0\n"
     );
 
     std::fs::write(levels.join("floor.scene"), FLOOR_SCENE).expect("scene written");
-    let output = Command::new(binary(&directory, "physics_game"))
-        .current_dir(&directory)
-        .output()
-        .expect("the game runs");
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        output.status.success(),
-        "the physics game failed:\n{stderr}"
-    );
-    assert_eq!(
-        String::from_utf8_lossy(&output.stdout),
-        "static rectangle 10.0\nlanded on Floor true\n"
-    );
+    let (stdout, _) = play(&directory, "physics_game");
+    assert_eq!(stdout, "static rectangle 10.0\nlanded on Floor true\n");
 
     std::fs::write(levels.join("floor_3d.scene"), FLOOR_3D_SCENE).expect("scene written");
-    let output = Command::new(binary(&directory, "physics_3d_game"))
-        .current_dir(&directory)
-        .output()
-        .expect("the game runs");
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        output.status.success(),
-        "the 3D physics game failed:\n{stderr}"
-    );
+    let (stdout, _) = play(&directory, "physics_3d_game");
+    assert_eq!(stdout, "box 10.0 true\nlanded on Floor true\n");
+
+    let (stdout, _) = play(&directory, "coroutine_game");
+    // The blinker's coroutine ends with frame 3, when it leaves the tree.
     assert_eq!(
-        String::from_utf8_lossy(&output.stdout),
-        "box 10.0 true\nlanded on Floor true\n"
+        stdout,
+        "frame 1\nblink\nframe 2\nlater\nblink\nframe 3\nframe 4\nframe 5\n"
     );
 
     let output = Command::new(binary(&directory, "misspelled_game"))

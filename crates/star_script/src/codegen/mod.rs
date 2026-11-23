@@ -31,7 +31,7 @@ use std::fmt;
 
 use crate::Span;
 use crate::ast::{Expr, SourceFile};
-use crate::semantic::{Analysis, ExprInfo, Resolution, Type};
+use crate::semantic::{Analysis, ExprInfo, MethodInfo, Resolution, Type};
 
 /// Generates the Rust code of a checked program.
 ///
@@ -140,14 +140,6 @@ const fn internal(problem: &'static str, span: Span) -> CodegenError {
     }
 }
 
-/// Coroutines, until the translation has them (step 13.10c).
-const fn coroutines_not_translated(span: Span) -> CodegenError {
-    CodegenError {
-        kind: CodegenErrorKind::NotTranslatedYet("coroutines (`async` and `await`)"),
-        span,
-    }
-}
-
 /// What every part of the generator reads: the program and its analysis.
 #[derive(Clone, Copy)]
 struct Context<'a> {
@@ -170,6 +162,20 @@ impl<'a> Context<'a> {
         self.info(expression)?
             .resolution
             .ok_or_else(|| internal("name without resolution", expression.span))
+    }
+
+    /// Whether `callee` names an `async` method.
+    fn calls_async_method(self, callee: &Expr) -> Result<bool> {
+        Ok(match self.resolution(callee)? {
+            Resolution::Method { class, index } => self
+                .analysis
+                .classes()
+                .class(class)
+                .methods
+                .get(index)
+                .is_some_and(MethodInfo::is_async),
+            _ => false,
+        })
     }
 }
 

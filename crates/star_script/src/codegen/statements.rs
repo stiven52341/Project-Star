@@ -1,6 +1,6 @@
 //! Statements, inside the body of a method, constructor or value.
 
-use super::conversions::{default_value, read_variable};
+use super::conversions::{RUNTIME, SOME, default_value, read_variable};
 use super::expressions::arithmetic;
 use super::names::ident;
 use super::writer::Writer;
@@ -56,10 +56,7 @@ impl Body<'_> {
                 operator,
                 value,
             } => self.assignment(out, target, *operator, value),
-            StatementKind::Expression(expression) => {
-                out.line(&format!("{};", self.expression(expression)?));
-                Ok(())
-            }
+            StatementKind::Expression(expression) => self.expression_statement(out, expression),
             StatementKind::If(if_statement) => {
                 let condition = self.expression(&if_statement.condition)?;
                 out.open(&format!("if {condition} {{"));
@@ -92,6 +89,34 @@ impl Body<'_> {
                 Ok(())
             }
         }
+    }
+
+    /// A call alone: run, or started as a coroutine if it is `async`.
+    fn expression_statement(&self, out: &mut Writer, expression: &Expr) -> Result<()> {
+        let code = self.expression(expression)?;
+        let ExprKind::Call { callee, .. } = &expression.kind else {
+            out.line(&format!("{code};"));
+            return Ok(());
+        };
+        if !self.context.calls_async_method(callee)? {
+            out.line(&format!("{code};"));
+            return Ok(());
+        }
+        let start = format!("{RUNTIME}::tasks::start");
+        if matches!(
+            callee.kind,
+            ExprKind::Member {
+                null_safe: true,
+                ..
+            }
+        ) {
+            out.line(&format!(
+                "if let {SOME}(task_) = {code} {{ {start}(task_); }}"
+            ));
+        } else {
+            out.line(&format!("{start}({code});"));
+        }
+        Ok(())
     }
 
     fn variable(&self, out: &mut Writer, variable: &VariableDecl) -> Result<()> {
