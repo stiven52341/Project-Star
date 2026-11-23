@@ -749,6 +749,20 @@ another while there are several, and `Esc` hides them until the word
 changes. These keys are taken before the writing aids, so `Tab` indents
 only when nothing is suggested.
 
+“Go to definition” (`navigation.rs`, tested): `Ctrl`+click (`Cmd` on
+macOS; the pointer becomes a hand while `Ctrl` is held over the text) or
+`F12` on a name. What names mean comes from `scope.rs`, shared with the
+suggestions. A member after a `.` goes to its declaration in its class (or
+the base that declares it); otherwise a variable or parameter declared
+before in the function being written goes to its declaration in the text,
+then a member of the class being written, then a class, then any earlier
+declaration in the text. Members and classes are found in the class table
+of the last check that could read the program, with their places
+(`ClassOrigin::Script` now keeps where the class's name is written), which
+`ProgramOutline::locate` turns into a file and a position with the texts
+that check read: a script opens with the cursor there; a blueprint opens
+(its StarScript is never shown). Names of the engine go nowhere.
+
 Blueprints and scripts are saved with `Ctrl+S` or “File” → “Save”, and
 all of them before “Compile”, which reads the files. Tabs with unsaved changes
 show `•`; closing one, the project or the window asks first (“Save”,

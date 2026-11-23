@@ -11,8 +11,9 @@ use std::time::{Duration, Instant};
 use eframe::egui;
 
 use star_script::semantic::ClassTable;
+use star_script::{Position, Span};
 
-use crate::project_check::{CheckWorker, OpenTexts, Problem};
+use crate::project_check::{CheckWorker, OpenTexts, Problem, ProgramOutline};
 
 /// How long after the last change the check starts, so it does not run on
 /// every key.
@@ -25,10 +26,10 @@ pub(super) struct LiveCheck {
     /// The thread that checks, once started.
     worker: Option<CheckWorker>,
     problems: Vec<Problem>,
-    /// The classes of the last check that could read the program: while a
-    /// line is half written the program cannot be read, and suggestions
-    /// still need them.
-    classes: Option<ClassTable>,
+    /// What the last check that could read the program found it declares:
+    /// while a line is half written the program cannot be read, and
+    /// suggestions still need it.
+    outline: Option<ProgramOutline>,
 }
 
 impl LiveCheck {
@@ -37,7 +38,7 @@ impl LiveCheck {
             changed_at: None,
             worker: None,
             problems: Vec::new(),
-            classes: None,
+            outline: None,
         }
     }
 
@@ -48,8 +49,15 @@ impl LiveCheck {
 
     /// The classes of the program and the engine, as the last check that
     /// could read them found them.
-    pub(super) const fn classes(&self) -> Option<&ClassTable> {
-        self.classes.as_ref()
+    pub(super) fn classes(&self) -> Option<&ClassTable> {
+        self.outline.as_ref().map(|outline| &outline.classes)
+    }
+
+    /// The file (inside the assets folder), line and column of the
+    /// program's place `span`, as the last check that could read the
+    /// program found them.
+    pub(super) fn locate(&self, span: Span) -> Option<(String, Position)> {
+        self.outline.as_ref()?.locate(span)
     }
 
     /// The problems the last check found.
@@ -68,8 +76,8 @@ impl LiveCheck {
     ) {
         if let Some(check) = self.worker.as_ref().and_then(CheckWorker::latest) {
             self.problems = check.problems;
-            if check.classes.is_some() {
-                self.classes = check.classes;
+            if check.outline.is_some() {
+                self.outline = check.outline;
             }
         }
         let Some(changed_at) = self.changed_at else {

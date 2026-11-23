@@ -6,6 +6,8 @@ mod completion;
 mod editing;
 mod highlight;
 mod mistakes;
+mod navigation;
+mod scope;
 mod suggestions;
 
 use std::fs;
@@ -16,6 +18,7 @@ use star_script::Position;
 use star_script::semantic::ClassTable;
 
 use self::code_view::CodeView;
+pub(crate) use self::code_view::Edited;
 pub(crate) use self::completion::CandidateKind;
 use self::mistakes::Mistake;
 use crate::project::ASSETS_DIRECTORY;
@@ -107,19 +110,20 @@ impl ScriptTab {
 
     /// Shows the text to edit, with the mistakes among `problems` that are
     /// in it marked, and suggestions from the program's `classes`, if
-    /// known. Returns whether the user changed it.
+    /// known. Returns whether the user changed it, and the place of the
+    /// program they asked to go to.
     pub(crate) fn show(
         &mut self,
         ui: &mut egui::Ui,
         problems: &[Problem],
         classes: Option<&ClassTable>,
-    ) -> bool {
+    ) -> Edited {
         let texts = texts::current();
         let text = match &mut self.text {
             Ok(text) => text,
             Err(error) => {
                 ui.colored_label(ERROR_COLOR, texts.script_unreadable(error));
-                return false;
+                return Edited::default();
             }
         };
         if let Some(error) = &self.save_error {
@@ -137,9 +141,9 @@ impl ScriptTab {
             })
             .collect();
         let id = ui.make_persistent_id(("script", &self.path));
-        let changed = self.view.show(ui, text, id, &mistakes, classes);
-        self.unsaved |= changed;
-        changed
+        let edited = self.view.show(ui, text, id, &mistakes, classes);
+        self.unsaved |= edited.changed;
+        edited
     }
 }
 

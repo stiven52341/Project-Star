@@ -3,14 +3,12 @@
 //! type found from the classes of the last check and the declarations in
 //! the text); elsewhere, the names of the text, the members of the class
 //! being written, the classes, keywords and basic types.
-//!
-//! The text is usually half written while suggestions are needed, so it is
-//! never parsed: only the compiler's lexer (which keeps going after
-//! mistakes) and the class table of the last check that could read the
-//! program are used.
+//! What names mean there is the `scope` module's.
 
-use star_script::semantic::{BASIC_TYPE_NAMES, ClassId, ClassTable, Type};
-use star_script::{Keyword, LexErrorKind, Token, TokenKind, scan};
+use star_script::semantic::{BASIC_TYPE_NAMES, ClassTable, Type};
+use star_script::{Keyword, LexErrorKind, TokenKind, scan};
+
+use super::scope::{Receiver, Scope, receiver_chain, trailing_word};
 
 const LINE_COMMENT: &str = "//";
 
@@ -93,11 +91,11 @@ pub(super) fn complete(
         return None;
     }
     let word_start = before.len() - typed.len();
-    let context = Context::of(&before[..word_start], classes);
+    let scope = Scope::of(&before[..word_start], classes);
     let mut candidates = match receiver_chain(&before[..word_start]) {
-        Some(chain) => context.members_of_chain(&chain)?,
+        Some(chain) => members(classes?, scope.receiver_of_chain(&chain)?, false),
         None if typed.is_empty() => return None,
-        None => context.names(text),
+        None => names(&scope, text),
     };
     candidates.retain(|candidate| candidate.name.starts_with(typed) && candidate.name != typed);
     candidates.sort_by(|first, second| {
@@ -132,213 +130,43 @@ fn is_inside_comment_or_string(before: &str) -> bool {
     in_comment || in_string
 }
 
-/// The name characters at the end of `text`.
-fn trailing_word(text: &str) -> &str {
-    let start = text
-        .char_indices()
-        .rev()
-        .take_while(|(_, character)| is_name_character(*character))
-        .last()
-        .map_or(text.len(), |(index, _)| index);
-    &text[start..]
-}
-
-const fn is_name_character(character: char) -> bool {
-    character.is_ascii_alphanumeric() || character == '_'
-}
-
-/// The names of `a.b.` (or `a?.b?.`) at the end of `before`, if it ends
-/// with a `.` after names; empty if what is before the `.` is not a name.
-fn receiver_chain(before: &str) -> Option<Vec<&str>> {
-    let mut rest = before.strip_suffix('.')?;
-    let mut chain = Vec::new();
-    loop {
-        rest = rest.strip_suffix('?').unwrap_or(rest);
-        let name = trailing_word(rest);
-        if name.is_empty() {
-            break;
-        }
-        chain.push(name);
-        rest = &rest[..rest.len() - name.len()];
-        match rest.strip_suffix('.') {
-            Some(shorter) => rest = shorter,
-            None => break,
-        }
-    }
-    chain.reverse();
-    Some(chain)
-}
-
-/// What is known where the word is written.
-struct Context<'text> {
-    classes: Option<&'text ClassTable>,
-    /// The tokens before the word.
-    tokens: Vec<Token>,
-    /// The class being written, if known.
-    current: Option<ClassId>,
-}
-
-/// The class whose members a `.` lists, and which of them.
-#[derive(Clone, Copy)]
-struct Receiver {
-    class: ClassId,
-    /// Whether it is the class itself (`Rock.`), whose static members are
-    /// listed, or one of its objects.
-    statics: bool,
-    /// Whether its private members are seen.
-    private: bool,
-}
-
-impl<'text> Context<'text> {
-    fn of(before: &str, classes: Option<&'text ClassTable>) -> Self {
-        let tokens = scan(before).tokens;
-        let current = classes.and_then(|classes| {
-            let name = tokens.windows(2).rev().find_map(|pair| match pair {
-                [
-                    Token {
-                        kind: TokenKind::Keyword(Keyword::Class),
-                        ..
-                    },
-                    Token {
-                        kind: TokenKind::Identifier(name),
-                        ..
-                    },
-                ] => Some(name),
-                _ => None,
-            })?;
-            classes.find(name)
-        });
-        Self {
-            classes,
-            tokens,
-            current,
-        }
-    }
-
-    /// Every name that may be written where no `.` comes before.
-    fn names(&self, text: &str) -> Vec<Candidate> {
-        let mut candidates: Vec<Candidate> = scan(text)
-            .tokens
-            .into_iter()
-            .filter_map(|token| match token.kind {
-                TokenKind::Identifier(name) => Some(plain(name, CandidateKind::Name)),
-                _ => None,
-            })
-            .collect();
-        candidates.extend(
-            Keyword::ALL
-                .iter()
-                .filter(|keyword| !keyword.is_reserved())
-                .map(|keyword| plain(keyword.as_str().to_owned(), CandidateKind::Keyword)),
-        );
-        candidates.extend(
-            BASIC_TYPE_NAMES
-                .iter()
-                .map(|name| plain((*name).to_owned(), CandidateKind::BasicType)),
-        );
-        if let Some(classes) = self.classes {
-            candidates.extend(
-                classes
-                    .iter()
-                    .map(|(_, class)| plain(class.name.clone(), CandidateKind::Class)),
-            );
-            if let Some(current) = self.current {
-                let own = Receiver {
-                    class: current,
-                    statics: false,
-                    private: true,
-                };
-                candidates.extend(members(classes, own, true));
-            }
-        }
-        candidates
-    }
-
-    /// The members of what `chain` names, if its type is known.
-    fn members_of_chain(&self, chain: &[&str]) -> Option<Vec<Candidate>> {
-        let classes = self.classes?;
-        let (first, rest) = chain.split_first()?;
-        let mut receiver = self.receiver_named(classes, first)?;
-        for name in rest {
-            let member = classes.find_member(receiver.class, name)?;
-            let ty = member_type(classes, member.class, name)?;
-            receiver = Receiver {
-                class: class_of(ty)?,
-                statics: false,
-                private: Some(member.class) == self.current,
-            };
-        }
-        Some(members(classes, receiver, false))
-    }
-
-    /// What the name at the start of a chain is.
-    fn receiver_named(&self, classes: &ClassTable, name: &str) -> Option<Receiver> {
-        let object = |class: ClassId| Receiver {
-            class,
-            statics: false,
-            private: Some(class) == self.current,
-        };
-        match name {
-            "self" => self.current.map(object),
-            "super" => self
-                .current
-                .and_then(|current| classes.class(current).base)
-                .map(object),
-            _ => {
-                if let Some(class) = self.declared_class_of(classes, name) {
-                    return Some(object(class));
-                }
-                if let Some(class) = classes.find(name) {
-                    return Some(Receiver {
-                        class,
-                        statics: true,
-                        private: Some(class) == self.current,
-                    });
-                }
-                let current = self.current?;
-                let ty = member_type(classes, current, name)?;
-                class_of(ty).map(object)
-            }
-        }
-    }
-
-    /// The class of the variable `name` as the text declares it last before
-    /// the word: `name: Class` (a variable or parameter) or
-    /// `var name = Class(…)`.
-    fn declared_class_of(&self, classes: &ClassTable, name: &str) -> Option<ClassId> {
-        let is_name =
-            |token: &Token| matches!(&token.kind, TokenKind::Identifier(found) if found == name);
-        self.tokens.windows(4).rev().find_map(|window| {
-            let class = match window {
-                [
-                    variable,
-                    colon,
-                    Token {
-                        kind: TokenKind::Identifier(class),
-                        ..
-                    },
-                    _,
-                ] if is_name(variable) && colon.kind == TokenKind::Colon => class,
-                [
-                    variable,
-                    Token {
-                        kind: TokenKind::Equal,
-                        ..
-                    },
-                    Token {
-                        kind: TokenKind::Identifier(class),
-                        ..
-                    },
-                    Token {
-                        kind: TokenKind::LeftParen,
-                        ..
-                    },
-                ] if is_name(variable) => class,
-                _ => return None,
-            };
-            classes.find(class)
+/// Every name that may be written where no `.` comes before.
+fn names(scope: &Scope<'_>, text: &str) -> Vec<Candidate> {
+    let mut candidates: Vec<Candidate> = scan(text)
+        .tokens
+        .into_iter()
+        .filter_map(|token| match token.kind {
+            TokenKind::Identifier(name) => Some(plain(name, CandidateKind::Name)),
+            _ => None,
         })
+        .collect();
+    candidates.extend(
+        Keyword::ALL
+            .iter()
+            .filter(|keyword| !keyword.is_reserved())
+            .map(|keyword| plain(keyword.as_str().to_owned(), CandidateKind::Keyword)),
+    );
+    candidates.extend(
+        BASIC_TYPE_NAMES
+            .iter()
+            .map(|name| plain((*name).to_owned(), CandidateKind::BasicType)),
+    );
+    if let Some(classes) = scope.classes {
+        candidates.extend(
+            classes
+                .iter()
+                .map(|(_, class)| plain(class.name.clone(), CandidateKind::Class)),
+        );
+        if let Some(current) = scope.current {
+            let own = Receiver {
+                class: current,
+                statics: false,
+                private: true,
+            };
+            candidates.extend(members(classes, own, true));
+        }
     }
+    candidates
 }
 
 /// A candidate without a signature.
@@ -404,46 +232,6 @@ fn members(classes: &ClassTable, receiver: Receiver, everything: bool) -> Vec<Ca
         }
     }
     candidates
-}
-
-/// The type of the member `name` of `class` (or its bases): a field's or
-/// constant's type, or what a method gives.
-fn member_type<'table>(
-    classes: &'table ClassTable,
-    class: ClassId,
-    name: &str,
-) -> Option<&'table Type> {
-    classes.ancestors(class).find_map(|id| {
-        let class = classes.class(id);
-        class
-            .fields
-            .iter()
-            .find(|field| field.name == name)
-            .map(|field| &field.ty)
-            .or_else(|| {
-                class
-                    .constants
-                    .iter()
-                    .find(|constant| constant.name == name)
-                    .map(|constant| &constant.ty)
-            })
-            .or_else(|| {
-                class
-                    .methods
-                    .iter()
-                    .find(|method| method.name == name)
-                    .map(|method| &method.return_type)
-            })
-    })
-}
-
-/// The class of objects of `ty`, `null` or not.
-fn class_of(ty: &Type) -> Option<ClassId> {
-    match ty {
-        Type::Class(class) => Some(*class),
-        Type::Nullable(inner) => class_of(inner),
-        _ => None,
-    }
 }
 
 #[cfg(test)]

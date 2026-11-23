@@ -93,7 +93,7 @@ mod tests {
 
         assert_eq!(first.problems.len(), 1);
         assert_eq!(second.problems, []);
-        assert!(second.classes.is_some());
+        assert!(second.outline.is_some());
         // Checks while writing never translate the program.
         assert!(second.program.is_none());
     }

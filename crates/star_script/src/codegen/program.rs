@@ -141,7 +141,7 @@ fn class_items(context: Context<'_>) -> Result<Vec<ClassItem<'_>>> {
     let classes = context.analysis.classes();
     let mut items = Vec::new();
     for (id, class) in classes.iter() {
-        let ClassOrigin::Script { declaration } = class.origin else {
+        let ClassOrigin::Script { declaration, .. } = class.origin else {
             continue;
         };
         let declaration = context

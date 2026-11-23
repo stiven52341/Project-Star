@@ -21,6 +21,7 @@ mod viewport_tools;
 
 use eframe::{egui, egui_wgpu};
 use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
+use star_script::Span;
 
 pub(crate) use self::asset_files::{AssetFileError, NewAsset};
 use self::assets_panel::{AssetEvent, AssetsPanel, OpenedAsset};
@@ -35,7 +36,7 @@ use self::unsaved_dialog::{UnsavedChoice, show_unsaved_dialog};
 use self::viewport::SceneViewport;
 use crate::editor_log::LogHistory;
 use crate::game_run::PlayRequest;
-use crate::project::{ASSETS_DIRECTORY, Project, SCRIPT_EXTENSION};
+use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, Project, SCRIPT_EXTENSION};
 use crate::project_check::Problem;
 use crate::style::ERROR_COLOR;
 use crate::texts::{self, Language};
@@ -347,8 +348,12 @@ impl EditorWindow {
             },
             ActiveDocument::Blueprint(tab) => tab.show(ui, self.problems.problems()),
             ActiveDocument::Script(tab) => {
-                if tab.show(ui, self.live_check.problems(), self.live_check.classes()) {
+                let edited = tab.show(ui, self.live_check.problems(), self.live_check.classes());
+                if edited.changed {
                     self.live_check.request();
+                }
+                if let Some(span) = edited.go_to {
+                    self.go_to_definition(span);
                 }
             }
         }
@@ -426,6 +431,23 @@ impl EditorWindow {
             {
                 tab.reveal(position);
             }
+        }
+    }
+
+    /// Opens the file of the program's place `span` there: a script with
+    /// the cursor on it, or a blueprint (whose StarScript is never shown).
+    fn go_to_definition(&mut self, span: Span) {
+        let Some((path, position)) = self.live_check.locate(span) else {
+            return;
+        };
+        let assets = self.assets.directory();
+        if path.ends_with(SCRIPT_EXTENSION) {
+            self.documents.open_script(assets, path);
+            if let ActiveDocument::Script(tab) = self.documents.active() {
+                tab.reveal(position);
+            }
+        } else if path.ends_with(BLUEPRINT_EXTENSION) {
+            self.documents.open_blueprint(assets, path);
         }
     }
 

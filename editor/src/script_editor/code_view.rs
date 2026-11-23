@@ -6,12 +6,13 @@ use std::hash::{Hash, Hasher};
 
 use eframe::egui;
 use egui::text::{CCursor, CCursorRange, LayoutJob};
-use star_script::Position;
 use star_script::semantic::ClassTable;
+use star_script::{Position, Span};
 
 use super::editing::{Action, Selection, apply};
 use super::highlight::colored;
 use super::mistakes::{Mark, Mistake, marks, paint_marks};
+use super::navigation::{Definition, definition_at};
 use super::suggestions::Suggestions;
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -43,7 +44,8 @@ impl CodeView {
 
     /// Shows `text` to edit, with `mistakes` marked on it and suggestions
     /// from the program's `classes`, if known. Returns whether the user
-    /// changed it.
+    /// changed it, and the place of the program to go to if they asked for
+    /// a definition in another part of it.
     pub(super) fn show(
         &mut self,
         ui: &mut egui::Ui,
@@ -51,7 +53,7 @@ impl CodeView {
         id: egui::Id,
         mistakes: &[Mistake<'_>],
         classes: Option<&ClassTable>,
-    ) -> bool {
+    ) -> Edited {
         let font = egui::TextStyle::Monospace.resolve(ui.style());
         let jumped = self.jump.take().map(|position| {
             let index = char_index_of(text, position);
@@ -60,6 +62,7 @@ impl CodeView {
         });
         let footer_height = ui.spacing().interact_size.y;
         let mut changed = false;
+        let mut go_to = None;
         let cursor = cursor_while_writing(ui.ctx(), id);
         if let Some(completion) = self.suggestions.find(text, cursor, classes) {
             changed |= self
@@ -79,11 +82,13 @@ impl CodeView {
                     marks: &marks,
                     classes,
                 };
-                changed |= self.show_lines(ui, text, id, &shown);
+                let lines = self.show_lines(ui, text, id, &shown);
+                changed |= lines.changed;
+                go_to = lines.go_to;
             });
         ui.separator();
         self.show_footer(ui, &marks);
-        changed
+        Edited { changed, go_to }
     }
 
     /// Where the cursor is, and the mistake on its line or how many there
@@ -114,7 +119,7 @@ impl CodeView {
         text: &mut String,
         id: egui::Id,
         shown: &Shown<'_, '_>,
-    ) -> bool {
+    ) -> Edited {
         let Shown {
             font,
             jumped,
@@ -172,7 +177,53 @@ impl CodeView {
                 .translate(output.galley_pos.to_vec2());
             ui.scroll_to_rect(rect, Some(egui::Align::Center));
         }
-        output.response.changed()
+        let go_to = match asked_definition(ui, &output, id) {
+            Some(cursor) => match definition_at(text, cursor, classes) {
+                Some(Definition::InText(index)) => {
+                    self.jump_to(position_of(text, index));
+                    None
+                }
+                Some(Definition::InProgram(span)) => Some(span),
+                None => None,
+            },
+            None => None,
+        };
+        Edited {
+            changed: output.response.changed(),
+            go_to,
+        }
+    }
+}
+
+/// What the user did to the text.
+#[derive(Debug, Default)]
+pub(crate) struct Edited {
+    /// Whether they changed it.
+    pub(crate) changed: bool,
+    /// The place of the program they asked to go to, out of this text.
+    pub(crate) go_to: Option<Span>,
+}
+
+/// Where the cursor is if the user asked for the definition of the name
+/// there: clicking it with `Ctrl` (`Cmd` on macOS), or `F12`. While `Ctrl`
+/// is held over the text, the pointer shows that names can be clicked.
+fn asked_definition(
+    ui: &egui::Ui,
+    output: &egui::text_edit::TextEditOutput,
+    id: egui::Id,
+) -> Option<usize> {
+    let command = ui.input(|input| input.modifiers.command);
+    if command && output.response.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let focused = ui.memory(|memory| memory.has_focus(id));
+    let key =
+        focused && ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::F12));
+    let clicked = command && output.response.clicked();
+    if key || clicked {
+        output.cursor_range.map(|range| range.primary.index.0)
+    } else {
+        None
     }
 }
 

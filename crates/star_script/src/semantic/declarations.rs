@@ -52,7 +52,10 @@ impl Checker<'_> {
                     self.error(kind, declaration.name.span);
                     return None;
                 }
-                let origin = ClassOrigin::Script { declaration: index };
+                let origin = ClassOrigin::Script {
+                    declaration: index,
+                    name: declaration.name.span,
+                };
                 Some(
                     self.analysis
                         .classes

@@ -20,6 +20,8 @@ pub enum ClassOrigin {
     Script {
         /// Index of the declaration.
         declaration: usize,
+        /// Where its name is written.
+        name: Span,
     },
     /// Provided by the engine and implemented in Rust.
     Native,

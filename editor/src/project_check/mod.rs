@@ -18,7 +18,9 @@ use std::path::Path;
 
 use star_script::codegen::{self, GeneratedProgram};
 use star_script::semantic::ClassTable;
-use star_script::{CompileError, GameSettings, analyze_program_with, check_program_with};
+use star_script::{
+    CompileError, GameSettings, Position, SourceSet, Span, analyze_program_with, check_program_with,
+};
 
 pub(crate) use self::job::{CheckJob, CheckStatus};
 pub(crate) use self::problem::Problem;
@@ -30,7 +32,7 @@ use crate::project::{
 };
 
 /// What checking a project found.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub(crate) struct ProjectCheck {
     /// How many StarScript files and blueprints were checked.
     pub(crate) scripts: usize,
@@ -39,9 +41,31 @@ pub(crate) struct ProjectCheck {
     pub(crate) problems: Vec<Problem>,
     /// The Rust code of the game, if there are scripts and no problems.
     pub(crate) program: Option<GeneratedProgram>,
-    /// The program's classes (the engine's too) and their members, if its
-    /// files could be read, even with mistakes in their meaning.
-    pub(crate) classes: Option<ClassTable>,
+    /// What the program declares, if its files could be read, even with
+    /// mistakes in their meaning.
+    pub(crate) outline: Option<ProgramOutline>,
+}
+
+/// The classes a program declares (with the engine's) and their members,
+/// and the texts they were read from, to find where each is written: what
+/// suggestions and “Go to definition” need.
+#[derive(Debug, Clone)]
+pub(crate) struct ProgramOutline {
+    pub(crate) classes: ClassTable,
+    sources: SourceSet,
+}
+
+impl ProgramOutline {
+    /// The file (as a path inside the assets folder) and the line and
+    /// column where the program's place `span` is.
+    pub(crate) fn locate(&self, span: Span) -> Option<(String, Position)> {
+        let location = self.sources.locate(span)?;
+        let path = location
+            .file
+            .strip_prefix(ASSETS_DIRECTORY)?
+            .strip_prefix('/')?;
+        Some((path.to_owned(), location.position))
+    }
 }
 
 /// The texts of files open in the editor, by their path inside the assets
@@ -99,12 +123,16 @@ pub(crate) fn check_project_with(
             .map(|analysis| analysis.classes().clone()),
         None => None,
     };
+    let outline = classes.map(|classes| ProgramOutline {
+        classes,
+        sources: program.sources().clone(),
+    });
     let program = generated.filter(|_| problems.is_empty());
     ProjectCheck {
         scripts,
         problems,
         program,
-        classes,
+        outline,
     }
 }
 
