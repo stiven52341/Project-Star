@@ -7,6 +7,7 @@ class Basics {
         Debug.print(GREETING + ", StarScript")
         Debug.print(LIMIT.to_string())
         arithmetic()
+        integers()
         loops()
         lists()
         nulls()
@@ -25,12 +26,31 @@ class Basics {
         Debug.print((-5).abs().to_string())
         var ten = 10.0
         Debug.print(ten.sqrt().floor().to_string())
-        const big = 9223372036854775807
+        const big: bigint = 9223372036854775807
         Debug.print((big + 1).to_string())
         Debug.print("abc".to_upper() + " " + "abc".length().to_string())
         var text = "Star"
         text += "Script"
         Debug.print(text + " " + text.contains("Scr").to_string())
+    }
+
+    static func integers() {
+        var small: short = 32767
+        small += 1
+        Debug.print(small.to_string())
+        const lowest: short = -32768
+        Debug.print(lowest.to_string())
+        var count = 2147483647
+        count += 1
+        Debug.print(count.to_string())
+        const wide = count as bigint * 2
+        Debug.print(wide.to_string())
+        Debug.print((70000 as short).to_string())
+        var steps: short = 0
+        for step in steps..3 {
+            steps += step
+        }
+        Debug.print(steps.to_string())
     }
 
     static func loops() {

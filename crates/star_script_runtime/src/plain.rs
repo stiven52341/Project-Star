@@ -34,7 +34,7 @@ macro_rules! plain_itself {
     };
 }
 
-plain_itself!(i64, f32, bool, String);
+plain_itself!(i16, i32, i64, f32, bool, String);
 
 impl<T: Plain> Plain for Option<T> {
     type Sent = Option<T::Sent>;

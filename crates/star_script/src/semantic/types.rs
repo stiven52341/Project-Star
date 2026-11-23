@@ -5,8 +5,12 @@ use super::ClassId;
 /// Type of a value, as the compiler understands it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
-    /// `int`: 64-bit signed integer.
+    /// `short`: 16-bit signed integer.
+    Short,
+    /// `int`: 32-bit signed integer, the usual one.
     Int,
+    /// `bigint`: 64-bit signed integer.
+    BigInt,
     /// `float`: 32-bit floating-point number.
     Float,
     /// `bool`
@@ -36,7 +40,13 @@ impl Type {
     #[must_use]
     pub fn is_plain_value(&self) -> bool {
         match self {
-            Self::Int | Self::Float | Self::Bool | Self::String | Self::Error => true,
+            Self::Short
+            | Self::Int
+            | Self::BigInt
+            | Self::Float
+            | Self::Bool
+            | Self::String
+            | Self::Error => true,
             Self::List(inner) | Self::Nullable(inner) => inner.is_plain_value(),
             Self::Void | Self::Null | Self::Range | Self::Class(_) => false,
         }
@@ -78,10 +88,27 @@ impl Type {
         matches!(self, Self::Error)
     }
 
-    /// `int` or `float`.
+    /// An integer type or `float`.
     #[must_use]
     pub const fn is_numeric(&self) -> bool {
-        matches!(self, Self::Int | Self::Float)
+        self.is_integer() || matches!(self, Self::Float)
+    }
+
+    /// `short`, `int` or `bigint`.
+    #[must_use]
+    pub const fn is_integer(&self) -> bool {
+        matches!(self, Self::Short | Self::Int | Self::BigInt)
+    }
+
+    /// The smallest and largest values of an integer type.
+    #[must_use]
+    pub const fn integer_range(&self) -> Option<(i64, i64)> {
+        match self {
+            Self::Short => Some((i16::MIN as i64, i16::MAX as i64)),
+            Self::Int => Some((i32::MIN as i64, i32::MAX as i64)),
+            Self::BigInt => Some((i64::MIN, i64::MAX)),
+            _ => None,
+        }
     }
 
     /// Whether a variable of this type can start without an explicit value:
@@ -121,6 +148,19 @@ mod tests {
     #[test]
     fn only_objects_need_an_explicit_value() {
         assert!(Type::list(Type::Int).has_default_value());
+    }
+
+    #[test]
+    fn integer_types_know_their_range() {
+        assert_eq!(Type::Short.integer_range(), Some((-32_768, 32_767)));
+        assert_eq!(
+            Type::Int.integer_range(),
+            Some((-2_147_483_648, 2_147_483_647))
+        );
+        assert_eq!(Type::BigInt.integer_range(), Some((i64::MIN, i64::MAX)));
+        assert_eq!(Type::Float.integer_range(), None);
+        assert!(Type::Short.is_numeric() && Type::BigInt.is_integer());
+        assert!(!Type::Float.is_integer());
         assert!(!Type::Class(ClassId::new(0)).has_default_value());
         assert!(Type::Class(ClassId::new(0)).nullable().has_default_value());
     }

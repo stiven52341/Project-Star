@@ -325,7 +325,7 @@ fn builtin_code(
     use BuiltinMethod as Method;
 
     match (method, receiver_type) {
-        (Method::Abs, Type::Int) => format!("({receiver}).wrapping_abs()"),
+        (Method::Abs, integer) if integer.is_integer() => format!("({receiver}).wrapping_abs()"),
         (Method::Abs, _) => format!("({receiver}).abs()"),
         (Method::Min, _) => format!("({receiver}).min({argument})"),
         (Method::Max, _) => format!("({receiver}).max({argument})"),
@@ -336,7 +336,7 @@ fn builtin_code(
         (Method::ToString, Type::Float) => format!("{RUNTIME}::float_to_string({receiver})"),
         (Method::ToString, Type::String) => receiver.to_owned(),
         (Method::ToString, _) => format!("({receiver}).to_string()"),
-        (Method::Length, Type::String) => format!("(({receiver}).chars().count() as i64)"),
+        (Method::Length, Type::String) => format!("{RUNTIME}::text_length(&({receiver}))"),
         (Method::Contains, Type::String) => format!("({receiver}).contains(({argument}).as_str())"),
         (Method::Contains, _) => format!("({receiver}).contains(&({argument}))"),
         (Method::ToUpper, _) => format!("({receiver}).to_uppercase()"),

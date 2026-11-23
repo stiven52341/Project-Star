@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn work_runs_on_another_thread_with_copies() {
-        let numbers = List::from_vec(vec![1, 2, 3]);
+        let numbers = List::from_vec(vec![1_i64, 2, 3]);
 
         let total = awaited(run((numbers.send(),), sum));
 

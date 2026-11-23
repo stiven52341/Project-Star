@@ -26,6 +26,8 @@ pub use equality::StarEq;
 pub use fault::{fault, proven};
 pub use field::Field;
 pub use list::List;
-pub use operations::{concat, float_to_string, int_divide, int_remainder, print};
+pub use operations::{
+    Integer, concat, float_to_string, int_divide, int_remainder, print, text_length,
+};
 pub use plain::Plain;
 pub use tasks::Task;

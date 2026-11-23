@@ -134,6 +134,17 @@ pub enum SemanticErrorKind {
         /// Type of the value.
         operand: String,
     },
+    /// An integer literal that does not fit in its type: `var s: short = 40000`.
+    IntegerOutOfRange {
+        /// The value written.
+        value: i64,
+        /// The type it should have.
+        ty: String,
+        /// The smallest value of the type.
+        min: i64,
+        /// The largest value of the type.
+        max: i64,
+    },
     /// An `as` that cannot convert between the two types.
     InvalidCast {
         /// Type of the value.
@@ -303,12 +314,20 @@ impl fmt::Display for SemanticErrorKind {
             }
             Self::TypeMismatch { expected, found } => {
                 write!(formatter, "expected `{expected}`, found `{found}`")?;
-                if (expected == "float" && found == "int") || (expected == "int" && found == "float")
-                {
+                if is_number_name(expected) && is_number_name(found) {
                     write!(formatter, "; convert it with `as {expected}`")?;
                 }
                 Ok(())
             }
+            Self::IntegerOutOfRange {
+                value,
+                ty,
+                min,
+                max,
+            } => write!(
+                formatter,
+                "{value} does not fit in a `{ty}`, which goes from {min} to {max}"
+            ),
             Self::InvalidOperands {
                 operator,
                 left,
@@ -450,4 +469,9 @@ impl fmt::Display for SemanticErrorKind {
             }
         }
     }
+}
+
+/// Whether `name` is a numeric type, which `as` converts to any other.
+fn is_number_name(name: &str) -> bool {
+    matches!(name, "short" | "int" | "bigint" | "float")
 }

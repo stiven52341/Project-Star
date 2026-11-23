@@ -242,6 +242,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           stopping the game.
     - [x] 13.10f The code editor and an example: suggestions and types
           show `async` and `parallel`; an example game that uses both.
+- [x] 13.11 Integer types (decision 55): `short` (`i16`), `int` (`i32`)
+      and `bigint` (`i64`), with literals that take the type their place
+      needs and must fit in it.
 - [ ] **Editor ideas, not planned yet**: undo and redo in the scene
       editor (`Ctrl+Z`); moving nodes to another parent by dragging them in
       the tree; dropping a `.star` on a node to give it its class; “Show in

@@ -85,15 +85,18 @@ mod tests {
     #[test]
     fn star_script_reads_every_literal_written() {
         let values = [
-            Literal::Bool(true),
-            Literal::Int(-3),
-            Literal::Int(i64::MIN),
-            Literal::Float(1e20),
-            Literal::Float(-0.1),
-            Literal::String("say \"hi\"\\\n\t\r\0\u{7}ñ".to_owned()),
+            (Literal::Bool(true), "bool"),
+            (Literal::Int(-3), "int"),
+            (Literal::Int(i64::MIN), "bigint"),
+            (Literal::Float(1e20), "float"),
+            (Literal::Float(-0.1), "float"),
+            (
+                Literal::String("say \"hi\"\\\n\t\r\0\u{7}ñ".to_owned()),
+                "string",
+            ),
         ];
-        for value in &values {
-            let source = format!("class A {{\n    var value = {}\n}}\n", code(value));
+        for (value, ty) in &values {
+            let source = format!("class A {{\n    var value: {ty} = {}\n}}\n", code(value));
 
             let checked = star_script::check_source(&source);
 

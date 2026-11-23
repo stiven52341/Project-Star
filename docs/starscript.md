@@ -89,14 +89,14 @@ Convention: `PascalCase` for classes, `snake_case` for variables and methods,
 Reserved words do nothing yet, but they cannot be used as names. That way,
 enabling them later will not break existing programs.
 
-The basic types (`int`, `float`, `bool`, `string`) are **not** keywords:
+The basic types (`short`, `int`, `bigint`, `float`, `bool`, `string`) are **not** keywords:
 they are names of predefined classes.
 
 ### Literals
 
 | Type | Examples | Notes |
 |------|----------|-------|
-| Integer | `42` `1_000_000` `0xFF` `0b1010` | 64-bit signed. `_` separates digits |
+| Integer | `42` `1_000_000` `0xFF` `0b1010` | An `int`, unless its place needs another number type (see Inference). `_` separates digits |
 | Decimal | `3.14` `0.5` `1e3` `2.5e-3` | Needs a digit before the point: `.5` is not valid |
 | Text | `"Hello"` `"line\n"` `"\u{1F680}"` | A single line. Escapes: `\n \t \r \\ \" \0 \u{…}` |
 | Boolean | `true` `false` | |
@@ -223,7 +223,9 @@ cargo run -p star_script --example check -- file.star
 
 | StarScript | Rust | Default value |
 |------------|------|---------------|
-| `int` | `i64` | `0` |
+| `short` | `i16` (from -32768 to 32767) | `0` |
+| `int` | `i32` (about ±2100 million): the usual integer | `0` |
+| `bigint` | `i64` (about ±9.2·10¹⁸) | `0` |
 | `float` | `f32` (same as the engine and the GPU) | `0.0` |
 | `bool` | `bool` | `false` |
 | `string` | `String` | `""` |
@@ -244,10 +246,14 @@ through `b`. Numbers, `bool` and `string` are copied.
   `var e = [a, null]` infers `[Enemy?]`.
 - `null` alone and an empty `[]` do not tell their type: it must be written
   (`var target: Enemy? = null`, `var names: [string] = []`).
-- An integer literal becomes a `float` where one is needed:
-  `var speed: float = 2`, `speed * 2` and `2 * speed` are valid.
-- Apart from that, `int` and `float` **do not mix**: `speed + lives` is an
-  error; write `speed + lives as float`. The error suggests it.
+- An integer literal takes the number type its place needs:
+  `var speed: float = 2`, `speed * 2` and `2 * speed` are valid, and so are
+  `var small: short = 3` and `small + 1`. It must fit in that type:
+  `var small: short = 40000` is an error, `-32768` is a valid `short`.
+- Apart from that, number types **do not mix**: `speed + lives` is an
+  error; write `speed + lives as float`. The same goes for `short`, `int`
+  and `bigint` (`small + lives` → `small as int + lives`). The error
+  suggests it.
 - `+` joins texts: `"Lives: " + lives.to_string()`.
 
 ### Null safety
@@ -308,7 +314,7 @@ compiler prevents it.
 - **`static func`**: belongs to the class and is called as `Class.method()`;
   it has no `self`. `static var` fields do not exist yet.
 - **`is` and `as`**: `x is Player` checks the class. `x as Player` towards a
-  subclass may fail, so it gives a `Player?`. Between `int` and `float`, `as`
+  subclass may fail, so it gives a `Player?`. Between number types, `as`
   converts.
 - **Creating objects**: `Player(…)` with the arguments of its `init`. A
   `private init` can only be used inside the class.
@@ -320,18 +326,21 @@ compiler prevents it.
 - Parameters, constants and the variable of a `for` cannot be reassigned.
 - A local variable cannot have the name of another one still visible. It can
   have the name of a field: `self.speed = speed`.
-- Ranges `a..b` only exist in `for`.
+- Ranges `a..b` only exist in `for`. Both ends have the same integer type,
+  which is the type of the loop variable (`int` if both are literals).
 
 ### Values at run time
 
 - `==` compares numbers, `bool`, `string` and lists **by content** (lists,
   element by element); objects, **by identity** (whether they are the same
   object). `null` is only equal to `null`.
-- Integers **wrap around** on overflow (`9223372036854775807 + 1` gives the
-  minimum), the same in debug and release builds.
+- Integers **wrap around** on overflow (`2147483647 + 1` gives the minimum
+  `int`), the same in debug and release builds. `as` between integer types
+  keeps the lowest bits: `70000 as short` is `4464`.
+- List indices and `length()` are `int`.
 - `a / b` between integers rounds towards zero (`-7 / 2` is `-3`) and `a % b`
-  takes the sign of `a` (`-7 % 3` is `-1`). `float as int` drops the decimals
-  and saturates at the extremes.
+  takes the sign of `a` (`-7 % 3` is `-1`). `float as int` (or `short`,
+  `bigint`) drops the decimals and saturates at the extremes.
 - `for x in list` goes through the elements it had when it started: changing
   the list inside the loop does not change what it goes through.
 - `float.to_string()` always shows that it is a `float`: `2.0`, not `2`.
@@ -345,7 +354,7 @@ compiler prevents it.
 
 | Type | Methods |
 |------|---------|
-| `int` | `abs()` `min(x)` `max(x)` `to_string()` |
+| `short`, `int`, `bigint` | `abs()` `min(x)` `max(x)` `to_string()` |
 | `float` | `abs()` `min(x)` `max(x)` `floor()` `ceil()` `round()` `sqrt()` `to_string()` |
 | `bool` | `to_string()` |
 | `string` | `length()` `is_empty()` `contains(s)` `to_upper()` `to_lower()` `to_string()` |
@@ -1043,7 +1052,7 @@ class Walker extends Node {
 ```
 
 - `parallel` only goes with `static func`: such a function has no `self`.
-- Its parameters and its result can only be **values**: `int`, `float`,
+- Its parameters and its result can only be **values**: numbers,
   `bool`, `string`, lists of values and nullable values. Never classes.
   It must have a result (`->`): that is all it does. It cannot be `async`:
   it is awaited already.

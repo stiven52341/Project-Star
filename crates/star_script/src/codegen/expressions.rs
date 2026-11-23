@@ -1,6 +1,6 @@
 //! Expressions: each becomes a Rust expression that yields an owned value.
 
-use super::conversions::{NONE, RC, RUNTIME, SOME, read_variable};
+use super::conversions::{NONE, RC, RUNTIME, SOME, number_type, read_variable};
 use super::names::ident;
 use super::statements::Body;
 use super::{Result, internal};
@@ -164,9 +164,18 @@ impl Body<'_> {
     // --- Operators ---
 
     fn unary(&self, operator: UnaryOperator, operand: &Expr) -> Result<String> {
+        let ty = self.context.type_of(operand)?;
+        if let (UnaryOperator::Negate, ExprKind::Literal(Literal::Integer(value)), Some(suffix)) =
+            (operator, &operand.kind, integer_type(ty))
+        {
+            // Whole, so that `-32768` is a valid `short`.
+            return Ok(format!("(-{value}_{suffix})"));
+        }
         let code = self.expression(operand)?;
-        Ok(match (operator, self.context.type_of(operand)?) {
-            (UnaryOperator::Negate, Type::Int) => format!("({code}).wrapping_neg()"),
+        Ok(match (operator, ty) {
+            (UnaryOperator::Negate, integer) if integer.is_integer() => {
+                format!("({code}).wrapping_neg()")
+            }
             (UnaryOperator::Negate, _) => format!("(-({code}))"),
             (UnaryOperator::Not, _) => format!("(!({code}))"),
         })
@@ -289,9 +298,12 @@ impl Body<'_> {
         let code = self.expression(value)?;
         match (from, target) {
             _ if from == target => Ok(code),
-            (Type::Int, Type::Float) => Ok(format!("(({code}) as f32)")),
-            // Rust's `as` saturates: too large values give the largest `int`.
-            (Type::Float, Type::Int) => Ok(format!("(({code}) as i64)")),
+            // Rust's `as` between integers keeps the lowest bits (it wraps
+            // around), and from `float` it drops the decimals and saturates.
+            (from, target) if from.is_numeric() && target.is_numeric() => {
+                let rust = number_type(target).unwrap_or_default();
+                Ok(format!("(({code}) as {rust})"))
+            }
             _ => {
                 let (Some(from_class), Some(to_class)) = (from.class(), target.class()) else {
                     return Err(internal("cast between unrelated types", span));
@@ -341,17 +353,27 @@ pub(super) fn arithmetic(
     span: Span,
 ) -> Result<String> {
     Ok(match (ty, operator) {
-        (Type::Int, BinaryOperator::Add) => format!("({left}).wrapping_add({right})"),
-        (Type::Int, BinaryOperator::Subtract) => format!("({left}).wrapping_sub({right})"),
-        (Type::Int, BinaryOperator::Multiply) => format!("({left}).wrapping_mul({right})"),
-        (Type::Int, BinaryOperator::Divide) => format!("{RUNTIME}::int_divide({left}, {right})"),
-        (Type::Int, BinaryOperator::Remainder) => {
-            format!("{RUNTIME}::int_remainder({left}, {right})")
-        }
+        (integer, operator) if integer.is_integer() => integer_arithmetic(operator, left, right),
         (Type::String, BinaryOperator::Add) => format!("{RUNTIME}::concat({left}, &({right}))"),
         (Type::Float, _) => format!("(({left}) {} ({right}))", operator.symbol()),
         _ => return Err(internal("arithmetic on a non-numeric type", span)),
     })
+}
+
+/// `left operator right` between integers of one type.
+fn integer_arithmetic(operator: BinaryOperator, left: &str, right: &str) -> String {
+    match operator {
+        BinaryOperator::Add => format!("({left}).wrapping_add({right})"),
+        BinaryOperator::Subtract => format!("({left}).wrapping_sub({right})"),
+        BinaryOperator::Multiply => format!("({left}).wrapping_mul({right})"),
+        BinaryOperator::Divide => format!("{RUNTIME}::int_divide({left}, {right})"),
+        _ => format!("{RUNTIME}::int_remainder({left}, {right})"),
+    }
+}
+
+/// The Rust type of an integer type.
+fn integer_type(ty: &Type) -> Option<&'static str> {
+    ty.is_integer().then(|| number_type(ty)).flatten()
 }
 
 fn literal_code(literal: &Literal, ty: &Type) -> String {
@@ -359,7 +381,7 @@ fn literal_code(literal: &Literal, ty: &Type) -> String {
         // An integer literal where a `float` is needed: `var speed: float = 2`.
         #[allow(clippy::cast_precision_loss)] // Literals that large are not exact floats anyway.
         Literal::Integer(value) if *ty == Type::Float => float_literal(*value as f64),
-        Literal::Integer(value) => format!("{value}_i64"),
+        Literal::Integer(value) => format!("{value}_{}", integer_type(ty).unwrap_or("i32")),
         Literal::Float(value) => float_literal(*value),
         Literal::String(text) => format!("::std::string::String::from({text:?})"),
         Literal::Bool(value) => value.to_string(),

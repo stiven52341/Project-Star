@@ -8,13 +8,15 @@ use super::{
 use crate::Span;
 
 /// Names of the basic types; they cannot be used as class names.
-pub const BASIC_TYPE_NAMES: [&str; 4] = ["int", "float", "bool", "string"];
+pub const BASIC_TYPE_NAMES: [&str; 6] = ["short", "int", "bigint", "float", "bool", "string"];
 
 /// The basic type called `name`.
 #[must_use]
 pub fn basic_type(name: &str) -> Option<Type> {
     match name {
+        "short" => Some(Type::Short),
         "int" => Some(Type::Int),
+        "bigint" => Some(Type::BigInt),
         "float" => Some(Type::Float),
         "bool" => Some(Type::Bool),
         "string" => Some(Type::String),
@@ -615,14 +617,15 @@ fn builtin_signature(receiver: &Type, method: BuiltinMethod) -> Option<(Vec<Type
     use BuiltinMethod as Method;
 
     let signature = match (receiver, method) {
-        (Type::Int | Type::Float, Method::Abs) => (vec![], receiver.clone()),
-        (Type::Int | Type::Float, Method::Min | Method::Max) => {
+        (number, Method::Abs) if number.is_numeric() => (vec![], receiver.clone()),
+        (number, Method::Min | Method::Max) if number.is_numeric() => {
             (vec![receiver.clone()], receiver.clone())
         }
         (Type::Float, Method::Floor | Method::Ceil | Method::Round | Method::Sqrt) => {
             (vec![], Type::Float)
         }
-        (Type::Int | Type::Float | Type::Bool | Type::String, Method::ToString)
+        (value, Method::ToString) if value.is_numeric() => (vec![], Type::String),
+        (Type::Bool | Type::String, Method::ToString)
         | (Type::String, Method::ToUpper | Method::ToLower) => (vec![], Type::String),
         (Type::String | Type::List(_), Method::Length) => (vec![], Type::Int),
         (Type::String | Type::List(_), Method::IsEmpty) => (vec![], Type::Bool),
@@ -673,5 +676,7 @@ mod tests {
         assert!(builtin_method(&Type::Int, "sqrt").is_none());
         assert!(builtin_method(&Type::Bool, "length").is_none());
         assert!(builtin_method(&Type::Int, "explode").is_none());
+        assert!(builtin_method(&Type::Short, "abs").is_some());
+        assert!(builtin_method(&Type::BigInt, "to_string").is_some());
     }
 }

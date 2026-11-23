@@ -398,9 +398,8 @@ impl<'text> Scope<'text> {
         match ty {
             Type::Class(class) => Some(self.object_of(*class)),
             Type::Nullable(inner) => self.chained_value(inner),
-            Type::Int | Type::Float | Type::Bool | Type::String | Type::List(_) => {
-                Some(Chained::Basic(ty.clone()))
-            }
+            Type::Bool | Type::String | Type::List(_) => Some(Chained::Basic(ty.clone())),
+            number if number.is_numeric() => Some(Chained::Basic(ty.clone())),
             _ => None,
         }
     }

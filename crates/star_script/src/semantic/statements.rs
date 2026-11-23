@@ -138,12 +138,9 @@ impl Checker<'_> {
             right,
         } = &iterable.kind
         {
-            for bound in [left, right] {
-                let found = self.expression(bound, Some(&Type::Int));
-                self.require_assignable(&found, &Type::Int, bound.span);
-            }
+            let element = self.range_bounds(left, right, iterable.span);
             self.analysis.record(iterable, Type::Range, None);
-            return Type::Int;
+            return element;
         }
         match self.expression(iterable, None) {
             Type::List(element) => *element,
@@ -161,6 +158,25 @@ impl Checker<'_> {
                 Type::Error
             }
         }
+    }
+
+    /// The bounds of `left..right`: integers of one type, which is the type
+    /// of the values it goes through (`int` if both are literals).
+    fn range_bounds(&mut self, left: &Expr, right: &Expr, span: Span) -> Type {
+        let (left_type, right_type) = self.operands(left, right, None);
+        if left_type.is_error() || right_type.is_error() {
+            return Type::Error;
+        }
+        if left_type == right_type && left_type.is_integer() {
+            return left_type;
+        }
+        let kind = SemanticErrorKind::InvalidOperands {
+            operator: BinaryOperator::Range.symbol(),
+            left: self.type_name(&left_type),
+            right: self.type_name(&right_type),
+        };
+        self.error(kind, span);
+        Type::Error
     }
 
     fn return_statement(&mut self, value: Option<&Expr>, span: Span) {

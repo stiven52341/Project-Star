@@ -2,13 +2,48 @@
 
 use crate::fault;
 
+/// An integer type of StarScript: `short` (`i16`), `int` (`i32`) or
+/// `bigint` (`i64`).
+pub trait Integer: Copy + PartialEq {
+    /// Zero, which no integer can be divided by.
+    const ZERO: Self;
+
+    /// `self / divisor`, wrapping around on overflow.
+    #[must_use]
+    fn wrapping_div(self, divisor: Self) -> Self;
+
+    /// `self % divisor`, wrapping around on overflow.
+    #[must_use]
+    fn wrapping_rem(self, divisor: Self) -> Self;
+}
+
+macro_rules! integer {
+    ($($rust:ty),*) => {
+        $(
+            impl Integer for $rust {
+                const ZERO: Self = 0;
+
+                fn wrapping_div(self, divisor: Self) -> Self {
+                    <$rust>::wrapping_div(self, divisor)
+                }
+
+                fn wrapping_rem(self, divisor: Self) -> Self {
+                    <$rust>::wrapping_rem(self, divisor)
+                }
+            }
+        )*
+    };
+}
+
+integer!(i16, i32, i64);
+
 /// `a / b` between integers. Like the other integer operations, it wraps
 /// around on overflow (`int.min / -1`), so debug and release builds of a
 /// game always give the same results.
 #[must_use]
 #[track_caller]
-pub fn int_divide(dividend: i64, divisor: i64) -> i64 {
-    if divisor == 0 {
+pub fn int_divide<I: Integer>(dividend: I, divisor: I) -> I {
+    if divisor == I::ZERO {
         fault("integer division by zero");
     }
     dividend.wrapping_div(divisor)
@@ -17,11 +52,17 @@ pub fn int_divide(dividend: i64, divisor: i64) -> i64 {
 /// `a % b` between integers; the result has the sign of `a`.
 #[must_use]
 #[track_caller]
-pub fn int_remainder(dividend: i64, divisor: i64) -> i64 {
-    if divisor == 0 {
+pub fn int_remainder<I: Integer>(dividend: I, divisor: I) -> I {
+    if divisor == I::ZERO {
         fault("integer remainder by zero");
     }
     dividend.wrapping_rem(divisor)
+}
+
+/// `text.length()`: how many characters it has (at most the largest `int`).
+#[must_use]
+pub fn text_length(text: &str) -> i32 {
+    i32::try_from(text.chars().count()).unwrap_or(i32::MAX)
 }
 
 /// `a + b` between texts.
@@ -52,8 +93,11 @@ mod tests {
         assert_eq!(int_divide(7, 2), 3);
         assert_eq!(int_divide(-7, 2), -3);
         assert_eq!(int_divide(i64::MIN, -1), i64::MIN);
+        assert_eq!(int_divide(i16::MIN, -1_i16), i16::MIN);
+        assert_eq!(int_divide(i32::MIN, -1_i32), i32::MIN);
         assert_eq!(int_remainder(-7, 2), -1);
         assert_eq!(int_remainder(i64::MIN, -1), 0);
+        assert_eq!(int_remainder(i16::MIN, -1_i16), 0);
     }
 
     #[test]
@@ -66,6 +110,11 @@ mod tests {
     #[should_panic(expected = "integer remainder by zero")]
     fn remainder_by_zero_is_a_fault() {
         let _ = int_remainder(1, 0);
+    }
+
+    #[test]
+    fn texts_count_characters() {
+        assert_eq!(text_length("año"), 3);
     }
 
     #[test]

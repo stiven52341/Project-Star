@@ -26,7 +26,7 @@ macro_rules! value_equality {
     };
 }
 
-value_equality!(i64, f32, bool, String);
+value_equality!(i16, i32, i64, f32, bool, String);
 
 impl<T: StarEq> StarEq for Option<T> {
     fn star_eq(&self, other: &Self) -> bool {

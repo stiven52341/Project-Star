@@ -33,8 +33,9 @@ impl Context<'_> {
     /// The Rust type of values of `ty`.
     pub(super) fn rust_type(self, ty: &Type, span: Span) -> Result<String> {
         Ok(match ty {
-            Type::Int => "i64".to_owned(),
-            Type::Float => "f32".to_owned(),
+            Type::Short | Type::Int | Type::BigInt | Type::Float => {
+                number_type(ty).unwrap_or_default().to_owned()
+            }
             Type::Bool => "bool".to_owned(),
             Type::String => "::std::string::String".to_owned(),
             Type::Void => "()".to_owned(),
@@ -119,8 +120,10 @@ impl Context<'_> {
 /// The value a variable of `ty` starts with when none is given.
 pub(super) fn default_value(ty: &Type, span: Span) -> Result<String> {
     Ok(match ty {
-        Type::Int => "0_i64".to_owned(),
         Type::Float => "0.0_f32".to_owned(),
+        integer if integer.is_integer() => {
+            format!("0_{}", number_type(integer).unwrap_or_default())
+        }
         Type::Bool => "false".to_owned(),
         Type::String => "::std::string::String::new()".to_owned(),
         Type::List(_) => format!("{RUNTIME}::List::new()"),
@@ -131,7 +134,18 @@ pub(super) fn default_value(ty: &Type, span: Span) -> Result<String> {
 
 /// Whether reading a value of `ty` must copy it with `.clone()`.
 pub(super) const fn needs_clone(ty: &Type) -> bool {
-    !matches!(ty, Type::Int | Type::Float | Type::Bool)
+    !(ty.is_numeric() || matches!(ty, Type::Bool))
+}
+
+/// The Rust type of a number type: `short` is `i16`, `float` is `f32`.
+pub(super) const fn number_type(ty: &Type) -> Option<&'static str> {
+    match ty {
+        Type::Short => Some("i16"),
+        Type::Int => Some("i32"),
+        Type::BigInt => Some("i64"),
+        Type::Float => Some("f32"),
+        _ => None,
+    }
 }
 
 /// The code that reads `name` (a variable) as an owned value.

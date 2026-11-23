@@ -539,7 +539,7 @@ pub mod Sprite {
         pub texture: ::star_script_runtime::Field<::std::string::String>,
         pub width: ::star_script_runtime::Field<f32>,
         pub height: ::star_script_runtime::Field<f32>,
-        pub layer: ::star_script_runtime::Field<i64>,
+        pub layer: ::star_script_runtime::Field<i32>,
         pub pixelated: ::star_script_runtime::Field<bool>,
         pub color: ::star_script_runtime::Field<crate::classes::Color::Ref>,
     }
@@ -1146,11 +1146,10 @@ fn with_sprite_(
     };
     let look_ = crate::classes::Sprite::HasFields::fields(&*sprite_);
     look_.texture.read(|texture_| {
-        let layer_ = look_.layer.get().clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
         then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptSprite {
             texture: texture_,
             size: ::star_engine::star_math::Vec2::new(look_.width.get(), look_.height.get()),
-            layer: layer_,
+            layer: look_.layer.get(),
             pixelated: look_.pixelated.get(),
             color: look_.color.read(|color_| engine_color_(&**color_)),
         }));
@@ -1346,7 +1345,7 @@ fn read_scene_(
                 texture: image_.texture.as_str().to_owned(),
                 width: image_.size.x,
                 height: image_.size.y,
-                layer: i64::from(image_.layer),
+                layer: image_.layer,
                 pixelated: image_.filter == ::star_engine::star_render::TextureFilter::Pixelated,
                 color: [image_.color.r, image_.color.g, image_.color.b, image_.color.a],
             }),

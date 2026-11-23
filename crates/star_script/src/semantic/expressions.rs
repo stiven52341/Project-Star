@@ -37,7 +37,7 @@ impl Checker<'_> {
     fn expression_kind(&mut self, expression: &Expr, expected: Option<&Type>) -> Checked {
         let span = expression.span;
         let ty = match &expression.kind {
-            ExprKind::Literal(literal) => literal_type(literal, expected),
+            ExprKind::Literal(literal) => self.literal(literal, expected, false, span),
             ExprKind::Name(name) => return self.name_value(name, span),
             ExprKind::Member {
                 object,
@@ -54,6 +54,12 @@ impl Checker<'_> {
             ExprKind::Super => {
                 self.error(SemanticErrorKind::InvalidSuper, span);
                 Type::Error
+            }
+            ExprKind::Unary {
+                operator: UnaryOperator::Negate,
+                operand,
+            } if matches!(operand.kind, ExprKind::Literal(Literal::Integer(_))) => {
+                self.negative_literal(operand, expected, span)
             }
             ExprKind::Unary { operator, operand } => self.unary(*operator, operand, expected),
             ExprKind::Binary {
@@ -328,6 +334,41 @@ impl Checker<'_> {
 
     // --- Operators ---
 
+    /// The type of `literal`; an integer must fit in it (`negated`: with
+    /// a `-` before it, which lets `-32768` be a `short`).
+    fn literal(
+        &mut self,
+        literal: &Literal,
+        expected: Option<&Type>,
+        negated: bool,
+        span: Span,
+    ) -> Type {
+        let ty = literal_type(literal, expected);
+        if let (Literal::Integer(value), Some((min, max))) = (literal, ty.integer_range()) {
+            let value = if negated { -*value } else { *value };
+            if !(min..=max).contains(&value) {
+                let kind = SemanticErrorKind::IntegerOutOfRange {
+                    value,
+                    ty: self.type_name(&ty),
+                    min,
+                    max,
+                };
+                self.error(kind, span);
+            }
+        }
+        ty
+    }
+
+    /// `-3`: an integer literal with `-`, whose value must fit in its type.
+    fn negative_literal(&mut self, literal: &Expr, expected: Option<&Type>, span: Span) -> Type {
+        let ExprKind::Literal(value) = &literal.kind else {
+            return Type::Error;
+        };
+        let ty = self.literal(value, expected, true, span);
+        self.analysis.record(literal, ty.clone(), None);
+        ty
+    }
+
     fn unary(&mut self, operator: UnaryOperator, operand: &Expr, expected: Option<&Type>) -> Type {
         let (expected, valid): (Option<&Type>, fn(&Type) -> bool) = match operator {
             UnaryOperator::Negate => (expected, Type::is_numeric),
@@ -364,8 +405,7 @@ impl Checker<'_> {
                 self.equality(operator, left, right, span)
             }
             BinaryOperator::Range => {
-                self.expression(left, Some(&Type::Int));
-                self.expression(right, Some(&Type::Int));
+                self.operands(left, right, None);
                 self.error(SemanticErrorKind::RangeOutsideFor, span);
                 Type::Error
             }
@@ -421,7 +461,12 @@ impl Checker<'_> {
 
     /// Checks both operands so that an integer literal adapts to the other
     /// side: in `speed * 2` and `2 * speed`, `2` is a `float` if `speed` is.
-    fn operands(&mut self, left: &Expr, right: &Expr, expected: Option<&Type>) -> (Type, Type) {
+    pub(super) fn operands(
+        &mut self,
+        left: &Expr,
+        right: &Expr,
+        expected: Option<&Type>,
+    ) -> (Type, Type) {
         if is_integer_literal(left) && !is_integer_literal(right) {
             let right_type = self.expression(right, expected);
             let left_type = self.expression(left, Some(&right_type));
@@ -611,8 +656,15 @@ impl Checker<'_> {
 }
 
 fn literal_type(literal: &Literal, expected: Option<&Type>) -> Type {
+    match (literal, expected.map(Type::non_null)) {
+        (Literal::Integer(_), Some(number)) if number.is_numeric() => number,
+        (Literal::Integer(_), _) => Type::Int,
+        (literal, _) => other_literal_type(literal),
+    }
+}
+
+fn other_literal_type(literal: &Literal) -> Type {
     match literal {
-        Literal::Integer(_) if expected.map(Type::non_null) == Some(Type::Float) => Type::Float,
         Literal::Integer(_) => Type::Int,
         Literal::Float(_) => Type::Float,
         Literal::String(_) => Type::String,
@@ -621,7 +673,7 @@ fn literal_type(literal: &Literal, expected: Option<&Type>) -> Type {
     }
 }
 
-/// `3` or `-3`: literals that become `float` where a `float` is needed.
+/// `3` or `-3`: literals that take the numeric type that is needed.
 fn is_integer_literal(expression: &Expr) -> bool {
     match &expression.kind {
         ExprKind::Literal(Literal::Integer(_)) => true,

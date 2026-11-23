@@ -264,6 +264,76 @@ fn compound_assignment_needs_matching_numbers() {
 }
 
 #[test]
+fn integer_literals_take_the_integer_type_needed() {
+    assert_valid_body(
+        "var small: short = -32768
+         var big: bigint = 9223372036854775807
+         small = small * 2 + 1
+         big = 3 - big
+         var count = 2147483647
+         count = count + n
+         for i in small..10 { small = i }",
+    );
+}
+
+#[test]
+fn integer_literals_must_fit_in_their_type() {
+    assert_eq!(
+        body_errors("var small: short = 40000\nvar count = 2147483648"),
+        [
+            Kind::IntegerOutOfRange {
+                value: 40000,
+                ty: "short".into(),
+                min: -32768,
+                max: 32767
+            },
+            Kind::IntegerOutOfRange {
+                value: 2_147_483_648,
+                ty: "int".into(),
+                min: -2_147_483_648,
+                max: 2_147_483_647
+            }
+        ]
+    );
+    assert_eq!(
+        body_errors("var small: short = -32769"),
+        [Kind::IntegerOutOfRange {
+            value: -32769,
+            ty: "short".into(),
+            min: -32768,
+            max: 32767
+        }]
+    );
+}
+
+#[test]
+fn integer_types_do_not_mix_without_as() {
+    assert_eq!(
+        body_errors("var small: short = 1\nvar sum = small + n"),
+        [Kind::InvalidOperands {
+            operator: "+",
+            left: "short".into(),
+            right: "int".into()
+        }]
+    );
+    assert_eq!(
+        body_errors("var big: bigint = n"),
+        [mismatch("bigint", "int")]
+    );
+    assert_eq!(
+        body_errors("var small: short = 1\nfor i in small..n { }"),
+        [Kind::InvalidOperands {
+            operator: "..",
+            left: "short".into(),
+            right: "int".into()
+        }]
+    );
+    assert_valid_body(
+        "var big = n as bigint + 1\nvar small = big as short\nvar x = small as float",
+    );
+}
+
+#[test]
 fn casts_between_numbers_and_related_classes() {
     assert_valid(
         "class Boss extends Enemy {}

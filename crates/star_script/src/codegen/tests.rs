@@ -20,7 +20,7 @@ fn each_class_gets_a_module() {
 
     assert!(code.contains("pub mod Player {"));
     assert!(code.contains("pub mod Enemy {"));
-    assert!(code.contains("pub lives: ::star_script_runtime::Field<i64>,"));
+    assert!(code.contains("pub lives: ::star_script_runtime::Field<i32>,"));
 }
 
 #[test]
@@ -29,7 +29,7 @@ fn rust_keywords_are_escaped() {
 
     assert!(code.contains("pub mod r#struct {"));
     assert!(code.contains("pub r#type: "));
-    assert!(code.contains("pub fn r#fn(this_: &Ref, None_: i64)"));
+    assert!(code.contains("pub fn r#fn(this_: &Ref, None_: i32)"));
 }
 
 #[test]
@@ -44,7 +44,23 @@ fn subclasses_extend_the_trait_of_their_base() {
 fn integers_wrap_around() {
     let code = rust("class A { func f(a: int) -> int { return a * 2 + 1 } }");
 
-    assert!(code.contains("((a).wrapping_mul(2_i64)).wrapping_add(1_i64)"));
+    assert!(code.contains("((a).wrapping_mul(2_i32)).wrapping_add(1_i32)"));
+}
+
+#[test]
+fn each_integer_type_has_its_rust_width() {
+    let code = rust(
+        "class A { func f(small: short, big: bigint) -> short {
+             const lowest: short = -32768
+             return big as short + lowest + small
+         }
+         var count = 0 }",
+    );
+
+    assert!(code.contains("small: i16, big: i64) -> i16"));
+    assert!(code.contains("(-32768_i16)"));
+    assert!(code.contains("((big) as i16)"));
+    assert!(code.contains("pub count: ::star_script_runtime::Field<i32>,"));
 }
 
 #[test]
@@ -356,7 +372,7 @@ fn async_methods_are_tasks_of_their_object() {
     );
 
     assert!(
-        code.contains("fn glow(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::Task<i64>;")
+        code.contains("fn glow(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::Task<i32>;")
     );
     assert!(code.contains("::star_script_runtime::Task::new(async move {"));
     assert!(code.contains("(::star_script_runtime::tasks::wait(1.0_f32)).await;"));
@@ -403,8 +419,8 @@ fn awaited_parallel_functions_run_on_other_threads_with_copies() {
     );
 
     assert!(code.contains(
-        "::star_script_runtime::parallel::run((::star_script_runtime::Plain::send(&1_i64), \
-         ::star_script_runtime::Plain::send(&::star_script_runtime::List::from_vec(::std::vec![2_i64])),), \
+        "::star_script_runtime::parallel::run((::star_script_runtime::Plain::send(&1_i32), \
+         ::star_script_runtime::Plain::send(&::star_script_runtime::List::from_vec(::std::vec![2_i32])),), \
          |(argument0_, argument1_,)| crate::classes::P::Methods::f(\
          ::star_script_runtime::Plain::receive(argument0_), ::star_script_runtime::Plain::receive(argument1_)))"
     ));

@@ -58,7 +58,7 @@ impl<T: Clone> List<T> {
     /// `list[index]`.
     #[must_use]
     #[track_caller]
-    pub fn get(&self, index: i64) -> T {
+    pub fn get(&self, index: i32) -> T {
         self.read(|elements| {
             let position = checked_index(index, elements.len());
             elements[position].clone()
@@ -67,7 +67,7 @@ impl<T: Clone> List<T> {
 
     /// `list[index] = value`.
     #[track_caller]
-    pub fn set(&self, index: i64, value: T) {
+    pub fn set(&self, index: i32, value: T) {
         self.write(|elements| {
             let position = checked_index(index, elements.len());
             elements[position] = value;
@@ -76,8 +76,8 @@ impl<T: Clone> List<T> {
 
     /// `length()`: number of elements.
     #[must_use]
-    pub fn length(&self) -> i64 {
-        self.read(|elements| i64::try_from(elements.len()).unwrap_or(i64::MAX))
+    pub fn length(&self) -> i32 {
+        self.read(|elements| i32::try_from(elements.len()).unwrap_or(i32::MAX))
     }
 
     /// `is_empty()`: whether there are no elements.
@@ -146,7 +146,7 @@ impl<T: Clone + StarEq> StarEq for List<T> {
 const OVERLAPPING_ACCESS: &str = "internal compiler error: overlapping list access";
 
 #[track_caller]
-fn checked_index(index: i64, length: usize) -> usize {
+fn checked_index(index: i32, length: usize) -> usize {
     match usize::try_from(index) {
         Ok(position) if position < length => position,
         _ => fault(&format!(

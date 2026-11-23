@@ -130,7 +130,7 @@ pub struct SceneSprite {
     /// Height in world units.
     pub height: f32,
     /// Sprites in higher layers are drawn on top of lower ones.
-    pub layer: i64,
+    pub layer: i32,
     /// Whether the pixels are kept sharp.
     pub pixelated: bool,
     /// Red, green, blue and opacity, from `0.0` to `1.0`.

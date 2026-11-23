@@ -304,7 +304,9 @@ impl ClassTable {
     #[must_use]
     pub fn type_name(&self, ty: &Type) -> String {
         match ty {
+            Type::Short => "short".to_owned(),
             Type::Int => "int".to_owned(),
+            Type::BigInt => "bigint".to_owned(),
             Type::Float => "float".to_owned(),
             Type::Bool => "bool".to_owned(),
             Type::String => "string".to_owned(),
