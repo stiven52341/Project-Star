@@ -4,17 +4,18 @@ use star_assets::AssetPath;
 use star_core::{EngineError, EngineResult};
 use star_ecs::{Entity, World};
 use star_math::Vec2;
-use star_physics::BodySettings;
+use star_physics::{BodySettings, Shape3d};
 use star_render::{
     Color, Material, Mesh3dId, MeshShape, Sprite, TextureFilter, TextureId, TextureRegion,
 };
 
-use crate::body_data::BodyData;
+use crate::body_data::{Body3dData, BodyData};
 use crate::node_3d_data::{LightData, MeshOutline, MeshTable, Transform3dData};
 use crate::scene_file::{FORMAT_VERSION, FilterData, NodeData, SceneFile, SpriteData};
 use crate::scene_outline::{NodeOutline, SceneOutline};
 use crate::{
-    Body2D, Children, Hierarchy, LightNode, MeshNode, Name, SpriteNode, Transform2D, Transform3D,
+    Body2D, Body3D, Children, Hierarchy, LightNode, MeshNode, Name, SpriteNode, Transform2D,
+    Transform3D,
 };
 
 /// A tree of nodes that can be added to a world as many times as needed:
@@ -22,8 +23,9 @@ use crate::{
 /// captured from a world to be saved in one.
 ///
 /// It keeps, for each node, its name, its [`Transform2D`], its
-/// [`SpriteNode`], its [`Body2D`], its [`Transform3D`], its [`MeshNode`]
-/// and its [`LightNode`]; other components are not part of scenes yet.
+/// [`SpriteNode`], its [`Body2D`], its [`Transform3D`], its [`MeshNode`],
+/// its [`LightNode`] and its [`Body3D`]; other components are not part of
+/// scenes yet.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scene {
     /// Parents always come before their children; the first node is the root.
@@ -43,6 +45,7 @@ struct SceneNode {
     transform_3d: Option<Transform3D>,
     mesh: Option<MeshNode>,
     light: Option<LightNode>,
+    body_3d: Option<BodySettings<Shape3d>>,
 }
 
 /// Loads what the nodes of a scene show, so a [`Scene`] can be read.
@@ -197,6 +200,9 @@ impl Scene {
             if let Some(light) = node.light {
                 world.insert(entity, light)?;
             }
+            if let Some(body) = node.body_3d {
+                world.insert(entity, Body3D::new(body))?;
+            }
         }
         Ok(())
     }
@@ -244,6 +250,7 @@ fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResul
         transform_3d: outline.transform_3d,
         mesh,
         light: outline.light,
+        body_3d: outline.body_3d,
     })
 }
 
@@ -289,6 +296,7 @@ fn write_node(node: &SceneNode, sources: &impl SceneSources) -> EngineResult<Nod
             .map(Transform3dData::from_transform),
         mesh,
         light: node.light.as_ref().map(LightData::from_light),
+        body_3d: node.body_3d.as_ref().map(Body3dData::from_settings),
     })
 }
 
@@ -356,6 +364,7 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
         transform_3d: world.get::<Transform3D>(entity).map(|transform| *transform),
         mesh: world.get::<MeshNode>(entity).map(|mesh| *mesh),
         light: world.get::<LightNode>(entity).map(|light| *light),
+        body_3d: world.get::<Body3D>(entity).map(|body| *body.settings()),
     }
 }
 
@@ -618,6 +627,11 @@ mod tests {
         texture = "crate.png"
         roughness = 0.8
 
+        [node.body_3d]
+        kind = "static"
+        shape = "box"
+        size = [1.0, 1.0, 1.0]
+
         [[node]]
         name = "Lamp"
         parent = 0
@@ -631,7 +645,7 @@ mod tests {
     "#;
 
     #[test]
-    fn scenes_keep_3d_nodes_with_their_meshes_and_lights() {
+    fn scenes_keep_3d_nodes_with_their_meshes_lights_and_bodies() {
         let textures = Textures::default();
         let scene = read(ROOM, &textures).unwrap();
         let mut world = World::new();
@@ -650,6 +664,10 @@ mod tests {
         );
         assert_eq!(mesh.material.roughness, 0.8);
         assert!(mesh.material.base_color_texture.is_some());
+        let body = world.get::<Body3D>(crate_node).unwrap();
+        assert_eq!(body.settings().kind, star_physics::BodyKind::Static);
+        assert_eq!(body.id(), None);
+        drop(body);
         let lamp = world.find_child(root, "Lamp").unwrap();
         assert!(matches!(
             world.get::<LightNode>(lamp).map(|light| *light),
@@ -661,7 +679,9 @@ mod tests {
             .to_text(&textures)
             .unwrap();
         assert!(
-            text.contains("[node.mesh]") && text.contains("[node.light]"),
+            text.contains("[node.mesh]")
+                && text.contains("[node.light]")
+                && text.contains("[node.body_3d]"),
             "{text}"
         );
         assert_eq!(read(&text, &textures).unwrap().node_count(), 3);

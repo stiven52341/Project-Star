@@ -2,11 +2,12 @@
 //! that follow their bodies.
 
 use std::collections::HashMap;
+use std::hash::Hash;
 
 use star_core::{EngineError, EngineResult};
 use star_ecs::{Entity, World};
-use star_math::{Affine2, Vec2};
-use star_physics::{BodyId, BodyKind, ContactPhase, Physics2d};
+use star_math::Affine2;
+use star_physics::{BodyId, BodyId3d, BodyKind, Contact, ContactPhase, Physics2d};
 
 use crate::{Body2D, GlobalTransform2D, Parent, Transform2D};
 
@@ -47,15 +48,36 @@ impl NodeContact {
 /// Which node each body of the [`Physics2d`] belongs to, and the contacts
 /// of the last frame between nodes. A resource of the world, kept by
 /// [`step_node_physics`].
-#[derive(Debug, Default)]
-pub struct PhysicsNodes {
-    nodes: HashMap<BodyId, Entity>,
+pub type PhysicsNodes = BodyNodes<BodyId>;
+
+/// Which node each body of the [`Physics3d`](star_physics::Physics3d)
+/// belongs to, and the contacts of the last frame between nodes. A
+/// resource of the world, kept by
+/// [`step_node_physics_3d`](crate::step_node_physics_3d).
+pub type PhysicsNodes3d = BodyNodes<BodyId3d>;
+
+/// Which node each body of a simulation belongs to, and the contacts of
+/// the last frame between nodes: [`PhysicsNodes`] in 2D and
+/// [`PhysicsNodes3d`] in 3D.
+#[derive(Debug)]
+pub struct BodyNodes<Id> {
+    nodes: HashMap<Id, Entity>,
     /// Bodies removed this frame, whose last contacts still name them.
-    departed: Vec<(BodyId, Entity)>,
+    departed: Vec<(Id, Entity)>,
     contacts: Vec<NodeContact>,
 }
 
-impl PhysicsNodes {
+impl<Id> Default for BodyNodes<Id> {
+    fn default() -> Self {
+        Self {
+            nodes: HashMap::new(),
+            departed: Vec::new(),
+            contacts: Vec::new(),
+        }
+    }
+}
+
+impl<Id: Copy + Eq + Hash> BodyNodes<Id> {
     /// No bodies yet.
     #[must_use]
     pub fn new() -> Self {
@@ -64,7 +86,7 @@ impl PhysicsNodes {
 
     /// The node `body` belongs to.
     #[must_use]
-    pub fn node(&self, body: BodyId) -> Option<Entity> {
+    pub fn node(&self, body: Id) -> Option<Entity> {
         self.nodes.get(&body).copied()
     }
 
@@ -76,13 +98,59 @@ impl PhysicsNodes {
         &self.contacts
     }
 
-    fn node_or_departed(&self, body: BodyId) -> Option<Entity> {
+    fn node_or_departed(&self, body: Id) -> Option<Entity> {
         self.node(body).or_else(|| {
             self.departed
                 .iter()
                 .find(|(departed, _)| *departed == body)
                 .map(|(_, node)| *node)
         })
+    }
+
+    /// Records that `body` is the body of `node`.
+    pub(crate) fn add(&mut self, body: Id, node: Entity) {
+        self.nodes.insert(body, node);
+    }
+
+    /// Forgets the bodies whose node is gone or has another body now (by
+    /// `body_of`, the body a node has), calling `remove` with each; their
+    /// contacts of this frame still name their nodes.
+    pub(crate) fn remove_departed(
+        &mut self,
+        body_of: impl Fn(Entity) -> Option<Id>,
+        mut remove: impl FnMut(Id),
+    ) {
+        let Self {
+            nodes, departed, ..
+        } = self;
+        departed.clear();
+        nodes.retain(|&body, &mut node| {
+            let kept = body_of(node) == Some(body);
+            if !kept {
+                remove(body);
+                departed.push((body, node));
+            }
+            kept
+        });
+    }
+
+    /// Turns the contacts of the bodies during the last frame into
+    /// contacts of their nodes.
+    pub(crate) fn collect_contacts(&mut self, contacts: &[Contact<Id>]) {
+        self.contacts.clear();
+        for contact in contacts {
+            if let (Some(first), Some(second)) = (
+                self.node_or_departed(contact.first),
+                self.node_or_departed(contact.second),
+            ) {
+                self.contacts.push(NodeContact {
+                    first,
+                    second,
+                    phase: contact.phase,
+                    is_sensor: contact.is_sensor,
+                });
+            }
+        }
     }
 }
 
@@ -114,30 +182,16 @@ pub fn step_node_physics(world: &World, elapsed: f32) -> EngineResult<()> {
     ) else {
         return Ok(());
     };
-    remove_departed_bodies(world, &mut physics, &mut nodes);
+    nodes.remove_departed(
+        |node| world.get::<Body2D>(node).and_then(|body| body.id()),
+        |body| physics.remove_body(body),
+    );
     place_bodies(world, &mut physics, &mut nodes)?;
     push_bodies(world, &mut physics)?;
     physics.advance(elapsed);
     follow_bodies(world, &physics)?;
-    collect_contacts(&physics, &mut nodes);
+    nodes.collect_contacts(physics.contacts());
     Ok(())
-}
-
-fn remove_departed_bodies(world: &World, physics: &mut Physics2d, nodes: &mut PhysicsNodes) {
-    let PhysicsNodes {
-        nodes, departed, ..
-    } = nodes;
-    departed.clear();
-    nodes.retain(|&body, &mut node| {
-        let kept = world
-            .get::<Body2D>(node)
-            .is_some_and(|component| component.id() == Some(body));
-        if !kept {
-            physics.remove_body(body);
-            departed.push((body, node));
-        }
-        kept
-    });
 }
 
 fn place_bodies(
@@ -161,7 +215,7 @@ fn place_bodies(
             None => match physics.add_body(body.settings(), position, rotation) {
                 Ok(id) => {
                     body.placed(id, *local);
-                    nodes.nodes.insert(id, node);
+                    nodes.add(id, node);
                 }
                 Err(error) => failure = Some(named_error(world, node, &error)),
             },
@@ -179,7 +233,7 @@ fn push_bodies(world: &World, physics: &mut Physics2d) -> EngineResult<()> {
         if let Some(velocity) = velocity {
             physics.set_velocity(id, velocity);
         }
-        if impulse != Vec2::ZERO {
+        if let Some(impulse) = impulse {
             physics.apply_impulse(id, impulse);
         }
     })
@@ -211,23 +265,6 @@ fn follow_bodies(world: &World, physics: &Physics2d) -> EngineResult<()> {
     })
 }
 
-fn collect_contacts(physics: &Physics2d, nodes: &mut PhysicsNodes) {
-    nodes.contacts.clear();
-    for contact in physics.contacts() {
-        if let (Some(first), Some(second)) = (
-            nodes.node_or_departed(contact.first),
-            nodes.node_or_departed(contact.second),
-        ) {
-            nodes.contacts.push(NodeContact {
-                first,
-                second,
-                phase: contact.phase,
-                is_sensor: contact.is_sensor,
-            });
-        }
-    }
-}
-
 /// Where the space of `node`'s parent is in the world: the global transform
 /// of its closest ancestor that has one.
 fn parent_global(world: &World, node: Entity) -> Affine2 {
@@ -241,7 +278,8 @@ fn parent_global(world: &World, node: Entity) -> Affine2 {
     Affine2::IDENTITY
 }
 
-fn named_error(world: &World, node: Entity, error: &EngineError) -> EngineError {
+/// `error` of a body, naming its `node`.
+pub(crate) fn named_error(world: &World, node: Entity, error: &EngineError) -> EngineError {
     let name = world
         .get::<crate::Name>(node)
         .map_or_else(|| format!("{node:?}"), |name| name.as_str().to_owned());
@@ -250,6 +288,7 @@ fn named_error(world: &World, node: Entity, error: &EngineError) -> EngineError 
 
 #[cfg(test)]
 mod tests {
+    use star_math::Vec2;
     use star_physics::{BodySettings, Shape2d};
 
     use super::*;

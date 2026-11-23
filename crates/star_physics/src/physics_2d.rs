@@ -70,7 +70,7 @@ impl Physics2d {
     ///
     /// # Errors
     ///
-    /// [`EngineError::Physics`] if the position, the rotation or the gravity
+    /// [`EngineError::Physics`](star_core::EngineError::Physics) if the position, the rotation or the gravity
     /// scale is not finite, the friction or bounciness is negative, or the
     /// density is not positive.
     pub fn add_body(

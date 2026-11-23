@@ -86,7 +86,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
 - [ ] **Phase 10 — 3D physics** (rapier3d):
   - [x] 10a `Physics3d`: spheres, boxes and capsules; dynamic, static and
         kinematic bodies; sensors and contacts, in fixed steps as in 2D.
-  - [ ] 10b `Body3D` nodes the engine simulates, kept in `.scene` files.
+  - [x] 10b `Body3D` nodes the engine simulates, kept in `.scene` files
+        (`[node.body_3d]`).
   - [ ] 10c Example `physics_3d`.
 - [ ] **Phase 11 — Mobile**: Android and iOS packaging.
 - [ ] **Phase 12 — Visual editor** (egui):

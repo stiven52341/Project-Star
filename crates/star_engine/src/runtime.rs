@@ -7,11 +7,12 @@ use star_core::{EngineResult, Time};
 use star_ecs::{Schedule, Stage, World};
 use star_input::Input;
 use star_math::Vec2;
-use star_physics::Physics2d;
+use star_physics::{Physics2d, Physics3d};
 use star_platform::{InputEvent, Window, WindowEventHandler, WindowSize};
 use star_render::{Color, Frame, Renderer, RendererConfig};
 use star_scene::{
-    PhysicsNodes, TransformPropagation, draw_3d_nodes, draw_sprite_nodes, step_node_physics,
+    PhysicsNodes, PhysicsNodes3d, TransformPropagation, draw_3d_nodes, draw_sprite_nodes,
+    step_node_physics, step_node_physics_3d,
 };
 
 use crate::EngineWorld as _;
@@ -86,7 +87,9 @@ impl<G: Game> Runtime<G> {
         self.schedule.run_stage(Stage::Update, &mut self.world)?;
         // Bodies are placed where their parents are now.
         self.transforms.run(&mut self.world)?;
-        step_node_physics(&self.world, self.world.time().delta().as_secs_f32())?;
+        let elapsed = self.world.time().delta().as_secs_f32();
+        step_node_physics(&self.world, elapsed)?;
+        step_node_physics_3d(&self.world, elapsed)?;
         for stage in [Stage::Physics, Stage::Last] {
             self.schedule.run_stage(stage, &mut self.world)?;
         }
@@ -99,9 +102,10 @@ impl<G: Game> Runtime<G> {
 }
 
 /// A world with the engine's resources: the [`Time`], the `input`, the
-/// `audio`, and the 2D physics ([`Physics2d`] with `gravity`, and the
-/// [`PhysicsNodes`] of its bodies). The [`WindowSize`] comes when the window
-/// opens.
+/// `audio`, the 2D physics ([`Physics2d`] with `gravity`, and the
+/// [`PhysicsNodes`] of its bodies) and the 3D physics ([`Physics3d`] with
+/// Earth's gravity, and the [`PhysicsNodes3d`] of its bodies). The
+/// [`WindowSize`] comes when the window opens.
 pub(crate) fn engine_world(input: Input, audio: Audio, gravity: Vec2) -> World {
     let mut world = World::new();
     world.insert_resource(Time::new());
@@ -109,6 +113,8 @@ pub(crate) fn engine_world(input: Input, audio: Audio, gravity: Vec2) -> World {
     world.insert_resource(audio);
     world.insert_resource(Physics2d::new(gravity));
     world.insert_resource(PhysicsNodes::new());
+    world.insert_resource(Physics3d::default());
+    world.insert_resource(PhysicsNodes3d::new());
     world
 }
 
@@ -172,8 +178,10 @@ mod tests {
     use star_assets::AssetFolder;
     use star_core::EngineError;
     use star_input::{ActionMap, ButtonState, Key};
-    use star_physics::{BodyKind, BodySettings, DEFAULT_GRAVITY, Shape2d};
-    use star_scene::{Body2D, GlobalTransform2D, Hierarchy, Transform2D};
+    use star_physics::{BodyKind, BodySettings, DEFAULT_GRAVITY, Shape2d, Shape3d};
+    use star_scene::{
+        Body2D, Body3D, GlobalTransform2D, GlobalTransform3D, Hierarchy, Transform2D, Transform3D,
+    };
 
     use super::*;
     use crate::game::EmptyGame;
@@ -325,6 +333,24 @@ mod tests {
 
         assert!(runtime.world.get::<Body2D>(ball).unwrap().id().is_some());
         let global = *runtime.world.get::<GlobalTransform2D>(ball).unwrap();
+        assert!(global.position().y < 0.0, "{global:?}");
+    }
+
+    #[test]
+    fn bodies_of_3d_nodes_move_with_the_frames() {
+        let mut runtime = runtime(EmptyGame, Input::new(), Schedule::new());
+        let ball = runtime.world.spawn_node("Ball", None).unwrap();
+        let settings = BodySettings::new(BodyKind::Dynamic, Shape3d::sphere(0.5).unwrap());
+        runtime.world.insert(ball, Transform3D::IDENTITY).unwrap();
+        runtime.world.insert(ball, Body3D::new(settings)).unwrap();
+        let mut time = Time::new();
+        time.advance(Duration::from_millis(100));
+        runtime.world.insert_resource(time);
+
+        runtime.simulate().unwrap();
+
+        assert!(runtime.world.get::<Body3D>(ball).unwrap().id().is_some());
+        let global = *runtime.world.get::<GlobalTransform3D>(ball).unwrap();
         assert!(global.position().y < 0.0, "{global:?}");
     }
 

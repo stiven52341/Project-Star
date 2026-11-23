@@ -9,9 +9,11 @@
 //! [`SpriteNode`] is drawn. A 3D node is placed by its [`Transform3D`]
 //! ([`GlobalTransform3D`] in the world) and can show a [`MeshNode`] or shine
 //! a [`LightNode`]. A [`Body2D`] makes a 2D node a body of the 2D physics,
-//! which [`step_node_physics`] moves it with. A [`Scene`] is a tree of nodes saved in a
-//! `.scene` file (TOML) and instanced into a world as many times as needed;
-//! its [`SceneOutline`] describes the file's nodes without loading their images.
+//! which [`step_node_physics`] moves it with, and a [`Body3D`] a 3D node a
+//! body of the 3D physics ([`step_node_physics_3d`]). A [`Scene`] is a tree
+//! of nodes saved in a `.scene` file (TOML) and instanced into a world as
+//! many times as needed; its [`SceneOutline`] describes the file's nodes
+//! without loading their images.
 
 mod body_data;
 mod body_node;
@@ -19,17 +21,19 @@ mod hierarchy;
 mod node_3d;
 mod node_3d_data;
 mod node_physics;
+mod node_physics_3d;
 mod scene;
 mod scene_file;
 mod scene_outline;
 mod sprite_node;
 mod transform;
 
-pub use body_node::Body2D;
+pub use body_node::{Body2D, Body3D, NodeBody};
 pub use hierarchy::{Children, Hierarchy, Name, Parent};
 pub use node_3d::{LightNode, MeshNode, draw_3d_nodes};
 pub use node_3d_data::MeshOutline;
-pub use node_physics::{NodeContact, PhysicsNodes, step_node_physics};
+pub use node_physics::{BodyNodes, NodeContact, PhysicsNodes, PhysicsNodes3d, step_node_physics};
+pub use node_physics_3d::step_node_physics_3d;
 pub use scene::{Scene, SceneAssets, SceneSources};
 pub use scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
 pub use sprite_node::{SpriteNode, draw_sprite_nodes};

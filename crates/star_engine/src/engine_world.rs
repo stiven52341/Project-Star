@@ -6,13 +6,13 @@ use star_audio::Audio;
 use star_core::Time;
 use star_ecs::World;
 use star_input::Input;
-use star_physics::Physics2d;
+use star_physics::{Physics2d, Physics3d};
 use star_platform::WindowSize;
-use star_scene::PhysicsNodes;
+use star_scene::{PhysicsNodes, PhysicsNodes3d};
 
 /// Quick access to the engine's resources in a [`World`]: the [`Time`] and
 /// the [`Input`] of the current frame, the [`WindowSize`], the [`Audio`] and
-/// the 2D physics. The engine adds them before the game starts and keeps
+/// the 2D and 3D physics. The engine adds them before the game starts and keeps
 /// them updated.
 pub trait EngineWorld {
     /// The timing of the current frame (zero before the first one).
@@ -41,6 +41,19 @@ pub trait EngineWorld {
     /// Which node each body is, and the contacts between nodes of the last
     /// frame. `None` like [`physics`](Self::physics).
     fn physics_nodes(&self) -> Option<Ref<'_, PhysicsNodes>>;
+
+    /// The 3D physics, to read where bodies are and how fast they move.
+    /// `None` like [`physics`](Self::physics).
+    fn physics_3d(&self) -> Option<Ref<'_, Physics3d>>;
+
+    /// The 3D physics, to change velocities, push bodies or change gravity
+    /// (Earth's, along -y, until the game changes it). `None` like
+    /// [`physics`](Self::physics).
+    fn physics_3d_mut(&self) -> Option<RefMut<'_, Physics3d>>;
+
+    /// Which 3D node each 3D body is, and the contacts between 3D nodes of
+    /// the last frame. `None` like [`physics`](Self::physics).
+    fn physics_nodes_3d(&self) -> Option<Ref<'_, PhysicsNodes3d>>;
 }
 
 impl EngineWorld for World {
@@ -75,6 +88,18 @@ impl EngineWorld for World {
     fn physics_nodes(&self) -> Option<Ref<'_, PhysicsNodes>> {
         self.resource::<PhysicsNodes>()
     }
+
+    fn physics_3d(&self) -> Option<Ref<'_, Physics3d>> {
+        self.resource::<Physics3d>()
+    }
+
+    fn physics_3d_mut(&self) -> Option<RefMut<'_, Physics3d>> {
+        self.resource_mut::<Physics3d>()
+    }
+
+    fn physics_nodes_3d(&self) -> Option<Ref<'_, PhysicsNodes3d>> {
+        self.resource::<PhysicsNodes3d>()
+    }
 }
 
 #[cfg(test)]
@@ -107,5 +132,7 @@ mod tests {
         assert!(!world.audio().has_output());
         assert!(world.physics().is_none());
         assert!(world.physics_nodes().is_none());
+        assert!(world.physics_3d().is_none());
+        assert!(world.physics_nodes_3d().is_none());
     }
 }

@@ -182,7 +182,8 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   `plane` with two, or `sphere` with a `radius` and optional `segments` and
   `rings`; and its material: `color`, `metallic`, `roughness`, `texture`,
   `filter`) and an optional `[node.light]` (`kind` `directional` or `point`,
-  `color` of three numbers, `intensity`, and the `range` of point lights).
+  `color` of three numbers, `intensity`, and the `range` of point lights)
+  and an optional `[node.body_3d]` (see Physics).
   Unknown fields are errors, so typos are not silently ignored. Scenes keep
   names, classes, transforms, sprites, bodies, meshes and lights; other
   components will join them later.
@@ -381,6 +382,20 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   body can be simulated without adding it.
 - StarScript nodes get bodies through the `Body` class (decision 47;
   `docs/starscript.md`).
+- **3D nodes with bodies**: a `Body3D` makes a node with a `Transform3D`
+  a body of the `Physics3d`, exactly as a `Body2D` does in 2D: `Body2D`
+  and `Body3D` are the same generic component (`NodeBody`), and
+  `PhysicsNodes` and `PhysicsNodes3d` the same bookkeeping (`BodyNodes`).
+  The engine owns a `Physics3d` (Earth's gravity along -y; games change it
+  through `world.physics_3d_mut()`) and a `PhysicsNodes3d`, and runs
+  `step_node_physics_3d` right after `step_node_physics`. Bodies are
+  placed with the rotation of their global matrix (`Quat::from_mat4`), and
+  written back into the parent's space; under a parent scaled differently
+  along each axis and turned, the rotation is only approximate. Scenes
+  keep them in a `[node.body_3d]` table, like `[node.body]` with the
+  shapes `sphere` (`radius`), `box` (`size` of three numbers) and
+  `capsule` (`height` and `radius`). StarScript does not see 3D bodies
+  yet.
 
 ## Rendering
 

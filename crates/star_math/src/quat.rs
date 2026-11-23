@@ -115,6 +115,58 @@ impl Quat {
         }
     }
 
+    /// The rotation of `matrix`, leaving its scale and translation out;
+    /// `None` if an axis is scaled to nothing. A mirrored matrix (with a
+    /// negative scale) has no rotation that matches it.
+    #[must_use]
+    pub fn from_mat4(matrix: Mat4) -> Option<Self> {
+        let [x_axis, y_axis, z_axis, _] = matrix.to_columns();
+        let [x_axis, y_axis, z_axis] =
+            [x_axis, y_axis, z_axis].map(|[x, y, z, _]| Vec3::new(x, y, z).normalized());
+        let (x_axis, y_axis, z_axis) = (x_axis?, y_axis?, z_axis?);
+        // Elements of the rotation matrix, by row and column.
+        let (m00, m10, m20) = (x_axis.x, x_axis.y, x_axis.z);
+        let (m01, m11, m21) = (y_axis.x, y_axis.y, y_axis.z);
+        let (m02, m12, m22) = (z_axis.x, z_axis.y, z_axis.z);
+        // The largest of the four components is computed first, so it is
+        // never divided by a number close to zero.
+        let trace = m00 + m11 + m22;
+        let [x, y, z, w] = if trace > 0.0 {
+            let four_w = (trace + 1.0).sqrt() * 2.0;
+            [
+                (m21 - m12) / four_w,
+                (m02 - m20) / four_w,
+                (m10 - m01) / four_w,
+                four_w / 4.0,
+            ]
+        } else if m00 > m11 && m00 > m22 {
+            let four_x = (1.0 + m00 - m11 - m22).sqrt() * 2.0;
+            [
+                four_x / 4.0,
+                (m01 + m10) / four_x,
+                (m02 + m20) / four_x,
+                (m21 - m12) / four_x,
+            ]
+        } else if m11 > m22 {
+            let four_y = (1.0 + m11 - m00 - m22).sqrt() * 2.0;
+            [
+                (m01 + m10) / four_y,
+                four_y / 4.0,
+                (m12 + m21) / four_y,
+                (m02 - m20) / four_y,
+            ]
+        } else {
+            let four_z = (1.0 + m22 - m00 - m11).sqrt() * 2.0;
+            [
+                (m02 + m20) / four_z,
+                (m12 + m21) / four_z,
+                four_z / 4.0,
+                (m10 - m01) / four_z,
+            ]
+        };
+        Self::from_xyzw([x, y, z, w])
+    }
+
     /// The rotation of the four numbers `[x, y, z, w]` of a quaternion,
     /// scaled to length 1; `None` if they have no length or are not finite.
     #[must_use]
@@ -302,6 +354,34 @@ mod tests {
         assert_close(again.rotate(point), rotation.rotate(point));
         assert_eq!(Quat::from_xyzw([0.0, 0.0, 0.0, 2.0]), Some(Quat::IDENTITY));
         assert_eq!(Quat::from_xyzw([f32::NAN, 0.0, 0.0, 1.0]), None);
+    }
+
+    #[test]
+    fn matrices_give_back_their_rotation() {
+        let point = Vec3::new(1.0, 2.0, 3.0);
+        for angles in [
+            Vec3::ZERO,
+            Vec3::new(0.3, -1.1, 0.4),
+            Vec3::new(0.0, PI, 0.0),
+            Vec3::new(PI, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, PI),
+            Vec3::new(-FRAC_PI_4, 2.8, -3.0),
+        ] {
+            let rotation = Quat::from_euler(angles);
+            let matrix = Mat4::from_scale_rotation_translation(
+                Vec3::new(2.0, 0.5, 3.0),
+                rotation,
+                Vec3::new(4.0, 5.0, 6.0),
+            );
+
+            let read = Quat::from_mat4(matrix).unwrap();
+
+            assert_close(read.rotate(point), rotation.rotate(point));
+        }
+        assert_eq!(
+            Quat::from_mat4(Mat4::from_scale(Vec3::new(0.0, 1.0, 1.0))),
+            None
+        );
     }
 
     #[test]

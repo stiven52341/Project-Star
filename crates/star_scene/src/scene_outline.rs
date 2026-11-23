@@ -5,9 +5,9 @@ use star_core::{EngineError, EngineResult};
 use star_math::Vec2;
 use star_render::{Color, Sprite, TextureFilter, TextureRegion};
 
-use star_physics::BodySettings;
+use star_physics::{BodySettings, Shape3d};
 
-use crate::body_data::BodyData;
+use crate::body_data::{Body3dData, BodyData};
 use crate::node_3d_data::MeshOutline;
 use crate::scene_file::{NodeData, SceneFile, SpriteData};
 use crate::{LightNode, Transform2D, Transform3D};
@@ -44,6 +44,8 @@ pub struct NodeOutline {
     pub mesh: Option<MeshOutline>,
     /// The light it shines, if any.
     pub light: Option<LightNode>,
+    /// Its body in the 3D physics, if any.
+    pub body_3d: Option<BodySettings<Shape3d>>,
 }
 
 /// The image a node of a [`SceneOutline`] shows.
@@ -165,6 +167,12 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         .map(BodyData::to_settings)
         .transpose()
         .map_err(named)?;
+    let body_3d = node
+        .body_3d
+        .as_ref()
+        .map(Body3dData::to_settings)
+        .transpose()
+        .map_err(named)?;
     let mesh = node
         .mesh
         .as_ref()
@@ -200,6 +208,7 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
             .map(crate::node_3d_data::Transform3dData::to_transform),
         mesh,
         light,
+        body_3d,
     })
 }
 

@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use star_core::{EngineError, EngineResult};
 
-use crate::body_data::BodyData;
+use crate::body_data::{Body3dData, BodyData};
 use crate::node_3d_data::{LightData, MeshTable, Transform3dData};
 
 /// The version of the layout this engine writes and reads.
@@ -48,6 +48,8 @@ pub(crate) struct NodeData {
     pub(crate) mesh: Option<MeshTable>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) light: Option<LightData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) body_3d: Option<Body3dData>,
 }
 
 /// A `[node.sprite]` table.
@@ -167,6 +169,7 @@ mod tests {
                 transform_3d: None,
                 mesh: None,
                 light: None,
+                body_3d: None,
             }],
         };
 
