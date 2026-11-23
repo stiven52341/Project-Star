@@ -205,4 +205,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           marked on their lines.
     - [x] 13.9d Suggestions: names in scope and members, shown as faint
           text and accepted with `Tab`, with a list of the others.
+    - [x] 13.9e Go to definition (`Ctrl`+click or `F12`); mistakes and
+          suggestions checked on one thread that lives with the project,
+          without translating to Rust.
 - [ ] **Future — Consoles** (PlayStation, Xbox).
