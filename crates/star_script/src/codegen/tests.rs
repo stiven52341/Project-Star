@@ -393,3 +393,17 @@ fn async_main_runs_until_its_coroutines_finish() {
     );
     assert!(code.contains("::star_script_runtime::tasks::run_until_finished();"));
 }
+
+#[test]
+fn parallel_functions_are_not_translated_yet() {
+    let errors = compile_source(
+        "class P {\n parallel static func f(n: int) -> int { return n }\n static async func main() { Debug.print((await f(1)).to_string()) }\n}",
+    )
+    .expect_err("parallel functions are not translated");
+
+    let messages: Vec<String> = errors.iter().map(ToString::to_string).collect();
+    assert_eq!(
+        messages,
+        ["`parallel` functions cannot be translated to Rust yet"]
+    );
+}

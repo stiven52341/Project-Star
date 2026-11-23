@@ -31,6 +31,17 @@ pub enum Type {
 }
 
 impl Type {
+    /// Whether values of the type can go to another thread, copied: numbers,
+    /// `bool`, `string`, and lists and nullables of them. Not objects.
+    #[must_use]
+    pub fn is_plain_value(&self) -> bool {
+        match self {
+            Self::Int | Self::Float | Self::Bool | Self::String | Self::Error => true,
+            Self::List(inner) | Self::Nullable(inner) => inner.is_plain_value(),
+            Self::Void | Self::Null | Self::Range | Self::Class(_) => false,
+        }
+    }
+
     /// `[element]`
     #[must_use]
     pub fn list(element: Self) -> Self {

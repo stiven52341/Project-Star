@@ -1,6 +1,6 @@
 //! Statements inside methods and constructors.
 
-use super::checker::{Checker, ContextKind, NameTarget};
+use super::checker::{Checker, ContextKind, FreeCall, NameTarget};
 use super::{FoundMember, LocalId, MemberRef, Resolution, SemanticErrorKind, Type, flow};
 use crate::Span;
 use crate::ast::{
@@ -27,7 +27,10 @@ impl Checker<'_> {
                 value,
             } => self.assignment(target, *operator, value, statement.span),
             StatementKind::Expression(expression) => {
-                self.context.free_call = Some(expression.span);
+                self.context.free_call = Some(FreeCall {
+                    span: expression.span,
+                    awaited: false,
+                });
                 self.expression(expression, None);
                 // `await f()` is a call too; `await` reports what is not.
                 if !matches!(expression.kind, ExprKind::Call { .. } | ExprKind::Await(_)) {

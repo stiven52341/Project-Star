@@ -146,6 +146,9 @@ pub enum Execution {
     Direct,
     /// `async`: as a coroutine, which can wait across frames with `await`.
     Async,
+    /// `parallel`: on another thread, with copies of its arguments; awaited
+    /// from coroutines, called directly from other `parallel` functions.
+    Parallel,
 }
 
 impl MethodInfo {
@@ -153,6 +156,18 @@ impl MethodInfo {
     #[must_use]
     pub fn is_async(&self) -> bool {
         self.execution == Execution::Async
+    }
+
+    /// Whether the method is a `parallel` function.
+    #[must_use]
+    pub fn is_parallel(&self) -> bool {
+        self.execution == Execution::Parallel
+    }
+
+    /// Whether `await` can wait for a call of the method.
+    #[must_use]
+    pub fn is_awaitable(&self) -> bool {
+        self.execution != Execution::Direct
     }
 
     /// Whether `other` takes the same parameter types and returns the same type.

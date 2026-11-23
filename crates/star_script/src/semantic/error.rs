@@ -199,6 +199,15 @@ pub enum SemanticErrorKind {
     NullSafeAwait,
     /// An `async` method called inside an expression without `await`.
     AsyncCallNotAwaited(String),
+    /// A `parallel` function called without `await`.
+    ParallelCallNotAwaited(String),
+    /// Inside a `parallel` function, a method or class that is not another
+    /// `parallel` function.
+    NotParallel(String),
+    /// A type of a `parallel` function that is not a plain value.
+    NotPlainValue(String),
+    /// A `parallel` function without `->`.
+    ParallelWithoutResult(String),
     /// Assigning to a constant, parameter or loop variable.
     AssignToImmutable(String),
 
@@ -380,6 +389,24 @@ impl fmt::Display for SemanticErrorKind {
             }
             Self::NullSafeAwait => formatter.write_str(
                 "`await` cannot wait through `?.`: check that the object is not `null` first",
+            ),
+            Self::ParallelCallNotAwaited(name) => write!(
+                formatter,
+                "`{name}` runs on another thread: write `await {name}(…)`, inside an `async` method"
+            ),
+            Self::NotParallel(name) => write!(
+                formatter,
+                "a `parallel` function can only call methods of values and other `parallel` \
+                 functions: `{name}` is not one"
+            ),
+            Self::NotPlainValue(ty) => write!(
+                formatter,
+                "a `parallel` function only takes and gives values (numbers, `bool`, `string` \
+                 and lists of them), not `{ty}`"
+            ),
+            Self::ParallelWithoutResult(name) => write!(
+                formatter,
+                "`{name}` must return a value: the result of a `parallel` function is all it does"
             ),
             Self::AsyncCallNotAwaited(name) => write!(
                 formatter,

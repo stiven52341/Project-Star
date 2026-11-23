@@ -140,6 +140,14 @@ const fn internal(problem: &'static str, span: Span) -> CodegenError {
     }
 }
 
+/// `parallel` functions, until the translation has them (step 13.10e).
+const fn parallel_not_translated(span: Span) -> CodegenError {
+    CodegenError {
+        kind: CodegenErrorKind::NotTranslatedYet("`parallel` functions"),
+        span,
+    }
+}
+
 /// What every part of the generator reads: the program and its analysis.
 #[derive(Clone, Copy)]
 struct Context<'a> {

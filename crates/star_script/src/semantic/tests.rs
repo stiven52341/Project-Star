@@ -1221,3 +1221,92 @@ fn awaited_values_are_still_checked() {
         ]
     );
 }
+
+// --- Parallel functions ---
+
+/// `Paths`, with the `parallel` function `sum(values: [int]) -> int`, and
+/// `extra`.
+fn with_paths(extra: &str) -> String {
+    format!(
+        "class Paths {{\n parallel static func sum(values: [int]) -> int {{\n var total = 0\n for value in values {{ total += value.abs() }}\n return total\n }}\n{extra}\n}}"
+    )
+}
+
+#[test]
+fn parallel_functions_are_awaited_from_coroutines() {
+    assert_valid(&with_paths(
+        "static async func use_it() {\n var total: int = await sum([1, 2]) + 1\n }",
+    ));
+}
+
+#[test]
+fn parallel_functions_call_each_other_directly() {
+    assert_valid(&with_paths(
+        "const LIMIT = 3\n private parallel static func twice(values: [int]) -> [int?] {\n var result: [int?] = [sum(values), null, LIMIT]\n return result\n }",
+    ));
+}
+
+#[test]
+fn parallel_functions_need_await() {
+    assert_eq!(
+        errors(&with_paths(
+            "static func start() {\n sum([1])\n var n = sum([2])\n }"
+        )),
+        [
+            Kind::ParallelCallNotAwaited("sum".to_owned()),
+            Kind::ParallelCallNotAwaited("sum".to_owned())
+        ]
+    );
+}
+
+#[test]
+fn parallel_functions_only_take_and_give_values() {
+    assert_eq!(
+        errors(
+            "class Rock {}\nclass P {\n parallel static func f(rock: Rock, rocks: [Rock?]) -> Rock { return rock }\n parallel static func g(n: int) {}\n}"
+        ),
+        [
+            Kind::NotPlainValue("Rock".to_owned()),
+            Kind::NotPlainValue("[Rock?]".to_owned()),
+            Kind::NotPlainValue("Rock".to_owned()),
+            Kind::ParallelWithoutResult("g".to_owned())
+        ]
+    );
+}
+
+#[test]
+fn parallel_functions_only_use_values_and_other_parallel_functions() {
+    let source = "class Rock {}\nclass P {\n static func plain() -> int { return 1 }\n \
+                  async func later() {}\n \
+                  parallel static func f(n: int) -> int {\n Debug.print(\"no\")\n var rock = Rock()\n await later()\n return plain()\n }\n}";
+
+    assert_eq!(
+        errors(source),
+        [
+            Kind::NotParallel("print".to_owned()),
+            Kind::NotParallel("Rock".to_owned()),
+            Kind::AwaitOutsideAsync,
+            Kind::SelfUnavailable,
+            Kind::NotParallel("plain".to_owned())
+        ]
+    );
+}
+
+#[test]
+fn parallel_goes_only_with_static_and_never_with_async() {
+    assert_eq!(
+        errors(
+            "class P {\n parallel func f() -> int { return 1 }\n parallel static async func g() -> int { return 1 }\n}"
+        ),
+        [
+            Kind::InvalidModifier {
+                modifier: ModifierKind::Parallel,
+                member: "a method that is not static"
+            },
+            Kind::InvalidModifier {
+                modifier: ModifierKind::Async,
+                member: "a parallel function"
+            }
+        ]
+    );
+}

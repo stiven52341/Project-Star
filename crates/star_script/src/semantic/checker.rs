@@ -42,9 +42,21 @@ pub(super) struct BodyContext {
     pub(super) initialization: Option<Initialization>,
     /// Whether the body is an `async` method, where `await` can be used.
     pub(super) is_async: bool,
-    /// The call that may be of an `async` method: the one right after
-    /// `await`, or a statement of its own, which starts a coroutine.
-    pub(super) free_call: Option<Span>,
+    /// Whether the body is a `parallel` function, which only sees values.
+    pub(super) is_parallel: bool,
+    /// The call that may be of an `async` or `parallel` method: the one
+    /// right after `await`, or a statement of its own, which starts a
+    /// coroutine.
+    pub(super) free_call: Option<FreeCall>,
+}
+
+/// A call that is not part of a bigger expression.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct FreeCall {
+    /// The whole call.
+    pub(super) span: Span,
+    /// Whether it comes after `await`, rather than alone on its line.
+    pub(super) awaited: bool,
 }
 
 impl BodyContext {
@@ -58,6 +70,7 @@ impl BodyContext {
             top_level_depth: 2,
             initialization: None,
             is_async: false,
+            is_parallel: false,
             free_call: None,
         }
     }

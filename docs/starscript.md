@@ -40,7 +40,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes), sounds (`Sound`, `Audio`), physics (`Body`) and 3D (`Node3D`, `Mesh`, `Light`, `Camera3D`) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; “Play” builds and runs the game; the editor has a code editor for `.star` files (colors, writing aids, mistakes while writing, suggestions) |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
-| 9 | Concurrency and parallelism | In progress: coroutines done (`async`, `await`, `Time`; section 7); `parallel` is read but not allowed yet |
+| 9 | Concurrency and parallelism | In progress: coroutines done (`async`, `await`, `Time`; section 7); `parallel` functions are checked but not translated to Rust yet |
 
 ## 1. Lexicon (final)
 
@@ -1045,9 +1045,13 @@ class Walker extends Node {
 - `parallel` only goes with `static func`: such a function has no `self`.
 - Its parameters and its result can only be **values**: `int`, `float`,
   `bool`, `string`, lists of values and nullable values. Never classes.
+  It must have a result (`->`): that is all it does. It cannot be `async`:
+  it is awaited already.
 - Inside it, only its parameters, its local variables, the constants of
   classes, the methods of values (`abs`, `push`…) and other `parallel`
-  functions (which run directly on the same thread) can be used.
+  functions (which run directly on the same thread) can be used: no
+  objects are created, and no other method is called, not even of the
+  engine (`Debug.print`).
 - It is called with `await`, from an `async` method: the call runs on
   another thread and the coroutine continues in the first frame after the
   result is ready. Calling it without `await` is an error, since its result

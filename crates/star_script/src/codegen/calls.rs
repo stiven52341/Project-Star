@@ -5,7 +5,7 @@ use super::conversions::{NONE, RC, RUNTIME, SOME};
 use super::expressions::self_reference;
 use super::names::ident;
 use super::statements::Body;
-use super::{Result, internal};
+use super::{Result, internal, parallel_not_translated};
 use crate::ast::{Expr, ExprKind, Literal};
 use crate::semantic::{
     BuiltinMethod, ClassId, ClassOrigin, INPUT_CLASS, ParameterInfo, Resolution, Type,
@@ -62,6 +62,9 @@ impl Body<'_> {
             .ok_or_else(|| internal("unknown method", callee.span))?;
         if info.origin == ClassOrigin::Native && info.name == INPUT_CLASS {
             return self.input_call(callee, &method.name, arguments);
+        }
+        if method.is_parallel() {
+            return Err(parallel_not_translated(callee.span));
         }
         let arguments = self.arguments(&method.parameters, arguments)?;
         // Static methods of the engine are functions of the runtime; the

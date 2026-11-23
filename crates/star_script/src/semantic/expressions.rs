@@ -1,6 +1,6 @@
 //! Expressions: their types, and what names and members refer to.
 
-use super::checker::{Checker, ContextKind, NameTarget};
+use super::checker::{Checker, ContextKind, FreeCall, NameTarget};
 use super::narrowing::is_null;
 use super::natives::builtin_method;
 use super::{ClassId, FoundMember, MemberRef, MethodInfo, Resolution, SemanticErrorKind, Type};
@@ -76,9 +76,12 @@ impl Checker<'_> {
         if !self.context.is_async {
             self.error(SemanticErrorKind::AwaitOutsideAsync, span);
         }
-        self.context.free_call = Some(value.span);
+        self.context.free_call = Some(FreeCall {
+            span: value.span,
+            awaited: true,
+        });
         let ty = self.expression(value, None);
-        if !self.is_async_call(value) {
+        if !self.is_awaitable_call(value) {
             self.error(SemanticErrorKind::AwaitWithoutAsyncCall, value.span);
             return Type::Error;
         }
@@ -92,9 +95,10 @@ impl Checker<'_> {
         ty
     }
 
-    /// Whether `value` calls an `async` method. Calls whose method is
-    /// unknown count, so their mistake is reported once.
-    fn is_async_call(&self, value: &Expr) -> bool {
+    /// Whether `value` calls an `async` method or a `parallel` function.
+    /// Calls whose method is unknown count, so their mistake is reported
+    /// once.
+    fn is_awaitable_call(&self, value: &Expr) -> bool {
         let ExprKind::Call { callee, .. } = &value.kind else {
             return false;
         };
@@ -106,7 +110,7 @@ impl Checker<'_> {
                     .class(class)
                     .methods
                     .get(index)
-                    .is_some_and(MethodInfo::is_async),
+                    .is_some_and(MethodInfo::is_awaitable),
                 _ => info.ty == Type::Error,
             },
             None => true,

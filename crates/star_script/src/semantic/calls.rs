@@ -3,7 +3,9 @@
 use super::checker::{Checker, ContextKind, NameTarget};
 use super::expressions::{Receiver, wrap_null_safe};
 use super::natives::{INPUT_CLASS, builtin_method};
-use super::{ClassId, ClassOrigin, MemberRef, MethodInfo, Resolution, SemanticErrorKind, Type};
+use super::{
+    ClassId, ClassOrigin, Execution, MemberRef, MethodInfo, Resolution, SemanticErrorKind, Type,
+};
 use crate::Span;
 use crate::ast::{Expr, ExprKind, Literal, Name};
 
@@ -67,6 +69,10 @@ impl Checker<'_> {
     }
 
     fn construct(&mut self, callee: &Expr, class: ClassId, arguments: &[Expr], span: Span) -> Type {
+        if self.context.is_parallel {
+            let name = self.analysis.classes.class(class).name.clone();
+            self.error(SemanticErrorKind::NotParallel(name), callee.span);
+        }
         let info = self.analysis.classes.class(class);
         let is_private = info.constructor.as_ref().is_some_and(|c| c.is_private);
         let parameters: Vec<Type> = info
@@ -310,8 +316,7 @@ impl Checker<'_> {
         } else {
             wrap_null_safe(method.return_type.clone(), null_safe)
         };
-        if method.is_async() && self.context.free_call != Some(span) {
-            let kind = SemanticErrorKind::AsyncCallNotAwaited(method.name.clone());
+        if let Some(kind) = self.call_problem(method, span) {
             self.error(kind, callee.span);
         }
         let resolution = Resolution::Method { class, index };
@@ -324,6 +329,25 @@ impl Checker<'_> {
             .collect();
         self.arguments(&parameters, arguments, span);
         result
+    }
+
+    /// What is wrong with calling `method` here, from how it runs: a
+    /// `parallel` function only calls others, directly; elsewhere they are
+    /// awaited, and `async` methods are awaited or started.
+    fn call_problem(&self, method: &MethodInfo, span: Span) -> Option<SemanticErrorKind> {
+        let free = self.context.free_call.filter(|free| free.span == span);
+        if self.context.is_parallel {
+            return (!method.is_parallel())
+                .then(|| SemanticErrorKind::NotParallel(method.name.clone()));
+        }
+        match method.execution {
+            Execution::Direct => None,
+            Execution::Async => free
+                .is_none()
+                .then(|| SemanticErrorKind::AsyncCallNotAwaited(method.name.clone())),
+            Execution::Parallel => (!free.is_some_and(|free| free.awaited))
+                .then(|| SemanticErrorKind::ParallelCallNotAwaited(method.name.clone())),
+        }
     }
 
     fn method_info(&self, class: ClassId, index: usize) -> Option<MethodInfo> {

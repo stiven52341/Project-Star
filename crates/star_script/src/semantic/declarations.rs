@@ -183,16 +183,13 @@ impl Checker<'_> {
             ModifierKind::Static,
             ModifierKind::Override,
             ModifierKind::Async,
+            ModifierKind::Parallel,
         ];
         self.check_modifiers(member, &all, "a method");
         let is_static = member.has_modifier(ModifierKind::Static);
         let is_private = member.has_modifier(ModifierKind::Private);
         let is_override = member.has_modifier(ModifierKind::Override);
-        let execution = if member.has_modifier(ModifierKind::Async) {
-            Execution::Async
-        } else {
-            Execution::Direct
-        };
+        let execution = self.execution_of(member, is_static);
         if is_override && (is_static || is_private) {
             let what = if is_static {
                 "a static method"
@@ -209,6 +206,9 @@ impl Checker<'_> {
             .return_type
             .as_ref()
             .map_or(Type::Void, |type_ref| self.resolve_type(type_ref));
+        if execution == Execution::Parallel {
+            self.check_parallel_signature(method, &parameters, &return_type);
+        }
         self.analysis
             .classes
             .class_mut(id)
@@ -223,6 +223,66 @@ impl Checker<'_> {
                 execution,
                 span: Some(method.name.span),
             });
+    }
+
+    /// How calls of the method run. `parallel` only goes with `static`,
+    /// and never with `async`: it is awaited already.
+    fn execution_of(&mut self, member: &Member, is_static: bool) -> Execution {
+        if !member.has_modifier(ModifierKind::Parallel) {
+            return if member.has_modifier(ModifierKind::Async) {
+                Execution::Async
+            } else {
+                Execution::Direct
+            };
+        }
+        if !is_static {
+            self.check_modifiers(
+                member,
+                &[
+                    ModifierKind::Private,
+                    ModifierKind::Static,
+                    ModifierKind::Override,
+                    ModifierKind::Async,
+                ],
+                "a method that is not static",
+            );
+        }
+        let without_async = [
+            ModifierKind::Private,
+            ModifierKind::Static,
+            ModifierKind::Override,
+            ModifierKind::Parallel,
+        ];
+        self.check_modifiers(member, &without_async, "a parallel function");
+        Execution::Parallel
+    }
+
+    /// A `parallel` function only takes and gives plain values, which can
+    /// be copied to its thread and back, and must give one: its result is
+    /// its only effect.
+    fn check_parallel_signature(
+        &mut self,
+        method: &MethodDecl,
+        parameters: &[ParameterInfo],
+        return_type: &Type,
+    ) {
+        for (parameter, info) in method.parameters.iter().zip(parameters) {
+            if !info.ty.is_plain_value() {
+                let kind = SemanticErrorKind::NotPlainValue(self.type_name(&info.ty));
+                self.error(kind, parameter.type_annotation.span);
+            }
+        }
+        match &method.return_type {
+            None => {
+                let kind = SemanticErrorKind::ParallelWithoutResult(method.name.text.clone());
+                self.error(kind, method.name.span);
+            }
+            Some(type_ref) if !return_type.is_plain_value() => {
+                let kind = SemanticErrorKind::NotPlainValue(self.type_name(return_type));
+                self.error(kind, type_ref.span);
+            }
+            Some(_) => {}
+        }
     }
 
     fn collect_constructor(&mut self, id: ClassId, member: &Member, constructor: &ConstructorDecl) {
@@ -441,6 +501,7 @@ impl Checker<'_> {
         };
         self.context = BodyContext::new(id, kind, info.return_type.clone());
         self.context.is_async = info.is_async();
+        self.context.is_parallel = info.is_parallel();
         self.check_body(&method.parameters, &info.parameters, &method.body);
         if info.return_type != Type::Void && !flow::always_returns(&method.body) {
             let kind = SemanticErrorKind::MissingReturn(info.name.clone());
