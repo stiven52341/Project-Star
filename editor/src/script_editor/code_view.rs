@@ -3,6 +3,7 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::ops::Range;
 
 use eframe::egui;
 use egui::text::{CCursor, CCursorRange, LayoutJob};
@@ -10,6 +11,7 @@ use star_script::semantic::ClassTable;
 use star_script::{Position, Span};
 
 use super::editing::{Action, Selection, apply};
+use super::find_bar::{FIND_SHORTCUT, FindBar, Found};
 use super::highlight::colored;
 use super::mistakes::{Mark, Mistake, marks, paint_marks};
 use super::navigation::{Definition, definition_at};
@@ -22,6 +24,10 @@ const GUTTER_PADDING: f32 = 8.0;
 /// Fewest digits the line numbers' column has room for.
 const MIN_GUTTER_DIGITS: usize = 3;
 const DECIMAL_RADIX: usize = 10;
+/// How strongly the matches of the find bar are painted, from 0 to 1, of
+/// the color of selected text; the one chosen, and the others.
+const CHOSEN_MATCH_OPACITY: f32 = 0.8;
+const OTHER_MATCH_OPACITY: f32 = 0.35;
 
 /// The text's cursor and colors, kept between frames.
 #[derive(Default)]
@@ -33,6 +39,7 @@ pub(super) struct CodeView {
     /// The colored text last laid out, by a hash of the text and the theme.
     colors: Option<(u64, LayoutJob)>,
     suggestions: Suggestions,
+    find: FindBar,
 }
 
 impl CodeView {
@@ -55,13 +62,17 @@ impl CodeView {
         classes: Option<&ClassTable>,
     ) -> Edited {
         let font = egui::TextStyle::Monospace.resolve(ui.style());
-        let jumped = self.jump.take().map(|position| {
+        let mut scroll_to = self.jump.take().map(|position| {
             let index = char_index_of(text, position);
-            put_cursor(ui.ctx(), id, index);
+            select(ui.ctx(), id, index..index);
             index
         });
+        let found = self.show_find_bar(ui, text, id);
+        let mut changed = found.as_ref().is_some_and(|found| found.changed);
+        if let Some(found) = found.as_ref().filter(|found| found.moved) {
+            scroll_to = found.current_range().map(|range| range.start);
+        }
         let footer_height = ui.spacing().interact_size.y;
-        let mut changed = false;
         let mut go_to = None;
         let cursor = cursor_while_writing(ui.ctx(), id);
         if let Some(completion) = self.suggestions.find(text, cursor, classes) {
@@ -78,8 +89,9 @@ impl CodeView {
             .show(ui, |ui| {
                 let shown = Shown {
                     font: &font,
-                    jumped,
+                    scroll_to,
                     marks: &marks,
+                    found: found.as_ref(),
                     classes,
                 };
                 let lines = self.show_lines(ui, text, id, &shown);
@@ -89,6 +101,35 @@ impl CodeView {
         ui.separator();
         self.show_footer(ui, &marks);
         Edited { changed, go_to }
+    }
+
+    /// The find bar, if it is open or `Ctrl+F` opens it. When it closes, the
+    /// match chosen is selected in the text edit `id`, which gets the
+    /// keyboard back.
+    fn show_find_bar(
+        &mut self,
+        ui: &mut egui::Ui,
+        text: &mut String,
+        id: egui::Id,
+    ) -> Option<Found> {
+        let selection = selection(ui.ctx(), id);
+        if ui.input_mut(|input| input.consume_shortcut(&FIND_SHORTCUT)) {
+            let selected = selection.clone().map(|range| char_slice(text, range));
+            self.find.open(selected.as_deref());
+        }
+        if !self.find.is_open() {
+            return None;
+        }
+        let cursor = selection.map_or(0, |range| range.start);
+        let found = self.find.show(ui, text, id, cursor);
+        ui.separator();
+        if found.closed {
+            if let Some(range) = found.current_range() {
+                select(ui.ctx(), id, range);
+            }
+            ui.memory_mut(|memory| memory.request_focus(id));
+        }
+        Some(found)
     }
 
     /// Where the cursor is, and the mistake on its line or how many there
@@ -122,8 +163,9 @@ impl CodeView {
     ) -> Edited {
         let Shown {
             font,
-            jumped,
+            scroll_to,
             marks,
+            found,
             classes,
         } = *shown;
         let digits = digit_count(text.lines().count()).max(MIN_GUTTER_DIGITS);
@@ -142,6 +184,8 @@ impl CodeView {
             job.wrap.max_width = wrap_width;
             ui.fonts_mut(|fonts| fonts.layout_job(job))
         };
+        // Added before the text, so the matches are painted under it.
+        let matches_slot = ui.painter().add(egui::Shape::Noop);
         let output = ui
             .horizontal_top(|ui| {
                 ui.add_space(gutter_width);
@@ -160,6 +204,10 @@ impl CodeView {
         let cursor = output.cursor_range.map(|range| range.primary.index.0);
         self.cursor = cursor.map(|index| position_of(text, index));
         paint_line_numbers(ui, &output, font, self.cursor, marks);
+        if let Some(found) = found {
+            ui.painter()
+                .set(matches_slot, match_shapes(ui, &output, found));
+        }
         if let Some(message) = paint_marks(ui, &output, marks) {
             egui::Popup::from_response(&output.response)
                 .kind(egui::PopupKind::Tooltip)
@@ -170,7 +218,7 @@ impl CodeView {
         if let Some(completion) = self.suggestions.find(text, cursor, classes) {
             self.suggestions.paint(ui, &output, font, text, &completion);
         }
-        if let Some(index) = jumped {
+        if let Some(index) = scroll_to {
             let rect = output
                 .galley
                 .pos_from_cursor(CCursor::new(index))
@@ -230,9 +278,12 @@ fn asked_definition(
 /// What is shown on the text besides it.
 struct Shown<'shown, 'message> {
     font: &'shown egui::FontId,
-    /// Where the cursor was just put, to scroll to.
-    jumped: Option<usize>,
+    /// The character to bring into sight: where the cursor was just put,
+    /// or the match just chosen.
+    scroll_to: Option<usize>,
     marks: &'shown [Mark<'message>],
+    /// What the find bar found, if it is open.
+    found: Option<&'shown Found>,
     classes: Option<&'shown ClassTable>,
 }
 
@@ -424,15 +475,90 @@ const EDITING_KEYS: [egui::Key; 12] = [
     egui::Key::PageDown,
 ];
 
-/// Puts the cursor of the text edit `id` before the character at `index`,
-/// and gives it the keyboard.
-fn put_cursor(context: &egui::Context, id: egui::Id, index: usize) {
+/// Selects the characters `range` of the text edit `id` (puts its cursor
+/// there, if empty), and gives it the keyboard.
+fn select(context: &egui::Context, id: egui::Id, range: Range<usize>) {
     let mut state = egui::text_edit::TextEditState::load(context, id).unwrap_or_default();
-    state
-        .cursor
-        .set_char_range(Some(CCursorRange::one(CCursor::new(index))));
+    state.cursor.set_char_range(Some(CCursorRange::two(
+        CCursor::new(range.start),
+        CCursor::new(range.end),
+    )));
     state.store(context, id);
     context.memory_mut(|memory| memory.request_focus(id));
+}
+
+/// The characters selected in the text edit `id`, in order; empty where
+/// only the cursor is.
+fn selection(context: &egui::Context, id: egui::Id) -> Option<Range<usize>> {
+    let range = egui::text_edit::TextEditState::load(context, id)?
+        .cursor
+        .char_range()?;
+    let (primary, secondary) = (range.primary.index.0, range.secondary.index.0);
+    Some(primary.min(secondary)..primary.max(secondary))
+}
+
+/// The characters `range` of `text`.
+fn char_slice(text: &str, range: Range<usize>) -> String {
+    text.chars().skip(range.start).take(range.len()).collect()
+}
+
+/// A background under each match of the find bar in the text laid out in
+/// `output`, stronger under the one chosen.
+fn match_shapes(
+    ui: &egui::Ui,
+    output: &egui::text_edit::TextEditOutput,
+    found: &Found,
+) -> egui::Shape {
+    let color = ui.visuals().selection.bg_fill;
+    let shapes = found
+        .matches
+        .iter()
+        .enumerate()
+        .flat_map(|(index, range)| {
+            let opacity = if Some(index) == found.current {
+                CHOSEN_MATCH_OPACITY
+            } else {
+                OTHER_MATCH_OPACITY
+            };
+            match_areas(output, range.clone())
+                .map(move |area| egui::Shape::rect_filled(area, 0.0, color.gamma_multiply(opacity)))
+        })
+        .collect();
+    egui::Shape::Vec(shapes)
+}
+
+/// The areas the characters `range` cover in the text laid out in
+/// `output`: one, or two when the row wraps inside them.
+fn match_areas(
+    output: &egui::text_edit::TextEditOutput,
+    range: Range<usize>,
+) -> impl Iterator<Item = egui::Rect> {
+    let offset = output.galley_pos.to_vec2();
+    let start = output
+        .galley
+        .pos_from_cursor(CCursor::new(range.start))
+        .translate(offset);
+    let end = output
+        .galley
+        .pos_from_cursor(CCursor::new(range.end))
+        .translate(offset);
+    let same_row = (end.min.y - start.min.y).abs() < f32::EPSILON;
+    let areas = if same_row {
+        [Some(egui::Rect::from_min_max(start.min, end.max)), None]
+    } else {
+        let right = output.galley_pos.x + output.galley.rect.right();
+        [
+            Some(egui::Rect::from_min_max(
+                start.min,
+                egui::pos2(right, start.max.y),
+            )),
+            Some(egui::Rect::from_min_max(
+                egui::pos2(output.galley_pos.x, end.min.y),
+                end.max,
+            )),
+        ]
+    };
+    areas.into_iter().flatten()
 }
 
 /// How many decimal digits `number` has.

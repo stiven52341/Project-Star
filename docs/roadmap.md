@@ -208,7 +208,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.9e Go to definition (`Ctrl`+click or `F12`); mistakes and
           suggestions checked on one thread that lives with the project,
           without translating to Rust.
-    - [ ] 13.9f Find and replace in a script (`Ctrl+F`).
+    - [x] 13.9f Find and replace in a script (`Ctrl+F`): the matches
+          painted, the next and previous one, case, and replacing one
+          or all.
     - [ ] 13.9g The type of a name under the pointer.
     - [ ] Known limits to improve: suggestions only follow chains of names
           (not `make().`), and do not list the methods of basic types

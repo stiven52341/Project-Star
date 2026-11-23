@@ -52,6 +52,56 @@ impl Texts {
         )
     }
 
+    /// The hint of the field of the text to find.
+    pub(crate) const fn find_hint(&self) -> &'static str {
+        self.pick("Find", "Buscar")
+    }
+
+    /// The hint of the field of what replaces the text found.
+    pub(crate) const fn replace_hint(&self) -> &'static str {
+        self.pick("Replace with", "Reemplazar por")
+    }
+
+    /// What the button that tells upper and lower case apart does.
+    pub(crate) const fn match_case(&self) -> &'static str {
+        self.pick("Match case", "Distinguir mayúsculas y minúsculas")
+    }
+
+    pub(crate) const fn previous_match(&self) -> &'static str {
+        self.pick("Previous match (Shift+Enter)", "Anterior (Mayús+Intro)")
+    }
+
+    pub(crate) const fn next_match(&self) -> &'static str {
+        self.pick("Next match (Enter)", "Siguiente (Intro)")
+    }
+
+    pub(crate) const fn close_find(&self) -> &'static str {
+        self.pick("Close (Esc)", "Cerrar (Esc)")
+    }
+
+    /// The button that replaces the match chosen.
+    pub(crate) const fn replace(&self) -> &'static str {
+        self.pick("Replace", "Reemplazar")
+    }
+
+    /// The button that replaces every match.
+    pub(crate) const fn replace_all(&self) -> &'static str {
+        self.pick("Replace all", "Reemplazar todo")
+    }
+
+    /// What the find bar says when the text is nowhere.
+    pub(crate) const fn no_matches(&self) -> &'static str {
+        self.pick("No results", "Sin resultados")
+    }
+
+    /// Which match is chosen, of how many.
+    pub(crate) fn match_count(&self, chosen: usize, count: usize) -> String {
+        match self.language {
+            Language::English => format!("{chosen} of {count}"),
+            Language::Spanish => format!("{chosen} de {count}"),
+        }
+    }
+
     /// What a suggested name is, when it has no signature to show.
     pub(crate) const fn candidate_kind(&self, kind: CandidateKind) -> &'static str {
         match kind {

@@ -763,6 +763,19 @@ of the last check that could read the program, with their places
 that check read: a script opens with the cursor there; a blueprint opens
 (its StarScript is never shown). Names of the engine go nowhere.
 
+Find and replace (`find.rs`, the search itself, and `find_bar.rs`, the bar;
+both tested): `Ctrl+F` (`Cmd+F` on macOS) opens a bar over the code with
+the selected text, if it is one line. Matches are character ranges, found
+without overlapping, with or without telling upper and lower case apart
+(`Aa`). The match from the cursor is chosen first; `Enter` and
+`Shift+Enter` (or `‹` and `›`) go to the next and previous one, round the
+text, and bring it into sight. Every match is painted under the text (a
+shape slot added before the text edit), the chosen one stronger. “Replace”
+(or `Enter` in its field) replaces the chosen match and chooses the next;
+“Replace all” replaces every one, from the last so the places of the others
+hold. `Esc` or `×` closes the bar and gives the keyboard back to the code
+with the chosen match selected.
+
 Blueprints and scripts are saved with `Ctrl+S` or “File” → “Save”, and
 all of them before “Compile”, which reads the files. Tabs with unsaved changes
 show `•`; closing one, the project or the window asks first (“Save”,

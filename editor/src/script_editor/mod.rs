@@ -4,6 +4,8 @@
 mod code_view;
 mod completion;
 mod editing;
+mod find;
+mod find_bar;
 mod highlight;
 mod mistakes;
 mod navigation;
