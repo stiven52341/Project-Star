@@ -1107,3 +1107,22 @@ fn only_nodes_can_join_the_tree() {
         [mismatch("Node", "Enemy")]
     );
 }
+
+#[test]
+fn await_outside_async_methods_is_reported() {
+    assert_eq!(
+        errors("class T {\n func wait() {}\n func f() { await wait() }\n}"),
+        [SemanticErrorKind::AwaitOutsideAsync]
+    );
+}
+
+#[test]
+fn awaited_values_are_still_checked() {
+    assert_eq!(
+        body_errors("await missing()"),
+        [
+            SemanticErrorKind::AwaitOutsideAsync,
+            SemanticErrorKind::UnknownName("missing".to_owned())
+        ]
+    );
+}

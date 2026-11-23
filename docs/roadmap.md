@@ -225,7 +225,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           by decision (see `docs/architecture.md`).
   - [ ] 13.10 Concurrency and parallelism (`docs/starscript.md`, section 7;
         decision 54):
-    - [ ] 13.10a Syntax: the keywords `async`, `await` and `parallel`;
+    - [x] 13.10a Syntax: the keywords `async`, `await` and `parallel`;
           `async` and `parallel` as modifiers of methods, `await` before
           an expression.
     - [ ] 13.10b Coroutines in the analysis: `async` methods and their

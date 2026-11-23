@@ -142,11 +142,12 @@ impl Parser<'_> {
         }
     }
 
-    /// `-value`, `!value` or a postfix expression.
+    /// `-value`, `!value`, `await value` or a postfix expression.
     fn unary(&mut self) -> ParseResult<Expr> {
         let operator = match self.peek() {
             TokenKind::Minus => UnaryOperator::Negate,
             TokenKind::Bang => UnaryOperator::Not,
+            TokenKind::Keyword(Keyword::Await) => return self.await_expression(),
             _ => return self.nested(Self::postfix),
         };
         let start = self.advance().span.start();
@@ -157,6 +158,15 @@ impl Parser<'_> {
         };
         let span = self.span_from(start);
         Ok(self.expression_node(kind, span))
+    }
+
+    /// `await value`. It binds like `-`: `await a.b() + 1` waits for
+    /// `a.b()` and then adds.
+    fn await_expression(&mut self) -> ParseResult<Expr> {
+        let start = self.advance().span.start();
+        let value = self.nested(Self::unary)?;
+        let span = self.span_from(start);
+        Ok(self.expression_node(ExprKind::Await(Box::new(value)), span))
     }
 
     /// A primary expression followed by calls, member accesses and indexing.

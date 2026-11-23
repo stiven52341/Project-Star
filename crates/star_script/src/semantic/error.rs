@@ -181,6 +181,8 @@ pub enum SemanticErrorKind {
     ConstantUsedBeforeDeclaration(String),
     /// `super` not followed by `.method(…)`.
     InvalidSuper,
+    /// `await` outside an `async` method.
+    AwaitOutsideAsync,
     /// Assigning to a constant, parameter or loop variable.
     AssignToImmutable(String),
 
@@ -345,6 +347,9 @@ impl fmt::Display for SemanticErrorKind {
             Self::InvalidSuper => {
                 formatter.write_str("`super` can only be used to call a base method: `super.name()`")
             }
+            Self::AwaitOutsideAsync => formatter.write_str(
+                "`await` can only be used inside an `async` method",
+            ),
             Self::AssignToImmutable(name) => write!(formatter, "`{name}` cannot be changed"),
             Self::MissingReturn(name) => write!(
                 formatter,

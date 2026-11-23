@@ -346,6 +346,36 @@ fn modifiers_are_recorded_in_order() {
 }
 
 #[test]
+fn async_and_parallel_are_modifiers() {
+    let file = parse_source(
+        "class A {\n async func blink() {}\n parallel static func sum(x: int) -> int { return x }\n}",
+    )
+    .expect("valid");
+    let [blink, sum] = &file.classes[0].members[..] else {
+        panic!("two members");
+    };
+
+    assert!(blink.has_modifier(ModifierKind::Async));
+    assert!(sum.has_modifier(ModifierKind::Parallel));
+    assert!(sum.has_modifier(ModifierKind::Static));
+}
+
+#[test]
+fn await_binds_like_a_prefix_operator() {
+    assert_eq!(expression("await a.b()"), "(await (call (. a b)))");
+    assert_eq!(expression("await f() + 1"), "(+ (await (call f)) 1)");
+    assert_eq!(expression("-await f()"), "(- (await (call f)))");
+}
+
+#[test]
+fn await_alone_is_not_a_value() {
+    assert_eq!(
+        expression_error("await"),
+        unexpected(Expected::Expression, TokenKind::EndOfFile)
+    );
+}
+
+#[test]
 fn repeated_modifiers_are_reported() {
     assert_eq!(
         errors("class A { private private var x = 1 }"),

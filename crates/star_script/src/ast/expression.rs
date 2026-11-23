@@ -94,6 +94,9 @@ pub enum ExprKind {
     },
     /// `[a, b, c]`: a list.
     Array(Vec<Expr>),
+    /// `await value`: waits until the value, a call of something that
+    /// waits, is ready.
+    Await(Box<Expr>),
 }
 
 impl fmt::Display for Expr {
@@ -134,6 +137,7 @@ impl fmt::Display for Expr {
                 formatter.write_str("(array")?;
                 write_each(formatter, elements)
             }
+            ExprKind::Await(value) => write!(formatter, "(await {value})"),
         }
     }
 }

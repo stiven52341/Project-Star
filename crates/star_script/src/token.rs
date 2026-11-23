@@ -234,6 +234,12 @@ pub enum Keyword {
     False,
     /// `null`
     Null,
+    /// `async`: a method that can wait across frames.
+    Async,
+    /// `await`: waits for a method that can wait.
+    Await,
+    /// `parallel`: a function that runs on another thread.
+    Parallel,
     /// `interface`, reserved for the future.
     Interface,
     /// `implements`, reserved for the future.
@@ -250,7 +256,7 @@ pub enum Keyword {
 
 impl Keyword {
     /// Every keyword, in the order the specification lists them.
-    pub const ALL: [Self; 30] = [
+    pub const ALL: [Self; 33] = [
         Self::Class,
         Self::Extends,
         Self::Init,
@@ -275,6 +281,9 @@ impl Keyword {
         Self::True,
         Self::False,
         Self::Null,
+        Self::Async,
+        Self::Await,
+        Self::Parallel,
         Self::Interface,
         Self::Implements,
         Self::Abstract,
@@ -319,6 +328,9 @@ impl Keyword {
             Self::True => "true",
             Self::False => "false",
             Self::Null => "null",
+            Self::Async => "async",
+            Self::Await => "await",
+            Self::Parallel => "parallel",
             Self::Interface => "interface",
             Self::Implements => "implements",
             Self::Abstract => "abstract",

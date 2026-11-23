@@ -66,8 +66,17 @@ impl Checker<'_> {
             ExprKind::Call { callee, arguments } => self.call(callee, arguments, span),
             ExprKind::Index { object, index } => self.index(object, index),
             ExprKind::Array(elements) => self.array(elements, expected, span),
+            ExprKind::Await(value) => self.await_value(value, span),
         };
         (ty, None)
+    }
+
+    /// `await value`. No method can wait yet, so it is always misplaced;
+    /// the value is still checked for its own mistakes.
+    fn await_value(&mut self, value: &Expr, span: Span) -> Type {
+        self.expression(value, None);
+        self.error(SemanticErrorKind::AwaitOutsideAsync, span);
+        Type::Error
     }
 
     // --- Names and members ---

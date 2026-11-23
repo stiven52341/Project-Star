@@ -21,7 +21,8 @@ pub struct ClassDecl {
 /// One member of a class, with its modifiers.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Member {
-    /// `private`, `static` and `override`, in source order.
+    /// `private`, `static`, `override`, `async` and `parallel`, in source
+    /// order.
     pub modifiers: Vec<Modifier>,
     /// What the member is.
     pub kind: MemberKind,
@@ -66,6 +67,10 @@ pub enum ModifierKind {
     Static,
     /// Redefines a method of the base class.
     Override,
+    /// A method that can wait across frames, with `await`.
+    Async,
+    /// A static function that runs on another thread.
+    Parallel,
 }
 
 impl ModifierKind {
@@ -76,6 +81,8 @@ impl ModifierKind {
             Keyword::Private => Some(Self::Private),
             Keyword::Static => Some(Self::Static),
             Keyword::Override => Some(Self::Override),
+            Keyword::Async => Some(Self::Async),
+            Keyword::Parallel => Some(Self::Parallel),
             _ => None,
         }
     }
@@ -87,6 +94,8 @@ impl ModifierKind {
             Self::Private => Keyword::Private,
             Self::Static => Keyword::Static,
             Self::Override => Keyword::Override,
+            Self::Async => Keyword::Async,
+            Self::Parallel => Keyword::Parallel,
         }
     }
 }

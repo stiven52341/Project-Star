@@ -28,7 +28,8 @@ impl Checker<'_> {
             } => self.assignment(target, *operator, value, statement.span),
             StatementKind::Expression(expression) => {
                 self.expression(expression, None);
-                if !matches!(expression.kind, ExprKind::Call { .. }) {
+                // `await f()` is a call too; `await` reports what is not.
+                if !matches!(expression.kind, ExprKind::Call { .. } | ExprKind::Await(_)) {
                     self.error(SemanticErrorKind::UnusedValue, expression.span);
                 }
             }

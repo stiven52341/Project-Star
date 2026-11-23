@@ -39,6 +39,7 @@ impl Body<'_> {
                 self.expression(index)?
             )),
             ExprKind::Array(elements) => self.array(expression, elements),
+            ExprKind::Await(_) => Err(internal("`await` outside an `async` method", span)),
         }
     }
 
