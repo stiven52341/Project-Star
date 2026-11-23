@@ -42,6 +42,7 @@ cargo run -p sprites_2d                                   # render test: batched
 cargo run -p scene_2d                                     # scene test: a .scene file instanced (Space adds more)
 cargo run -p sounds_2d                                    # audio test: Space beeps, M loops a melody, up/down volume
 cargo run -p physics_2d                                   # 2D physics: Space drops balls, C crates; a moving paddle and a sensor
+cargo run -p physics_3d                                   # 3D physics: Space drops balls, C crates; a sweeping bar and a sensor
 cargo run -p star_editor                                  # editor: create or open a project
 cargo run -p star_script --example tokenize -- f.star     # StarScript: show the tokens of a file
 cargo run -p star_script --example parse -- f.star        # StarScript: show the syntax tree
