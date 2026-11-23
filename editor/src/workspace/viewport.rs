@@ -19,8 +19,8 @@ use super::viewport_assets::ViewportAssets;
 use super::viewport_tools::{paint_handles, show_toolbar, tool_from_keys};
 use crate::project::ProjectDimension;
 use crate::scene_editor::{
-    Drag, HandleShape, Lens, Marks, Ray, SceneDocument, Tool, cross_lines, cube_lines, handle_at,
-    shapes, square_lines,
+    Drag, HandleShape, ImageDrop, Lens, Marks, Ray, SceneDocument, Tool, cross_lines, cube_lines,
+    handle_at, shapes, square_lines,
 };
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -28,6 +28,9 @@ use crate::texts;
 const BACKGROUND: Color = Color::rgb(0.12, 0.12, 0.14);
 const LABEL_MARGIN: f32 = 10.0;
 const LABEL_SIZE: f32 = 14.0;
+/// The width of the outline of the view while an image would be dropped
+/// on it.
+const DROP_TARGET_WIDTH: f32 = 3.0;
 const FULL_TEXTURE: egui::Rect =
     egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
 
@@ -112,6 +115,7 @@ impl SceneViewport {
             if hovered.is_none() {
                 self.select_clicked(&response, rect, scene);
             }
+            self.drop_image(&response, rect, scene);
         }
         self.handle_camera_input(ui, &response, rect);
         self.match_target_size(rect, ui.ctx().pixels_per_point());
@@ -125,6 +129,14 @@ impl SceneViewport {
         let handles = self.handles(scene.as_deref(), lens.as_ref());
         let active = self.drag.map(|drag| drag.handle).or(hovered);
         paint_handles(&painter, rect, &handles, active);
+        if response.dnd_hover_payload::<ImageDrop>().is_some() {
+            painter.rect_stroke(
+                rect,
+                0.0,
+                egui::Stroke::new(DROP_TARGET_WIDTH, ui.visuals().selection.stroke.color),
+                egui::StrokeKind::Inside,
+            );
+        }
         self.paint_overlay(ui, &painter, rect);
         show_toolbar(ui, rect, LABEL_MARGIN, &mut self.tool);
     }
@@ -220,6 +232,21 @@ impl SceneViewport {
             .and_then(|view_projection| Ray::through(view_projection, to_screen(pointer, rect)));
         if let Some(ray) = ray {
             scene.select_at(ray);
+        }
+    }
+
+    /// Adds to `scene` a node showing the image dropped on the view, if
+    /// one was, where it was dropped.
+    fn drop_image(&self, response: &egui::Response, rect: egui::Rect, scene: &mut SceneDocument) {
+        let Some(image) = response.dnd_release_payload::<ImageDrop>() else {
+            return;
+        };
+        let ray = response
+            .hover_pos()
+            .zip(self.lens(rect))
+            .map(|(pointer, lens)| lens.ray(in_view(pointer, rect)));
+        if let Some(ray) = ray {
+            scene.drop_image_at(&image, ray);
         }
     }
 

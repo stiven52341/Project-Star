@@ -14,6 +14,7 @@ use super::thumbnails::Thumbnails;
 use crate::blueprint_editor::create_blueprint;
 use crate::file_tree::{FileNode, file_paths, scan_directory};
 use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, SCENE_EXTENSION};
+use crate::scene_editor::ImageDrop;
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -45,6 +46,10 @@ const TILE_ROUNDING: f32 = 4.0;
 const NAME_SIZE: f32 = 12.0;
 /// Lines a name takes at most under its icon.
 const NAME_ROWS: usize = 2;
+/// The side of the copy of an image that follows the pointer while it is
+/// dragged, and how far from the pointer it is.
+const DRAGGED_SIDE: f32 = 40.0;
+const DRAGGED_OFFSET: f32 = 12.0;
 /// What separates folders in the way back to the top.
 const PATH_SEPARATOR: &str = "›";
 
@@ -148,7 +153,36 @@ impl AssetsPanel {
                     }
                 });
             });
+        self.show_dragged_image(ui);
         opened
+    }
+
+    /// While an image of the panel is dragged, a small copy of it and its
+    /// name follow the pointer.
+    fn show_dragged_image(&mut self, ui: &egui::Ui) {
+        let ctx = ui.ctx();
+        let Some(image) = egui::DragAndDrop::payload::<ImageDrop>(ctx) else {
+            return;
+        };
+        let Some(cursor) = ctx.pointer_latest_pos() else {
+            return;
+        };
+        ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
+        let painter = ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Tooltip,
+            egui::Id::unique("dragged_asset"),
+        ));
+        let space = egui::Rect::from_min_size(
+            cursor + egui::Vec2::splat(DRAGGED_OFFSET),
+            egui::Vec2::splat(DRAGGED_SIDE),
+        );
+        if let Some(texture) = self.thumbnails.get(ctx, &image.path) {
+            let place = fit(texture.size_vec2(), space);
+            painter.image(texture.id(), place, FULL_TEXTURE, egui::Color32::WHITE);
+        } else {
+            let name = image.path.rsplit('/').next().unwrap_or(&image.path);
+            paint_icon(&painter, space, AssetKind::Image, name);
+        }
     }
 
     /// The way from the assets folder down to the folder shown: each step
@@ -172,7 +206,7 @@ impl AssetsPanel {
     /// One tile: the icon of `entry` and its name under it. A click
     /// selects it; returns whether it was double clicked.
     fn show_tile(&mut self, ui: &mut egui::Ui, entry: &Entry) -> bool {
-        let (rect, response) = ui.allocate_exact_size(TILE_SIZE, egui::Sense::click());
+        let (rect, response) = ui.allocate_exact_size(TILE_SIZE, egui::Sense::click_and_drag());
         let hint =
             if OpenedAsset::of(entry.path.clone()).is_some() || entry.kind == AssetKind::Folder {
                 format!("{}\n{}", entry.name, texts::current().open_file_hint)
@@ -201,6 +235,12 @@ impl AssetsPanel {
             .then(|| self.thumbnails.get(ui.ctx(), &entry.path))
             .flatten()
             .map(|texture| (texture.id(), texture.size_vec2()));
+        if entry.kind == AssetKind::Image {
+            response.dnd_set_drag_payload(ImageDrop {
+                path: entry.path.clone(),
+                aspect: thumbnail.map(|(_, size)| size.x / size.y),
+            });
+        }
         match thumbnail {
             Some((texture, size)) => {
                 painter.image(texture, fit(size, icon), FULL_TEXTURE, egui::Color32::WHITE);

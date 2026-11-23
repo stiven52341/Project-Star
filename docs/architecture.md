@@ -605,6 +605,17 @@ the size it started at. Positions found in the world go back through
 the inverse of the parent's place. 3D nodes are handled in 3D in 3D
 projects; drags that grab no handle still move the camera.
 
+Images can be dragged from the assets panel (egui's drag and drop, with
+an `ImageDrop` payload: the path and the image's shape, read from its
+thumbnail; a small copy follows the pointer). Dropped on the view, they
+become a new child of the root where the pointer's ray meets the 2D
+plane, or the ground (`y = 0`) in 3D, in front of the camera if it never
+does; dropped on a row of the tree, a new child of that node at its
+place (`scene_editor/dropping.rs`). In 2D the node gets a sprite one
+unit tall, as wide as the image's shape; in 3D, a plane of that size
+with the image as its texture. It is named after the file, unique among
+its siblings, and selected.
+
 The **blueprint editor** (`blueprint_editor/`) draws a graph of the open
 blueprint on a canvas of its own, painted with egui's painter (no node
 editor library: the model, its pins and its rules are `star_blueprint`'s).

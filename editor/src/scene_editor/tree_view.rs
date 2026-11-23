@@ -6,11 +6,13 @@
 
 use std::collections::HashSet;
 use std::f32::consts::FRAC_1_SQRT_2;
+use std::sync::Arc;
 
 use eframe::egui;
 use star_engine::star_scene::NodeOutline;
 
 use super::ROOT;
+use super::dropping::ImageDrop;
 use super::tree::children_of;
 use crate::texts;
 
@@ -25,6 +27,8 @@ const ICON_GAP: f32 = 6.0;
 const ARROW_HALF: f32 = 3.5;
 const GUIDE_WIDTH: f32 = 1.0;
 const CLASS_TEXT_SIZE: f32 = 11.0;
+/// The width of the outline of a row an image would be dropped on.
+const DROP_TARGET_WIDTH: f32 = 2.0;
 
 const SPRITE_COLOR: egui::Color32 = egui::Color32::from_rgb(110, 190, 120);
 const MESH_COLOR: egui::Color32 = egui::Color32::from_rgb(95, 155, 230);
@@ -114,6 +118,8 @@ pub(super) struct TreeView<'scene> {
     selected: &'scene mut Option<usize>,
     /// Rows drawn so far, to stripe every other one.
     rows: usize,
+    /// An image dropped on a row this frame, with that row's node.
+    dropped: Option<(usize, Arc<ImageDrop>)>,
 }
 
 impl<'scene> TreeView<'scene> {
@@ -129,11 +135,13 @@ impl<'scene> TreeView<'scene> {
             state,
             selected,
             rows: 0,
+            dropped: None,
         }
     }
 
     /// The search field and, under it, the tree, or the nodes that match.
-    pub(super) fn show(mut self, ui: &mut egui::Ui) {
+    /// Returns the image dropped on a row, if one was, with its node.
+    pub(super) fn show(mut self, ui: &mut egui::Ui) -> Option<(usize, Arc<ImageDrop>)> {
         let texts = texts::current();
         ui.add(
             egui::TextEdit::singleline(&mut self.state.search)
@@ -161,6 +169,7 @@ impl<'scene> TreeView<'scene> {
                 }
             });
         self.state.reveal = false;
+        self.dropped
     }
 
     fn open_parents_of_selected(&mut self) {
@@ -275,6 +284,17 @@ impl<'scene> TreeView<'scene> {
 
         if response.clicked() && !toggled {
             *self.selected = Some(index);
+        }
+        if response.dnd_hover_payload::<ImageDrop>().is_some() {
+            painter.rect_stroke(
+                rect,
+                0.0,
+                egui::Stroke::new(DROP_TARGET_WIDTH, ui.visuals().selection.stroke.color),
+                egui::StrokeKind::Inside,
+            );
+        }
+        if let Some(image) = response.dnd_release_payload::<ImageDrop>() {
+            self.dropped = Some((index, image));
         }
         if selected && self.state.reveal {
             response.scroll_to_me(Some(egui::Align::Center));

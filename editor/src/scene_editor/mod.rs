@@ -5,6 +5,7 @@
 
 mod components;
 mod drawing;
+mod dropping;
 mod fields;
 mod gizmo;
 mod picking;
@@ -16,10 +17,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use eframe::egui;
-use star_engine::prelude::{Frame, SceneOutline};
+use star_engine::prelude::{Frame, SceneOutline, Vec3};
 
 use self::components::new_node;
 pub(crate) use self::drawing::{Marks, SceneGpu, cross_lines, cube_lines, square_lines};
+pub(crate) use self::dropping::ImageDrop;
 pub(crate) use self::gizmo::{
     Drag, Handle, HandleShape, Lens, Target, Tip, Tool, handle_at, shapes,
 };
@@ -133,6 +135,44 @@ impl SceneDocument {
         }
     }
 
+    /// Adds a node showing `image` under the root, where `ray` meets the
+    /// scene, and selects it.
+    pub(crate) fn drop_image_at(&mut self, image: &ImageDrop, ray: Ray) {
+        let world = dropping::drop_point(ray, self.dimension);
+        self.add_image(image, ROOT, Some(world));
+    }
+
+    /// Adds a node showing `image` under `parent`, at its parent's place
+    /// (or at `world`, if given), and selects it.
+    fn add_image(&mut self, image: &ImageDrop, parent: usize, world: Option<Vec3>) {
+        let Ok(outline) = &mut self.content else {
+            return;
+        };
+        let handed = drawing::handed_down(outline.nodes());
+        let Some(&place) = handed.get(parent) else {
+            return;
+        };
+        let world = world.unwrap_or_else(|| match self.dimension {
+            ProjectDimension::TwoD => {
+                let origin = place.0.translation();
+                Vec3::new(origin.x, origin.y, 0.0)
+            }
+            ProjectDimension::ThreeD => place.1.translation(),
+        });
+        let name = unique_child_name(outline, parent, image.node_name());
+        let Some(node) = image.node(name, self.dimension, world, place) else {
+            return;
+        };
+        match outline.add_node(parent, node) {
+            Ok(index) => {
+                self.selected = Some(index);
+                self.unsaved = true;
+                self.tree.reveal_selected();
+            }
+            Err(error) => log::warn!("{error}"),
+        }
+    }
+
     /// The node selected, for the handles of the view to move: in 3D if
     /// the project is 3D and the node has a 3D transform, in 2D if not.
     /// `None` if no node is selected or it has no transform.
@@ -191,7 +231,11 @@ impl SceneDocument {
         };
         self.unsaved |= editor.show_buttons(ui);
         ui.separator();
-        TreeView::new(editor.outline.nodes(), &mut self.tree, editor.selected).show(ui);
+        let dropped =
+            TreeView::new(editor.outline.nodes(), &mut self.tree, editor.selected).show(ui);
+        if let Some((parent, image)) = dropped {
+            self.add_image(&image, parent, None);
+        }
     }
 
     /// The node selected, to edit, choosing images among `images`. Returns

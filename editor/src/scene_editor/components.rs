@@ -117,15 +117,20 @@ pub(super) fn new_node(name: String, dimension: ProjectDimension) -> NodeOutline
 /// A sprite one unit wide showing the first image, if there is one.
 fn new_sprite(images: &[String]) -> Option<SpriteOutline> {
     let texture = images.first().and_then(|path| AssetPath::new(path).ok())?;
-    Some(SpriteOutline {
+    Some(sprite_of(texture, Vec2::ONE))
+}
+
+/// A sprite of `size` showing `texture`, whole and as it is.
+pub(super) const fn sprite_of(texture: AssetPath, size: Vec2) -> SpriteOutline {
+    SpriteOutline {
         texture,
         filter: TextureFilter::Smooth,
-        size: Vec2::ONE,
+        size,
         region: TextureRegion::FULL,
         anchor: Sprite::CENTER,
         color: Color::WHITE,
         layer: 0,
-    })
+    }
 }
 
 fn new_body() -> Option<BodySettings> {
@@ -140,7 +145,7 @@ fn new_body_3d() -> Option<BodySettings<Shape3d>> {
         .map(|shape| BodySettings::new(BodyKind::Dynamic, shape))
 }
 
-fn new_mesh() -> MeshOutline {
+pub(super) fn new_mesh() -> MeshOutline {
     MeshOutline {
         shape: MeshShape::Cube { size: Vec3::ONE },
         color: Color::WHITE,
