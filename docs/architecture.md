@@ -589,7 +589,8 @@ its bar (or with `Q`, `W`, `E`, `R`): **View** only moves the camera,
 **Move** has arrows along the world's axes and a square that moves the
 node on the screen's plane (`z = 0` in 2D), **Rotate** has rings around
 the node's own axes (one around Z in 2D) and **Scale** has lines ending
-in boxes along its own axes and a square that scales it evenly. The
+in boxes along its own axes, an orange one between X and Y that scales
+both at once, and a square that scales it evenly. The
 geometry is `scene_editor/gizmo.rs`, in the view's pixels and free of
 egui: a `Lens` places world points on screen and turns pixels into rays,
 handles keep a fixed size on screen, and a `Drag` computes the node's

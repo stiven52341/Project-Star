@@ -49,6 +49,8 @@ pub(crate) enum Tool {
 pub(crate) enum Handle {
     /// Along or around an axis: 0 for X, 1 for Y, 2 for Z.
     Axis(usize),
+    /// The line between X and Y of the scale tool, which scales both.
+    AxesXY,
     /// The square in the middle.
     Center,
 }
@@ -231,6 +233,17 @@ pub(crate) fn shapes(tool: Tool, target: &Target, lens: &Lens) -> Vec<HandleShap
             })
         })
         .collect();
+    if tool == Tool::Scale
+        && let Some(end) = diagonal(target, tool)
+            .and_then(|direction| lens.screen_point(origin + direction * length))
+    {
+        shapes.push(HandleShape {
+            handle: Handle::AxesXY,
+            points: vec![center, end],
+            closed: false,
+            tip: Tip::Box,
+        });
+    }
     if tool != Tool::Rotate {
         shapes.push(HandleShape {
             handle: Handle::Center,
@@ -370,21 +383,23 @@ impl Drag {
     }
 
     fn scaled(&self, lens: &Lens, to: Vec2) -> Option<Target> {
-        let factors = if let Some((name, axis)) = self.axis() {
-            let origin = self.start.origin();
-            let from = along_line(origin, axis, lens.ray(self.from))?;
-            let to = along_line(origin, axis, lens.ray(to))?;
-            if from.abs() < PARALLEL_EPSILON {
-                return None;
+        let factors = match self.handle {
+            Handle::Axis(name) => {
+                let (_, axis) = self.axis()?;
+                let mut factors = [1.0; 3];
+                *factors.get_mut(name)? = self.ratio_along(lens, axis, to)?;
+                factors
             }
-            let mut factors = [1.0; 3];
-            *factors.get_mut(name)? = (to / from).max(MIN_SCALE_FACTOR);
-            factors
-        } else {
-            let dragged = to - self.from;
-            let factor =
-                (1.0 + (dragged.x - dragged.y) / UNIFORM_SCALE_PIXELS).max(MIN_SCALE_FACTOR);
-            [factor; 3]
+            Handle::AxesXY => {
+                let factor = self.ratio_along(lens, diagonal(&self.start, self.tool)?, to)?;
+                [factor, factor, 1.0]
+            }
+            Handle::Center => {
+                let dragged = to - self.from;
+                let factor =
+                    (1.0 + (dragged.x - dragged.y) / UNIFORM_SCALE_PIXELS).max(MIN_SCALE_FACTOR);
+                [factor; 3]
+            }
         };
         Some(match self.start {
             Target::Flat { parent, local } => Target::Flat {
@@ -407,6 +422,24 @@ impl Drag {
             },
         })
     }
+}
+
+impl Drag {
+    /// How much farther from the node, along `axis`, the pointer at `to`
+    /// is than it was when the drag began: the factor it scales by.
+    fn ratio_along(&self, lens: &Lens, axis: Vec3, to: Vec2) -> Option<f32> {
+        let origin = self.start.origin();
+        let from = along_line(origin, axis, lens.ray(self.from))?;
+        let to = along_line(origin, axis, lens.ray(to))?;
+        (from.abs() >= PARALLEL_EPSILON).then(|| (to / from).max(MIN_SCALE_FACTOR))
+    }
+}
+
+/// The direction halfway between the X and Y axes of `tool` for `target`.
+fn diagonal(target: &Target, tool: Tool) -> Option<Vec3> {
+    let axes = target.axes(tool);
+    let (x, y) = (axes.first()?, axes.get(1)?);
+    (*x + *y).normalized()
 }
 
 fn unit(vector: Vec3) -> Vec3 {
@@ -561,6 +594,22 @@ mod tests {
 
         let handles: Vec<_> = shapes.iter().map(|shape| shape.handle).collect();
         assert_eq!(handles, [Handle::Axis(0), Handle::Axis(1), Handle::Center]);
+    }
+
+    #[test]
+    fn the_scale_tool_has_a_line_between_x_and_y() {
+        let shapes = shapes(Tool::Scale, &flat(Vec2::ZERO), &lens_2d());
+
+        let handles: Vec<_> = shapes.iter().map(|shape| shape.handle).collect();
+        assert_eq!(
+            handles,
+            [
+                Handle::Axis(0),
+                Handle::Axis(1),
+                Handle::AxesXY,
+                Handle::Center
+            ]
+        );
         let x_end = shapes[0].points[1];
         assert!((x_end - Vec2::new(100.0 + HANDLE_PIXELS, 100.0)).length() < EPSILON);
     }
@@ -635,6 +684,19 @@ mod tests {
         );
 
         assert!((scaled.scale - Vec2::new(2.0, 1.0)).length() < EPSILON);
+    }
+
+    #[test]
+    fn the_line_between_x_and_y_scales_both() {
+        let scaled = drag(
+            Tool::Scale,
+            Handle::AxesXY,
+            flat(Vec2::ZERO),
+            Vec2::new(130.0, 70.0),
+            Vec2::new(160.0, 40.0),
+        );
+
+        assert!((scaled.scale - Vec2::new(2.0, 2.0)).length() < EPSILON);
     }
 
     #[test]

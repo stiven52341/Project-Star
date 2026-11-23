@@ -20,6 +20,8 @@ const TOOLBAR_ROUNDING: u8 = 4;
 const X_COLOR: egui::Color32 = egui::Color32::from_rgb(230, 85, 80);
 const Y_COLOR: egui::Color32 = egui::Color32::from_rgb(125, 205, 90);
 const Z_COLOR: egui::Color32 = egui::Color32::from_rgb(80, 145, 240);
+/// Between X's red and Y's green, unlike the highlight's yellow.
+const XY_COLOR: egui::Color32 = egui::Color32::from_rgb(235, 140, 60);
 const CENTER_COLOR: egui::Color32 = egui::Color32::from_rgb(225, 225, 225);
 /// The color of the handle under the pointer or being dragged.
 const ACTIVE_COLOR: egui::Color32 = egui::Color32::from_rgb(255, 215, 60);
@@ -117,6 +119,7 @@ const fn handle_color(handle: Handle) -> egui::Color32 {
         Handle::Axis(0) => X_COLOR,
         Handle::Axis(1) => Y_COLOR,
         Handle::Axis(_) => Z_COLOR,
+        Handle::AxesXY => XY_COLOR,
         Handle::Center => CENTER_COLOR,
     }
 }
