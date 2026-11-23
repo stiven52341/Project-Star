@@ -570,6 +570,13 @@ meshes can be seen). The view loads each image of `assets/` and builds
 each unit mesh once (`ViewportAssets`); one that fails logs a warning
 once and is left out. The node selected is marked with orange lines: a
 frame around its sprite, a box around its mesh, or a cross where it is.
+A click in the view selects the node under the pointer
+(`scene_editor/picking.rs`): a ray from the camera through the point
+clicked meets sprites over their rectangle, meshes over their box (a ball
+for spheres) and nodes that show nothing over their cross. What a node
+shows wins over a cross, then the nearest hit, the higher sprite layer
+and the later node (drawn on top); a click on nothing clears the
+selection.
 
 The **blueprint editor** (`blueprint_editor/`) draws a graph of the open
 blueprint on a canvas of its own, painted with egui's painter (no node

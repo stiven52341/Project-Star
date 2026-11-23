@@ -31,12 +31,12 @@ impl Texts {
     pub(crate) const fn viewport_controls(&self, dimension: ProjectDimension) -> &'static str {
         match dimension {
             ProjectDimension::TwoD => self.pick(
-                "Drag to pan · Wheel to zoom in or out",
-                "Arrastra para desplazar · Rueda para acercar o alejar",
+                "Click to select · Drag to pan · Wheel to zoom in or out",
+                "Clic para seleccionar · Arrastra para desplazar · Rueda para acercar o alejar",
             ),
             ProjectDimension::ThreeD => self.pick(
-                "Drag to orbit · Wheel to zoom in or out",
-                "Arrastra para orbitar · Rueda para acercar o alejar",
+                "Click to select · Drag to orbit · Wheel to zoom in or out",
+                "Clic para seleccionar · Arrastra para orbitar · Rueda para acercar o alejar",
             ),
         }
     }

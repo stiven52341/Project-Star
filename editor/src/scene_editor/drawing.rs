@@ -20,7 +20,7 @@ const PREVIEW_AMBIENT_INTENSITY: f32 = 0.3;
 const SPRITE_MARK_MARGIN: f32 = 0.05;
 /// How big the mark of a selected node that shows nothing is, in world
 /// units.
-const POINT_MARK_SIZE: f32 = 0.5;
+pub(super) const POINT_MARK_SIZE: f32 = 0.5;
 /// How thick the mark of a selected plane is, so its box is visible.
 const PLANE_MARK_THICKNESS: f32 = 0.02;
 
@@ -81,15 +81,15 @@ pub(crate) fn draw_scene(
 /// Where a node ends up in the world, in 2D and in 3D: only in the spaces
 /// it has a transform for, as the engine places nodes.
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct Place {
-    flat: Option<Affine2>,
-    solid: Option<Mat4>,
+pub(super) struct Place {
+    pub(super) flat: Option<Affine2>,
+    pub(super) solid: Option<Mat4>,
 }
 
 /// The place of every node. Parents come first in a scene, so one pass
 /// finds them all; a node without a transform passes its parent's on to
 /// its children.
-fn places(nodes: &[NodeOutline]) -> Vec<Place> {
+pub(super) fn places(nodes: &[NodeOutline]) -> Vec<Place> {
     let mut inherited: Vec<(Affine2, Mat4)> = Vec::with_capacity(nodes.len());
     let mut places = Vec::with_capacity(nodes.len());
     for node in nodes {

@@ -6,6 +6,7 @@
 mod components;
 mod drawing;
 mod fields;
+mod picking;
 mod properties;
 mod tree;
 
@@ -17,6 +18,7 @@ use star_engine::prelude::{Frame, SceneOutline};
 
 use self::components::new_node;
 pub(crate) use self::drawing::{Marks, SceneGpu, cross_lines, cube_lines, square_lines};
+pub(crate) use self::picking::Ray;
 use self::properties::{NodeContext, edit_node};
 use self::tree::children_of;
 use crate::project::ProjectDimension;
@@ -111,6 +113,14 @@ impl SceneDocument {
     pub(crate) fn draw(&self, gpu: &mut impl SceneGpu, marks: Marks, frame: &mut Frame) {
         if let Ok(outline) = &self.content {
             drawing::draw_scene(outline, self.selected, gpu, marks, frame);
+        }
+    }
+
+    /// Selects the node `ray` meets first, or none if it meets nothing, as
+    /// when the user clicks the view.
+    pub(crate) fn select_at(&mut self, ray: Ray) {
+        if let Ok(outline) = &self.content {
+            self.selected = picking::node_at(outline, ray);
         }
     }
 

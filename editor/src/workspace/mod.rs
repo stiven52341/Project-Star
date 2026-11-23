@@ -319,7 +319,7 @@ impl EditorWindow {
         }
         match self.documents.active() {
             ActiveDocument::Scene => match &mut self.viewport {
-                Ok(viewport) => viewport.show(ui, self.documents.scene()),
+                Ok(viewport) => viewport.show(ui, self.documents.scene_mut()),
                 Err(error) => {
                     ui.colored_label(ERROR_COLOR, texts::current().viewport_error(error));
                 }

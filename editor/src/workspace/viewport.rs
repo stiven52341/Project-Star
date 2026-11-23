@@ -17,7 +17,7 @@ use super::editor_camera::EditorCamera;
 use super::grid::grid_lines;
 use super::viewport_assets::ViewportAssets;
 use crate::project::ProjectDimension;
-use crate::scene_editor::{Marks, SceneDocument, cross_lines, cube_lines, square_lines};
+use crate::scene_editor::{Marks, Ray, SceneDocument, cross_lines, cube_lines, square_lines};
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -81,12 +81,20 @@ impl SceneViewport {
         })
     }
 
-    /// Shows the view, with `scene` drawn in it if one is open.
-    pub(crate) fn show(&mut self, ui: &mut egui::Ui, scene: Option<&SceneDocument>) {
-        let (rect, response) = ui.allocate_exact_size(ui.available_size(), egui::Sense::drag());
+    /// Shows the view, with `scene` drawn in it if one is open; a click
+    /// selects the node under the pointer.
+    pub(crate) fn show(&mut self, ui: &mut egui::Ui, mut scene: Option<&mut SceneDocument>) {
+        let (rect, response) =
+            ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());
         self.handle_input(ui, &response, rect);
+        if let Some(scene) = scene.as_deref_mut() {
+            self.select_clicked(&response, rect, scene);
+        }
         self.match_target_size(rect, ui.ctx().pixels_per_point());
-        self.render_error = self.render(scene).err().map(|error| error.to_string());
+        self.render_error = self
+            .render(scene.as_deref())
+            .err()
+            .map(|error| error.to_string());
 
         let painter = ui.painter_at(rect);
         painter.image(self.texture_id, rect, FULL_TEXTURE, egui::Color32::WHITE);
@@ -103,6 +111,30 @@ impl SceneViewport {
             if scroll.abs() > f32::EPSILON {
                 self.camera.zoom(scroll);
             }
+        }
+    }
+
+    /// Selects, in `scene`, the node under the pointer when the view is
+    /// clicked.
+    fn select_clicked(
+        &self,
+        response: &egui::Response,
+        rect: egui::Rect,
+        scene: &mut SceneDocument,
+    ) {
+        if !response.clicked() {
+            return;
+        }
+        let Some(pointer) = response.interact_pointer_pos() else {
+            return;
+        };
+        let ray = self
+            .camera
+            .to_camera()
+            .view_projection(rect.aspect_ratio())
+            .and_then(|view_projection| Ray::through(view_projection, to_screen(pointer, rect)));
+        if let Some(ray) = ray {
+            scene.select_at(ray);
         }
     }
 
@@ -168,6 +200,13 @@ impl Drop for SceneViewport {
     }
 }
 
+/// Where `pointer` is in the view `rect`: from `(-1, -1)` at its bottom
+/// left to `(1, 1)` at its top right, as the GPU sees the screen.
+fn to_screen(pointer: egui::Pos2, rect: egui::Rect) -> Vec2 {
+    let across = (pointer - rect.left_top()) / rect.size();
+    Vec2::new(across.x * 2.0 - 1.0, 1.0 - across.y * 2.0)
+}
+
 /// Rounds a non-negative on-screen length to whole pixels.
 // Viewport sizes are small positive numbers, so the conversion cannot overflow
 // or lose a sign.
@@ -183,6 +222,15 @@ mod tests {
     #[test]
     fn lengths_are_rounded_to_whole_pixels() {
         assert_eq!(to_pixels(99.6), 100);
+    }
+
+    #[test]
+    fn pointers_are_placed_on_the_gpu_screen() {
+        let rect = egui::Rect::from_min_size(egui::pos2(100.0, 50.0), egui::vec2(200.0, 100.0));
+
+        assert_eq!(to_screen(rect.left_top(), rect), Vec2::new(-1.0, 1.0));
+        assert_eq!(to_screen(rect.center(), rect), Vec2::new(0.0, 0.0));
+        assert_eq!(to_screen(rect.right_bottom(), rect), Vec2::new(1.0, -1.0));
     }
 
     #[test]
