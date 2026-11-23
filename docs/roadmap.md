@@ -214,12 +214,14 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.9g The type of a name under the pointer: variables (even
           inferred), members with their class, and classes with their
           base.
-    - [ ] Known limits to improve: suggestions only follow chains of names
-          (not `make().`), and do not list the methods of basic types
-          (`"a".length()`) nor go into lists; while the list of
-          suggestions is shown, the up and down arrows choose in it; the
-          check while writing does not report what only the translation
-          to Rust finds (“Compile” does).
+    - [x] 13.9h Suggestions follow calls (`make().`), elements of lists
+          (`rocks[0].`) and literals, list the methods of basic types and
+          lists (`"a".length()`), and use the types the check inferred.
+    - [ ] Known limits to improve: while the list of suggestions is
+          shown, the up and down arrows choose in it; the check while
+          writing does not report what only the translation to Rust finds
+          (“Compile” does); chains inside parentheses (`(a + b).`) or
+          after list literals suggest nothing.
 - [ ] **Editor ideas, not planned yet**: undo and redo in the scene
       editor (`Ctrl+Z`); moving nodes to another parent by dragging them in
       the tree; dropping a `.star` on a node to give it its class; “Show in

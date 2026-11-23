@@ -6,7 +6,7 @@
 use star_script::Span;
 use star_script::semantic::{ClassId, ClassOrigin, ClassTable, MemberRef};
 
-use super::scope::{Scope, name_around, receiver_chain};
+use super::scope::{Chained, Known, Scope, name_around};
 
 /// Where a name is declared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,21 +18,21 @@ pub(crate) enum Definition {
 }
 
 /// Where the name around the character `cursor` of `text` is declared,
-/// with the program's `classes` if they are known. `None` if there is no
-/// name there, or its declaration is unknown or in the engine.
-pub(super) fn definition_at(
-    text: &str,
-    cursor: usize,
-    classes: Option<&ClassTable>,
-) -> Option<Definition> {
+/// with what the last check `knows`. `None` if there is no name there, or
+/// its declaration is unknown or in the engine.
+pub(super) fn definition_at(text: &str, cursor: usize, knows: Known<'_>) -> Option<Definition> {
     let range = name_around(text, cursor)?;
     let name = &text[range.clone()];
     let start = range.start;
     let before = &text[..start];
-    let scope = Scope::of(before, classes);
+    let scope = Scope::of(before, knows);
+    let classes = knows.classes;
     let in_text = |byte: usize| Definition::InText(text[..byte].chars().count());
-    if let Some(chain) = receiver_chain(before) {
-        let receiver = scope.receiver_of_chain(&chain)?;
+    if scope.is_after_dot() {
+        // The language's own methods are declared nowhere.
+        let Chained::Class(receiver) = scope.chained()? else {
+            return None;
+        };
         return member_definition(classes?, receiver.class, name);
     }
     if let Some(byte) = scope.declaration_of(name, true) {
@@ -99,7 +99,14 @@ mod tests {
         let cursor = marked.find('|').unwrap();
         let text = marked.replace('|', "");
         let classes = classes();
-        let found = definition_at(&text, text[..cursor].chars().count(), Some(&classes))?;
+        let found = definition_at(
+            &text,
+            text[..cursor].chars().count(),
+            Known {
+                classes: Some(&classes),
+                locals: None,
+            },
+        )?;
         let (source, start) = match found {
             Definition::InText(index) => (text.as_str(), text.char_indices().nth(index)?.0),
             Definition::InProgram(span) => (program, span.start()),

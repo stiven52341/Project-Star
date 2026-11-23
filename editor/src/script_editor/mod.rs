@@ -19,10 +19,11 @@ use std::path::{Path, PathBuf};
 use eframe::egui;
 use star_script::Position;
 
+use self::code_view::CodeView;
 pub(crate) use self::code_view::Edited;
-use self::code_view::{CodeView, Known};
 pub(crate) use self::completion::CandidateKind;
 use self::mistakes::Mistake;
+use self::scope::Known;
 use crate::project::ASSETS_DIRECTORY;
 use crate::project_check::{Problem, ProgramOutline};
 use crate::style::ERROR_COLOR;

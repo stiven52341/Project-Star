@@ -1,14 +1,17 @@
 //! Suggestions while writing a script: the names that may complete the
 //! word at the cursor. After a `.`, the members of what is before it (its
-//! type found from the classes of the last check and the declarations in
-//! the text); elsewhere, the names of the text, the members of the class
+//! type found from what the last check knows and the declarations in the
+//! text), or the methods of the language for basic types and lists;
+//! elsewhere, the names of the text, the members of the class
 //! being written, the classes, keywords and basic types.
 //! What names mean there is the `scope` module's.
 
-use star_script::semantic::{BASIC_TYPE_NAMES, ClassTable, MethodInfo, Type};
+use star_script::semantic::{
+    BASIC_TYPE_NAMES, BuiltinSignature, ClassTable, MethodInfo, Type, builtin_methods,
+};
 use star_script::{Keyword, LexErrorKind, TokenKind, scan};
 
-use super::scope::{Receiver, Scope, receiver_chain, trailing_word};
+use super::scope::{Chained, Known, Receiver, Scope, trailing_word};
 
 const LINE_COMMENT: &str = "//";
 
@@ -70,14 +73,10 @@ pub(super) struct Completion {
 }
 
 /// The suggestions for the word that ends at the character `cursor` of
-/// `text`, with the `classes` of the program if they are known. `None` if
+/// `text`, with what the last check `knows`. `None` if
 /// there is no word being written there, it is inside a comment or a
 /// string, or nothing completes it.
-pub(super) fn complete(
-    text: &str,
-    cursor: usize,
-    classes: Option<&ClassTable>,
-) -> Option<Completion> {
+pub(super) fn complete(text: &str, cursor: usize, knows: Known<'_>) -> Option<Completion> {
     let byte = text
         .char_indices()
         .nth(cursor)
@@ -91,11 +90,17 @@ pub(super) fn complete(
         return None;
     }
     let word_start = before.len() - typed.len();
-    let scope = Scope::of(&before[..word_start], classes);
-    let mut candidates = match receiver_chain(&before[..word_start]) {
-        Some(chain) => members(classes?, scope.receiver_of_chain(&chain)?, false),
-        None if typed.is_empty() => return None,
-        None => names(&scope, text),
+    let scope = Scope::of(&before[..word_start], knows);
+    let mut candidates = if scope.is_after_dot() {
+        let classes = knows.classes?;
+        match scope.chained()? {
+            Chained::Class(receiver) => members(classes, receiver, false),
+            Chained::Basic(ty) => builtins(classes, &ty),
+        }
+    } else if typed.is_empty() {
+        return None;
+    } else {
+        names(&scope, text)
     };
     candidates.retain(|candidate| candidate.name.starts_with(typed) && candidate.name != typed);
     candidates.sort_by(|first, second| {
@@ -223,16 +228,43 @@ fn members(classes: &ClassTable, receiver: Receiver, everything: bool) -> Vec<Ca
     candidates
 }
 
+/// The methods of the language that values of type `ty` have.
+fn builtins(classes: &ClassTable, ty: &Type) -> Vec<Candidate> {
+    builtin_methods(ty)
+        .map(|signature| Candidate {
+            signature: Some(builtin_signature(classes, &signature)),
+            takes_parameters: !signature.parameters.is_empty(),
+            ..plain(signature.method.name().to_owned(), CandidateKind::Method)
+        })
+        .collect()
+}
+
 /// The parameters of `method` and what it gives: `(speed: float) -> bool`.
 pub(super) fn method_signature(classes: &ClassTable, method: &MethodInfo) -> String {
-    let parameters: Vec<String> = method
+    let parameters = method
         .parameters
         .iter()
-        .map(|parameter| format!("{}: {}", parameter.name, classes.type_name(&parameter.ty)))
-        .collect();
-    let result = match method.return_type {
+        .map(|parameter| format!("{}: {}", parameter.name, classes.type_name(&parameter.ty)));
+    signature(classes, parameters, &method.return_type)
+}
+
+/// The parameter types of a method of the language and what it gives:
+/// `(int) -> int`.
+pub(super) fn builtin_signature(classes: &ClassTable, method: &BuiltinSignature) -> String {
+    let parameters = method.parameters.iter().map(|ty| classes.type_name(ty));
+    signature(classes, parameters, &method.return_type)
+}
+
+/// `(parameters) -> result`, without the result if there is none.
+fn signature(
+    classes: &ClassTable,
+    parameters: impl Iterator<Item = String>,
+    result: &Type,
+) -> String {
+    let parameters: Vec<String> = parameters.collect();
+    let result = match result {
         Type::Void => String::new(),
-        ref ty => format!(" -> {}", classes.type_name(ty)),
+        ty => format!(" -> {}", classes.type_name(ty)),
     };
     format!("({}){result}", parameters.join(", "))
 }
@@ -259,7 +291,11 @@ mod tests {
         let cursor = text.find('|').unwrap();
         let plain = text.replace('|', "");
         let classes = classes();
-        complete(&plain, plain[..cursor].chars().count(), Some(&classes))
+        let knows = Known {
+            classes: Some(&classes),
+            locals: None,
+        };
+        complete(&plain, plain[..cursor].chars().count(), knows)
             .map(|completion| {
                 completion
                     .candidates
@@ -319,6 +355,59 @@ mod tests {
 
         // `rotation` comes from `Node`.
         assert_eq!(names, ["rotation", "roll"]);
+    }
+
+    #[test]
+    fn chains_follow_what_calls_give() {
+        let static_call = suggested(&inside_rock("Rock.make(1).si|"));
+        let constructor = suggested(&inside_rock("Rock().fri|"));
+
+        assert_eq!(static_call, ["size"]);
+        assert_eq!(constructor, ["friend"]);
+    }
+
+    #[test]
+    fn basic_values_list_the_methods_of_the_language() {
+        let text = suggested(&inside_rock("\"rock\".to_|"));
+        let number = suggested(&inside_rock("self.size.|"));
+
+        assert_eq!(text, ["to_lower", "to_upper", "to_string"]);
+        assert_eq!(number, ["abs", "max", "min", "to_string"]);
+    }
+
+    #[test]
+    fn lists_list_their_methods_and_their_elements_their_members() {
+        let list = suggested(&inside_rock("var rocks: [Rock] = []\n    rocks.p|"));
+        let element = suggested(&inside_rock("var rocks: [Rock] = []\n    rocks[0].si|"));
+
+        assert_eq!(list, ["pop", "push"]);
+        assert_eq!(element, ["size"]);
+    }
+
+    #[test]
+    fn inferred_types_come_from_the_check() {
+        let marked = inside_rock("var word = \"a\".to_upper()\n    word.is_|");
+        let cursor = marked.find('|').unwrap();
+        let text = marked.replace('|', "");
+        let mut sources = SourceSet::new();
+        sources.add("rock.star", text.as_str());
+        let analysis = analyze_program_with(&sources, &GameSettings::default()).unwrap();
+        let locals = analysis
+            .declared_locals()
+            .map(|(span, local)| (span.start(), local.clone()))
+            .collect();
+        let knows = Known {
+            classes: Some(analysis.classes()),
+            locals: Some(&locals),
+        };
+
+        let completion = complete(&text, cursor, knows).unwrap();
+
+        assert_eq!(completion.candidates[0].name, "is_empty");
+        assert_eq!(
+            completion.candidates[0].signature.as_deref(),
+            Some("() -> bool")
+        );
     }
 
     #[test]

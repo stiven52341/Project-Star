@@ -26,9 +26,10 @@ pub use classes::{
 };
 pub use error::{SemanticError, SemanticErrorKind};
 pub use natives::{
-    AUDIO_CLASS, BASIC_TYPE_NAMES, BODY_CLASS, BuiltinMethod, CAMERA_3D_CLASS, CAMERA_CLASS,
-    COLOR_CLASS, GAME_CLASS, INPUT_CLASS, LIGHT_CLASS, MESH_CLASS, NODE_3D_CLASS, NODE_CLASS,
-    SCENE_CLASS, SOUND_CLASS, SPRITE_CLASS,
+    AUDIO_CLASS, BASIC_TYPE_NAMES, BODY_CLASS, BuiltinMethod, BuiltinSignature, CAMERA_3D_CLASS,
+    CAMERA_CLASS, COLOR_CLASS, GAME_CLASS, INPUT_CLASS, LIGHT_CLASS, MESH_CLASS, NODE_3D_CLASS,
+    NODE_CLASS, SCENE_CLASS, SOUND_CLASS, SPRITE_CLASS, basic_type, builtin_method,
+    builtin_methods,
 };
 pub use scene_classes::SceneClassError;
 pub use types::Type;

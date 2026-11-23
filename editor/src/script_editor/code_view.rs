@@ -7,7 +7,6 @@ use std::ops::Range;
 
 use eframe::egui;
 use egui::text::{CCursor, CCursorRange, LayoutJob};
-use star_script::semantic::ClassTable;
 use star_script::{Position, Span};
 
 use super::editing::{Action, Selection, apply};
@@ -16,8 +15,8 @@ use super::highlight::colored;
 use super::hover::{NameType, name_type_at};
 use super::mistakes::{Mark, Mistake, marks, paint_marks};
 use super::navigation::{Definition, definition_at};
+use super::scope::Known;
 use super::suggestions::Suggestions;
-use crate::project_check::ScriptLocals;
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -63,7 +62,6 @@ impl CodeView {
         mistakes: &[Mistake<'_>],
         knows: Known<'_>,
     ) -> Edited {
-        let Known { classes, locals } = knows;
         let font = egui::TextStyle::Monospace.resolve(ui.style());
         let mut scroll_to = self.jump.take().map(|position| {
             let index = char_index_of(text, position);
@@ -78,7 +76,7 @@ impl CodeView {
         let footer_height = ui.spacing().interact_size.y;
         let mut go_to = None;
         let cursor = cursor_while_writing(ui.ctx(), id);
-        if let Some(completion) = self.suggestions.find(text, cursor, classes) {
+        if let Some(completion) = self.suggestions.find(text, cursor, knows) {
             changed |= self
                 .suggestions
                 .handle_keys(ui.ctx(), text, id, &completion);
@@ -95,8 +93,7 @@ impl CodeView {
                     scroll_to,
                     marks: &marks,
                     found: found.as_ref(),
-                    classes,
-                    locals,
+                    knows,
                 };
                 let lines = self.show_lines(ui, text, id, &shown);
                 changed |= lines.changed;
@@ -170,8 +167,7 @@ impl CodeView {
             scroll_to,
             marks,
             found,
-            classes,
-            locals,
+            knows,
         } = *shown;
         let digits = digit_count(text.lines().count()).max(MIN_GUTTER_DIGITS);
         let digit_width = ui.fonts_mut(|fonts| fonts.glyph_width(font, '0'));
@@ -218,14 +214,14 @@ impl CodeView {
                 .kind(egui::PopupKind::Tooltip)
                 .at_pointer()
                 .show(|ui| ui.colored_label(ERROR_COLOR, message));
-        } else if let Some(name_type) = hovered_name_type(&output, text, classes, locals) {
+        } else if let Some(name_type) = hovered_name_type(&output, text, knows) {
             let response: &egui::Response = &output.response;
             response.clone().on_hover_ui_at_pointer(|ui| {
                 ui.monospace(name_type.description);
             });
         }
         let cursor = cursor_while_writing(ui.ctx(), id);
-        if let Some(completion) = self.suggestions.find(text, cursor, classes) {
+        if let Some(completion) = self.suggestions.find(text, cursor, knows) {
             self.suggestions.paint(ui, &output, font, text, &completion);
         }
         if let Some(index) = scroll_to {
@@ -236,7 +232,7 @@ impl CodeView {
             ui.scroll_to_rect(rect, Some(egui::Align::Center));
         }
         let go_to = match asked_definition(ui, &output, id) {
-            Some(cursor) => match definition_at(text, cursor, classes) {
+            Some(cursor) => match definition_at(text, cursor, knows) {
                 Some(Definition::InText(index)) => {
                     self.jump_to(position_of(text, index));
                     None
@@ -253,22 +249,12 @@ impl CodeView {
     }
 }
 
-/// What the last check that could read the program knows, for one script.
-#[derive(Clone, Copy, Default)]
-pub(crate) struct Known<'known> {
-    /// The classes of the program and the engine.
-    pub(crate) classes: Option<&'known ClassTable>,
-    /// The local variables of the script.
-    pub(crate) locals: Option<&'known ScriptLocals>,
-}
-
 /// The type of the name under the pointer in the text laid out in
 /// `output`, if it is known.
 fn hovered_name_type(
     output: &egui::text_edit::TextEditOutput,
     text: &str,
-    classes: Option<&ClassTable>,
-    locals: Option<&ScriptLocals>,
+    knows: Known<'_>,
 ) -> Option<NameType> {
     let pointer = output.response.hover_pos()?;
     let cursor = output
@@ -276,7 +262,7 @@ fn hovered_name_type(
         .cursor_from_pos(pointer - output.galley_pos)
         .index
         .0;
-    let found = name_type_at(text, cursor, classes, locals)?;
+    let found = name_type_at(text, cursor, knows)?;
     // The cursor nearest the pointer may touch a name the pointer is not on,
     // as past the end of a line.
     text_areas(output, found.range.clone())
@@ -325,8 +311,7 @@ struct Shown<'shown, 'message> {
     marks: &'shown [Mark<'message>],
     /// What the find bar found, if it is open.
     found: Option<&'shown Found>,
-    classes: Option<&'shown ClassTable>,
-    locals: Option<&'shown ScriptLocals>,
+    knows: Known<'shown>,
 }
 
 /// Where the cursor of the text edit `id` is while it has the keyboard and

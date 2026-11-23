@@ -11,7 +11,8 @@ use crate::Span;
 pub const BASIC_TYPE_NAMES: [&str; 4] = ["int", "float", "bool", "string"];
 
 /// The basic type called `name`.
-pub(super) fn basic_type(name: &str) -> Option<Type> {
+#[must_use]
+pub fn basic_type(name: &str) -> Option<Type> {
     match name {
         "int" => Some(Type::Int),
         "float" => Some(Type::Float),
@@ -557,14 +558,26 @@ impl BuiltinMethod {
 
 /// Parameter types and return type of a builtin method.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct BuiltinSignature {
-    pub(super) method: BuiltinMethod,
-    pub(super) parameters: Vec<Type>,
-    pub(super) return_type: Type,
+pub struct BuiltinSignature {
+    /// Which method it is.
+    pub method: BuiltinMethod,
+    /// The types of its parameters, in order.
+    pub parameters: Vec<Type>,
+    /// What it gives.
+    pub return_type: Type,
+}
+
+/// Every method a value of type `receiver` has, in a fixed order. Tools
+/// use it to suggest them.
+pub fn builtin_methods(receiver: &Type) -> impl Iterator<Item = BuiltinSignature> + '_ {
+    BUILTIN_METHODS
+        .iter()
+        .filter_map(|(name, _)| builtin_method(receiver, name))
 }
 
 /// The method `name` of a value of type `receiver`, if it has one.
-pub(super) fn builtin_method(receiver: &Type, name: &str) -> Option<BuiltinSignature> {
+#[must_use]
+pub fn builtin_method(receiver: &Type, name: &str) -> Option<BuiltinSignature> {
     let method = BUILTIN_METHODS
         .iter()
         .find(|(method_name, _)| *method_name == name)
@@ -622,6 +635,15 @@ mod tests {
 
         assert_eq!(push.parameters, [Type::String]);
         assert_eq!(pop.return_type, Type::String.nullable());
+    }
+
+    #[test]
+    fn every_method_of_a_type_is_listed() {
+        let names: Vec<&str> = builtin_methods(&Type::Int)
+            .map(|signature| signature.method.name())
+            .collect();
+
+        assert_eq!(names, ["abs", "min", "max", "to_string"]);
     }
 
     #[test]

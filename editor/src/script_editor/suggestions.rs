@@ -5,9 +5,9 @@
 
 use eframe::egui;
 use egui::text::{CCursor, CCursorRange};
-use star_script::semantic::ClassTable;
 
 use super::completion::{Candidate, Completion, complete};
+use super::scope::Known;
 use crate::texts;
 
 /// How many names the list shows at once.
@@ -40,9 +40,9 @@ impl Suggestions {
         &mut self,
         text: &str,
         cursor: Option<usize>,
-        classes: Option<&ClassTable>,
+        knows: Known<'_>,
     ) -> Option<Completion> {
-        let Some(completion) = cursor.and_then(|cursor| complete(text, cursor, classes)) else {
+        let Some(completion) = cursor.and_then(|cursor| complete(text, cursor, knows)) else {
             self.word = None;
             return None;
         };
@@ -227,12 +227,12 @@ mod tests {
         let mut suggestions = Suggestions::default();
         let text = "var counter = 1\nco";
 
-        assert!(suggestions.find(text, Some(18), None).is_some());
+        assert!(suggestions.find(text, Some(18), Known::default()).is_some());
         suggestions.dismissed = true;
-        assert!(suggestions.find(text, Some(18), None).is_none());
+        assert!(suggestions.find(text, Some(18), Known::default()).is_none());
         assert!(
             suggestions
-                .find("var counter = 1\nc", Some(17), None)
+                .find("var counter = 1\nc", Some(17), Known::default())
                 .is_some()
         );
     }

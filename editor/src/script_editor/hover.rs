@@ -9,11 +9,10 @@
 
 use std::ops::Range;
 
-use star_script::semantic::{ClassId, ClassTable, LocalInfo, MemberRef};
+use star_script::semantic::{ClassId, ClassTable, LocalInfo, MemberRef, Type, builtin_method};
 
-use super::completion::{is_inside_comment_or_string, method_signature};
-use super::scope::{Scope, name_around, receiver_chain};
-use crate::project_check::ScriptLocals;
+use super::completion::{builtin_signature, is_inside_comment_or_string, method_signature};
+use super::scope::{Chained, Known, Scope, name_around};
 
 /// A name of the text and what its type is.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,23 +23,17 @@ pub(super) struct NameType {
     pub(super) description: String,
 }
 
-/// The type of the name around the character `cursor` of `text`, from the
-/// program's `classes` and the `locals` of this script found by the last
-/// check. `None` outside names, in comments and strings, and where the
-/// type is unknown.
-pub(super) fn name_type_at(
-    text: &str,
-    cursor: usize,
-    classes: Option<&ClassTable>,
-    locals: Option<&ScriptLocals>,
-) -> Option<NameType> {
+/// The type of the name around the character `cursor` of `text`, from what
+/// the last check `knows`. `None` outside names, in comments and strings,
+/// and where the type is unknown.
+pub(super) fn name_type_at(text: &str, cursor: usize, knows: Known<'_>) -> Option<NameType> {
     let bytes = name_around(text, cursor)?;
     let before = &text[..bytes.start];
     if is_inside_comment_or_string(before) {
         return None;
     }
     let name = &text[bytes.clone()];
-    let description = describe(before, name, classes?, locals)?;
+    let description = describe(before, name, knows.classes?, knows)?;
     let start = before.chars().count();
     Some(NameType {
         range: start..start + name.chars().count(),
@@ -49,38 +42,34 @@ pub(super) fn name_type_at(
 }
 
 /// What `name`, written after `before`, is.
-fn describe(
-    before: &str,
-    name: &str,
-    classes: &ClassTable,
-    locals: Option<&ScriptLocals>,
-) -> Option<String> {
-    let scope = Scope::of(before, Some(classes));
-    if let Some(chain) = receiver_chain(before) {
-        let receiver = scope.receiver_of_chain(&chain)?;
-        return member_description(classes, receiver.class, name);
+fn describe(before: &str, name: &str, classes: &ClassTable, knows: Known<'_>) -> Option<String> {
+    let scope = Scope::of(before, knows);
+    if scope.is_after_dot() {
+        return match scope.chained()? {
+            Chained::Class(receiver) => member_description(classes, receiver.class, name),
+            Chained::Basic(ty) => builtin_description(classes, &ty, name),
+        };
     }
-    let local_at = |byte: usize| {
-        locals
-            .and_then(|locals| locals.get(&byte))
-            .filter(|local| local.name == name)
-    };
     // The name of a declaration.
-    if let Some(local) = local_at(before.len()) {
+    if let Some(local) = scope.local_at(before.len(), name) {
         return Some(local_description(classes, local));
     }
-    if let Some(declaration) = scope.declaration_of(name, true) {
+    if scope.declaration_of(name, true).is_some() {
         // A variable of the function hides any member with its name.
-        return local_at(declaration)
-            .map(|local| local_description(classes, local))
-            .or_else(|| {
-                let class = scope.declared_class_of(classes, name)?;
-                Some(format!("{name}: {}", classes.class(class).name))
-            });
+        let ty = scope.variable_type(name)?;
+        return Some(format!("{name}: {}", classes.type_name(&ty)));
     }
-    if matches!(name, "self" | "super") {
-        let receiver = scope.receiver_named(classes, name)?;
-        return Some(class_description(classes, receiver.class));
+    let class_of_self = match name {
+        "self" => Some(scope.current),
+        "super" => Some(
+            scope
+                .current
+                .and_then(|current| classes.class(current).base),
+        ),
+        _ => None,
+    };
+    if let Some(class) = class_of_self {
+        return Some(class_description(classes, class?));
     }
     scope
         .current
@@ -89,6 +78,17 @@ fn describe(
             let class = classes.find(name)?;
             Some(class_description(classes, class))
         })
+}
+
+/// `string.length() -> int`: the method `name` of the language that values
+/// of type `ty` have.
+fn builtin_description(classes: &ClassTable, ty: &Type, name: &str) -> Option<String> {
+    let method = builtin_method(ty, name)?;
+    Some(format!(
+        "{}.{name}{}",
+        classes.type_name(ty),
+        builtin_signature(classes, &method)
+    ))
 }
 
 /// `turns: int`.
@@ -133,6 +133,7 @@ mod tests {
     use star_script::{GameSettings, SourceSet, analyze_program_with};
 
     use super::*;
+    use crate::project_check::ScriptLocals;
 
     const ROCK: &str = "class Rock extends Node {\n  var size: int = 1\n  func roll(speed: float) -> bool {\n    var turns = 2\n    turns = size\n    return speed > 0.0 // turns\n  }\n}\n";
     const GAME: &str = "class Demo {\n  func play(rock: Rock) {\n    rock.roll(1.0)\n    var other = Rock()\n  }\n}\n";
@@ -152,6 +153,13 @@ mod tests {
         (analysis.classes().clone(), locals)
     }
 
+    fn knows<'known>(classes: &'known ClassTable, locals: &'known ScriptLocals) -> Known<'known> {
+        Known {
+            classes: Some(classes),
+            locals: Some(locals),
+        }
+    }
+
     /// The type of the name at the first `|` of `marked`, as `name_type_at`
     /// gives it with what the program knows.
     fn type_at(marked: &str) -> Option<String> {
@@ -161,8 +169,7 @@ mod tests {
         let found = name_type_at(
             &text,
             text[..cursor].chars().count(),
-            Some(&classes),
-            Some(&locals),
+            knows(&classes, &locals),
         )?;
         Some(found.description)
     }
@@ -196,6 +203,13 @@ mod tests {
     }
 
     #[test]
+    fn methods_of_the_language_show_their_type() {
+        let marked = ROCK.replace("turns = size", "turns = size.ma|x(3)");
+
+        assert_eq!(type_at(&marked).as_deref(), Some("int.max(int) -> int"));
+    }
+
+    #[test]
     fn classes_show_their_base() {
         let marked = GAME.replace("var other = Rock()", "var other = Ro|ck()");
 
@@ -216,7 +230,7 @@ mod tests {
         let (classes, locals) = program();
         let cursor = ROCK.find("size\n").unwrap() + 2;
 
-        let found = name_type_at(ROCK, cursor, Some(&classes), Some(&locals)).unwrap();
+        let found = name_type_at(ROCK, cursor, knows(&classes, &locals)).unwrap();
 
         assert_eq!(found.range, cursor - 2..cursor + 2);
     }

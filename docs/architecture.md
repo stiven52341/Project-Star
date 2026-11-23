@@ -736,11 +736,22 @@ last check that could read the program, which the live check keeps
 (`star_script::analyze_program_with` keeps the classes even when their
 code has mistakes of meaning; while a line is half written the program
 cannot be read at all, so the previous table is used). After a `.` (or
-`?.`), the members of what is before it: `self` and `super`, a class (its
-static members), a variable declared before in the text (`name: Class` or
-`var name = Class(…)`), or a field of the class being written, followed
-through chains such as `self.friend?.`; private members only inside their
-class. Elsewhere, the names written in the text, the members of the class
+`?.`), the members of what is before it. `scope.rs` reads the chain before
+the `.` backwards with the lexer: names, calls (`make(…)`, skipping their
+balanced parentheses), elements (`[…]`) and literals (`"a"`, `1.5`,
+`true`; not integers, since `1.` starts a decimal number). Its first link
+is `self` or `super`, a variable of the function (with the type the live
+check found for it, `ProgramOutline`'s locals, so inferred types work; or,
+if the text changed since, the type the text writes: `name: [Rock]` or
+`var name = Class(…)`), a class (its static members), a constructor
+(`Rock()`), or a field or method of the class being written; each next
+link is a member's type, a method's result or a list's element. A class
+lists its members (private ones only inside their class); a basic type or
+a list lists the language's methods (`star_script::semantic::
+builtin_methods`, with their parameter types: `push(Rock)`, `pop() ->
+Rock?`). A chain whose value cannot be known (`(a + b).`, `[1, 2].`)
+suggests nothing. “Go to definition” and the types under the pointer read
+chains the same way. Elsewhere, the names written in the text, the members of the class
 being written, the classes, the keywords and the basic types. The chosen
 name's rest is painted in faint text after the cursor and the others are
 listed under it (with their signatures); `Tab` writes it (a method with its
