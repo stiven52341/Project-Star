@@ -19,17 +19,19 @@ pub enum BodyKind {
 
 /// Friction of a surface when none is given: things slide a little.
 pub const DEFAULT_FRICTION: f32 = 0.5;
-/// Mass per square world unit when none is given.
+/// Mass per square (2D) or cubic (3D) world unit when none is given.
 pub const DEFAULT_DENSITY: f32 = 1.0;
 
 /// What a body is: how it moves, its outline and its surface. Where it is
-/// is given when it is added to a [`Physics2d`](crate::Physics2d).
+/// is given when it is added to a [`Physics2d`](crate::Physics2d) (with a
+/// [`Shape2d`], the default) or a [`Physics3d`](crate::Physics3d) (with a
+/// [`Shape3d`](crate::Shape3d)).
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct BodySettings {
+pub struct BodySettings<Shape = Shape2d> {
     /// How it moves.
     pub kind: BodyKind,
     /// Its outline.
-    pub shape: Shape2d,
+    pub shape: Shape,
     /// How much gravity pulls it: 0 floats, 1 falls normally.
     pub gravity_scale: f32,
     /// Whether collisions never turn it (characters that stay upright).
@@ -38,18 +40,19 @@ pub struct BodySettings {
     pub friction: f32,
     /// How much it bounces: 0 stops, 1 bounces back as fast as it came.
     pub bounciness: f32,
-    /// Mass per square world unit (only dynamic bodies have mass).
+    /// Mass per square (2D) or cubic (3D) world unit (only dynamic bodies
+    /// have mass).
     pub density: f32,
     /// Whether it only detects what overlaps it, without colliding:
     /// areas that open doors, pick up coins or hurt.
     pub is_sensor: bool,
 }
 
-impl BodySettings {
+impl<Shape> BodySettings<Shape> {
     /// A body of `kind` and `shape`, pulled by gravity, with the default
     /// surface.
     #[must_use]
-    pub const fn new(kind: BodyKind, shape: Shape2d) -> Self {
+    pub const fn new(kind: BodyKind, shape: Shape) -> Self {
         Self {
             kind,
             shape,
@@ -62,7 +65,8 @@ impl BodySettings {
         }
     }
 
-    /// Checks that a [`Physics2d`](crate::Physics2d) can simulate the body.
+    /// Checks that a [`Physics2d`](crate::Physics2d) or a
+    /// [`Physics3d`](crate::Physics3d) can simulate the body.
     ///
     /// # Errors
     ///
@@ -92,6 +96,17 @@ impl BodySettings {
             )));
         }
         Ok(())
+    }
+}
+
+/// Checks that each named number (of a body's position or rotation) is
+/// finite.
+pub(crate) fn check_finite(numbers: &[(&str, f32)]) -> EngineResult<()> {
+    match numbers.iter().find(|(_, value)| !value.is_finite()) {
+        Some((what, value)) => Err(EngineError::Physics(format!(
+            "the {what} of a body must be a finite number, not {value}"
+        ))),
+        None => Ok(()),
     }
 }
 

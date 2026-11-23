@@ -93,6 +93,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 46 | 2D physics with **rapier2d** (Apache-2.0), hidden in `star_physics` | Pure Rust (every platform, mobile included), maintained, and mature: stable stacks, sensors, sleeping bodies, joints and continuous collision for later. The engine's own `Physics2d`, `BodySettings`, `Shape2d` and `Contact` are all games see, so the solver can be replaced. Time advances in **fixed steps** (1/60 s, at most 8 per frame), so a game behaves the same at any frame rate. Rejected: an own solver (stable stacking and many bodies are hard to get right) and `box2d` bindings (C code to build on every platform). It needs Rust 1.86 |
 | 47 | A StarScript body is a **`Body` object in a field of `Node`**, synced both ways | A node of any class (a `Sprite` too) can have one, as with `Body2D` and `[node.body]`. The simulation runs after the scripts, so before their next frame the generated game copies back the position and rotation of each node with a body, its velocity and what it touches (by `ScriptNodes::read_bodies` and `body_state`); a velocity the script changed and the impulses it gave are passed on through `Body2D`, which keeps them until the body exists. Kinds and shapes are words (`"dynamic"`, `"circle"`), since StarScript has no enums yet; a body the physics cannot simulate is left out with one warning, so a typo never stops the game. Contacts are polled lists (`touching`, `just_touched`, `just_separated`), like `Input`'s actions, and hold their nodes weakly. Rejected: a `Body` node class (a sprite could not be a body, and scenes put both on one node), callbacks on `Node` (every node class would grow), and calls into the physics from scripts (the world is only lent to the engine's code) |
 | 48 | 3D materials are **PBR metallic-roughness**, lit by a few lights per frame in one pass | The model of glTF, Unity, Godot and Unreal, so imported models will look as their authors made them; the cost over Blinn-Phong is a few shader lines. Lights are a uniform array of 16 read by every 3D draw (forward shading): simple, every backend runs it, and enough for the games of this phase. Rejected: Blinn-Phong (models would need converting later), deferred shading and clustered lights (worth it with hundreds of lights; they can come behind the same `Frame` API), and shadows for now |
+| 49 | 3D physics with **rapier3d** (Apache-2.0), beside rapier2d in `star_physics` | The 3D sibling of rapier2d, of the same authors and version: it shares parry, glamx and nalgebra, so the dependency tree barely grows, and `Physics3d` can have the same API as `Physics2d` (`BodySettings` and `Contact` are generic over the shape and the body id; the fixed-step clock and the contact bookkeeping are shared code). Rejected: avian3d (built on Bevy's ECS) and an own solver (as in decision 46) |
 
 ## ECS
 
@@ -327,6 +328,13 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
 - `star_physics` simulates 2D bodies with rapier2d (decision 46). A
   `Physics2d` holds them: `add_body(&BodySettings)` gives a `BodyId`, and
   ids of removed bodies are simply ignored.
+- **3D**: a `Physics3d` does the same in space with rapier3d (decision 49):
+  `add_body(&BodySettings<Shape3d>, position, rotation)` gives a
+  `BodyId3d`, positions and velocities are `Vec3`s and rotations `Quat`s,
+  gravity defaults to `DEFAULT_GRAVITY_3D` (-y), and its contacts are
+  `Contact<BodyId3d>`. A `Shape3d` is a sphere, a box (`Shape3d::cuboid`)
+  or a vertical capsule. Kinds, surfaces, sensors, fixed steps and
+  contacts behave as in 2D.
 - A body has one `Shape2d`: a circle, a rectangle (turning with the body)
   or a vertical capsule, whose constructors reject sizes that are not
   positive and finite. `BodySettings` gives its `BodyKind` — **dynamic**

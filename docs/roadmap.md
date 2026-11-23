@@ -83,7 +83,11 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `LightNode`, drawn by the engine and kept in `.scene` files
         (`[node.transform_3d]`, `[node.mesh]`, `[node.light]`). StarScript
         does not see them yet.
-- [ ] **Phase 10 — 3D physics**.
+- [ ] **Phase 10 — 3D physics** (rapier3d):
+  - [x] 10a `Physics3d`: spheres, boxes and capsules; dynamic, static and
+        kinematic bodies; sensors and contacts, in fixed steps as in 2D.
+  - [ ] 10b `Body3D` nodes the engine simulates, kept in `.scene` files.
+  - [ ] 10c Example `physics_3d`.
 - [ ] **Phase 11 — Mobile**: Android and iOS packaging.
 - [ ] **Phase 12 — Visual editor** (egui):
   - [x] Project manager: new project (name, location, 2D/3D, platforms),

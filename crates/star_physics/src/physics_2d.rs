@@ -1,30 +1,21 @@
 //! The 2D simulation: bodies moving, falling and colliding.
 
-use std::collections::HashMap;
-
 use rapier2d::prelude::{
     ActiveCollisionTypes, ActiveEvents, ColliderBuilder, ColliderHandle, PhysicsWorld,
     RigidBodyBuilder, RigidBodyHandle, Rotation, Vector,
 };
-use star_core::{EngineError, EngineResult};
+use star_core::EngineResult;
 use star_math::Vec2;
 
-use crate::contact::{ColliderContact, ContactCollector};
+use crate::body::check_finite;
+use crate::contact::ContactLog;
 use crate::shape::ShapeKind;
-use crate::{BodyKind, BodySettings, Contact};
+use crate::step_clock::StepClock;
+use crate::{BodyKind, BodySettings, Contact, FIXED_STEP};
 
 /// Gravity of a new [`Physics2d`]: Earth's, downwards, taking a world unit
 /// as a meter.
 pub const DEFAULT_GRAVITY: Vec2 = Vec2::new(0.0, -9.81);
-
-/// Seconds simulated by each step. Steps always have the same length, so
-/// the simulation behaves the same whatever the frame rate.
-pub const FIXED_STEP: f32 = 1.0 / 60.0;
-
-/// Most steps one [`Physics2d::advance`] runs. A frame that took longer
-/// (the window was dragged, the game paused in a debugger) slows the
-/// simulation down instead of making it run ever more steps to catch up.
-pub const MAX_STEPS_PER_ADVANCE: u32 = 8;
 
 /// A body in a [`Physics2d`], by its number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -38,15 +29,8 @@ pub struct BodyId(pub(crate) RigidBodyHandle);
 /// id of a removed body is simply ignored.
 pub struct Physics2d {
     world: PhysicsWorld,
-    collector: ContactCollector,
-    /// The body of each collider (one per body), kept after the body is
-    /// removed until its last contacts are reported.
-    owners: HashMap<ColliderHandle, BodyId>,
-    removed: Vec<ColliderHandle>,
-    collider_contacts: Vec<ColliderContact>,
-    contacts: Vec<Contact>,
-    /// Time waiting to be simulated, less than a step after each advance.
-    pending_time: f32,
+    contacts: ContactLog<ColliderHandle, BodyId>,
+    clock: StepClock,
 }
 
 impl Default for Physics2d {
@@ -64,12 +48,8 @@ impl Physics2d {
         world.integration_parameters.dt = FIXED_STEP;
         Self {
             world,
-            collector: ContactCollector::default(),
-            owners: HashMap::new(),
-            removed: Vec::new(),
-            collider_contacts: Vec::new(),
-            contacts: Vec::new(),
-            pending_time: 0.0,
+            contacts: ContactLog::new(),
+            clock: StepClock::default(),
         }
     }
 
@@ -105,7 +85,7 @@ impl Physics2d {
             .rotation(rotation);
         let (body, collider) = self.world.insert(body, collider_builder(settings));
         let id = BodyId(body);
-        self.owners.insert(collider, id);
+        self.contacts.add_owner(collider, id);
         Ok(id)
     }
 
@@ -113,7 +93,7 @@ impl Physics2d {
     /// step.
     pub fn remove_body(&mut self, body: BodyId) {
         if let Some(removed) = self.world.remove_body(body.0) {
-            self.removed.extend_from_slice(removed.colliders());
+            self.contacts.remove_owners(removed.colliders());
         }
     }
 
@@ -179,50 +159,27 @@ impl Physics2d {
 
     /// Simulates `elapsed` seconds more, in [`FIXED_STEP`]s, and gives how
     /// many steps ran. Time shorter than a step waits for the next call;
-    /// at most [`MAX_STEPS_PER_ADVANCE`] steps run, and the rest is
-    /// dropped. Contacts are those of the steps of this call.
+    /// at most [`MAX_STEPS_PER_ADVANCE`](crate::MAX_STEPS_PER_ADVANCE)
+    /// steps run, and the rest is dropped. Contacts are those of the steps
+    /// of this call.
     pub fn advance(&mut self, elapsed: f32) -> u32 {
         self.contacts.clear();
-        if elapsed.is_finite() && elapsed > 0.0 {
-            self.pending_time += elapsed;
-        }
-        let mut steps = 0;
-        while self.pending_time >= FIXED_STEP && steps < MAX_STEPS_PER_ADVANCE {
-            self.step();
-            self.pending_time -= FIXED_STEP;
-            steps += 1;
-        }
-        if steps == MAX_STEPS_PER_ADVANCE {
-            self.pending_time = self.pending_time.min(FIXED_STEP);
-        }
-        steps
+        let Self {
+            world,
+            contacts,
+            clock,
+        } = self;
+        clock.advance(elapsed, || {
+            world.step_with_events(&(), contacts.collector());
+            contacts.collect_step();
+        })
     }
 
     /// The bodies that started or stopped touching during the last
     /// [`advance`](Self::advance), in the order it happened.
     #[must_use]
     pub fn contacts(&self) -> &[Contact] {
-        &self.contacts
-    }
-
-    fn step(&mut self) {
-        self.world.step_with_events(&(), &self.collector);
-        self.collector.drain_into(&mut self.collider_contacts);
-        for contact in self.collider_contacts.drain(..) {
-            let owner = |collider| self.owners.get(&collider).copied();
-            if let (Some(first), Some(second)) = (owner(contact.first), owner(contact.second)) {
-                self.contacts.push(Contact {
-                    first,
-                    second,
-                    phase: contact.phase,
-                    is_sensor: contact.is_sensor,
-                });
-            }
-        }
-        // The contacts of removed bodies ended during this step.
-        for collider in self.removed.drain(..) {
-            self.owners.remove(&collider);
-        }
+        self.contacts.contacts()
     }
 }
 
@@ -260,16 +217,11 @@ fn collider_builder(settings: &BodySettings) -> ColliderBuilder {
 }
 
 fn check_settings(settings: &BodySettings, position: Vec2, rotation: f32) -> EngineResult<()> {
-    let numbers = [
+    check_finite(&[
         ("position", position.x),
         ("position", position.y),
         ("rotation", rotation),
-    ];
-    if let Some((what, value)) = numbers.iter().find(|(_, value)| !value.is_finite()) {
-        return Err(EngineError::Physics(format!(
-            "the {what} of a body must be a finite number, not {value}"
-        )));
-    }
+    ])?;
     settings.check()
 }
 
@@ -284,7 +236,7 @@ fn from_vector(vector: Vector) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ContactPhase, Shape2d};
+    use crate::{ContactPhase, MAX_STEPS_PER_ADVANCE, Shape2d};
 
     /// Seconds of a test frame: a 60 Hz screen.
     const FRAME: f32 = 1.0 / 60.0;

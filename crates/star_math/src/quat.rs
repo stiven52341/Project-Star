@@ -115,6 +115,19 @@ impl Quat {
         }
     }
 
+    /// The rotation of the four numbers `[x, y, z, w]` of a quaternion,
+    /// scaled to length 1; `None` if they have no length or are not finite.
+    #[must_use]
+    pub fn from_xyzw([x, y, z, w]: [f32; 4]) -> Option<Self> {
+        Self { x, y, z, w }.normalized()
+    }
+
+    /// The four numbers `[x, y, z, w]` of the quaternion.
+    #[must_use]
+    pub const fn to_xyzw(self) -> [f32; 4] {
+        [self.x, self.y, self.z, self.w]
+    }
+
     /// The same rotation with length 1 again, after many combinations
     /// rounded it; `None` if it has no length or is not finite.
     #[must_use]
@@ -278,6 +291,17 @@ mod tests {
         // At the pole f32 tells pitches apart only to about a thousandth.
         let error = (again.rotate(point) - rotation.rotate(point)).length();
         assert!(error < GIMBAL_TOLERANCE, "{error}");
+    }
+
+    #[test]
+    fn quaternions_round_trip_through_their_numbers() {
+        let rotation = Quat::from_euler(Vec3::new(0.3, -1.1, 0.4));
+
+        let again = Quat::from_xyzw(rotation.to_xyzw()).unwrap();
+        let point = Vec3::new(1.0, 2.0, 3.0);
+        assert_close(again.rotate(point), rotation.rotate(point));
+        assert_eq!(Quat::from_xyzw([0.0, 0.0, 0.0, 2.0]), Some(Quat::IDENTITY));
+        assert_eq!(Quat::from_xyzw([f32::NAN, 0.0, 0.0, 1.0]), None);
     }
 
     #[test]

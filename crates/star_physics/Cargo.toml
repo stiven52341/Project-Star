@@ -12,6 +12,7 @@ repository.workspace = true
 star_core.workspace = true
 star_math.workspace = true
 rapier2d.workspace = true
+rapier3d.workspace = true
 
 [lints]
 workspace = true

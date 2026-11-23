@@ -88,7 +88,8 @@ impl Shape2d {
     }
 }
 
-fn check_size(what: &str, size: f32) -> EngineResult<()> {
+/// Checks that a size of a shape is positive and finite.
+pub(crate) fn check_size(what: &str, size: f32) -> EngineResult<()> {
     if size.is_finite() && size > 0.0 {
         Ok(())
     } else {

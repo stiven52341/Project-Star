@@ -13,7 +13,8 @@ pub use star_input::{
 };
 pub use star_math::{Affine2, Mat4, Quat, Vec2, Vec3};
 pub use star_physics::{
-    BodyId, BodyKind, BodySettings, Contact, ContactPhase, Physics2d, Shape2d, ShapeKind,
+    BodyId, BodyId3d, BodyKind, BodySettings, Contact, ContactPhase, Physics2d, Physics3d, Shape2d,
+    Shape3d, ShapeKind, ShapeKind3d,
 };
 pub use star_platform::TargetPlatform;
 pub use star_render::{

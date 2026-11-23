@@ -124,7 +124,7 @@ Tools    star_script                         (StarScript compiler; no dependenci
 | `star_assets` | Loading (PNG through png, JPEG through zune-jpeg; WAV, OGG, MP3 and FLAC through symphonia), caching and hot-reload of resources |
 | `star_render` | 2D and 3D rendering on wgpu (DX12, Vulkan, Metal, OpenGL) |
 | `star_audio` | Sound and music playback: an own mixer of voices (volume, loops) over the audio output |
-| `star_physics` | 2D and 3D physics: bodies, shapes, sensors and contacts over rapier2d (fixed steps) |
+| `star_physics` | 2D and 3D physics: bodies, shapes, sensors and contacts over rapier2d and rapier3d (fixed steps) |
 | `star_scene` | Scenes and Godot/Unity-style node tree |
 | `star_engine` | Public entry point that integrates everything |
 | `star_script` | StarScript compiler (`.star` → Rust). Specification in `docs/starscript.md` |
