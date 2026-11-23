@@ -34,6 +34,17 @@ pub struct MeshId(pub(crate) usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Mesh3dId(pub(crate) usize);
 
+impl Mesh3dId {
+    /// The id of the `index`-th 3D mesh a renderer created. Ids normally
+    /// come from the renderer; one it did not create is reported as an
+    /// error when drawn, so this is meant for tests and tools that store
+    /// ids.
+    #[must_use]
+    pub const fn from_index(index: usize) -> Self {
+        Self(index)
+    }
+}
+
 /// Vertex buffer of a mesh, ready to be drawn.
 pub(crate) struct GpuMesh {
     pub(crate) vertex_buffer: wgpu::Buffer,

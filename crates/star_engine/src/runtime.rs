@@ -10,7 +10,9 @@ use star_math::Vec2;
 use star_physics::Physics2d;
 use star_platform::{InputEvent, Window, WindowEventHandler, WindowSize};
 use star_render::{Color, Frame, Renderer, RendererConfig};
-use star_scene::{PhysicsNodes, TransformPropagation, draw_sprite_nodes, step_node_physics};
+use star_scene::{
+    PhysicsNodes, TransformPropagation, draw_3d_nodes, draw_sprite_nodes, step_node_physics,
+};
 
 use crate::EngineWorld as _;
 use crate::game::{Game, GameContext};
@@ -144,6 +146,7 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
         self.simulate()?;
         self.frame.begin(self.clear_color);
         draw_sprite_nodes(&self.world, &mut self.frame)?;
+        draw_3d_nodes(&self.world, &mut self.frame)?;
         let Some(renderer) = &mut self.renderer else {
             return Ok(());
         };

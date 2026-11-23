@@ -6,7 +6,9 @@
 //! through the [`Hierarchy`] methods of the world. A 2D node is placed by its
 //! [`Transform2D`], relative to its parent; [`TransformPropagation`] computes
 //! where it ends up in the world ([`GlobalTransform2D`]), where its
-//! [`SpriteNode`] is drawn. A [`Body2D`] makes it a body of the 2D physics,
+//! [`SpriteNode`] is drawn. A 3D node is placed by its [`Transform3D`]
+//! ([`GlobalTransform3D`] in the world) and can show a [`MeshNode`] or shine
+//! a [`LightNode`]. A [`Body2D`] makes a 2D node a body of the 2D physics,
 //! which [`step_node_physics`] moves it with. A [`Scene`] is a tree of nodes saved in a
 //! `.scene` file (TOML) and instanced into a world as many times as needed;
 //! its [`SceneOutline`] describes the file's nodes without loading their images.
@@ -14,6 +16,7 @@
 mod body_data;
 mod body_node;
 mod hierarchy;
+mod node_3d;
 mod node_physics;
 mod scene;
 mod scene_file;
@@ -23,6 +26,7 @@ mod transform;
 
 pub use body_node::Body2D;
 pub use hierarchy::{Children, Hierarchy, Name, Parent};
+pub use node_3d::{LightNode, MeshNode, draw_3d_nodes};
 pub use node_physics::{NodeContact, PhysicsNodes, step_node_physics};
 pub use scene::{Scene, TextureLoader};
 pub use scene_outline::{NodeOutline, SceneOutline, SpriteOutline};

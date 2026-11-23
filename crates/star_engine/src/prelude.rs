@@ -22,6 +22,6 @@ pub use star_render::{
     TextureFilter, TextureId, TextureRegion, Vertex,
 };
 pub use star_scene::{
-    Body2D, Children, GlobalTransform2D, GlobalTransform3D, Hierarchy, Name, NodeContact, Parent,
-    PhysicsNodes, Scene, SceneOutline, SpriteNode, Transform2D, Transform3D,
+    Body2D, Children, GlobalTransform2D, GlobalTransform3D, Hierarchy, LightNode, MeshNode, Name,
+    NodeContact, Parent, PhysicsNodes, Scene, SceneOutline, SpriteNode, Transform2D, Transform3D,
 };

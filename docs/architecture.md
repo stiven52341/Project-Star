@@ -150,6 +150,12 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 - A `SpriteNode` shows a texture at its node: the engine adds the sprites of
   every node with a global transform to the frame before `Game::draw`,
   moved, rotated and scaled with the node.
+- A `MeshNode` (a `Mesh3dId` and a `Material`) shows a 3D mesh at its 3D
+  node, and a `LightNode` lights the meshes from it: `Directional` shines
+  along the node's -z axis (forward), `Point` from its position. The engine
+  adds them to the frame after the sprites and before `Game::draw`
+  (`draw_3d_nodes`); light nodes beyond `MAX_LIGHTS` are left out, and the
+  ambient light stays on the `Frame`.
 - A **`Scene`** is a tree of nodes that can be instanced many times
   (`scene.instantiate(&mut world, parent)` returns the copy's root; a failed
   copy leaves nothing behind). `GameContext::load_scene("levels/one.scene")`
