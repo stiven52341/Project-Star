@@ -37,6 +37,7 @@ cargo run -p hello_star                                   # minimal example (ope
 cargo run -p hello_star -- vulkan                         # force a backend: vulkan|dx12|metal|opengl
 cargo run -p triangle_2d                                  # render test: 2D triangle
 cargo run -p triangle_3d                                  # render test: spinning 3D triangle
+cargo run -p scene_3d                                     # 3D test: PBR spheres, a textured cube, sun and lamp
 cargo run -p sprites_2d                                   # render test: batched sprites (arrows/WASD move)
 cargo run -p scene_2d                                     # scene test: a .scene file instanced (Space adds more)
 cargo run -p sounds_2d                                    # audio test: Space beeps, M loops a melody, up/down volume

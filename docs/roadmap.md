@@ -77,7 +77,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         color) by `Frame::draw_mesh_3d`, with back-face culling.
   - [x] 9b PBR materials (metallic-roughness, base color texture) and
         lights: ambient, directional and point lights (decision 48).
-  - [ ] 9c Example `scene_3d`.
+  - [x] 9c Example `scene_3d`: rows of plastic and metal spheres from
+        rough to polished, a checkered cube, the sun and an orbiting lamp.
   - [ ] 9d 3D nodes: `Transform3D` (with quaternions) and mesh nodes, in
         the engine and in `.scene` files.
 - [ ] **Phase 10 — 3D physics**.
