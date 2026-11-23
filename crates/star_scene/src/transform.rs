@@ -70,6 +70,13 @@ impl Default for Transform2D {
 pub struct GlobalTransform2D(Affine2);
 
 impl GlobalTransform2D {
+    /// The place `affine` gives, for tools that compute where nodes are
+    /// without a world, like the editor drawing a scene file.
+    #[must_use]
+    pub const fn from_affine(affine: Affine2) -> Self {
+        Self(affine)
+    }
+
     /// The transform from the node's space to the world's.
     #[must_use]
     pub const fn affine(self) -> Affine2 {
@@ -160,6 +167,13 @@ impl Default for Transform3D {
 pub struct GlobalTransform3D(Mat4);
 
 impl GlobalTransform3D {
+    /// The place `matrix` gives, for tools that compute where nodes are
+    /// without a world, like the editor drawing a scene file.
+    #[must_use]
+    pub const fn from_matrix(matrix: Mat4) -> Self {
+        Self(matrix)
+    }
+
     /// The transform from the node's space to the world's.
     #[must_use]
     pub const fn matrix(self) -> Mat4 {

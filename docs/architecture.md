@@ -551,6 +551,17 @@ project's kind). Changes mark the tab (`●`) until “Save” (`Ctrl+S`),
 another scene, closing the project or quitting ask first, as blueprints
 do. A file that cannot be read or saved shows why in the panel.
 
+The view draws the open scene over its grid as the game would: each
+node's place is computed from the outline in one pass (parents come
+first; a node without a transform passes its parent's on), sprites are
+drawn through `SpriteNode::to_sprite`, meshes from the unit shapes of
+`MeshFile::unit_shape` scaled, and the scene's lights light them (a
+scene with none gets a preview sun and a soft ambient light, so its
+meshes can be seen). The view loads each image of `assets/` and builds
+each unit mesh once (`ViewportAssets`); one that fails logs a warning
+once and is left out. The node selected is marked with orange lines: a
+frame around its sprite, a box around its mesh, or a cross where it is.
+
 The **blueprint editor** (`blueprint_editor/`) draws a graph of the open
 blueprint on a canvas of its own, painted with egui's painter (no node
 editor library: the model, its pins and its rules are `star_blueprint`'s).

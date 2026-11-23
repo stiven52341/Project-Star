@@ -27,6 +27,16 @@ impl Topology {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MeshId(pub(crate) usize);
 
+impl MeshId {
+    /// The id of the `index`-th mesh a renderer created. Ids normally come
+    /// from the renderer; one it did not create is reported as an error
+    /// when drawn, so this is meant for tests and tools that store ids.
+    #[must_use]
+    pub const fn from_index(index: usize) -> Self {
+        Self(index)
+    }
+}
+
 /// Handle to a 3D mesh uploaded with
 /// [`Renderer::create_mesh_3d`](crate::Renderer::create_mesh_3d).
 ///

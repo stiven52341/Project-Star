@@ -123,7 +123,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 12b Edit scenes: the node's values in the inspector, adding
           and removing its parts, adding and deleting nodes, and saving
           the file (`SceneOutline::to_text`, `add_node`, `remove_node`).
-    - [ ] 12c Draw the open scene in the view (sprites, meshes, lights),
+    - [x] 12c Draw the open scene in the view (sprites, meshes, lights),
           with the selected node marked.
     - [ ] 12d Log console in the bottom panel.
 - [ ] **Phase 13 — StarScript and Blueprints** (`star_script`, see `docs/starscript.md`):

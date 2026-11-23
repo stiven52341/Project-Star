@@ -12,7 +12,7 @@ pub use wgpu;
 
 use crate::mesh::Topology;
 use crate::scene_renderer::SceneRenderer;
-use crate::{Frame, Image, MeshId, TextureFilter, TextureId, Vertex};
+use crate::{Frame, Image, Mesh3dId, MeshData, MeshId, TextureFilter, TextureId, Vertex};
 
 /// Non-sRGB storage holding sRGB-encoded values: UI toolkits such as egui
 /// sample textures expecting gamma-encoded colors, and an `...Srgb` format
@@ -79,6 +79,15 @@ impl OffscreenRenderer {
     /// Returns an error if `vertices` is empty or odd.
     pub fn create_lines(&mut self, vertices: &[Vertex]) -> EngineResult<MeshId> {
         self.scene.create_mesh(vertices, Topology::Lines)
+    }
+
+    /// Uploads a 3D mesh, to be drawn with a material.
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Renderer::create_mesh_3d`](crate::Renderer::create_mesh_3d).
+    pub fn create_mesh_3d(&mut self, mesh: &MeshData) -> EngineResult<Mesh3dId> {
+        self.scene.create_mesh_3d(mesh)
     }
 
     /// Uploads `image` to the GPU, to be drawn with `filter`.

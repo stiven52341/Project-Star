@@ -4,6 +4,7 @@
 //! it. Changes are kept until the scene is saved.
 
 mod components;
+mod drawing;
 mod fields;
 mod properties;
 mod tree;
@@ -12,9 +13,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use eframe::egui;
-use star_engine::prelude::SceneOutline;
+use star_engine::prelude::{Frame, SceneOutline};
 
 use self::components::new_node;
+pub(crate) use self::drawing::{Marks, SceneGpu, cross_lines, cube_lines, square_lines};
 use self::properties::{NodeContext, edit_node};
 use self::tree::children_of;
 use crate::project::ProjectDimension;
@@ -101,6 +103,14 @@ impl SceneDocument {
                 self.save_error = Some(texts::current().scene_not_saved(&error));
                 false
             }
+        }
+    }
+
+    /// Adds to `frame` what its nodes show and the mark of the one
+    /// selected, with the textures and meshes of `gpu`.
+    pub(crate) fn draw(&self, gpu: &mut impl SceneGpu, marks: Marks, frame: &mut Frame) {
+        if let Ok(outline) = &self.content {
+            drawing::draw_scene(outline, self.selected, gpu, marks, frame);
         }
     }
 

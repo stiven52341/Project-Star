@@ -10,6 +10,7 @@ mod output_panel;
 mod problems_panel;
 mod unsaved_dialog;
 mod viewport;
+mod viewport_assets;
 
 use eframe::{egui, egui_wgpu};
 use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
@@ -89,7 +90,8 @@ impl EditorWindow {
         let viewport = render_state
             .ok_or_else(|| texts::current().no_gpu_for_viewport.to_owned())
             .and_then(|state| {
-                SceneViewport::new(state, dimension).map_err(|error| error.to_string())
+                SceneViewport::new(state, dimension, assets.directory())
+                    .map_err(|error| error.to_string())
             });
         if let Err(error) = &viewport {
             log::error!("Scene viewport unavailable: {error}");
@@ -306,7 +308,7 @@ impl EditorWindow {
         }
         match self.documents.active() {
             ActiveDocument::Scene => match &mut self.viewport {
-                Ok(viewport) => viewport.show(ui),
+                Ok(viewport) => viewport.show(ui, self.documents.scene()),
                 Err(error) => {
                     ui.colored_label(ERROR_COLOR, texts::current().viewport_error(error));
                 }

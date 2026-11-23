@@ -84,12 +84,13 @@ impl MeshFile {
     }
 
     /// The mesh of size 1 the shape is drawn from, and how much it is
-    /// scaled along each axis.
+    /// scaled along each axis. Tools that draw shapes themselves, like the
+    /// editor, use it to build each kind of mesh once.
     ///
     /// # Errors
     ///
     /// [`EngineError::Rendering`] if a size is not positive and finite.
-    pub(crate) fn unit_shape(&self) -> EngineResult<(MeshShape, Vec3)> {
+    pub fn unit_shape(&self) -> EngineResult<(MeshShape, Vec3)> {
         let (unit, scale) = match self.shape {
             MeshShape::Cube { size } => (MeshShape::Cube { size: Vec3::ONE }, size),
             MeshShape::Plane { size } => (

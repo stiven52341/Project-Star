@@ -72,6 +72,11 @@ impl Documents {
     }
 
     /// The scene open in the “Scene” tab.
+    pub(crate) const fn scene(&self) -> Option<&SceneDocument> {
+        self.scene.as_ref()
+    }
+
+    /// The scene open in the “Scene” tab.
     pub(crate) fn scene_mut(&mut self) -> Option<&mut SceneDocument> {
         self.scene.as_mut()
     }

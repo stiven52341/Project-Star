@@ -2,7 +2,10 @@
 //!
 //! The engine draws into an offscreen texture on the same GPU device as the
 //! UI; egui then shows that texture like any image, with no CPU copies.
+//! Over the grid it draws the open scene, as the game would show it, with
+//! the node selected marked.
 
+use std::path::Path;
 use std::sync::Arc;
 
 use eframe::egui;
@@ -12,7 +15,9 @@ use star_render::interop::{OffscreenRenderer, wgpu};
 
 use super::editor_camera::EditorCamera;
 use super::grid::grid_lines;
+use super::viewport_assets::ViewportAssets;
 use crate::project::ProjectDimension;
+use crate::scene_editor::{Marks, SceneDocument, cross_lines, cube_lines, square_lines};
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -29,6 +34,8 @@ pub(crate) struct SceneViewport {
     ui_renderer: Arc<egui::mutex::RwLock<egui_wgpu::Renderer>>,
     texture_id: egui::TextureId,
     grid: MeshId,
+    marks: Marks,
+    assets: ViewportAssets,
     camera: EditorCamera,
     dimension: ProjectDimension,
     frame: Frame,
@@ -36,14 +43,21 @@ pub(crate) struct SceneViewport {
 }
 
 impl SceneViewport {
-    /// Prepares the engine renderer on the UI's GPU device.
+    /// Prepares the engine renderer on the UI's GPU device, to show scenes
+    /// with the images of the `assets` folder.
     pub(crate) fn new(
         render_state: &egui_wgpu::RenderState,
         dimension: ProjectDimension,
+        assets: &Path,
     ) -> EngineResult<Self> {
         let mut renderer =
             OffscreenRenderer::new(render_state.device.clone(), render_state.queue.clone());
         let grid = renderer.create_lines(&grid_lines(dimension))?;
+        let marks = Marks {
+            square: renderer.create_lines(&square_lines())?,
+            cube: renderer.create_lines(&cube_lines())?,
+            cross: renderer.create_lines(&cross_lines())?,
+        };
         let texture_id = render_state.renderer.write().register_native_texture(
             &render_state.device,
             renderer.color_view(),
@@ -55,6 +69,8 @@ impl SceneViewport {
             ui_renderer: Arc::clone(&render_state.renderer),
             texture_id,
             grid,
+            marks,
+            assets: ViewportAssets::new(assets),
             camera: match dimension {
                 ProjectDimension::TwoD => EditorCamera::new_2d(),
                 ProjectDimension::ThreeD => EditorCamera::new_3d(),
@@ -65,11 +81,12 @@ impl SceneViewport {
         })
     }
 
-    pub(crate) fn show(&mut self, ui: &mut egui::Ui) {
+    /// Shows the view, with `scene` drawn in it if one is open.
+    pub(crate) fn show(&mut self, ui: &mut egui::Ui, scene: Option<&SceneDocument>) {
         let (rect, response) = ui.allocate_exact_size(ui.available_size(), egui::Sense::drag());
         self.handle_input(ui, &response, rect);
         self.match_target_size(rect, ui.ctx().pixels_per_point());
-        self.render_error = self.render().err().map(|error| error.to_string());
+        self.render_error = self.render(scene).err().map(|error| error.to_string());
 
         let painter = ui.painter_at(rect);
         painter.image(self.texture_id, rect, FULL_TEXTURE, egui::Color32::WHITE);
@@ -105,10 +122,14 @@ impl SceneViewport {
         }
     }
 
-    fn render(&mut self) -> EngineResult<()> {
+    fn render(&mut self, scene: Option<&SceneDocument>) -> EngineResult<()> {
         self.frame.begin(BACKGROUND);
         self.frame.set_camera(self.camera.to_camera());
         self.frame.draw(self.grid, Mat4::IDENTITY);
+        if let Some(scene) = scene {
+            let mut gpu = self.assets.with(&mut self.renderer);
+            scene.draw(&mut gpu, self.marks, &mut self.frame);
+        }
         self.renderer.render(&self.frame)
     }
 
