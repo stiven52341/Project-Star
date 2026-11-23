@@ -40,7 +40,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes), sounds (`Sound`, `Audio`), physics (`Body`) and 3D (`Node3D`, `Mesh`, `Light`, `Camera3D`) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; “Play” builds and runs the game; the editor has a code editor for `.star` files (colors, writing aids, mistakes while writing, suggestions) |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
-| 9 | Concurrency and parallelism | In progress: coroutines (`async`, `await`, `Time`) and `parallel` functions done (section 7); the code editor and an example remain |
+| 9 | Concurrency and parallelism | Done: coroutines (`async`, `await`, `Time`) and `parallel` functions (section 7), shown by the code editor; example `examples/scripts/coroutines.star` |
 
 ## 1. Lexicon (final)
 
@@ -961,7 +961,7 @@ A game can write classes in Rust by implementing the engine's traits, and
 StarScript can use them like any other class. The exact mechanism will be
 defined in phase 5.
 
-## 7. Concurrency and parallelism (in progress)
+## 7. Concurrency and parallelism (final)
 
 Objects, lists and nodes live on the game's thread (they are `Rc`, see
 section 4), so StarScript has two separate tools:
@@ -978,9 +978,9 @@ section 4), so StarScript has two separate tools:
 class Lamp extends Sprite {
     async func blink(times: int) {
         for i in 0..times {
-            visible = false
+            color = Color(1.0, 1.0, 1.0, 0.0)   // see-through
             await Time.wait(0.25)
-            visible = true
+            color = Color(1.0, 1.0, 1.0, 1.0)
             await Time.wait(0.25)
         }
     }
@@ -1072,3 +1072,12 @@ class Walker extends Node {
   work, and the game's thread reports it when the result is awaited.
 
 Blueprints have neither yet.
+
+The code editor shows `async` and `parallel` before the methods that run
+so, in its suggestions (`async (seconds: float)`) and in the type of the
+name under the pointer (`async Time.wait(seconds: float)`).
+
+Example: `cargo run -p star_script --example run --
+crates/star_script/examples/scripts/coroutines.star` counts primes in a
+`parallel` function while a node's coroutine keeps talking, and that
+coroutine ends when the node leaves the tree.

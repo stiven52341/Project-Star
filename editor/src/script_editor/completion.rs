@@ -7,7 +7,7 @@
 //! What names mean there is the `scope` module's.
 
 use star_script::semantic::{
-    BASIC_TYPE_NAMES, BuiltinSignature, ClassTable, MethodInfo, Type, builtin_methods,
+    BASIC_TYPE_NAMES, BuiltinSignature, ClassTable, Execution, MethodInfo, Type, builtin_methods,
 };
 use star_script::{Keyword, LexErrorKind, TokenKind, scan};
 
@@ -219,7 +219,11 @@ fn members(classes: &ClassTable, receiver: Receiver, everything: bool) -> Vec<Ca
             .filter(|method| wanted(method.is_static, method.is_private))
         {
             candidates.push(Candidate {
-                signature: Some(method_signature(classes, method)),
+                signature: Some(format!(
+                    "{}{}",
+                    execution_word(method),
+                    method_signature(classes, method)
+                )),
                 takes_parameters: !method.parameters.is_empty(),
                 ..plain(method.name.clone(), CandidateKind::Method)
             });
@@ -246,6 +250,16 @@ pub(super) fn method_signature(classes: &ClassTable, method: &MethodInfo) -> Str
         .iter()
         .map(|parameter| format!("{}: {}", parameter.name, classes.type_name(&parameter.ty)));
     signature(classes, parameters, &method.return_type)
+}
+
+/// `async ` or `parallel ` before what is said of a method that runs so,
+/// as it is written before its `func`; nothing for the others.
+pub(super) const fn execution_word(method: &MethodInfo) -> &'static str {
+    match method.execution {
+        Execution::Direct => "",
+        Execution::Async => "async ",
+        Execution::Parallel => "parallel ",
+    }
 }
 
 /// The parameter types of a method of the language and what it gives:
@@ -407,6 +421,24 @@ mod tests {
         assert_eq!(
             completion.candidates[0].signature.as_deref(),
             Some("() -> bool")
+        );
+    }
+
+    #[test]
+    fn methods_that_wait_or_run_in_parallel_say_so() {
+        let classes = classes();
+        let knows = Known {
+            classes: Some(&classes),
+            locals: None,
+        };
+        let text = inside_rock("Time.wa");
+
+        let completion = complete(&text, text.find("wa").unwrap() + 2, knows).unwrap();
+
+        assert_eq!(completion.candidates[0].name, "wait");
+        assert_eq!(
+            completion.candidates[0].signature.as_deref(),
+            Some("async (seconds: float)")
         );
     }
 

@@ -59,7 +59,7 @@ const NATIVE_OBJECT_CLASSES: [&str; 11] = [
 /// translations over idiomatic Rust (`(a).wrapping_add(b)`, unused `mut`,
 /// class names as module names, …).
 const ALLOWED_LINTS: &str = "dead_code, non_camel_case_types, non_snake_case, unreachable_code, \
-    unused_braces, unused_mut, unused_parens, unused_variables, clippy::all, clippy::pedantic";
+    unused_braces, while_true, unused_mut, unused_parens, unused_variables, clippy::all, clippy::pedantic";
 
 /// A class declared in the program, with its declaration.
 pub(super) struct ClassItem<'a> {

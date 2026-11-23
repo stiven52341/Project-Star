@@ -223,7 +223,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           cursor until `Ctrl+I` makes it active. Chains inside
           parentheses (`(a + b).`) or after list literals suggest nothing,
           by decision (see `docs/architecture.md`).
-  - [ ] 13.10 Concurrency and parallelism (`docs/starscript.md`, section 7;
+  - [x] 13.10 Concurrency and parallelism (`docs/starscript.md`, section 7;
         decision 54):
     - [x] 13.10a Syntax: the keywords `async`, `await` and `parallel`;
           `async` and `parallel` as modifiers of methods, `await` before
@@ -240,7 +240,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.10e Parallel functions in Rust: threads of the runtime,
           values copied in and out, and runtime errors on those threads
           stopping the game.
-    - [ ] 13.10f The code editor and an example: suggestions and types
+    - [x] 13.10f The code editor and an example: suggestions and types
           show `async` and `parallel`; an example game that uses both.
 - [ ] **Editor ideas, not planned yet**: undo and redo in the scene
       editor (`Ctrl+Z`); moving nodes to another parent by dragging them in

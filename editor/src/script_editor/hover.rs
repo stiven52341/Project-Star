@@ -11,7 +11,9 @@ use std::ops::Range;
 
 use star_script::semantic::{ClassId, ClassTable, LocalInfo, MemberRef, Type, builtin_method};
 
-use super::completion::{builtin_signature, is_inside_comment_or_string, method_signature};
+use super::completion::{
+    builtin_signature, execution_word, is_inside_comment_or_string, method_signature,
+};
 use super::scope::{Chained, Known, Scope, name_around};
 
 /// A name of the text and what its type is.
@@ -96,7 +98,8 @@ fn local_description(classes: &ClassTable, local: &LocalInfo) -> String {
     format!("{}: {}", local.name, classes.type_name(&local.ty))
 }
 
-/// `Rock.size: int` or `Rock.roll(speed: float) -> bool`, from the class
+/// `Rock.size: int`, `Rock.roll(speed: float) -> bool` or
+/// `async Rock.glow()`, from the class
 /// that declares the member `name` of `class`.
 fn member_description(classes: &ClassTable, class: ClassId, name: &str) -> Option<String> {
     let found = classes.find_member(class, name)?;
@@ -113,7 +116,11 @@ fn member_description(classes: &ClassTable, class: ClassId, name: &str) -> Optio
         }
         MemberRef::Method(index) => {
             let method = declaring.methods.get(index)?;
-            format!("{owner}.{name}{}", method_signature(classes, method))
+            format!(
+                "{}{owner}.{name}{}",
+                execution_word(method),
+                method_signature(classes, method)
+            )
         }
     };
     Some(description)
@@ -199,6 +206,16 @@ mod tests {
         assert_eq!(
             type_at(&method).as_deref(),
             Some("Rock.roll(speed: float) -> bool")
+        );
+    }
+
+    #[test]
+    fn methods_that_wait_or_run_in_parallel_say_so() {
+        let marked = ROCK.replace("turns = size", "Time.wa|it(1.0)");
+
+        assert_eq!(
+            type_at(&marked).as_deref(),
+            Some("async Time.wait(seconds: float)")
         );
     }
 
