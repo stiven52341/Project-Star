@@ -194,7 +194,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.8c Edit the class (variables, graphs and their signature),
           create new blueprints, and mark on their nodes the mistakes
           “Compile” finds.
-  - [x] 13.9 StarScript code editor (egui's `TextEdit`, in tabs of the
+  - [ ] 13.9 StarScript code editor (egui's `TextEdit`, in tabs of the
         central area):
     - [x] 13.9a Open `.star` files from “Assets” in a tab: colors from the
           compiler's lexer, line numbers, the cursor's line and column,
@@ -208,4 +208,18 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.9e Go to definition (`Ctrl`+click or `F12`); mistakes and
           suggestions checked on one thread that lives with the project,
           without translating to Rust.
+    - [ ] 13.9f Find and replace in a script (`Ctrl+F`).
+    - [ ] 13.9g The type of a name under the pointer.
+    - [ ] Known limits to improve: suggestions only follow chains of names
+          (not `make().`), and do not list the methods of basic types
+          (`"a".length()`) nor go into lists; while the list of
+          suggestions is shown, the up and down arrows choose in it; the
+          check while writing does not report what only the translation
+          to Rust finds (“Compile” does).
+- [ ] **Editor ideas, not planned yet**: undo and redo in the scene
+      editor (`Ctrl+Z`); moving nodes to another parent by dragging them in
+      the tree; dropping a `.star` on a node to give it its class; “Show in
+      the file explorer” in “Assets” (needs platform code or a
+      dependency: ask first); a slider for the size of the icons of
+      “Assets”.
 - [ ] **Future — Consoles** (PlayStation, Xbox).
