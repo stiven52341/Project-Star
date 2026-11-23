@@ -13,6 +13,7 @@ pub mod game;
 mod game_assets;
 pub mod prelude;
 mod runtime;
+mod script_body;
 pub mod script_nodes;
 mod sound_library;
 mod sprite_file;

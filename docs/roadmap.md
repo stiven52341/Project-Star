@@ -57,7 +57,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         (`sounds_2d`).
   - [x] 7d Sounds in StarScript (part of 13.5): `Sound.load`, `play`,
         `stop`, `is_playing`, `volume` and `looping`, and `Audio.volume`.
-- [ ] **Phase 8 — 2D physics** (decision 46):
+- [x] **Phase 8 — 2D physics** (decisions 46 and 47):
   - [x] 8a Simulation (`star_physics`, rapier2d): `Physics2d` with dynamic,
         static and kinematic bodies; circles, rectangles and capsules;
         friction, bounciness, density; sensors; fixed steps; contacts that
@@ -66,7 +66,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `Physics2d` (a resource, with `App::with_gravity`), contacts between
         nodes, bodies in `.scene` files (`[node.body]`), and an example
         (`physics_2d`).
-  - [ ] 8c Physics in StarScript (part of 13.5).
+  - [x] 8c Physics in StarScript (part of 13.5): `Body` objects in the
+        `body` field of nodes (`Body.circle`, `rectangle`, `capsule`), with
+        their surface, velocity, `apply_impulse` and the nodes they touch;
+        bodies in scenes loaded by scripts.
 - [ ] **Phase 9 — 3D rendering**: materials, lights, indexed meshes. (`Mat4`
       and a perspective camera already exist.)
 - [ ] **Phase 10 — 3D physics**.
@@ -112,6 +115,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           and sticks give how far they go) and `Input.axis(negative,
           positive)`.
     - [x] 13.5i Sounds in StarScript: `Sound` and `Audio` (step 7d).
+    - [x] 13.5j Physics in StarScript: `Body` (step 8c).
   - [x] 13.6 Editor integration: compiling and an error panel.
     - [x] 13.6a Programs of several files (`SourceSet`): each file is read
           on its own and their classes are checked as one program; errors

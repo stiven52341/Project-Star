@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes) and sounds (`Sound`, `Audio`) done |
+| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes), sounds (`Sound`, `Audio`) and physics (`Body`) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; building and running from the editor pending |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
 
@@ -359,13 +359,14 @@ The engine provides them; their names cannot be used for other classes.
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. |
 | `Game` | fields `background: Color` (black), `camera: Camera?` (`null`); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
-| `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`; `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?` |
+| `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `body: Body?` (`null`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors) |
 | `Camera` (extends `Node`) | `init(name: string)`; field `view_height: float` (2.0) |
 | `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
 | `Scene` | `static load(path: string) -> Node?` |
 | `Sound` | no `init`: `static load(path: string) -> Sound?`; fields `volume: float` (1.0), `looping: bool` (`false`); `play()`, `stop()`, `is_playing() -> bool` |
 | `Audio` | `static volume() -> float`, `static set_volume(volume: float)` |
+| `Body` | no `init`: `static circle(kind: string, radius: float) -> Body`, `static rectangle(kind: string, width: float, height: float) -> Body`, `static capsule(kind: string, height: float, radius: float) -> Body`; fields `kind`, `shape: string`, `radius` (0.5), `width`, `height` (1.0), `gravity_scale` (1.0), `friction` (0.5), `bounciness` (0.0), `density` (1.0), `velocity_x`, `velocity_y: float` (0.0), `fixed_rotation`, `sensor: bool` (`false`); `apply_impulse(x: float, y: float)`, `touching() -> [Node]`, `just_touched() -> [Node]`, `just_separated() -> [Node]` |
 | `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool`, `static strength(action: string) -> float`, `static axis(negative: string, positive: string) -> float`, `static pointer_x() -> float`, `static pointer_y() -> float`, `static has_pointer() -> bool` |
 
 **A game is a class that extends `Game`**:
@@ -515,6 +516,69 @@ class Shooter extends Game {
   but are only heard from `start` on. Without an audio device the game runs
   silent: `play` is accepted and `is_playing()` is always `false`.
 - `Sound` cannot be extended, and has no `init`: `Sound()` is an error.
+
+**Physics**: a node with a `Body` in its `body` field falls, collides and
+is pushed. Bodies are made by their shape, with how they move as a word:
+`"dynamic"` (gravity, collisions, impulses), `"static"` (never moves:
+floors, walls) or `"kinematic"` (moves only at its velocity, and pushes
+dynamic bodies: platforms, doors).
+
+```
+class Ball extends Sprite {
+    init() {
+        super.init("Ball", "sprites/ball.png")
+        const solid = Body.circle("dynamic", 0.5)
+        solid.bounciness = 0.6
+        body = solid
+    }
+}
+
+class Hero extends Sprite {
+    init() {
+        super.init("Hero", "sprites/hero.png")
+        const solid = Body.capsule("dynamic", 2.0, 0.5)
+        solid.fixed_rotation = true
+        body = solid
+    }
+
+    override func update(delta: float) {
+        const solid = body
+        if solid == null { return }
+        solid.velocity_x = Input.axis("left", "right") * 4.0
+        if Input.just_pressed("jump") { solid.apply_impulse(0.0, 5.0) }
+        for other in solid.just_touched() {
+            if other.name == "Coin" { other.remove() }
+        }
+    }
+}
+```
+
+- The engine simulates the bodies after the scripts' frame, and before the
+  next one writes where it left them into `x`, `y` and `rotation`, and how
+  fast they move into `velocity_x` and `velocity_y`. Setting `x` or `y`
+  moves the body there at once; setting the velocity makes it move at that
+  velocity from then on. `apply_impulse` pushes a dynamic body once (mass
+  times velocity: a jump, a hit), when the frame ends.
+- `kind` and `shape` can be changed, like the sizes and the surface
+  (`friction`, `bounciness`, `density`, `gravity_scale`, `fixed_rotation`,
+  `sensor`): the engine then replaces the body. Only the sizes of the
+  shape are used: `radius` for circles, `width` and `height` for
+  rectangles, `height` (half circles included) and `radius` for capsules.
+  Shapes are not scaled with the node.
+- A body that cannot be simulated (an unknown kind or shape, a size that is
+  not positive, a negative friction) is left out, and the reason is written
+  once to the error output; the node goes on without a body.
+- `touching()` gives the nodes whose bodies touch this one now,
+  `just_touched()` those that started touching it during the last frame and
+  `just_separated()` those that stopped. A **sensor** (`sensor = true`)
+  does not collide: it only notices what overlaps it (coins, doors, areas
+  that hurt). The lists are new each time, and only name nodes of the
+  game's tree.
+- `body = null` takes the body away. A `Body` belongs to one node: given
+  to two, both are simulated, and it shows what happened to the last one.
+- Nodes of scenes keep their `[node.body]`. Console programs have no
+  physics: their bodies never move or touch anything.
+- `Body` cannot be extended, and has no `init`: `Body()` is an error.
 
 **Input works with actions**, declared in the project, not in the scripts.
 The game asks for an action by name, so the same code works with keyboard,

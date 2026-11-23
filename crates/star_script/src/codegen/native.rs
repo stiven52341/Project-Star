@@ -103,11 +103,12 @@ pub mod Game {
     }
 }";
 
-/// The modules of the engine classes `Color`, `Node`, `Sprite`, `Camera`,
-/// `Scene` and `Sound`.
+/// The modules of the engine classes `Color`, `Body`, `Node`, `Sprite`,
+/// `Camera`, `Scene` and `Sound`.
 pub(super) fn node_modules(out: &mut Writer) {
     let modules = [
         COLOR_MODULE,
+        BODY_MODULE,
         NODE_MODULE,
         SPRITE_MODULE,
         CAMERA_MODULE,
@@ -173,6 +174,143 @@ pub mod Color {
     }
 }";
 
+const BODY_MODULE: &str = "/// `class Body`, provided by the engine.
+pub mod Body {
+    /// A reference to an object of this class.
+    pub type Ref = ::std::rc::Rc<dyn Object>;
+
+    /// The nodes a body touches, without keeping them alive.
+    pub type Contacts_ = ::std::cell::RefCell<::std::vec::Vec<::std::rc::Weak<dyn crate::classes::Node::Object>>>;
+
+    /// The fields of a body: the public ones, the impulses given during the
+    /// frame, and what it touched in the last one.
+    pub struct Fields {
+        pub kind: ::star_script_runtime::Field<::std::string::String>,
+        pub shape: ::star_script_runtime::Field<::std::string::String>,
+        pub radius: ::star_script_runtime::Field<f32>,
+        pub width: ::star_script_runtime::Field<f32>,
+        pub height: ::star_script_runtime::Field<f32>,
+        pub gravity_scale: ::star_script_runtime::Field<f32>,
+        pub friction: ::star_script_runtime::Field<f32>,
+        pub bounciness: ::star_script_runtime::Field<f32>,
+        pub density: ::star_script_runtime::Field<f32>,
+        pub velocity_x: ::star_script_runtime::Field<f32>,
+        pub velocity_y: ::star_script_runtime::Field<f32>,
+        pub fixed_rotation: ::star_script_runtime::Field<bool>,
+        pub sensor: ::star_script_runtime::Field<bool>,
+        pub impulse_: ::std::cell::Cell<(f32, f32)>,
+        pub touching_: Contacts_,
+        pub just_touched_: Contacts_,
+        pub just_separated_: Contacts_,
+    }
+
+    /// Gives access to the fields of this class.
+    pub trait HasFields {
+        fn fields(&self) -> &Fields;
+    }
+
+    /// What a body can do.
+    pub trait Object: crate::AnyObject + HasFields {
+        fn apply_impulse(self: ::std::rc::Rc<Self>, x: f32, y: f32);
+        fn touching(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref>;
+        fn just_touched(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref>;
+        fn just_separated(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref>;
+    }
+
+    /// The methods of a body.
+    pub struct Methods;
+
+    impl Methods {
+        /// `func apply_impulse`: pushes the body once the frame ends.
+        pub fn apply_impulse(this_: &Ref, x: f32, y: f32) {
+            let impulse_ = &HasFields::fields(&**this_).impulse_;
+            let (old_x_, old_y_) = impulse_.get();
+            impulse_.set((old_x_ + x, old_y_ + y));
+        }
+
+        /// `func touching`
+        pub fn touching(this_: &Ref) -> ::star_script_runtime::List<crate::classes::Node::Ref> {
+            nodes_(&HasFields::fields(&**this_).touching_)
+        }
+
+        /// `func just_touched`
+        pub fn just_touched(this_: &Ref) -> ::star_script_runtime::List<crate::classes::Node::Ref> {
+            nodes_(&HasFields::fields(&**this_).just_touched_)
+        }
+
+        /// `func just_separated`
+        pub fn just_separated(this_: &Ref) -> ::star_script_runtime::List<crate::classes::Node::Ref> {
+            nodes_(&HasFields::fields(&**this_).just_separated_)
+        }
+    }
+
+    /// A new list with the nodes of `contacts_` that still exist.
+    fn nodes_(contacts_: &Contacts_) -> ::star_script_runtime::List<crate::classes::Node::Ref> {
+        ::star_script_runtime::List::from_vec(contacts_.borrow().iter().filter_map(::std::rc::Weak::upgrade).collect())
+    }
+
+    /// An object created as this class.
+    pub struct Instance {
+        pub Body: Fields,
+    }
+
+    impl HasFields for Instance {
+        fn fields(&self) -> &Fields { &self.Body }
+    }
+
+    impl crate::AnyObject for Instance {
+        fn Body(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref> { ::std::option::Option::Some(self) }
+    }
+
+    impl Object for Instance {
+        fn apply_impulse(self: ::std::rc::Rc<Self>, x: f32, y: f32) { Methods::apply_impulse(&(self as Ref), x, y) }
+        fn touching(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { Methods::touching(&(self as Ref)) }
+        fn just_touched(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { Methods::just_touched(&(self as Ref)) }
+        fn just_separated(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { Methods::just_separated(&(self as Ref)) }
+    }
+
+    /// A body of `kind` and `shape` at rest, with the engine's surface.
+    pub fn new_(kind: ::std::string::String, shape: &str, radius: f32, width: f32, height: f32) -> Ref {
+        let contacts_ = || ::std::cell::RefCell::new(::std::vec::Vec::new());
+        ::std::rc::Rc::new(Instance {
+            Body: Fields {
+                kind: ::star_script_runtime::Field::new(kind),
+                shape: ::star_script_runtime::Field::new(::std::string::String::from(shape)),
+                radius: ::star_script_runtime::Field::new(radius),
+                width: ::star_script_runtime::Field::new(width),
+                height: ::star_script_runtime::Field::new(height),
+                gravity_scale: ::star_script_runtime::Field::new(1.0),
+                friction: ::star_script_runtime::Field::new(0.5),
+                bounciness: ::star_script_runtime::Field::new(0.0),
+                density: ::star_script_runtime::Field::new(1.0),
+                velocity_x: ::star_script_runtime::Field::new(0.0),
+                velocity_y: ::star_script_runtime::Field::new(0.0),
+                fixed_rotation: ::star_script_runtime::Field::new(false),
+                sensor: ::star_script_runtime::Field::new(false),
+                impulse_: ::std::cell::Cell::new((0.0, 0.0)),
+                touching_: contacts_(),
+                just_touched_: contacts_(),
+                just_separated_: contacts_(),
+            },
+        })
+    }
+
+    /// `static func circle`
+    pub fn circle(kind: ::std::string::String, radius: f32) -> Ref {
+        new_(kind, \"circle\", radius, 1.0, 1.0)
+    }
+
+    /// `static func rectangle`
+    pub fn rectangle(kind: ::std::string::String, width: f32, height: f32) -> Ref {
+        new_(kind, \"rectangle\", 0.5, width, height)
+    }
+
+    /// `static func capsule`
+    pub fn capsule(kind: ::std::string::String, height: f32, radius: f32) -> Ref {
+        new_(kind, \"capsule\", radius, 1.0, height)
+    }
+}";
+
 const NODE_MODULE: &str = "/// `class Node`, provided by the engine.
 pub mod Node {
     /// A reference to an object of this class or of a subclass.
@@ -189,6 +327,7 @@ pub mod Node {
         pub rotation: ::star_script_runtime::Field<f32>,
         pub scale_x: ::star_script_runtime::Field<f32>,
         pub scale_y: ::star_script_runtime::Field<f32>,
+        pub body: ::star_script_runtime::Field<::std::option::Option<crate::classes::Body::Ref>>,
         pub id_: u64,
         pub parent_: ::std::cell::RefCell<::std::option::Option<::std::rc::Weak<dyn Object>>>,
         pub children_: ::std::cell::RefCell<::std::vec::Vec<Ref>>,
@@ -327,6 +466,7 @@ pub mod Node {
             rotation: ::star_script_runtime::Field::new(0.0),
             scale_x: ::star_script_runtime::Field::new(1.0),
             scale_y: ::star_script_runtime::Field::new(1.0),
+            body: ::star_script_runtime::Field::new(::std::option::Option::None),
             id_: NEXT_ID_.fetch_add(1, ::std::sync::atomic::Ordering::Relaxed),
             parent_: ::std::cell::RefCell::new(::std::option::Option::None),
             children_: ::std::cell::RefCell::new(::std::vec::Vec::new()),
@@ -556,6 +696,17 @@ pub mod Scene {
             let [r_, g_, b_, a_] = image_.color;
             look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
         }
+        if let ::std::option::Option::Some(solid_) = &node_.body {
+            let body_ = crate::classes::Body::new_(solid_.kind.clone(), &solid_.shape, solid_.radius, solid_.width, solid_.height);
+            let surface_ = crate::classes::Body::HasFields::fields(&*body_);
+            surface_.gravity_scale.set(solid_.gravity_scale);
+            surface_.fixed_rotation.set(solid_.fixed_rotation);
+            surface_.friction.set(solid_.friction);
+            surface_.bounciness.set(solid_.bounciness);
+            surface_.density.set(solid_.density);
+            surface_.sensor.set(solid_.sensor);
+            fields_.body.set(::std::option::Option::Some(body_));
+        }
         ::std::result::Result::Ok(object_)
     }
 }";
@@ -693,6 +844,7 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
         game: {class_path}::new(),
         nodes: ::std::vec::Vec::new(),
         pending: ::std::vec::Vec::new(),
+        known: ::std::collections::HashMap::new(),
         mirror: ::star_engine::script_nodes::ScriptNodes::new(),
     }};
     app_.run_game(game_)
@@ -707,6 +859,9 @@ struct EngineGame_ {{
     nodes: ::std::vec::Vec<crate::classes::Node::Ref>,
     /// Reused list of the nodes still to mirror, with their parent's number.
     pending: ::std::vec::Vec<(crate::classes::Node::Ref, ::std::option::Option<u64>)>,
+    /// Reused map of the nodes of the tree by their number, to tell bodies
+    /// what they touch.
+    known: ::std::collections::HashMap<u64, crate::classes::Node::Ref>,
     /// The node of the engine's world that mirrors each node of the game.
     mirror: ::star_engine::script_nodes::ScriptNodes,
 }}
@@ -729,8 +884,9 @@ impl ::star_engine::game::Game for EngineGame_ {{
             share_pointer_(&input, &self.view_(world), world.window_size());
         }}
         let delta_ = world.time().delta_seconds();
-        crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.game), delta_);
         let root_ = ::std::rc::Rc::clone(&crate::classes::Game::HasFields::fields(&*self.game).root_);
+        sync_bodies_(world, &mut self.mirror, &root_, &mut self.known, &mut self.nodes);
+        crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.game), delta_);
         crate::classes::Node::process_tree_(&root_, delta_, &mut self.nodes);
         mirror_nodes_(world, &mut self.mirror, &root_, &mut self.pending);
     }}
@@ -809,31 +965,126 @@ fn mirror_nodes_(
             rotation: fields_.rotation.get(),
             scale: ::star_engine::star_math::Vec2::new(fields_.scale_x.get(), fields_.scale_y.get()),
         };
-        let sprite_ = crate::AnyObject::Sprite(::std::rc::Rc::clone(&node_));
         fields_.name.read(|name_| {
-            match &sprite_ {
-                ::std::option::Option::Some(sprite_) => {
-                    let look_ = crate::classes::Sprite::HasFields::fields(&**sprite_);
-                    look_.texture.read(|texture_| {
-                        let layer_ = look_.layer.get().clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
-                        let shown_ = ::star_engine::script_nodes::ScriptSprite {
-                            texture: texture_,
-                            size: ::star_engine::star_math::Vec2::new(look_.width.get(), look_.height.get()),
-                            layer: layer_,
-                            pixelated: look_.pixelated.get(),
-                            color: look_.color.read(|color_| engine_color_(&**color_)),
-                        };
-                        mirror_.mirror(world_, &script_node_(fields_, parent_, name_, transform_, ::std::option::Option::Some(shown_)));
-                    });
-                }
-                ::std::option::Option::None => mirror_.mirror(world_, &script_node_(fields_, parent_, name_, transform_, ::std::option::Option::None)),
-            }
+            with_sprite_(&node_, |sprite_| {
+                with_body_(fields_, |body_| {
+                    let described_ = ::star_engine::script_nodes::ScriptNode {
+                        id: fields_.id_,
+                        parent: parent_,
+                        name: name_,
+                        transform: transform_,
+                        sprite: sprite_,
+                        body: body_,
+                    };
+                    mirror_.mirror(world_, &described_);
+                });
+            });
         });
         for child_ in fields_.children_.borrow().iter().rev() {
             pending_.push((::std::rc::Rc::clone(child_), ::std::option::Option::Some(fields_.id_)));
         }
     }
     mirror_.finish_frame(world_);
+}
+
+/// Runs `then_` with what the engine needs to know about the image `node_`
+/// shows, if it is a `Sprite`.
+fn with_sprite_(
+    node_: &crate::classes::Node::Ref,
+    then_: impl FnOnce(::std::option::Option<::star_engine::script_nodes::ScriptSprite<'_>>),
+) {
+    let ::std::option::Option::Some(sprite_) = crate::AnyObject::Sprite(::std::rc::Rc::clone(node_)) else {
+        return then_(::std::option::Option::None);
+    };
+    let look_ = crate::classes::Sprite::HasFields::fields(&*sprite_);
+    look_.texture.read(|texture_| {
+        let layer_ = look_.layer.get().clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
+        then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptSprite {
+            texture: texture_,
+            size: ::star_engine::star_math::Vec2::new(look_.width.get(), look_.height.get()),
+            layer: layer_,
+            pixelated: look_.pixelated.get(),
+            color: look_.color.read(|color_| engine_color_(&**color_)),
+        }));
+    });
+}
+
+/// Runs `then_` with what the engine needs to know about the node's body,
+/// if it has one, and forgets the impulses given to it.
+fn with_body_(
+    fields_: &crate::classes::Node::Fields,
+    then_: impl FnOnce(::std::option::Option<::star_engine::script_nodes::ScriptBody<'_>>),
+) {
+    let ::std::option::Option::Some(body_) = fields_.body.get() else {
+        return then_(::std::option::Option::None);
+    };
+    let body_ = crate::classes::Body::HasFields::fields(&*body_);
+    let (impulse_x_, impulse_y_) = body_.impulse_.replace((0.0, 0.0));
+    body_.kind.read(|kind_| {
+        body_.shape.read(|shape_| {
+            then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptBody {
+                kind: kind_,
+                shape: shape_,
+                radius: body_.radius.get(),
+                width: body_.width.get(),
+                height: body_.height.get(),
+                gravity_scale: body_.gravity_scale.get(),
+                fixed_rotation: body_.fixed_rotation.get(),
+                friction: body_.friction.get(),
+                bounciness: body_.bounciness.get(),
+                density: body_.density.get(),
+                sensor: body_.sensor.get(),
+                velocity: ::star_engine::star_math::Vec2::new(body_.velocity_x.get(), body_.velocity_y.get()),
+                impulse: ::star_engine::star_math::Vec2::new(impulse_x_, impulse_y_),
+            }));
+        });
+    });
+}
+
+/// Tells the nodes with a body of the game's tree what the simulation did
+/// in the last frame: where they are, how fast they move and what they
+/// touch. `known_` and `queue_` are reused, left empty.
+fn sync_bodies_(
+    world_: &::star_engine::star_ecs::World,
+    mirror_: &mut ::star_engine::script_nodes::ScriptNodes,
+    root_: &crate::classes::Node::Ref,
+    known_: &mut ::std::collections::HashMap<u64, crate::classes::Node::Ref>,
+    queue_: &mut ::std::vec::Vec<crate::classes::Node::Ref>,
+) {
+    mirror_.read_bodies(world_);
+    let mut next_ = ::std::option::Option::Some(::std::rc::Rc::clone(root_));
+    while let ::std::option::Option::Some(node_) = next_ {
+        let fields_ = crate::classes::Node::HasFields::fields(&*node_);
+        queue_.extend(fields_.children_.borrow().iter().cloned());
+        known_.insert(fields_.id_, ::std::rc::Rc::clone(&node_));
+        next_ = queue_.pop();
+    }
+    for (id_, node_) in known_.iter() {
+        let fields_ = crate::classes::Node::HasFields::fields(&**node_);
+        let ::std::option::Option::Some(body_) = fields_.body.get() else {
+            continue;
+        };
+        let ::std::option::Option::Some(state_) = mirror_.body_state(world_, *id_) else {
+            continue;
+        };
+        fields_.x.set(state_.transform.position.x);
+        fields_.y.set(state_.transform.position.y);
+        fields_.rotation.set(state_.transform.rotation);
+        let body_ = crate::classes::Body::HasFields::fields(&*body_);
+        body_.velocity_x.set(state_.velocity.x);
+        body_.velocity_y.set(state_.velocity.y);
+        let contacts_ = [
+            (&body_.touching_, state_.touching),
+            (&body_.just_touched_, state_.just_touched),
+            (&body_.just_separated_, state_.just_separated),
+        ];
+        for (list_, ids_) in contacts_ {
+            let mut list_ = list_.borrow_mut();
+            list_.clear();
+            list_.extend(ids_.iter().filter_map(|other_| known_.get(other_)).map(::std::rc::Rc::downgrade));
+        }
+    }
+    known_.clear();
 }
 
 /// The engine's value of a script `Color`.
@@ -849,23 +1100,6 @@ fn script_camera_(camera_: &dyn crate::classes::Camera::Object) -> ::star_engine
         id: node_.id_,
         position: ::star_engine::star_math::Vec2::new(node_.x.get(), node_.y.get()),
         view_height: crate::classes::Camera::HasFields::fields(camera_).view_height.get(),
-    }
-}
-
-/// What the engine needs to know about one node.
-fn script_node_<'a>(
-    fields_: &crate::classes::Node::Fields,
-    parent_: ::std::option::Option<u64>,
-    name_: &'a str,
-    transform_: ::star_engine::star_scene::Transform2D,
-    sprite_: ::std::option::Option<::star_engine::script_nodes::ScriptSprite<'a>>,
-) -> ::star_engine::script_nodes::ScriptNode<'a> {
-    ::star_engine::script_nodes::ScriptNode {
-        id: fields_.id_,
-        parent: parent_,
-        name: name_,
-        transform: transform_,
-        sprite: sprite_,
     }
 }";
 
@@ -899,6 +1133,22 @@ fn read_scene_(
                 layer: i64::from(image_.layer),
                 pixelated: image_.filter == ::star_engine::star_render::TextureFilter::Pixelated,
                 color: [image_.color.r, image_.color.g, image_.color.b, image_.color.a],
+            }),
+            body: node_.body.map(|settings_| {
+                let body_ = ::star_engine::script_nodes::ScriptBody::from_settings(&settings_);
+                ::star_script_runtime::scenes::SceneBody {
+                    kind: ::std::string::String::from(body_.kind),
+                    shape: ::std::string::String::from(body_.shape),
+                    radius: body_.radius,
+                    width: body_.width,
+                    height: body_.height,
+                    gravity_scale: body_.gravity_scale,
+                    fixed_rotation: body_.fixed_rotation,
+                    friction: body_.friction,
+                    bounciness: body_.bounciness,
+                    density: body_.density,
+                    sensor: body_.sensor,
+                }
             }),
         }
     });

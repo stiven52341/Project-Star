@@ -48,6 +48,20 @@ pub const SOUND_CLASS: &str = "Sound";
 /// Name of the engine class of the game's audio as a whole.
 pub const AUDIO_CLASS: &str = "Audio";
 
+/// Name of the engine class of the physics bodies of nodes.
+pub const BODY_CLASS: &str = "Body";
+
+/// The static methods of `Body` that make one, with the sizes of their
+/// shape after the kind.
+pub(super) const BODY_SHAPES: [(&str, &[&str]); 3] = [
+    ("circle", &["radius"]),
+    ("rectangle", &["width", "height"]),
+    ("capsule", &["height", "radius"]),
+];
+
+/// The methods of `Body` that list the nodes it touches.
+pub(super) const BODY_CONTACT_METHODS: [&str; 3] = ["touching", "just_touched", "just_separated"];
+
 /// The methods of `Input` that take the name of an action.
 pub(super) const INPUT_ACTION_METHODS: [(&str, Type); 4] = [
     ("is_down", Type::Bool),
@@ -102,7 +116,9 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     classes.add(input);
 
     let color = add_color_class(classes);
-    let node = add_node_class(classes);
+    let body = add_body_class(classes);
+    let node = add_node_class(classes, body);
+    add_body_methods(classes, body, node);
     add_sprite_class(classes, node, color);
     let camera = add_camera_class(classes, node);
 
@@ -171,7 +187,7 @@ fn add_color_class(classes: &mut ClassTable) -> ClassId {
 
 /// `Node`: an object of the scene tree, placed relative to its parent. The
 /// engine calls `start` once and `update` every frame while it is in the tree.
-fn add_node_class(classes: &mut ClassTable) -> ClassId {
+fn add_node_class(classes: &mut ClassTable, body: ClassId) -> ClassId {
     let mut node = ClassInfo::new(NODE_CLASS.to_owned(), ClassOrigin::Native);
     node.fields = vec![
         native_field("name", Type::String),
@@ -180,6 +196,7 @@ fn add_node_class(classes: &mut ClassTable) -> ClassId {
         native_field("rotation", Type::Float),
         native_field("scale_x", Type::Float),
         native_field("scale_y", Type::Float),
+        native_field("body", Type::Class(body).nullable()),
     ];
     node.constructor = Some(native_constructor(&[("name", Type::String)]));
     let id = classes.add(node);
@@ -205,6 +222,62 @@ fn add_node_class(classes: &mut ClassTable) -> ClassId {
     ];
     classes.class_mut(id).methods = methods.into();
     id
+}
+
+/// `Body`: the physics body of a node, made with `Body.circle`,
+/// `Body.rectangle` or `Body.capsule` (there is no `init`). Its kind and
+/// shape are words, and it keeps the sizes of every shape.
+fn add_body_class(classes: &mut ClassTable) -> ClassId {
+    let mut body = ClassInfo::new(BODY_CLASS.to_owned(), ClassOrigin::Native);
+    let floats = [
+        "radius",
+        "width",
+        "height",
+        "gravity_scale",
+        "friction",
+        "bounciness",
+        "density",
+        "velocity_x",
+        "velocity_y",
+    ];
+    body.fields = [("kind", Type::String), ("shape", Type::String)]
+        .into_iter()
+        .chain(floats.into_iter().map(|name| (name, Type::Float)))
+        .chain([("fixed_rotation", Type::Bool), ("sensor", Type::Bool)])
+        .map(|(name, ty)| native_field(name, ty))
+        .collect();
+    body.constructor = Some(ConstructorInfo {
+        parameters: Vec::new(),
+        is_private: true,
+        span: Span::new(0, 0),
+    });
+    classes.add(body)
+}
+
+/// The methods of `Body`, which name `Node`s.
+fn add_body_methods(classes: &mut ClassTable, body: ClassId, node: ClassId) {
+    let mut methods: Vec<MethodInfo> = BODY_SHAPES
+        .iter()
+        .map(|(name, sizes)| {
+            let parameters: Vec<(&str, Type)> = [("kind", Type::String)]
+                .into_iter()
+                .chain(sizes.iter().map(|size| (*size, Type::Float)))
+                .collect();
+            native_method(name, &parameters, Type::Class(body), true)
+        })
+        .collect();
+    methods.push(native_method(
+        "apply_impulse",
+        &[("x", Type::Float), ("y", Type::Float)],
+        Type::Void,
+        false,
+    ));
+    methods.extend(
+        BODY_CONTACT_METHODS
+            .iter()
+            .map(|name| native_method(name, &[], Type::list(Type::Class(node)), false)),
+    );
+    classes.class_mut(body).methods = methods;
 }
 
 /// `Sprite`: a node that shows an image of the asset folder.

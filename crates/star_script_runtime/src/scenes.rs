@@ -30,6 +30,8 @@ pub struct SceneNode {
     pub transform: Option<SceneTransform>,
     /// The image it shows; only `Sprite` objects can show one.
     pub sprite: Option<SceneSprite>,
+    /// Its physics body.
+    pub body: Option<SceneBody>,
 }
 
 /// Where a [`SceneNode`] is, relative to its parent.
@@ -62,6 +64,35 @@ pub struct SceneSprite {
     pub pixelated: bool,
     /// Red, green, blue and opacity, from `0.0` to `1.0`.
     pub color: [f32; 4],
+}
+
+/// The physics body of a [`SceneNode`], with the words and values of
+/// StarScript's `Body`. Every size is given, also those its shape does not
+/// use.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SceneBody {
+    /// `"dynamic"`, `"static"` or `"kinematic"`.
+    pub kind: String,
+    /// `"circle"`, `"rectangle"` or `"capsule"`.
+    pub shape: String,
+    /// Of circles and capsules.
+    pub radius: f32,
+    /// Of rectangles.
+    pub width: f32,
+    /// Of rectangles and capsules.
+    pub height: f32,
+    /// How much gravity pulls it.
+    pub gravity_scale: f32,
+    /// Whether collisions never turn it.
+    pub fixed_rotation: bool,
+    /// How hard it is to slide over.
+    pub friction: f32,
+    /// How much it bounces.
+    pub bounciness: f32,
+    /// Mass per square world unit.
+    pub density: f32,
+    /// Whether it only detects what overlaps it.
+    pub sensor: bool,
 }
 
 /// Reads the scene at an asset path, or explains why it cannot.
@@ -149,6 +180,7 @@ mod tests {
             parent,
             transform: None,
             sprite: None,
+            body: None,
         }
     }
 

@@ -974,6 +974,83 @@ fn sounds_are_loaded_and_may_be_missing() {
 }
 
 #[test]
+fn nodes_have_bodies_that_name_what_they_touch() {
+    assert_valid_body(
+        "const ball = Sprite(\"Ball\", \"ball.png\")\n \
+         ball.body = Body.circle(\"dynamic\", 0.5)\n \
+         const solid = ball.body\n \
+         if solid != null {\n solid.bounciness = 0.5\n solid.sensor = true\n \
+         solid.velocity_x = solid.velocity_y + 1.0\n solid.apply_impulse(0.0, 2.0)\n \
+         for other in solid.just_touched() {\n Debug.print(other.name)\n }\n \
+         Debug.print(solid.kind + solid.shape)\n }\n \
+         ball.body = Body.rectangle(\"static\", 2.0, 1.0)\n \
+         ball.body = Body.capsule(\"kinematic\", 2.0, 0.5)\n \
+         ball.body = null",
+    );
+    assert_eq!(
+        body_errors("const solid: Body = Node(\"Ball\").body"),
+        [mismatch("Body", "Body?")]
+    );
+}
+
+/// The example of `docs/starscript.md`.
+#[test]
+fn the_documented_bodies_are_valid() {
+    let settings = crate::GameSettings {
+        actions: ["left", "right", "jump"]
+            .map(|name| crate::InputAction {
+                name: name.into(),
+                bindings: vec!["Space".into()],
+            })
+            .into(),
+    };
+    let source = r#"
+class Ball extends Sprite {
+    init() {
+        super.init("Ball", "sprites/ball.png")
+        const solid = Body.circle("dynamic", 0.5)
+        solid.bounciness = 0.6
+        body = solid
+    }
+}
+
+class Hero extends Sprite {
+    init() {
+        super.init("Hero", "sprites/hero.png")
+        const solid = Body.capsule("dynamic", 2.0, 0.5)
+        solid.fixed_rotation = true
+        body = solid
+    }
+
+    override func update(delta: float) {
+        const solid = body
+        if solid == null { return }
+        solid.velocity_x = Input.axis("left", "right") * 4.0
+        if Input.just_pressed("jump") { solid.apply_impulse(0.0, 5.0) }
+        for other in solid.just_touched() {
+            if other.name == "Coin" { other.remove() }
+        }
+    }
+}
+"#;
+
+    let checked = check_with(&parse_source(source).expect("valid syntax"), &settings);
+
+    assert!(checked.is_ok(), "{:?}", checked.err());
+}
+
+#[test]
+fn bodies_only_come_from_their_shapes() {
+    assert_eq!(
+        body_errors("const solid = Body()"),
+        [Kind::PrivateMember {
+            name: "init".into(),
+            owner: "Body".into(),
+        }]
+    );
+}
+
+#[test]
 fn sounds_only_come_from_files() {
     assert_eq!(
         body_errors("const jump = Sound()"),

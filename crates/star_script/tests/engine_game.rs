@@ -108,6 +108,63 @@ class NodeGame extends Game {
 }
 ";
 
+/// A ball that falls on a floor loaded from a scene, and closes the game
+/// when it lands.
+const PHYSICS_GAME: &str = "
+class Ball extends Node {
+    init() {
+        super.init(\"Ball\")
+        body = Body.circle(\"dynamic\", 0.5)
+    }
+}
+
+class PhysicsGame extends Game {
+    var frames = 0
+    var ball = Ball()
+
+    override func start() {
+        const floor = Scene.load(\"levels/floor.scene\")
+        if floor != null {
+            add_child(floor)
+            const solid = floor.body
+            if solid != null {
+                Debug.print(solid.kind + \" \" + solid.shape + \" \" + solid.width.to_string())
+            }
+        }
+        add_child(ball)
+    }
+
+    override func update(delta: float) {
+        frames += 1
+        const solid = ball.body
+        if solid != null {
+            for other in solid.just_touched() {
+                Debug.print(\"landed on \" + other.name + \" \" + (ball.y < 0.0).to_string())
+                quit()
+            }
+        }
+        if frames == 600 {
+            Debug.print(\"never landed\")
+            quit()
+        }
+    }
+}
+";
+
+/// The floor of the physics game.
+const FLOOR_SCENE: &str = r#"
+format = 1
+
+[[node]]
+name = "Floor"
+position = [0.0, -2.0]
+
+[node.body]
+kind = "static"
+shape = "rectangle"
+size = [10.0, 1.0]
+"#;
+
 /// The scene the node game loads, from the `assets` folder of its working
 /// directory.
 const FLEET_SCENE: &str = r#"
@@ -170,6 +227,12 @@ fn games_run_in_the_engine_until_they_quit() {
     package
         .add_program("node_game", compile_with("node_game", NODE_GAME, &valid))
         .expect("valid name");
+    package
+        .add_program(
+            "physics_game",
+            compile_with("physics_game", PHYSICS_GAME, &valid),
+        )
+        .expect("valid name");
     package.write(&directory).expect("package written");
 
     build(&directory);
@@ -202,6 +265,21 @@ fn games_run_in_the_engine_until_they_quit() {
         "Fleet 2\nsprites/leader.png 1.5 0.5\ntrue\ntrue\n\
          game frame 1\nship start\nship x 1.0\ndrone start Wingman -2.0\ngame frame 2\nship x 2.0\n\
          game frame 3\nship x 3.0\n"
+    );
+
+    std::fs::write(levels.join("floor.scene"), FLOOR_SCENE).expect("scene written");
+    let output = Command::new(binary(&directory, "physics_game"))
+        .current_dir(&directory)
+        .output()
+        .expect("the game runs");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "the physics game failed:\n{stderr}"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "static rectangle 10.0\nlanded on Floor true\n"
     );
 
     let output = Command::new(binary(&directory, "misspelled_game"))

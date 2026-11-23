@@ -91,6 +91,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 44 | “Play” **builds the game with the system's Cargo**, from the engine's crates of the repository | The game a project makes is the same Rust a shipped game will be, built the same way, so what is played is what ships; no interpreter to keep in step with the compiler. The build runs off the UI thread and shares one target folder, so only the first “Play” builds the engine. It needs Rust installed and the editor run from the repository (a compile-time path to `crates/`): enough while the engine is developed. Rejected for now: shipping prebuilt engine libraries with the editor (comes with packaging), and running the game inside the editor's window (a game is its own process, so a crash or `quit()` never takes the editor with it) |
 | 45 | Sound decoding with **symphonia** (MPL-2.0), in `star_assets`; playback with **cpal** (Apache-2.0) and an **own mixer** in `star_audio` | symphonia is pure Rust (it builds for every platform, mobile included), maintained, and reads WAV, OGG Vorbis, MP3 and FLAC with one API; only the needed formats are enabled. Sounds are decoded whole into memory (`Sound`), simple and fast to start; long music may stream from the file later. cpal only opens the system's audio output (on Linux it needs the ALSA headers to build, `libasound2-dev`); mixing (voices, volumes, loops, groups) is the engine's own code, so it can be tested without a device and shaped by the engine's needs. Rejected: `rodio` and `kira` (they bring their own mixer and model), and one decoder crate per format (`hound`, `lewton`…: several APIs for the same job) |
 | 46 | 2D physics with **rapier2d** (Apache-2.0), hidden in `star_physics` | Pure Rust (every platform, mobile included), maintained, and mature: stable stacks, sensors, sleeping bodies, joints and continuous collision for later. The engine's own `Physics2d`, `BodySettings`, `Shape2d` and `Contact` are all games see, so the solver can be replaced. Time advances in **fixed steps** (1/60 s, at most 8 per frame), so a game behaves the same at any frame rate. Rejected: an own solver (stable stacking and many bodies are hard to get right) and `box2d` bindings (C code to build on every platform). It needs Rust 1.86 |
+| 47 | A StarScript body is a **`Body` object in a field of `Node`**, synced both ways | A node of any class (a `Sprite` too) can have one, as with `Body2D` and `[node.body]`. The simulation runs after the scripts, so before their next frame the generated game copies back the position and rotation of each node with a body, its velocity and what it touches (by `ScriptNodes::read_bodies` and `body_state`); a velocity the script changed and the impulses it gave are passed on through `Body2D`, which keeps them until the body exists. Kinds and shapes are words (`"dynamic"`, `"circle"`), since StarScript has no enums yet; a body the physics cannot simulate is left out with one warning, so a typo never stops the game. Contacts are polled lists (`touching`, `just_touched`, `just_separated`), like `Input`'s actions, and hold their nodes weakly. Rejected: a `Body` node class (a sprite could not be a body, and scenes put both on one node), callbacks on `Node` (every node class would grow), and calls into the physics from scripts (the world is only lent to the engine's code) |
 
 ## ECS
 
@@ -172,7 +173,9 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 - StarScript nodes (`Node`, `Sprite`) live in the script; after the scripts
   ran each frame, the generated game describes its tree to `ScriptNodes`
   (`star_engine::script_nodes`), which keeps one world node per script node
-  (decision 35).
+  (decision 35). A script node's `Body` becomes a `Body2D`, and what the
+  simulation did is copied back before the scripts' next frame (decision
+  47).
 
 ## Assets
 
@@ -339,6 +342,13 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   another shape is an error) and, only when they are not the defaults,
   `gravity_scale`, `fixed_rotation`, `friction`, `bounciness`, `density`
   and `sensor`.
+- A `Body2D` also takes a velocity (`set_velocity`) and impulses
+  (`apply_impulse`), passed to the body before the next step, so they work
+  on the frame the component is added; `velocity()` is the velocity after
+  the last step (or the one just set). `BodySettings::check` says whether a
+  body can be simulated without adding it.
+- StarScript nodes get bodies through the `Body` class (decision 47;
+  `docs/starscript.md`).
 
 ## Rendering
 

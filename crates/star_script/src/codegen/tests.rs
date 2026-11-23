@@ -261,6 +261,20 @@ fn games_read_scenes_through_the_engine() {
 }
 
 #[test]
+fn games_move_bodies_with_the_engine() {
+    let code = rust(
+        "class G extends Game {\n override func start() {\n const ball = Node(\"Ball\")\n \
+         ball.body = Body.circle(\"dynamic\", 0.5)\n ball.body?.apply_impulse(1.0, 0.0)\n \
+         add_child(ball)\n }\n}",
+    );
+
+    assert!(code.contains("pub mod Body {"));
+    assert!(code.contains("crate::classes::Body::circle("));
+    assert!(code.contains("sync_bodies_(world, &mut self.mirror, &root_"));
+    assert!(code.contains("body: node_.body.map(|settings_| {"));
+}
+
+#[test]
 fn games_play_sounds_through_the_engine() {
     let code = rust(
         "class G extends Game {\n var jump = Sound.load(\"jump.wav\")\n \
