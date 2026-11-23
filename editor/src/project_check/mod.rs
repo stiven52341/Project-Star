@@ -11,6 +11,7 @@ mod problem;
 mod program;
 mod scenes;
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -37,17 +38,23 @@ pub(crate) struct ProjectCheck {
     pub(crate) program: Option<GeneratedProgram>,
 }
 
-/// Checks the project in `directory`.
+/// The texts of files open in the editor, by their path inside the assets
+/// folder: what a check reads instead of their files, which may be older.
+pub(crate) type OpenTexts = HashMap<String, String>;
+
+/// Checks the project in `directory`, reading the files of `open` from
+/// there instead of from the disk.
 ///
 /// A project without scripts is a game written in Rust: its scenes are not
 /// checked against StarScript classes, which such games ignore. If a
 /// blueprint cannot become StarScript, only its problems are given for the
 /// program: the rest would only miss its class.
-pub(crate) fn check_project(directory: &Path) -> ProjectCheck {
+pub(crate) fn check_project_with(directory: &Path, open: &OpenTexts) -> ProjectCheck {
+    let assets_folder = AssetsFolder { directory, open };
     let mut problems = Vec::new();
     let settings = read_game_settings(directory, &mut problems);
     let assets = list_assets(directory, &mut problems);
-    let program = read_program(directory, &assets, &mut problems);
+    let program = read_program(&assets_folder, &assets, &mut problems);
     let scripts = assets.iter().filter(|path| is_program_file(path)).count();
     let (checked, generated) = if program.sources().is_empty() || !program.is_complete() {
         (None, None)
@@ -57,7 +64,7 @@ pub(crate) fn check_project(directory: &Path) -> ProjectCheck {
     if scripts > 0 {
         let classes = checked.as_ref().map(|checked| checked.analysis.classes());
         for path in assets.iter().filter(|path| path.ends_with(SCENE_EXTENSION)) {
-            if let Some(text) = read_asset(directory, path, &mut problems) {
+            if let Some(text) = assets_folder.read(path, &mut problems) {
                 problems.extend(scenes::check_scene(&asset_name(path), &text, classes));
             }
         }
@@ -99,10 +106,14 @@ fn is_program_file(path: &str) -> bool {
 
 /// The StarScript files and blueprints among `assets`, named as the
 /// problems name them.
-fn read_program(directory: &Path, assets: &[String], problems: &mut Vec<Problem>) -> Program {
+fn read_program(
+    folder: &AssetsFolder<'_>,
+    assets: &[String],
+    problems: &mut Vec<Problem>,
+) -> Program {
     let mut program = Program::new();
     for path in assets.iter().filter(|path| is_program_file(path)) {
-        let Some(text) = read_asset(directory, path, problems) else {
+        let Some(text) = folder.read(path, problems) else {
             continue;
         };
         if path.ends_with(BLUEPRINT_EXTENSION) {
@@ -114,12 +125,25 @@ fn read_program(directory: &Path, assets: &[String], problems: &mut Vec<Problem>
     program
 }
 
-/// The text of the file at `path` in the assets folder, or `None` (and a
-/// problem) if it cannot be read.
-fn read_asset(directory: &Path, path: &str, problems: &mut Vec<Problem>) -> Option<String> {
-    fs::read_to_string(directory.join(ASSETS_DIRECTORY).join(path))
-        .map_err(|error| problems.push(Problem::in_file(asset_name(path), error.to_string())))
-        .ok()
+/// The assets folder of the project in `directory`, with the texts open in
+/// the editor.
+struct AssetsFolder<'check> {
+    directory: &'check Path,
+    open: &'check OpenTexts,
+}
+
+impl AssetsFolder<'_> {
+    /// The text of the file at `path` in the assets folder (as it is open
+    /// in the editor, if it is), or `None` (and a problem) if it cannot be
+    /// read.
+    fn read(&self, path: &str, problems: &mut Vec<Problem>) -> Option<String> {
+        if let Some(text) = self.open.get(path) {
+            return Some(text.clone());
+        }
+        fs::read_to_string(self.directory.join(ASSETS_DIRECTORY).join(path))
+            .map_err(|error| problems.push(Problem::in_file(asset_name(path), error.to_string())))
+            .ok()
+    }
 }
 
 /// How problems name a file of the assets folder: from the project's root.

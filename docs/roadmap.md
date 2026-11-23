@@ -201,7 +201,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           saving, and “Problems” opening a script at the problem.
     - [x] 13.9b Writing aids: closing brackets and quotes, indentation on
           new lines, `Tab`/`Shift+Tab` over lines, `Ctrl+/` comments.
-    - [ ] 13.9c Mistakes while writing: checked in the background and
+    - [x] 13.9c Mistakes while writing: checked in the background and
           marked on their lines.
     - [ ] 13.9d Suggestions: names in scope and members, shown as faint
           text and accepted with `Tab`.

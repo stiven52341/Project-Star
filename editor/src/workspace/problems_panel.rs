@@ -5,7 +5,7 @@ use std::path::Path;
 use eframe::egui;
 use star_script::codegen::GeneratedProgram;
 
-use crate::project_check::{CheckJob, CheckStatus, Problem, ProjectCheck};
+use crate::project_check::{CheckJob, CheckStatus, OpenTexts, Problem, ProjectCheck};
 use crate::style::{ERROR_COLOR, SUCCESS_COLOR};
 use crate::texts;
 
@@ -51,7 +51,7 @@ impl ProblemsPanel {
             return;
         }
         let context = context.clone();
-        self.state = match CheckJob::start(directory.to_path_buf(), move || {
+        self.state = match CheckJob::start(directory.to_path_buf(), OpenTexts::new(), move || {
             context.request_repaint();
         }) {
             Ok(job) => CompileState::Running(job),

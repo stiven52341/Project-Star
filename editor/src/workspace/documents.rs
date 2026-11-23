@@ -8,6 +8,7 @@ use eframe::egui;
 
 use crate::blueprint_editor::BlueprintTab;
 use crate::project::ProjectDimension;
+use crate::project_check::OpenTexts;
 use crate::scene_editor::SceneDocument;
 use crate::script_editor::ScriptTab;
 use crate::texts;
@@ -85,6 +86,20 @@ impl Documents {
     /// is not open yet.
     pub(crate) fn open_script(&mut self, assets: &Path, path: String) {
         self.show_or_open(path, |path| Tab::Script(ScriptTab::open(assets, path)));
+    }
+
+    /// The texts of the open scripts, by their path inside the assets
+    /// folder, saved or not.
+    pub(crate) fn open_texts(&self) -> OpenTexts {
+        self.tabs
+            .iter()
+            .filter_map(|tab| match tab {
+                Tab::Script(script) => script
+                    .text()
+                    .map(|text| (script.path().to_owned(), text.to_owned())),
+                Tab::Blueprint(_) => None,
+            })
+            .collect()
     }
 
     /// Shows the tab of `path`, opening it with `open` if there is none.

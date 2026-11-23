@@ -4,6 +4,7 @@
 mod code_view;
 mod editing;
 mod highlight;
+mod mistakes;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,6 +13,9 @@ use eframe::egui;
 use star_script::Position;
 
 use self::code_view::CodeView;
+use self::mistakes::Mistake;
+use crate::project::ASSETS_DIRECTORY;
+use crate::project_check::Problem;
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -92,23 +96,40 @@ impl ScriptTab {
         self.view.jump_to(position);
     }
 
-    /// Shows the text to edit.
-    pub(crate) fn show(&mut self, ui: &mut egui::Ui) {
+    /// Its text, if its file could be read.
+    pub(crate) fn text(&self) -> Option<&str> {
+        self.text.as_deref().ok()
+    }
+
+    /// Shows the text to edit, with the mistakes among `problems` that are
+    /// in it marked. Returns whether the user changed it.
+    pub(crate) fn show(&mut self, ui: &mut egui::Ui, problems: &[Problem]) -> bool {
         let texts = texts::current();
         let text = match &mut self.text {
             Ok(text) => text,
             Err(error) => {
                 ui.colored_label(ERROR_COLOR, texts.script_unreadable(error));
-                return;
+                return false;
             }
         };
         if let Some(error) = &self.save_error {
             ui.colored_label(ERROR_COLOR, texts.script_not_saved(error));
         }
+        let file = format!("{ASSETS_DIRECTORY}/{}", self.path);
+        let mistakes: Vec<Mistake<'_>> = problems
+            .iter()
+            .filter(|problem| problem.file == file)
+            .filter_map(|problem| {
+                problem.position.map(|position| Mistake {
+                    position,
+                    message: &problem.message,
+                })
+            })
+            .collect();
         let id = ui.make_persistent_id(("script", &self.path));
-        if self.view.show(ui, text, id) {
-            self.unsaved = true;
-        }
+        let changed = self.view.show(ui, text, id, &mistakes);
+        self.unsaved |= changed;
+        changed
     }
 }
 

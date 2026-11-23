@@ -9,6 +9,7 @@ mod documents;
 mod editor_camera;
 mod grid;
 mod inspector_panel;
+mod live_check;
 mod menu_bar;
 mod output_panel;
 mod problems_panel;
@@ -26,6 +27,7 @@ use self::assets_panel::{AssetEvent, AssetsPanel, OpenedAsset};
 use self::console_panel::ConsolePanel;
 use self::documents::{ActiveDocument, Documents};
 use self::inspector_panel::show_inspector;
+use self::live_check::LiveCheck;
 use self::menu_bar::{MenuAction, MenuState, SAVE_SHORTCUT, show_menu_bar};
 use self::output_panel::OutputPanel;
 use self::problems_panel::{CheckEnd, ProblemsPanel};
@@ -84,6 +86,8 @@ pub(crate) struct EditorWindow {
     play_after_check: bool,
     bottom_tab: BottomTab,
     documents: Documents,
+    /// Checks the open scripts as they are written.
+    live_check: LiveCheck,
     /// What is waiting for the answer about unsaved changes.
     leaving: Option<Leaving>,
     /// Whether the user already chose to quit without saving.
@@ -121,6 +125,7 @@ impl EditorWindow {
             play_after_check: false,
             bottom_tab: BottomTab::Assets,
             documents: Documents::new(),
+            live_check: LiveCheck::new(),
             leaving: None,
             quit_confirmed: false,
             viewport,
@@ -136,6 +141,11 @@ impl EditorWindow {
     pub(crate) fn show(&mut self, ui: &mut egui::Ui) -> Option<EditorAction> {
         let mut action = None;
         self.follow_check(ui.ctx());
+        let documents = &self.documents;
+        self.live_check
+            .update(ui.ctx(), self.project.directory(), || {
+                documents.open_texts()
+            });
         self.output.update();
         self.handle_quit_request(ui.ctx());
         if ui.input_mut(|input| input.consume_shortcut(&SAVE_SHORTCUT)) {
@@ -336,7 +346,11 @@ impl EditorWindow {
                 }
             },
             ActiveDocument::Blueprint(tab) => tab.show(ui, self.problems.problems()),
-            ActiveDocument::Script(tab) => tab.show(ui),
+            ActiveDocument::Script(tab) => {
+                if tab.show(ui, self.live_check.problems()) {
+                    self.live_check.request();
+                }
+            }
         }
     }
 
@@ -374,6 +388,7 @@ impl EditorWindow {
                 }
                 Some(AssetEvent::Opened(OpenedAsset::Script(path))) => {
                     self.documents.open_script(self.assets.directory(), path);
+                    self.live_check.request();
                 }
                 Some(AssetEvent::Gone(path)) => self.documents.forget(&path),
                 None => {}
@@ -405,6 +420,7 @@ impl EditorWindow {
             }
         } else if path.ends_with(SCRIPT_EXTENSION) {
             self.documents.open_script(assets, path.to_owned());
+            self.live_check.request();
             if let (ActiveDocument::Script(tab), Some(position)) =
                 (self.documents.active(), problem.position)
             {

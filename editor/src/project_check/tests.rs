@@ -27,6 +27,10 @@ fn project(test_name: &str, files: &[(&str, &str)]) -> TestDirectory {
     directory
 }
 
+fn check_project(directory: &std::path::Path) -> ProjectCheck {
+    check_project_with(directory, &OpenTexts::new())
+}
+
 fn messages(check: &ProjectCheck) -> Vec<String> {
     check.problems.iter().map(ToString::to_string).collect()
 }
@@ -261,5 +265,28 @@ fn broken_blueprints_are_reported_alone() {
             .any(|problem| matches!(problem.origin, Some(Origin::Node { .. }))),
         "{:?}",
         messages(&check)
+    );
+}
+
+#[test]
+fn open_texts_are_checked_instead_of_their_files() {
+    let directory = project(
+        "check_open_texts",
+        &[
+            (MANIFEST_FILE_NAME, MANIFEST),
+            ("assets/demo.star", GAME),
+            ("assets/rock.star", ROCK),
+        ],
+    );
+    let open = OpenTexts::from([(
+        "rock.star".to_owned(),
+        "class Rock {\n  var x = @\n}\n".to_owned(),
+    )]);
+
+    let check = check_project_with(directory.path(), &open);
+
+    assert_eq!(
+        messages(&check),
+        ["assets/rock.star:2:11: unexpected character `@`"]
     );
 }

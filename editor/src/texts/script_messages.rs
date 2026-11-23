@@ -32,4 +32,14 @@ impl Texts {
             "Los scripts se editan como texto en el área central.",
         )
     }
+
+    /// How many mistakes the script shown has.
+    pub(crate) fn mistakes_in_script(&self, count: usize) -> String {
+        match (self.language, count) {
+            (Language::English, 1) => "1 mistake in this script".to_owned(),
+            (Language::English, _) => format!("{count} mistakes in this script"),
+            (Language::Spanish, 1) => "1 error en este script".to_owned(),
+            (Language::Spanish, _) => format!("{count} errores en este script"),
+        }
+    }
 }

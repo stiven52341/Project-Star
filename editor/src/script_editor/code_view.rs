@@ -10,6 +10,8 @@ use star_script::Position;
 
 use super::editing::{Action, Selection, apply};
 use super::highlight::colored;
+use super::mistakes::{Mark, Mistake, marks, paint_marks};
+use crate::style::ERROR_COLOR;
 use crate::texts;
 
 /// Space between the line numbers and the edges of their column.
@@ -36,8 +38,15 @@ impl CodeView {
         self.jump = Some(position);
     }
 
-    /// Shows `text` to edit. Returns whether the user changed it.
-    pub(super) fn show(&mut self, ui: &mut egui::Ui, text: &mut String, id: egui::Id) -> bool {
+    /// Shows `text` to edit, with `mistakes` marked on it. Returns whether
+    /// the user changed it.
+    pub(super) fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        text: &mut String,
+        id: egui::Id,
+        mistakes: &[Mistake<'_>],
+    ) -> bool {
         let font = egui::TextStyle::Monospace.resolve(ui.style());
         let jumped = self.jump.take().map(|position| {
             let index = char_index_of(text, position);
@@ -46,18 +55,37 @@ impl CodeView {
         });
         let footer_height = ui.spacing().interact_size.y;
         let mut changed = apply_writing_aids(ui.ctx(), text, id);
+        let marks = marks(text, mistakes);
         egui::ScrollArea::vertical()
             .id_salt(id)
             .auto_shrink(false)
             .max_height((ui.available_height() - footer_height).max(0.0))
             .show(ui, |ui| {
-                changed |= self.show_lines(ui, text, id, &font, jumped);
+                changed |= self.show_lines(ui, text, id, &font, jumped, &marks);
             });
         ui.separator();
-        if let Some(position) = self.cursor {
-            ui.weak(texts::current().cursor_position(position.line, position.column));
-        }
+        self.show_footer(ui, &marks);
         changed
+    }
+
+    /// Where the cursor is, and the mistake on its line or how many there
+    /// are.
+    fn show_footer(&self, ui: &mut egui::Ui, marks: &[Mark<'_>]) {
+        let texts = texts::current();
+        ui.horizontal(|ui| {
+            if let Some(position) = self.cursor {
+                ui.weak(texts.cursor_position(position.line, position.column));
+                ui.separator();
+            }
+            let on_cursor_line = marks
+                .iter()
+                .find(|mark| self.cursor.is_some_and(|cursor| cursor.line == mark.line));
+            if let Some(mark) = on_cursor_line {
+                ui.colored_label(ERROR_COLOR, mark.message);
+            } else if !marks.is_empty() {
+                ui.colored_label(ERROR_COLOR, texts.mistakes_in_script(marks.len()));
+            }
+        });
     }
 
     /// The column of line numbers and the text beside it; `jumped` is where
@@ -69,6 +97,7 @@ impl CodeView {
         id: egui::Id,
         font: &egui::FontId,
         jumped: Option<usize>,
+        marks: &[Mark<'_>],
     ) -> bool {
         let digits = digit_count(text.lines().count()).max(MIN_GUTTER_DIGITS);
         let digit_width = ui.fonts_mut(|fonts| fonts.glyph_width(font, '0'));
@@ -103,7 +132,13 @@ impl CodeView {
             .inner;
         let cursor = output.cursor_range.map(|range| range.primary.index.0);
         self.cursor = cursor.map(|index| position_of(text, index));
-        paint_line_numbers(ui, &output, font, self.cursor);
+        paint_line_numbers(ui, &output, font, self.cursor, marks);
+        if let Some(message) = paint_marks(ui, &output, marks) {
+            egui::Popup::from_response(&output.response)
+                .kind(egui::PopupKind::Tooltip)
+                .at_pointer()
+                .show(|ui| ui.colored_label(ERROR_COLOR, message));
+        }
         if let Some(index) = jumped {
             let rect = output
                 .galley
@@ -139,12 +174,13 @@ fn colored_cached(
 }
 
 /// Paints the number of each line left of its first row, the cursor's
-/// brighter.
+/// brighter and those with mistakes in red.
 fn paint_line_numbers(
     ui: &egui::Ui,
     output: &egui::text_edit::TextEditOutput,
     font: &egui::FontId,
     cursor: Option<Position>,
+    marks: &[Mark<'_>],
 ) {
     let painter = ui.painter();
     let right = output.galley_pos.x - GUTTER_PADDING;
@@ -153,7 +189,9 @@ fn paint_line_numbers(
     let mut starts_line = true;
     for row in &output.galley.rows {
         if starts_line {
-            let color = if cursor.is_some_and(|cursor| cursor.line == line) {
+            let color = if marks.iter().any(|mark| mark.line == line) {
+                ERROR_COLOR
+            } else if cursor.is_some_and(|cursor| cursor.line == line) {
                 visuals.strong_text_color()
             } else {
                 visuals.weak_text_color()
@@ -325,7 +363,7 @@ fn position_of(text: &str, index: usize) -> Position {
 
 /// The index of the character at `position` of `text`: the end of its line
 /// if the line is shorter, the end of the text if it has fewer lines.
-fn char_index_of(text: &str, position: Position) -> usize {
+pub(super) fn char_index_of(text: &str, position: Position) -> usize {
     let mut current = Position { line: 1, column: 1 };
     for (index, character) in text.chars().enumerate() {
         let past_line = current.line > position.line;

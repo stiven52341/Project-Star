@@ -712,6 +712,18 @@ in that frame too, so typing order is kept; pressing the key of a
 character is not such a key, as the character comes after it in an event
 of its own (a `Text`, or an input method's `Commit`).
 
+Mistakes are shown while writing (`workspace/live_check.rs`): half a
+second after the last change to a script (or after one is opened), the
+whole project is checked on a thread of its own, as “Compile” does, but
+reading the open scripts' texts instead of their files (`OpenTexts`,
+`check_project_with`), saved or not. Its problems are only marked in the
+code: “Problems” and “Play” still follow “Compile”. Each mistake of the
+script shown is marked with a wavy red line under the name, number or
+string it starts at, or under its one character (`mistakes.rs`, with
+tests), with its message under the pointer; its line number turns red, and
+below the text the mistake of the cursor's line is written, or how many the
+script has.
+
 Blueprints and scripts are saved with `Ctrl+S` or “File” → “Save”, and
 all of them before “Compile”, which reads the files. Tabs with unsaved changes
 show `●`; closing one, the project or the window asks first (“Save”,
