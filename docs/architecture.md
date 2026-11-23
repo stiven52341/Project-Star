@@ -92,6 +92,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 45 | Sound decoding with **symphonia** (MPL-2.0), in `star_assets`; playback with **cpal** (Apache-2.0) and an **own mixer** in `star_audio` | symphonia is pure Rust (it builds for every platform, mobile included), maintained, and reads WAV, OGG Vorbis, MP3 and FLAC with one API; only the needed formats are enabled. Sounds are decoded whole into memory (`Sound`), simple and fast to start; long music may stream from the file later. cpal only opens the system's audio output (on Linux it needs the ALSA headers to build, `libasound2-dev`); mixing (voices, volumes, loops, groups) is the engine's own code, so it can be tested without a device and shaped by the engine's needs. Rejected: `rodio` and `kira` (they bring their own mixer and model), and one decoder crate per format (`hound`, `lewton`…: several APIs for the same job) |
 | 46 | 2D physics with **rapier2d** (Apache-2.0), hidden in `star_physics` | Pure Rust (every platform, mobile included), maintained, and mature: stable stacks, sensors, sleeping bodies, joints and continuous collision for later. The engine's own `Physics2d`, `BodySettings`, `Shape2d` and `Contact` are all games see, so the solver can be replaced. Time advances in **fixed steps** (1/60 s, at most 8 per frame), so a game behaves the same at any frame rate. Rejected: an own solver (stable stacking and many bodies are hard to get right) and `box2d` bindings (C code to build on every platform). It needs Rust 1.86 |
 | 47 | A StarScript body is a **`Body` object in a field of `Node`**, synced both ways | A node of any class (a `Sprite` too) can have one, as with `Body2D` and `[node.body]`. The simulation runs after the scripts, so before their next frame the generated game copies back the position and rotation of each node with a body, its velocity and what it touches (by `ScriptNodes::read_bodies` and `body_state`); a velocity the script changed and the impulses it gave are passed on through `Body2D`, which keeps them until the body exists. Kinds and shapes are words (`"dynamic"`, `"circle"`), since StarScript has no enums yet; a body the physics cannot simulate is left out with one warning, so a typo never stops the game. Contacts are polled lists (`touching`, `just_touched`, `just_separated`), like `Input`'s actions, and hold their nodes weakly. Rejected: a `Body` node class (a sprite could not be a body, and scenes put both on one node), callbacks on `Node` (every node class would grow), and calls into the physics from scripts (the world is only lent to the engine's code) |
+| 48 | 3D materials are **PBR metallic-roughness**, lit by a few lights per frame in one pass | The model of glTF, Unity, Godot and Unreal, so imported models will look as their authors made them; the cost over Blinn-Phong is a few shader lines. Lights are a uniform array of 16 read by every 3D draw (forward shading): simple, every backend runs it, and enough for the games of this phase. Rejected: Blinn-Phong (models would need converting later), deferred shading and clustered lights (worth it with hundreds of lights; they can come behind the same `Frame` API), and shadows for now |
 
 ## ECS
 
@@ -381,8 +382,24 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
   `Mesh3dId`; `Frame::draw_mesh_3d(mesh, Material, transform)` draws it.
   Their triangles are counterclockwise seen from the side they show, and
   the other side is not drawn (back-face culling), so closed meshes cost
-  half. They are drawn before colored meshes and sprites. A `Material` has
-  a base color for now (step 9a); lights and PBR come with 9b.
+  half. They are drawn before colored meshes and sprites.
+- **Materials are PBR, metallic-roughness** (decision 48): a `Material`
+  has a `base_color`, an optional `base_color_texture` (multiplied by it;
+  materials without one get a white pixel), `metallic` (0 to 1) and
+  `roughness` (0 to 1, at least 0.04 when drawn). The shader (`surface.wgsl`)
+  is Cook-Torrance: GGX distribution, Smith-Schlick geometry and Schlick's
+  Fresnel, with 4% reflectance for non-metals.
+- **Lights** belong to the `Frame`: `set_ambient_light(AmbientLight)` (none
+  at first, kept between frames like the camera) and up to `MAX_LIGHTS`
+  (16) `add_light`s per frame, either `DirectionalLight`s (a direction, like
+  the sun) or `PointLight`s (a position and a range, fading with the square
+  of the distance and smoothly reaching zero at the range). More lights are
+  `EngineError::CapacityExceeded` when rendering; lights that cannot shine
+  (a zero direction, no range, numbers that are not finite) are skipped. A
+  light of intensity 1 straight on a white matte surface gives white.
+  Normals use the inverse transpose of the model matrix (`Mat4::inverse`,
+  `transposed`), so non-uniform scales keep them right. Lighting happens in
+  linear space on sRGB targets; on other targets colors stay as given.
 - Each draw has its transform (projection·view·model) in a slot of a single
   uniform buffer with a dynamic offset: it works on every backend, OpenGL
   included, and uploads all the matrices of the frame in a single copy.

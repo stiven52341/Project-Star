@@ -2,7 +2,7 @@
 
 use star_math::Mat4;
 
-use crate::{Camera, Color, Material, Mesh3dId, MeshId, Sprite};
+use crate::{AmbientLight, Camera, Color, Light, Material, Mesh3dId, MeshId, Sprite};
 
 /// One mesh to draw, placed in the world by `transform`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -27,6 +27,8 @@ pub(crate) struct SurfaceDraw {
 pub struct Frame {
     clear_color: Color,
     camera: Camera,
+    ambient_light: AmbientLight,
+    lights: Vec<Light>,
     draws: Vec<DrawCommand>,
     surfaces: Vec<SurfaceDraw>,
     sprites: Vec<Sprite>,
@@ -40,9 +42,11 @@ impl Frame {
     }
 
     /// Starts a new frame filled with `clear_color`, discarding the previous
-    /// meshes and sprites. The camera is kept.
+    /// meshes, sprites and lights. The camera and the ambient light are
+    /// kept.
     pub fn begin(&mut self, clear_color: Color) {
         self.clear_color = clear_color;
+        self.lights.clear();
         self.draws.clear();
         self.surfaces.clear();
         self.sprites.clear();
@@ -56,6 +60,31 @@ impl Frame {
     /// Sets the point of view used to draw the frame.
     pub fn set_camera(&mut self, camera: Camera) {
         self.camera = camera;
+    }
+
+    /// Sets the light that reaches every 3D surface from everywhere (none
+    /// at first).
+    pub fn set_ambient_light(&mut self, light: AmbientLight) {
+        self.ambient_light = light;
+    }
+
+    /// Lights the 3D meshes of this frame with `light`, besides the others.
+    /// A frame can have up to [`MAX_LIGHTS`](crate::MAX_LIGHTS): rendering
+    /// a frame with more is an error.
+    pub fn add_light(&mut self, light: impl Into<Light>) {
+        self.lights.push(light.into());
+    }
+
+    /// The light that reaches every 3D surface from everywhere.
+    #[must_use]
+    pub fn ambient_light(&self) -> AmbientLight {
+        self.ambient_light
+    }
+
+    /// The lights of this frame, in the order they were added.
+    #[must_use]
+    pub fn lights(&self) -> &[Light] {
+        &self.lights
     }
 
     /// Draws `mesh` placed in the world by `transform` (position, rotation, scale).
@@ -167,8 +196,17 @@ mod tests {
         frame.draw(any_mesh_id(), Mat4::IDENTITY);
         frame.draw_mesh_3d(Mesh3dId(0), Material::default(), Mat4::IDENTITY);
         frame.draw_sprite(any_sprite());
+        frame.set_ambient_light(AmbientLight::new(Color::WHITE, 0.5));
+        frame.add_light(crate::DirectionalLight {
+            direction: star_math::Vec3::UP,
+            color: Color::WHITE,
+            intensity: 1.0,
+        });
 
         frame.begin(Color::WHITE);
+
+        assert_eq!(frame.lights().len(), 0);
+        assert_eq!(frame.ambient_light().intensity, 0.5);
 
         assert_eq!(frame.draw_count(), 0);
         assert_eq!(frame.mesh_3d_count(), 0);

@@ -8,7 +8,10 @@ use std::f32::consts::FRAC_PI_2;
 use star_math::{Mat4, Vec2, Vec3};
 
 use crate::scene_renderer::SceneRenderer;
-use crate::{Camera, Color, Frame, Image, Material, MeshData, Sprite, TextureFilter, TextureId};
+use crate::{
+    AmbientLight, Camera, Color, DirectionalLight, Frame, Image, Material, MeshData, PointLight,
+    Sprite, TextureFilter, TextureId,
+};
 
 /// Width and height of the target, in pixels.
 const SIZE: u32 = 8;
@@ -228,12 +231,25 @@ fn unknown_textures_are_an_error() {
 
 const BLACK: [u8; 4] = [0, 0, 0, 255];
 
-/// A frame that looks at the origin from 5 units away along z.
+/// A frame that looks at the origin from 5 units away along z, lit by an
+/// ambient light that shows colors as they are.
 fn frame_3d() -> Frame {
     let mut frame = Frame::new();
     frame.set_camera(Camera::new_3d(Vec3::new(0.0, 0.0, 5.0), Vec3::ZERO));
+    frame.set_ambient_light(AmbientLight::new(Color::WHITE, 1.0));
     frame
 }
+
+/// A white square 2 units wide, facing up.
+fn plane(gpu: &mut Gpu) -> crate::Mesh3dId {
+    gpu.scene
+        .create_mesh_3d(&MeshData::plane(Vec2::new(2.0, 2.0)).unwrap())
+        .unwrap()
+}
+
+/// Turns a plane to face the camera of [`frame_3d`].
+const FACE_THE_CAMERA: f32 = FRAC_PI_2;
+const MATTE_WHITE: Material = Material::new(Color::WHITE).with_roughness(1.0);
 
 #[test]
 #[ignore = "needs a GPU"]
@@ -260,10 +276,7 @@ fn meshes_3d_show_their_material() {
 #[ignore = "needs a GPU"]
 fn the_back_of_3d_meshes_is_not_drawn() {
     let mut gpu = Gpu::new();
-    let plane = gpu
-        .scene
-        .create_mesh_3d(&MeshData::plane(Vec2::new(2.0, 2.0)).unwrap())
-        .unwrap();
+    let plane = plane(&mut gpu);
     let green = Material::new(Color::rgb(0.0, 1.0, 0.0));
     let mut center = |turn: f32| {
         let mut frame = frame_3d();
@@ -272,6 +285,69 @@ fn the_back_of_3d_meshes_is_not_drawn() {
     };
 
     // Turned to face the camera, then away from it.
-    assert_eq!(center(FRAC_PI_2), GREEN);
-    assert_eq!(center(-FRAC_PI_2), BLACK);
+    assert_eq!(center(FACE_THE_CAMERA), GREEN);
+    assert_eq!(center(-FACE_THE_CAMERA), BLACK);
+}
+
+/// The red of the center of a matte white square facing the camera, lit
+/// only by `light`.
+fn lit_center(light: impl Into<crate::Light>) -> u8 {
+    let mut gpu = Gpu::new();
+    let plane = plane(&mut gpu);
+    let mut frame = frame_3d();
+    frame.set_ambient_light(AmbientLight::NONE);
+    frame.add_light(light);
+    frame.draw_mesh_3d(plane, MATTE_WHITE, Mat4::from_rotation_x(FACE_THE_CAMERA));
+    pixel(&gpu.render(&frame), SIZE / 2, SIZE / 2)[0]
+}
+
+#[test]
+#[ignore = "needs a GPU"]
+fn surfaces_facing_a_light_are_lit_and_the_others_are_not() {
+    let sun = |direction| DirectionalLight {
+        direction,
+        color: Color::WHITE,
+        intensity: 1.0,
+    };
+
+    let facing = lit_center(sun(Vec3::new(0.0, 0.0, -1.0)));
+    let behind = lit_center(sun(Vec3::new(0.0, 0.0, 1.0)));
+
+    assert!(facing > 230, "{facing}");
+    assert_eq!(behind, 0);
+}
+
+#[test]
+#[ignore = "needs a GPU"]
+fn point_lights_fade_with_distance_and_end_at_their_range() {
+    let lamp = |distance: f32, range: f32| PointLight {
+        position: Vec3::new(0.0, 0.0, distance),
+        color: Color::WHITE,
+        intensity: 1.0,
+        range,
+    };
+
+    let near = lit_center(lamp(0.5, 10.0));
+    let far = lit_center(lamp(2.0, 10.0));
+    let out_of_range = lit_center(lamp(2.0, 1.0));
+
+    assert!(near > far && far > 0, "{near} {far}");
+    assert_eq!(out_of_range, 0);
+}
+
+#[test]
+#[ignore = "needs a GPU"]
+fn textures_tint_3d_surfaces() {
+    let mut gpu = Gpu::new();
+    let plane = plane(&mut gpu);
+    let blue = gpu.texture(1, 1, &[BLUE]);
+    let mut frame = frame_3d();
+
+    frame.draw_mesh_3d(
+        plane,
+        Material::default().with_texture(blue),
+        Mat4::from_rotation_x(FACE_THE_CAMERA),
+    );
+
+    assert_eq!(pixel(&gpu.render(&frame), SIZE / 2, SIZE / 2), BLUE);
 }

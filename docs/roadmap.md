@@ -75,8 +75,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         coordinates), primitives (cube, plane, sphere), uploaded with
         `GameContext::create_mesh_3d` and drawn with a `Material` (base
         color) by `Frame::draw_mesh_3d`, with back-face culling.
-  - [ ] 9b PBR materials (metallic-roughness, base color texture) and
-        lights: ambient, directional and point lights.
+  - [x] 9b PBR materials (metallic-roughness, base color texture) and
+        lights: ambient, directional and point lights (decision 48).
   - [ ] 9c Example `scene_3d`.
   - [ ] 9d 3D nodes: `Transform3D` (with quaternions) and mesh nodes, in
         the engine and in `.scene` files.

@@ -18,6 +18,7 @@ mod gpu_info;
 mod gpu_tests;
 #[cfg(feature = "interop")]
 pub mod interop;
+mod light;
 mod material;
 mod mesh;
 mod mesh_data;
@@ -37,7 +38,8 @@ pub use camera::{Camera, Projection};
 pub use color::Color;
 pub use frame::Frame;
 pub use gpu_info::GpuInfo;
-pub use material::Material;
+pub use light::{AmbientLight, DirectionalLight, Light, MAX_LIGHTS, PointLight};
+pub use material::{DEFAULT_ROUGHNESS, Material};
 pub use mesh::{Mesh3dId, MeshId};
 pub use mesh_data::{
     MAX_SPHERE_DIVISIONS, MIN_SPHERE_RINGS, MIN_SPHERE_SEGMENTS, MeshData, MeshVertex,

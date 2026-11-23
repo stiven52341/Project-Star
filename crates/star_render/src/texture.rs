@@ -80,13 +80,33 @@ impl TextureBindings {
         filter: TextureFilter,
     ) -> EngineResult<GpuTexture> {
         ensure_fits(image, device.limits().max_texture_dimension_2d)?;
+        let sampler = match filter {
+            TextureFilter::Smooth => &self.smooth_sampler,
+            TextureFilter::Pixelated => &self.pixelated_sampler,
+        };
+        let pixels = Pixels {
+            width: image.width(),
+            height: image.height(),
+            rgba: image.pixels(),
+        };
+        Ok(self.create(device, queue, &pixels, sampler))
+    }
+
+    /// Copies `pixels`, which fit the GPU, to a texture sampled by `sampler`.
+    fn create(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        pixels: &Pixels<'_>,
+        sampler: &wgpu::Sampler,
+    ) -> GpuTexture {
         let texture = device.create_texture_with_data(
             queue,
             &wgpu::TextureDescriptor {
                 label: Some("texture"),
                 size: wgpu::Extent3d {
-                    width: image.width(),
-                    height: image.height(),
+                    width: pixels.width,
+                    height: pixels.height,
                     depth_or_array_layers: 1,
                 },
                 mip_level_count: 1,
@@ -97,13 +117,9 @@ impl TextureBindings {
                 view_formats: &[],
             },
             wgpu::util::TextureDataOrder::LayerMajor,
-            image.pixels(),
+            pixels.rgba,
         );
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let sampler = match filter {
-            TextureFilter::Smooth => &self.smooth_sampler,
-            TextureFilter::Pixelated => &self.pixelated_sampler,
-        };
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("texture"),
             layout: &self.layout,
@@ -118,7 +134,26 @@ impl TextureBindings {
                 },
             ],
         });
-        Ok(GpuTexture { bind_group })
+        GpuTexture { bind_group }
+    }
+}
+
+/// RGBA8 pixels in sRGB, row by row.
+struct Pixels<'a> {
+    width: u32,
+    height: u32,
+    rgba: &'a [u8],
+}
+
+impl TextureBindings {
+    /// A texture of one white pixel, which shows a color as it is.
+    pub(crate) fn upload_white(&self, device: &wgpu::Device, queue: &wgpu::Queue) -> GpuTexture {
+        let white = Pixels {
+            width: 1,
+            height: 1,
+            rgba: &[u8::MAX; 4],
+        };
+        self.create(device, queue, &white, &self.pixelated_sampler)
     }
 }
 

@@ -8,7 +8,7 @@ use crate::mesh::{GpuMesh, Topology, primitive_vertex_count};
 use crate::mesh_pipeline::MeshPipeline;
 use crate::sprite_pipeline::SpritePipeline;
 use crate::store::Store;
-use crate::surface_pipeline::{GpuSurfaceMesh, SurfacePipeline, SurfaceUniforms};
+use crate::surface_pipeline::{FrameLights, GpuSurfaceMesh, SurfacePipeline, SurfaceUniforms};
 use crate::texture::{GpuTexture, TextureBindings};
 use crate::vertex::encode_vertices;
 use crate::{Color, Frame, Image, Mesh3dId, MeshData, MeshId, TextureFilter, TextureId, Vertex};
@@ -27,6 +27,8 @@ pub(crate) struct SceneRenderer {
     meshes: Store<GpuMesh>,
     surface_meshes: Store<GpuSurfaceMesh>,
     textures: Store<GpuTexture>,
+    /// What 3D materials without a texture show: one white pixel.
+    white_texture: GpuTexture,
 }
 
 impl SceneRenderer {
@@ -39,10 +41,16 @@ impl SceneRenderer {
         height: u32,
     ) -> Self {
         let texture_bindings = TextureBindings::new(&device, target_format);
+        let white_texture = texture_bindings.upload_white(&device, &queue);
         Self {
             depth_buffer: DepthBuffer::new(&device, width, height),
             mesh_pipeline: MeshPipeline::new(&device, target_format),
-            surface_pipeline: SurfacePipeline::new(&device, target_format),
+            surface_pipeline: SurfacePipeline::new(
+                &device,
+                target_format,
+                texture_bindings.layout(),
+            ),
+            white_texture,
             sprite_pipeline: SpritePipeline::new(&device, target_format, texture_bindings.layout()),
             texture_bindings,
             meshes: Store::default(),
@@ -149,8 +157,20 @@ impl SceneRenderer {
             &self.queue,
             frame.surfaces().iter().map(|draw| SurfaceUniforms {
                 model_view_projection: view_projection * draw.transform,
+                model: draw.transform,
                 base_color: draw.material.base_color.in_target_space(target_format),
+                metallic: draw.material.metallic,
+                roughness: draw.material.roughness,
             }),
+        )?;
+        self.surface_pipeline.upload_lights(
+            &self.queue,
+            &FrameLights {
+                camera_position: frame.camera().position,
+                ambient: frame.ambient_light(),
+                lights: frame.lights(),
+            },
+            |color| color.in_target_space(target_format),
         )?;
         self.sprite_pipeline.prepare(
             &self.device,
@@ -183,7 +203,12 @@ impl SceneRenderer {
             let mut pass = self.begin_main_pass(&mut encoder, target, frame.clear_color());
             for (slot, draw) in (0..).zip(frame.surfaces()) {
                 let mesh = self.mesh_3d(draw.mesh)?;
-                self.surface_pipeline.draw(&mut pass, slot, mesh);
+                let texture = match draw.material.base_color_texture {
+                    Some(id) => self.texture(id)?,
+                    None => &self.white_texture,
+                };
+                self.surface_pipeline
+                    .draw(&mut pass, slot, mesh, &texture.bind_group);
             }
             for (slot, draw) in (0..).zip(frame.draws()) {
                 let mesh = self.mesh(draw.mesh)?;
