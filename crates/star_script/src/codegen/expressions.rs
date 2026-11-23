@@ -204,22 +204,33 @@ impl Body<'_> {
             | BinaryOperator::Less
             | BinaryOperator::LessEqual
             | BinaryOperator::Greater
-            | BinaryOperator::GreaterEqual => Ok(format!(
-                "(({}) {} ({}))",
-                self.expression(left)?,
-                operator.symbol(),
-                self.expression(right)?
-            )),
+            | BinaryOperator::GreaterEqual => {
+                let (left, right) = self.common_operands(left, right)?;
+                Ok(format!("(({left}) {} ({right}))", operator.symbol()))
+            }
             BinaryOperator::Add
             | BinaryOperator::Subtract
             | BinaryOperator::Multiply
             | BinaryOperator::Divide
             | BinaryOperator::Remainder => {
                 let ty = self.context.type_of(expression)?;
-                let left = self.expression(left)?;
-                let right = self.expression(right)?;
+                let left = self.value_as(left, ty)?;
+                let right = self.value_as(right, ty)?;
                 arithmetic(operator, ty, &left, &right, expression.span)
             }
+        }
+    }
+
+    /// Both sides of an operator, numbers converted to the type they meet in
+    /// (`small < count`: `small` as an `int`).
+    pub(super) fn common_operands(&self, left: &Expr, right: &Expr) -> Result<(String, String)> {
+        let left_type = self.context.type_of(left)?;
+        match left_type.common_number(self.context.type_of(right)?) {
+            Some(common) => Ok((
+                self.value_as(left, &common)?,
+                self.value_as(right, &common)?,
+            )),
+            None => Ok((self.expression(left)?, self.expression(right)?)),
         }
     }
 
@@ -355,7 +366,7 @@ pub(super) fn arithmetic(
     Ok(match (ty, operator) {
         (integer, operator) if integer.is_integer() => integer_arithmetic(operator, left, right),
         (Type::String, BinaryOperator::Add) => format!("{RUNTIME}::concat({left}, &({right}))"),
-        (Type::Float, _) => format!("(({left}) {} ({right}))", operator.symbol()),
+        (Type::Float | Type::Double, _) => format!("(({left}) {} ({right}))", operator.symbol()),
         _ => return Err(internal("arithmetic on a non-numeric type", span)),
     })
 }
@@ -378,28 +389,33 @@ fn integer_type(ty: &Type) -> Option<&'static str> {
 
 fn literal_code(literal: &Literal, ty: &Type) -> String {
     match literal {
-        // An integer literal where a `float` is needed: `var speed: float = 2`.
-        #[allow(clippy::cast_precision_loss)] // Literals that large are not exact floats anyway.
-        Literal::Integer(value) if *ty == Type::Float => float_literal(*value as f64),
+        // An integer literal where a decimal is needed: `var speed: float = 2`.
+        #[allow(clippy::cast_precision_loss)] // Literals that large are not exact decimals anyway.
+        Literal::Integer(value) if !ty.is_integer() => decimal_literal(*value as f64, ty),
         Literal::Integer(value) => format!("{value}_{}", integer_type(ty).unwrap_or("i32")),
-        Literal::Float(value) => float_literal(*value),
+        Literal::Float(value) => decimal_literal(*value, ty),
         Literal::String(text) => format!("::std::string::String::from({text:?})"),
         Literal::Bool(value) => value.to_string(),
         Literal::Null => NONE.to_owned(),
     }
 }
 
-/// A `float` literal. Values too large for a `float` become infinity,
-/// as when converting them at run time.
-#[allow(clippy::cast_possible_truncation)] // `float` is `f32` by design.
-fn float_literal(value: f64) -> String {
-    let value = value as f32;
-    if value.is_finite() {
-        format!("{value:?}_f32")
-    } else if value > 0.0 {
-        "f32::INFINITY".to_owned()
+/// A literal of `ty`, `double` or else `float`. Values too large for it
+/// become infinity, as when converting them at run time.
+fn decimal_literal(value: f64, ty: &Type) -> String {
+    let (suffix, text, finite) = if *ty == Type::Double {
+        ("f64", format!("{value:?}"), value.is_finite())
     } else {
-        "f32::NEG_INFINITY".to_owned()
+        #[allow(clippy::cast_possible_truncation)] // `float` is `f32` by design.
+        let value = value as f32;
+        ("f32", format!("{value:?}"), value.is_finite())
+    };
+    if finite {
+        format!("{text}_{suffix}")
+    } else if value > 0.0 {
+        format!("{suffix}::INFINITY")
+    } else {
+        format!("{suffix}::NEG_INFINITY")
     }
 }
 

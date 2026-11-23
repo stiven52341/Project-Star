@@ -51,6 +51,19 @@ class Basics {
             steps += step
         }
         Debug.print(steps.to_string())
+        var total: bigint = count
+        total += steps
+        Debug.print((total * 2).to_string())
+        Debug.print((steps < count).to_string())
+        var precise: double = 0.1
+        precise += 0.2
+        Debug.print(precise.to_string())
+        Debug.print((precise + steps).to_string())
+        var third: float = 1.5
+        precise = third
+        Debug.print((precise / 3).to_string())
+        var sizes: [bigint] = [steps, count]
+        Debug.print((sizes[0] == steps).to_string())
     }
 
     static func loops() {

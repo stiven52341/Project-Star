@@ -333,7 +333,9 @@ fn builtin_code(
         (Method::Ceil, _) => format!("({receiver}).ceil()"),
         (Method::Round, _) => format!("({receiver}).round()"),
         (Method::Sqrt, _) => format!("({receiver}).sqrt()"),
-        (Method::ToString, Type::Float) => format!("{RUNTIME}::float_to_string({receiver})"),
+        (Method::ToString, Type::Float | Type::Double) => {
+            format!("{RUNTIME}::float_to_string({receiver})")
+        }
         (Method::ToString, Type::String) => receiver.to_owned(),
         (Method::ToString, _) => format!("({receiver}).to_string()"),
         (Method::Length, Type::String) => format!("{RUNTIME}::text_length(&({receiver}))"),

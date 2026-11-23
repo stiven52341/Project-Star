@@ -34,7 +34,7 @@ macro_rules! plain_itself {
     };
 }
 
-plain_itself!(i16, i32, i64, f32, bool, String);
+plain_itself!(i16, i32, i64, f32, f64, bool, String);
 
 impl<T: Plain> Plain for Option<T> {
     type Sent = Option<T::Sent>;
@@ -80,6 +80,6 @@ mod tests {
     fn texts_and_numbers_are_their_own_copy() {
         assert_eq!(String::receive("hi".to_owned().send()), "hi");
         assert!(bool::receive(true.send()));
-        assert!((f32::receive(1.5.send()) - 1.5).abs() < f32::EPSILON);
+        assert!((f32::receive(1.5_f32.send()) - 1.5).abs() < f32::EPSILON);
     }
 }

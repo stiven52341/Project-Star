@@ -8,7 +8,9 @@ use super::{
 use crate::Span;
 
 /// Names of the basic types; they cannot be used as class names.
-pub const BASIC_TYPE_NAMES: [&str; 6] = ["short", "int", "bigint", "float", "bool", "string"];
+pub const BASIC_TYPE_NAMES: [&str; 7] = [
+    "short", "int", "bigint", "float", "double", "bool", "string",
+];
 
 /// The basic type called `name`.
 #[must_use]
@@ -18,6 +20,7 @@ pub fn basic_type(name: &str) -> Option<Type> {
         "int" => Some(Type::Int),
         "bigint" => Some(Type::BigInt),
         "float" => Some(Type::Float),
+        "double" => Some(Type::Double),
         "bool" => Some(Type::Bool),
         "string" => Some(Type::String),
         _ => None,
@@ -621,9 +624,10 @@ fn builtin_signature(receiver: &Type, method: BuiltinMethod) -> Option<(Vec<Type
         (number, Method::Min | Method::Max) if number.is_numeric() => {
             (vec![receiver.clone()], receiver.clone())
         }
-        (Type::Float, Method::Floor | Method::Ceil | Method::Round | Method::Sqrt) => {
-            (vec![], Type::Float)
-        }
+        (
+            Type::Float | Type::Double,
+            Method::Floor | Method::Ceil | Method::Round | Method::Sqrt,
+        ) => (vec![], receiver.clone()),
         (value, Method::ToString) if value.is_numeric() => (vec![], Type::String),
         (Type::Bool | Type::String, Method::ToString)
         | (Type::String, Method::ToUpper | Method::ToLower) => (vec![], Type::String),
@@ -677,6 +681,7 @@ mod tests {
         assert!(builtin_method(&Type::Bool, "length").is_none());
         assert!(builtin_method(&Type::Int, "explode").is_none());
         assert!(builtin_method(&Type::Short, "abs").is_some());
+        assert!(builtin_method(&Type::Double, "sqrt").is_some());
         assert!(builtin_method(&Type::BigInt, "to_string").is_some());
     }
 }

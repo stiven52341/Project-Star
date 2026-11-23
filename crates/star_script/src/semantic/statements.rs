@@ -160,15 +160,17 @@ impl Checker<'_> {
         }
     }
 
-    /// The bounds of `left..right`: integers of one type, which is the type
+    /// The bounds of `left..right`: integers, whose common type is the type
     /// of the values it goes through (`int` if both are literals).
     fn range_bounds(&mut self, left: &Expr, right: &Expr, span: Span) -> Type {
         let (left_type, right_type) = self.operands(left, right, None);
         if left_type.is_error() || right_type.is_error() {
             return Type::Error;
         }
-        if left_type == right_type && left_type.is_integer() {
-            return left_type;
+        if let Some(common) = left_type.common_number(&right_type)
+            && common.is_integer()
+        {
+            return common;
         }
         let kind = SemanticErrorKind::InvalidOperands {
             operator: BinaryOperator::Range.symbol(),
@@ -216,9 +218,11 @@ impl Checker<'_> {
         }
         let valid = target_type.is_error()
             || found.is_error()
-            || (found == target_type
-                && (target_type.is_numeric()
-                    || (operator == AssignOperator::Add && target_type == Type::String)));
+            || (target_type.is_numeric()
+                && target_type.common_number(&found) == Some(target_type.clone()))
+            || (operator == AssignOperator::Add
+                && target_type == Type::String
+                && found == Type::String);
         if !valid {
             let kind = SemanticErrorKind::InvalidOperands {
                 operator: operator.symbol(),

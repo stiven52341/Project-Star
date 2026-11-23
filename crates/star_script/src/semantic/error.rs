@@ -473,5 +473,5 @@ impl fmt::Display for SemanticErrorKind {
 
 /// Whether `name` is a numeric type, which `as` converts to any other.
 fn is_number_name(name: &str) -> bool {
-    matches!(name, "short" | "int" | "bigint" | "float")
+    matches!(name, "short" | "int" | "bigint" | "float" | "double")
 }

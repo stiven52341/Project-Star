@@ -173,11 +173,8 @@ impl Body<'_> {
             right,
         } = &iterable.kind
         {
-            return Ok(format!(
-                "({})..({})",
-                self.expression(left)?,
-                self.expression(right)?
-            ));
+            let (start, end) = self.common_operands(left, right)?;
+            return Ok(format!("({start})..({end})"));
         }
         Ok(format!("({}).snapshot()", self.expression(iterable)?))
     }
@@ -252,7 +249,7 @@ impl Body<'_> {
     ) -> Result<String> {
         match binary_operator(operator) {
             None => self.value_as(value, ty),
-            Some(binary) => arithmetic(binary, ty, current, &self.expression(value)?, value.span),
+            Some(binary) => arithmetic(binary, ty, current, &self.value_as(value, ty)?, value.span),
         }
     }
 

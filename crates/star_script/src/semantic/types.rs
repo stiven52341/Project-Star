@@ -11,8 +11,10 @@ pub enum Type {
     Int,
     /// `bigint`: 64-bit signed integer.
     BigInt,
-    /// `float`: 32-bit floating-point number.
+    /// `float`: 32-bit floating-point number, the usual one.
     Float,
+    /// `double`: 64-bit floating-point number.
+    Double,
     /// `bool`
     Bool,
     /// `string`
@@ -44,6 +46,7 @@ impl Type {
             | Self::Int
             | Self::BigInt
             | Self::Float
+            | Self::Double
             | Self::Bool
             | Self::String
             | Self::Error => true,
@@ -88,10 +91,40 @@ impl Type {
         matches!(self, Self::Error)
     }
 
-    /// An integer type or `float`.
+    /// An integer type, `float` or `double`.
     #[must_use]
     pub const fn is_numeric(&self) -> bool {
-        self.is_integer() || matches!(self, Self::Float)
+        self.is_integer() || matches!(self, Self::Float | Self::Double)
+    }
+
+    /// Whether a number of this type converts by itself to `to`, a wider
+    /// number type that holds every value of it exactly: `short` → `int`
+    /// → `bigint`, `float` → `double`, `short` → `float`, `int` → `double`.
+    #[must_use]
+    pub const fn widens_to(&self, to: &Self) -> bool {
+        matches!(
+            (self, to),
+            (
+                Self::Short,
+                Self::Int | Self::BigInt | Self::Float | Self::Double
+            ) | (Self::Int, Self::BigInt | Self::Double)
+                | (Self::Float, Self::Double)
+        )
+    }
+
+    /// The number type two numbers meet in: the same type, or the one the
+    /// other widens to. `None` if they are not numbers or neither widens.
+    #[must_use]
+    pub fn common_number(&self, other: &Self) -> Option<Self> {
+        if !self.is_numeric() || !other.is_numeric() {
+            None
+        } else if self == other || other.widens_to(self) {
+            Some(self.clone())
+        } else if self.widens_to(other) {
+            Some(other.clone())
+        } else {
+            None
+        }
     }
 
     /// `short`, `int` or `bigint`.
@@ -161,6 +194,20 @@ mod tests {
         assert_eq!(Type::Float.integer_range(), None);
         assert!(Type::Short.is_numeric() && Type::BigInt.is_integer());
         assert!(!Type::Float.is_integer());
+    }
+
+    #[test]
+    fn numbers_widen_only_without_losing_values() {
+        assert!(Type::Short.widens_to(&Type::BigInt));
+        assert!(Type::Int.widens_to(&Type::Double));
+        assert!(Type::Float.widens_to(&Type::Double));
+        assert!(!Type::Int.widens_to(&Type::Float));
+        assert!(!Type::BigInt.widens_to(&Type::Double));
+        assert!(!Type::Int.widens_to(&Type::Short));
+        assert_eq!(Type::Short.common_number(&Type::Int), Some(Type::Int));
+        assert_eq!(Type::Double.common_number(&Type::Int), Some(Type::Double));
+        assert_eq!(Type::Int.common_number(&Type::Float), None);
+        assert_eq!(Type::Int.common_number(&Type::Bool), None);
         assert!(!Type::Class(ClassId::new(0)).has_default_value());
         assert!(Type::Class(ClassId::new(0)).nullable().has_default_value());
     }

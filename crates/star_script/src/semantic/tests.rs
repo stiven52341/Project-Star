@@ -307,30 +307,57 @@ fn integer_literals_must_fit_in_their_type() {
 }
 
 #[test]
-fn integer_types_do_not_mix_without_as() {
+fn numbers_widen_by_themselves_without_losing_values() {
+    assert_valid_body(
+        "var small: short = 1
+         var big: bigint = n
+         big = small
+         big += n
+         var total = small + n
+         total = total * 2
+         var precise: double = speed
+         precise = precise + n + speed
+         var maybe: bigint? = small
+         var same = small == n
+         var less = n < precise
+         for i in small..n { total = i }",
+    );
+}
+
+#[test]
+fn numbers_that_could_lose_values_need_as() {
     assert_eq!(
-        body_errors("var small: short = 1\nvar sum = small + n"),
+        body_errors("var lives: int = 0\nvar big: bigint = 1\nlives = big"),
+        [mismatch("int", "bigint")]
+    );
+    assert_eq!(
+        body_errors("var sum = speed + n"),
         [Kind::InvalidOperands {
             operator: "+",
-            left: "short".into(),
+            left: "float".into(),
             right: "int".into()
         }]
     );
     assert_eq!(
-        body_errors("var big: bigint = n"),
-        [mismatch("bigint", "int")]
-    );
-    assert_eq!(
-        body_errors("var small: short = 1\nfor i in small..n { }"),
+        body_errors("var lives = 1\nlives += speed"),
         [Kind::InvalidOperands {
-            operator: "..",
-            left: "short".into(),
-            right: "int".into()
+            operator: "+=",
+            left: "int".into(),
+            right: "float".into()
         }]
+    );
+    assert_eq!(
+        body_errors("var list: [bigint] = [n]\nvar copy: [int] = list"),
+        [mismatch("[int]", "[bigint]")]
     );
     assert_valid_body(
         "var big = n as bigint + 1\nvar small = big as short\nvar x = small as float",
     );
+}
+
+#[test]
+fn decimal_literals_take_double_where_it_is_needed() {
+    assert_valid_body("var precise: double = 0.1\nprecise = 1.5 * precise + 2");
 }
 
 #[test]

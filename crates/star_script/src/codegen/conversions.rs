@@ -33,7 +33,7 @@ impl Context<'_> {
     /// The Rust type of values of `ty`.
     pub(super) fn rust_type(self, ty: &Type, span: Span) -> Result<String> {
         Ok(match ty {
-            Type::Short | Type::Int | Type::BigInt | Type::Float => {
+            Type::Short | Type::Int | Type::BigInt | Type::Float | Type::Double => {
                 number_type(ty).unwrap_or_default().to_owned()
             }
             Type::Bool => "bool".to_owned(),
@@ -66,6 +66,11 @@ impl Context<'_> {
                 let inner = self.coerce(code, from, to, span)?;
                 Ok(format!("{SOME}({inner})"))
             }
+            // A wider number holds the value exactly: `as` only widens it.
+            (from, to) if from.widens_to(to) => Ok(format!(
+                "(({code}) as {})",
+                number_type(to).unwrap_or_default()
+            )),
             (Type::Class(_), Type::Class(to)) => {
                 Ok(format!("(({code}) as {}::Ref)", self.class_path(*to)))
             }
@@ -121,6 +126,7 @@ impl Context<'_> {
 pub(super) fn default_value(ty: &Type, span: Span) -> Result<String> {
     Ok(match ty {
         Type::Float => "0.0_f32".to_owned(),
+        Type::Double => "0.0_f64".to_owned(),
         integer if integer.is_integer() => {
             format!("0_{}", number_type(integer).unwrap_or_default())
         }
@@ -144,6 +150,7 @@ pub(super) const fn number_type(ty: &Type) -> Option<&'static str> {
         Type::Int => Some("i32"),
         Type::BigInt => Some("i64"),
         Type::Float => Some("f32"),
+        Type::Double => Some("f64"),
         _ => None,
     }
 }

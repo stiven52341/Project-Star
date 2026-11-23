@@ -414,7 +414,7 @@ impl Checker<'_> {
             | BinaryOperator::Greater
             | BinaryOperator::GreaterEqual => {
                 let (left_type, right_type) = self.operands(left, right, None);
-                let valid = left_type == right_type && left_type.is_numeric();
+                let valid = left_type.common_number(&right_type).is_some();
                 self.report_operands(operator, &left_type, &right_type, valid, span);
                 Type::Bool
             }
@@ -424,10 +424,17 @@ impl Checker<'_> {
             | BinaryOperator::Divide
             | BinaryOperator::Remainder => {
                 let (left_type, right_type) = self.operands(left, right, expected);
-                let joins_text = operator == BinaryOperator::Add && left_type == Type::String;
-                let valid = left_type == right_type && (left_type.is_numeric() || joins_text);
+                let joins_text = operator == BinaryOperator::Add
+                    && left_type == Type::String
+                    && right_type == Type::String;
+                let result = if joins_text {
+                    Some(Type::String)
+                } else {
+                    left_type.common_number(&right_type)
+                };
+                let valid = result.is_some();
                 if self.report_operands(operator, &left_type, &right_type, valid, span) {
-                    left_type
+                    result.unwrap_or(Type::Error)
                 } else {
                     Type::Error
                 }
@@ -459,15 +466,16 @@ impl Checker<'_> {
         valid
     }
 
-    /// Checks both operands so that an integer literal adapts to the other
+    /// Checks both operands so that a number literal adapts to the other
     /// side: in `speed * 2` and `2 * speed`, `2` is a `float` if `speed` is.
+    /// The more adaptable side is checked last.
     pub(super) fn operands(
         &mut self,
         left: &Expr,
         right: &Expr,
         expected: Option<&Type>,
     ) -> (Type, Type) {
-        if is_integer_literal(left) && !is_integer_literal(right) {
+        if adaptability(left) > adaptability(right) {
             let right_type = self.expression(right, expected);
             let left_type = self.expression(left, Some(&right_type));
             (left_type, right_type)
@@ -659,6 +667,7 @@ fn literal_type(literal: &Literal, expected: Option<&Type>) -> Type {
     match (literal, expected.map(Type::non_null)) {
         (Literal::Integer(_), Some(number)) if number.is_numeric() => number,
         (Literal::Integer(_), _) => Type::Int,
+        (Literal::Float(_), Some(Type::Double)) => Type::Double,
         (literal, _) => other_literal_type(literal),
     }
 }
@@ -673,15 +682,17 @@ fn other_literal_type(literal: &Literal) -> Type {
     }
 }
 
-/// `3` or `-3`: literals that take the numeric type that is needed.
-fn is_integer_literal(expression: &Expr) -> bool {
+/// How many number types a value may take: an integer literal (`3`, `-3`)
+/// takes any, a decimal one `float` or `double`, anything else its own.
+fn adaptability(expression: &Expr) -> u8 {
     match &expression.kind {
-        ExprKind::Literal(Literal::Integer(_)) => true,
+        ExprKind::Literal(Literal::Integer(_)) => 2,
+        ExprKind::Literal(Literal::Float(_)) => 1,
         ExprKind::Unary {
             operator: UnaryOperator::Negate,
             operand,
-        } => is_integer_literal(operand),
-        _ => false,
+        } => adaptability(operand),
+        _ => 0,
     }
 }
 

@@ -292,7 +292,7 @@ impl ClassTable {
     pub fn is_assignable(&self, from: &Type, to: &Type) -> bool {
         match (from, to) {
             (Type::Error, _) | (_, Type::Error) | (Type::Null, Type::Nullable(_)) => true,
-            (from, to) if from == to => true,
+            (from, to) if from == to || from.widens_to(to) => true,
             (Type::Nullable(from), Type::Nullable(to)) => self.is_assignable(from, to),
             (from, Type::Nullable(to)) => self.is_assignable(from, to),
             (Type::Class(from), Type::Class(to)) => self.is_subclass(*from, *to),
@@ -308,6 +308,7 @@ impl ClassTable {
             Type::Int => "int".to_owned(),
             Type::BigInt => "bigint".to_owned(),
             Type::Float => "float".to_owned(),
+            Type::Double => "double".to_owned(),
             Type::Bool => "bool".to_owned(),
             Type::String => "string".to_owned(),
             Type::Void => "nothing".to_owned(),

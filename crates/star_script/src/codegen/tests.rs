@@ -64,6 +64,21 @@ fn each_integer_type_has_its_rust_width() {
 }
 
 #[test]
+fn numbers_widen_with_as() {
+    let code = rust(
+        "class A { func f(small: short, count: int) -> double {
+             var total: bigint = small
+             const precise: double = 0.5
+             return precise + count
+         } }",
+    );
+
+    assert!(code.contains("((small) as i64)"));
+    assert!(code.contains("0.5_f64"));
+    assert!(code.contains("((count) as f64)"));
+}
+
+#[test]
 fn entry_point_calls_static_main() {
     let code = rust("class Main { static func main() { Debug.print(\"hola\") } }");
 

@@ -89,7 +89,8 @@ Convention: `PascalCase` for classes, `snake_case` for variables and methods,
 Reserved words do nothing yet, but they cannot be used as names. That way,
 enabling them later will not break existing programs.
 
-The basic types (`short`, `int`, `bigint`, `float`, `bool`, `string`) are **not** keywords:
+The basic types (`short`, `int`, `bigint`, `float`, `double`, `bool`,
+`string`) are **not** keywords:
 they are names of predefined classes.
 
 ### Literals
@@ -97,7 +98,7 @@ they are names of predefined classes.
 | Type | Examples | Notes |
 |------|----------|-------|
 | Integer | `42` `1_000_000` `0xFF` `0b1010` | An `int`, unless its place needs another number type (see Inference). `_` separates digits |
-| Decimal | `3.14` `0.5` `1e3` `2.5e-3` | Needs a digit before the point: `.5` is not valid |
+| Decimal | `3.14` `0.5` `1e3` `2.5e-3` | A `float`, or a `double` where one is needed. Needs a digit before the point: `.5` is not valid |
 | Text | `"Hello"` `"line\n"` `"\u{1F680}"` | A single line. Escapes: `\n \t \r \\ \" \0 \u{…}` |
 | Boolean | `true` `false` | |
 
@@ -226,7 +227,8 @@ cargo run -p star_script --example check -- file.star
 | `short` | `i16` (from -32768 to 32767) | `0` |
 | `int` | `i32` (about ±2100 million): the usual integer | `0` |
 | `bigint` | `i64` (about ±9.2·10¹⁸) | `0` |
-| `float` | `f32` (same as the engine and the GPU) | `0.0` |
+| `float` | `f32` (same as the engine and the GPU): the usual decimal | `0.0` |
+| `double` | `f64`, for when a `float` is not precise enough | `0.0` |
 | `bool` | `bool` | `false` |
 | `string` | `String` | `""` |
 | `[T]` (list) | runtime `List<T>` (shared) | `[]` |
@@ -249,11 +251,22 @@ through `b`. Numbers, `bool` and `string` are copied.
 - An integer literal takes the number type its place needs:
   `var speed: float = 2`, `speed * 2` and `2 * speed` are valid, and so are
   `var small: short = 3` and `small + 1`. It must fit in that type:
-  `var small: short = 40000` is an error, `-32768` is a valid `short`.
-- Apart from that, number types **do not mix**: `speed + lives` is an
-  error; write `speed + lives as float`. The same goes for `short`, `int`
-  and `bigint` (`small + lives` → `small as int + lives`). The error
+  `var small: short = 40000` is an error, `-32768` is a valid `short`. A
+  decimal literal is a `double` where one is needed (`var d: double = 0.1`).
+- A number **converts by itself to a wider type that holds every one of
+  its values exactly**: `short` → `int` → `bigint`, `float` → `double`,
+  `short` → `float`, `int` → `double`. So `var total: bigint = lives`,
+  `small + lives` (an `int`), `precise + speed` (a `double`) and
+  `small < lives` are valid. It happens wherever a value is stored or
+  passed (variables, fields, arguments, `return`, `T?`) and between the two
+  sides of an operator, whose result is the wider type.
+- Conversions that may lose values need `as`: `int` → `short`, `bigint` →
+  `int`, `float` → `int`, and also `int` → `float` and `bigint` → `double`
+  (a `float` holds integers exactly only up to 16777216). So
+  `speed + lives` is an error; write `speed + lives as float`. The error
   suggests it.
+- Lists do not convert: a `[short]` is not a `[int]`, because both names
+  would be the same shared list.
 - `+` joins texts: `"Lives: " + lives.to_string()`.
 
 ### Null safety
@@ -326,8 +339,9 @@ compiler prevents it.
 - Parameters, constants and the variable of a `for` cannot be reassigned.
 - A local variable cannot have the name of another one still visible. It can
   have the name of a field: `self.speed = speed`.
-- Ranges `a..b` only exist in `for`. Both ends have the same integer type,
-  which is the type of the loop variable (`int` if both are literals).
+- Ranges `a..b` only exist in `for`. Their ends are integers, and the loop
+  variable has the type they meet in (`small..lives` gives `int`s; `int`
+  if both are literals).
 
 ### Values at run time
 
@@ -340,10 +354,12 @@ compiler prevents it.
 - List indices and `length()` are `int`.
 - `a / b` between integers rounds towards zero (`-7 / 2` is `-3`) and `a % b`
   takes the sign of `a` (`-7 % 3` is `-1`). `float as int` (or `short`,
-  `bigint`) drops the decimals and saturates at the extremes.
+  `bigint`) drops the decimals and saturates at the extremes; `double as
+  float` rounds to the nearest `float`.
 - `for x in list` goes through the elements it had when it started: changing
   the list inside the loop does not change what it goes through.
-- `float.to_string()` always shows that it is a `float`: `2.0`, not `2`.
+- `float.to_string()` and `double.to_string()` always show a decimal:
+  `2.0`, not `2`.
 - **Runtime errors**: reading outside a list (`list[5]` with two elements) or
   dividing an integer by zero **stops the game** with a clear message
   (`StarScript runtime error: index 5 is out of range for a list of length
@@ -355,7 +371,7 @@ compiler prevents it.
 | Type | Methods |
 |------|---------|
 | `short`, `int`, `bigint` | `abs()` `min(x)` `max(x)` `to_string()` |
-| `float` | `abs()` `min(x)` `max(x)` `floor()` `ceil()` `round()` `sqrt()` `to_string()` |
+| `float`, `double` | `abs()` `min(x)` `max(x)` `floor()` `ceil()` `round()` `sqrt()` `to_string()` |
 | `bool` | `to_string()` |
 | `string` | `length()` `is_empty()` `contains(s)` `to_upper()` `to_lower()` `to_string()` |
 | `[T]` | `length()` `is_empty()` `contains(x)` `push(x)` `pop() -> T?` `clear()` |

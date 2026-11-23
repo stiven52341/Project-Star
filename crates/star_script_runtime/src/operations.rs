@@ -72,10 +72,11 @@ pub fn concat(mut left: String, right: &str) -> String {
     left
 }
 
-/// `x.to_string()` for a `float`: always shows that it is a `float`
-/// (`2.0`, not `2`), and the shortest text that reads back the same value.
+/// `x.to_string()` for a `float` or a `double`: always shows that it is a
+/// decimal (`2.0`, not `2`), and the shortest text that reads back the
+/// same value.
 #[must_use]
-pub fn float_to_string(value: f32) -> String {
+pub fn float_to_string(value: impl std::fmt::Debug) -> String {
     format!("{value:?}")
 }
 
@@ -124,8 +125,9 @@ mod tests {
 
     #[test]
     fn floats_always_look_like_floats() {
-        assert_eq!(float_to_string(2.0), "2.0");
-        assert_eq!(float_to_string(0.1), "0.1");
-        assert_eq!(float_to_string(-1.5), "-1.5");
+        assert_eq!(float_to_string(2.0_f32), "2.0");
+        assert_eq!(float_to_string(0.1_f32), "0.1");
+        assert_eq!(float_to_string(-1.5_f32), "-1.5");
+        assert_eq!(float_to_string(0.1_f64), "0.1");
     }
 }
