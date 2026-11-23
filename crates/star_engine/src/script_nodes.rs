@@ -8,26 +8,37 @@
 //! sprite. The engine then draws them like any other node. Rust games use the
 //! scene API directly and do not need this.
 //!
-//! Script nodes with a `Body` get a [`Body2D`]. The simulation moves them
-//! after the script's frame, so before the next one the generated game reads
-//! back where they are, how fast they move and what they touch
-//! ([`ScriptNodes::read_bodies`] and [`ScriptNodes::body_state`]).
+//! Script nodes with a `Body` get a [`Body2D`], or a [`Body3D`] if they are
+//! `Node3D`s. The simulation moves them after the script's frame, so before
+//! the next one the generated game reads back where they are, how fast they
+//! move and what they touch ([`ScriptNodes::read_bodies`] and
+//! [`ScriptNodes::body_state`]).
+//!
+//! A `Node3D` gets a [`Transform3D`] instead of a [`Transform2D`]; a `Mesh`
+//! a [`MeshFile`] and a `Light` a [`LightNode`].
 
 use std::collections::HashMap;
+use std::ops::Add;
 
 use star_assets::AssetPath;
 use star_core::EngineResult;
 use star_ecs::{Entity, World};
-use star_math::Vec2;
-use star_physics::ContactPhase;
-use star_render::{Camera, Color, TextureFilter};
-use star_scene::{Body2D, GlobalTransform2D, Hierarchy, Name, PhysicsNodes, Transform2D};
-
-use crate::SpriteFile;
-pub use crate::script_body::{
-    CAPSULE, CIRCLE, DEFAULT_RADIUS, DEFAULT_SIZE, DYNAMIC, KINEMATIC, RECTANGLE, STATIC,
-    ScriptBody, ScriptBodyState,
+use star_math::{Mat4, Vec2, Vec3};
+use star_physics::{BodySettings, ContactPhase};
+use star_render::{Camera, Color, Projection, TextureFilter};
+use star_scene::{
+    Body2D, Body3D, GlobalTransform2D, GlobalTransform3D, Hierarchy, LightNode, Name, NodeBody,
+    NodeContact, PhysicsNodes, PhysicsNodes3d, Transform2D, Transform3D,
 };
+
+pub use crate::script_3d::{
+    CUBE, DIRECTIONAL, PLANE, POINT, ScriptCamera3D, ScriptLight, ScriptMesh,
+};
+pub use crate::script_body::{
+    BOX, CAPSULE, CIRCLE, DEFAULT_RADIUS, DEFAULT_SIZE, DYNAMIC, KINEMATIC, RECTANGLE, SPHERE,
+    STATIC, ScriptBody, ScriptBodyState,
+};
+use crate::{MeshFile, SpriteFile};
 
 /// One node of the script's tree, as the generated game describes it.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -40,10 +51,17 @@ pub struct ScriptNode<'a> {
     pub name: &'a str,
     /// Where it is, relative to its parent.
     pub transform: Transform2D,
+    /// For `Node3D` objects, where it is in 3D, relative to its parent:
+    /// then `transform` is not used, and its body is a 3D one.
+    pub transform_3d: Option<Transform3D>,
     /// The image it shows, for `Sprite` objects.
     pub sprite: Option<ScriptSprite<'a>>,
     /// Its physics body, if it has one.
     pub body: Option<ScriptBody<'a>>,
+    /// The mesh it shows, for `Mesh` objects.
+    pub mesh: Option<ScriptMesh<'a>>,
+    /// The light it shines, for `Light` objects.
+    pub light: Option<ScriptLight<'a>>,
 }
 
 /// What a StarScript `Sprite` shows.
@@ -99,8 +117,10 @@ struct Mirrored {
     invalid_texture: Option<String>,
     /// Why the script's body cannot be simulated, logged once.
     invalid_body: Option<String>,
+    /// Why the script's mesh or light cannot be shown, logged once.
+    invalid_look: Option<String>,
     /// The velocity the script was last told, to notice when it sets one.
-    told_velocity: Vec2,
+    told_velocity: Vec3,
     touching: Vec<u64>,
     just_touched: Vec<u64>,
     just_separated: Vec<u64>,
@@ -113,7 +133,8 @@ impl Mirrored {
             seen_in_frame: frame,
             invalid_texture: None,
             invalid_body: None,
-            told_velocity: Vec2::ZERO,
+            invalid_look: None,
+            told_velocity: Vec3::ZERO,
             touching: Vec::new(),
             just_touched: Vec::new(),
             just_separated: Vec::new(),
@@ -189,25 +210,35 @@ impl ScriptNodes {
             mirrored.just_touched.clear();
             mirrored.just_separated.clear();
             if let Some(body) = world.get::<Body2D>(mirrored.entity) {
+                let velocity = body.velocity();
+                mirrored.told_velocity = Vec3::new(velocity.x, velocity.y, 0.0);
+            } else if let Some(body) = world.get::<Body3D>(mirrored.entity) {
                 mirrored.told_velocity = body.velocity();
             }
         }
         if let Some(nodes) = world.resource::<PhysicsNodes>() {
-            for contact in nodes.contacts() {
-                let (Some(first), Some(second)) = (
-                    self.script_id(contact.first),
-                    self.script_id(contact.second),
-                ) else {
-                    continue;
-                };
-                for (node, other) in [(first, second), (second, first)] {
-                    if let Some(mirrored) = self.mirrored.get_mut(&node) {
-                        mirrored.note_contact(other, contact.phase);
-                    }
+            self.note_contacts(nodes.contacts());
+        }
+        if let Some(nodes) = world.resource::<PhysicsNodes3d>() {
+            self.note_contacts(nodes.contacts());
+        }
+        self.departed.clear();
+    }
+
+    fn note_contacts(&mut self, contacts: &[NodeContact]) {
+        for contact in contacts {
+            let (Some(first), Some(second)) = (
+                self.script_id(contact.first),
+                self.script_id(contact.second),
+            ) else {
+                continue;
+            };
+            for (node, other) in [(first, second), (second, first)] {
+                if let Some(mirrored) = self.mirrored.get_mut(&node) {
+                    mirrored.note_contact(other, contact.phase);
                 }
             }
         }
-        self.departed.clear();
     }
 
     /// What the simulation did to the body of the script node `id`, as of
@@ -216,11 +247,33 @@ impl ScriptNodes {
     #[must_use]
     pub fn body_state<'a>(&'a self, world: &World, id: u64) -> Option<ScriptBodyState<'a>> {
         let mirrored = self.mirrored.get(&id)?;
-        let body = world.get::<Body2D>(mirrored.entity)?;
-        body.id()?;
+        let (is_3d, position, angles, velocity) =
+            if let Some(body) = world.get::<Body3D>(mirrored.entity) {
+                body.id()?;
+                let transform = world.get::<Transform3D>(mirrored.entity)?;
+                (
+                    true,
+                    transform.position,
+                    transform.rotation.to_euler(),
+                    body.velocity(),
+                )
+            } else {
+                let body = world.get::<Body2D>(mirrored.entity)?;
+                body.id()?;
+                let transform = world.get::<Transform2D>(mirrored.entity)?;
+                let velocity = body.velocity();
+                (
+                    false,
+                    Vec3::new(transform.position.x, transform.position.y, 0.0),
+                    Vec3::new(0.0, 0.0, transform.rotation),
+                    Vec3::new(velocity.x, velocity.y, 0.0),
+                )
+            };
         Some(ScriptBodyState {
-            transform: *world.get::<Transform2D>(mirrored.entity)?,
-            velocity: body.velocity(),
+            is_3d,
+            position,
+            angles,
+            velocity,
             touching: &mirrored.touching,
             just_touched: &mirrored.just_touched,
             just_separated: &mirrored.just_separated,
@@ -262,6 +315,34 @@ impl ScriptNodes {
         view
     }
 
+    /// The 3D camera that shows the world from `camera`: from where its
+    /// node is in the world, looking along the node's -z axis, so it
+    /// follows and turns with its parents; from its own place if it is not
+    /// in the game's tree. Its roll is ignored, so the view never tilts.
+    #[must_use]
+    pub fn camera_3d(&self, world: &World, camera: &ScriptCamera3D) -> Camera {
+        let matrix = self
+            .entity(camera.id)
+            .and_then(|entity| {
+                world
+                    .get::<GlobalTransform3D>(entity)
+                    .map(|global| global.matrix())
+            })
+            .unwrap_or_else(|| {
+                Mat4::from_translation(camera.position) * camera.rotation().to_mat4()
+            });
+        let position = matrix.translation();
+        let [_, _, backward, _] = matrix.to_columns();
+        let forward = Vec3::new(-backward[0], -backward[1], -backward[2]);
+        Camera {
+            position,
+            target: position + forward,
+            projection: Projection::Perspective {
+                vertical_fov: camera.shown_field_of_view(),
+            },
+        }
+    }
+
     fn try_mirror(&mut self, world: &mut World, node: &ScriptNode<'_>) -> EngineResult<()> {
         let parent = node.parent.and_then(|parent| self.entity(parent));
         let entity = match self.mirrored.get_mut(&node.id) {
@@ -284,8 +365,16 @@ impl ScriptNodes {
             world.set_parent(entity, parent)?;
         }
         update_name(world, entity, node.name)?;
-        update_transform(world, entity, node.transform)?;
+        if let Some(transform) = node.transform_3d {
+            world.remove::<Transform2D>(entity);
+            replace(world, entity, transform)?;
+        } else {
+            world.remove::<Transform3D>(entity);
+            replace(world, entity, node.transform)?;
+        }
         self.update_body(world, node, entity)?;
+        self.update_mesh(world, node, entity)?;
+        self.update_light(world, node, entity)?;
         if let Some(sprite) = node.sprite {
             self.update_sprite(world, node.id, entity, sprite)
         } else {
@@ -303,42 +392,154 @@ impl ScriptNodes {
         let Some(mirrored) = self.mirrored.get_mut(&node.id) else {
             return Ok(());
         };
+        let is_3d = node.transform_3d.is_some();
+        if is_3d {
+            world.remove::<Body2D>(entity);
+        } else {
+            world.remove::<Body3D>(entity);
+        }
         let Some(script_body) = node.body else {
             world.remove::<Body2D>(entity);
+            world.remove::<Body3D>(entity);
             return Ok(());
         };
-        let settings = match script_body.to_settings() {
-            Ok(settings) => {
+        let velocity = (script_body.velocity != mirrored.told_velocity
+            && is_finite(script_body.velocity))
+        .then_some(script_body.velocity);
+        let impulse = (script_body.impulse != Vec3::ZERO && is_finite(script_body.impulse))
+            .then_some(script_body.impulse);
+        let flat = |vector: Vec3| Vec2::new(vector.x, vector.y);
+        let synced = if is_3d {
+            script_body.to_settings_3d().and_then(|settings| {
+                sync_body::<_, star_physics::BodyId3d, Transform3D, Vec3>(
+                    world, entity, settings, velocity, impulse,
+                )
+            })
+        } else {
+            script_body.to_settings().and_then(|settings| {
+                sync_body::<_, star_physics::BodyId, Transform2D, Vec2>(
+                    world,
+                    entity,
+                    settings,
+                    velocity.map(flat),
+                    impulse.map(flat),
+                )
+            })
+        };
+        match synced {
+            Ok(replaced) => {
                 mirrored.invalid_body = None;
-                settings
+                if replaced {
+                    mirrored.told_velocity = Vec3::ZERO;
+                }
+                if let Some(velocity) = velocity {
+                    mirrored.told_velocity = velocity;
+                }
+                Ok(())
             }
-            Err(error) => {
+            Err(star_core::EngineError::Physics(reason)) => {
                 world.remove::<Body2D>(entity);
-                let reason = error.to_string();
+                world.remove::<Body3D>(entity);
                 if mirrored.invalid_body.as_ref() != Some(&reason) {
                     log::warn!("the node \"{}\" has no body: {reason}", node.name);
                     mirrored.invalid_body = Some(reason);
                 }
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn update_mesh(
+        &mut self,
+        world: &mut World,
+        node: &ScriptNode<'_>,
+        entity: Entity,
+    ) -> EngineResult<()> {
+        let Some(mesh) = node.mesh.filter(|_| node.transform_3d.is_some()) else {
+            world.remove::<MeshFile>(entity);
+            return Ok(());
+        };
+        let shape = match mesh.to_shape() {
+            Ok(shape) => shape,
+            Err(error) => {
+                world.remove::<MeshFile>(entity);
+                self.reject_look(node, &error.to_string());
                 return Ok(());
             }
         };
-        let kept = world
-            .get::<Body2D>(entity)
-            .is_some_and(|body| *body.settings() == settings);
-        if !kept {
-            world.insert(entity, Body2D::new(settings))?;
-            mirrored.told_velocity = Vec2::ZERO;
-        }
-        if let Some(mut body) = world.get_mut::<Body2D>(entity) {
-            if script_body.velocity != mirrored.told_velocity && is_finite(script_body.velocity) {
-                body.set_velocity(script_body.velocity);
-                mirrored.told_velocity = script_body.velocity;
+        let texture = if mesh.texture.is_empty() {
+            None
+        } else {
+            match AssetPath::new(mesh.texture) {
+                Ok(path) => Some(path),
+                Err(error) => {
+                    self.reject_texture(node.id, mesh.texture, &error.to_string());
+                    None
+                }
             }
-            if script_body.impulse != Vec2::ZERO && is_finite(script_body.impulse) {
-                body.apply_impulse(script_body.impulse);
+        };
+        let filter = filter_of(mesh.pixelated);
+        let updated = world.get_mut::<MeshFile>(entity).map(|mut file| {
+            file.shape = shape;
+            file.color = mesh.color;
+            file.metallic = mesh.metallic;
+            file.roughness = mesh.roughness;
+            file.texture.clone_from(&texture);
+            file.filter = filter;
+        });
+        if updated.is_none() {
+            let mut file = MeshFile::new(shape)
+                .with_color(mesh.color)
+                .with_metallic(mesh.metallic)
+                .with_roughness(mesh.roughness);
+            if let Some(path) = texture {
+                file = file.with_texture(path, filter);
             }
+            world.insert(entity, file)?;
         }
         Ok(())
+    }
+
+    fn update_light(
+        &mut self,
+        world: &mut World,
+        node: &ScriptNode<'_>,
+        entity: Entity,
+    ) -> EngineResult<()> {
+        let Some(light) = node.light.filter(|_| node.transform_3d.is_some()) else {
+            world.remove::<LightNode>(entity);
+            return Ok(());
+        };
+        match light.to_light() {
+            Ok(light) => replace(world, entity, light),
+            Err(error) => {
+                world.remove::<LightNode>(entity);
+                self.reject_look(node, &error.to_string());
+                Ok(())
+            }
+        }
+    }
+
+    /// Logs once why the mesh or light of `node` is not shown.
+    fn reject_look(&mut self, node: &ScriptNode<'_>, reason: &str) {
+        if let Some(mirrored) = self.mirrored.get_mut(&node.id)
+            && mirrored.invalid_look.as_deref() != Some(reason)
+        {
+            mirrored.invalid_look = Some(reason.to_owned());
+            log::warn!("the node \"{}\" shows nothing: {reason}", node.name);
+        }
+    }
+
+    /// Logs once that the image `texture` of the script node `id` is not
+    /// a valid asset path.
+    fn reject_texture(&mut self, id: u64, texture: &str, reason: &str) {
+        if let Some(mirrored) = self.mirrored.get_mut(&id)
+            && mirrored.invalid_texture.as_deref() != Some(texture)
+        {
+            mirrored.invalid_texture = Some(texture.to_owned());
+            log::warn!("the image \"{texture}\" is not shown: {reason}");
+        }
     }
 
     fn update_sprite(
@@ -348,11 +549,7 @@ impl ScriptNodes {
         entity: Entity,
         sprite: ScriptSprite<'_>,
     ) -> EngineResult<()> {
-        let filter = if sprite.pixelated {
-            TextureFilter::Pixelated
-        } else {
-            TextureFilter::Smooth
-        };
+        let filter = filter_of(sprite.pixelated);
         let updated = world.get_mut::<SpriteFile>(entity).is_some_and(|mut file| {
             let same_image = file.path.as_str() == sprite.texture;
             if same_image {
@@ -376,20 +573,59 @@ impl ScriptNodes {
             }
             Err(error) => {
                 world.remove::<SpriteFile>(entity);
-                if let Some(mirrored) = self.mirrored.get_mut(&id)
-                    && mirrored.invalid_texture.as_deref() != Some(sprite.texture)
-                {
-                    mirrored.invalid_texture = Some(sprite.texture.to_owned());
-                    log::warn!("the sprite \"{}\" shows nothing: {error}", sprite.texture);
-                }
+                self.reject_texture(id, sprite.texture, &error.to_string());
             }
         }
         Ok(())
     }
 }
 
-fn is_finite(vector: Vec2) -> bool {
-    vector.x.is_finite() && vector.y.is_finite()
+/// Gives the node `entity` a body as `settings` say (keeping the one it
+/// has if it is the same), with the `velocity` and `impulse` the script
+/// gave it; whether its body was replaced.
+fn sync_body<Shape, Id, Transform, Vector>(
+    world: &mut World,
+    entity: Entity,
+    settings: BodySettings<Shape>,
+    velocity: Option<Vector>,
+    impulse: Option<Vector>,
+) -> EngineResult<bool>
+where
+    Shape: Copy + PartialEq + 'static,
+    Id: Copy + 'static,
+    Transform: Copy + PartialEq + 'static,
+    Vector: Copy + Default + PartialEq + Add<Output = Vector> + 'static,
+{
+    let kept = world
+        .get::<NodeBody<Shape, Id, Transform, Vector>>(entity)
+        .is_some_and(|body| *body.settings() == settings);
+    if !kept {
+        world.insert(
+            entity,
+            NodeBody::<Shape, Id, Transform, Vector>::new(settings),
+        )?;
+    }
+    if let Some(mut body) = world.get_mut::<NodeBody<Shape, Id, Transform, Vector>>(entity) {
+        if let Some(velocity) = velocity {
+            body.set_velocity(velocity);
+        }
+        if let Some(impulse) = impulse {
+            body.apply_impulse(impulse);
+        }
+    }
+    Ok(!kept)
+}
+
+fn is_finite(vector: Vec3) -> bool {
+    vector.x.is_finite() && vector.y.is_finite() && vector.z.is_finite()
+}
+
+const fn filter_of(pixelated: bool) -> TextureFilter {
+    if pixelated {
+        TextureFilter::Pixelated
+    } else {
+        TextureFilter::Smooth
+    }
 }
 
 fn update_name(world: &mut World, entity: Entity, name: &str) -> EngineResult<()> {
@@ -407,23 +643,21 @@ fn update_name(world: &mut World, entity: Entity, name: &str) -> EngineResult<()
     Ok(())
 }
 
-fn update_transform(world: &mut World, entity: Entity, transform: Transform2D) -> EngineResult<()> {
-    let updated = world
-        .get_mut::<Transform2D>(entity)
-        .map(|mut current| *current = transform)
-        .is_some();
-    if !updated {
-        world.insert(entity, transform)?;
+/// Gives `entity` the component `value`, in place if it has one.
+fn replace<T: 'static>(world: &mut World, entity: Entity, value: T) -> EngineResult<()> {
+    if let Some(mut current) = world.get_mut::<T>(entity) {
+        *current = value;
+        return Ok(());
     }
+    world.insert(entity, value)?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use star_math::Vec3;
-    use star_physics::{BodyKind, BodySettings, Physics2d, Shape2d};
-    use star_render::Projection;
-    use star_scene::{TransformPropagation, step_node_physics};
+    use star_math::Quat;
+    use star_physics::{BodyKind, BodySettings, Physics2d, Physics3d, Shape2d, Shape3d};
+    use star_scene::{TransformPropagation, step_node_physics, step_node_physics_3d};
 
     use super::*;
 
@@ -437,8 +671,11 @@ mod tests {
             parent,
             name,
             transform: Transform2D::IDENTITY,
+            transform_3d: None,
             sprite: None,
             body: None,
+            mesh: None,
+            light: None,
         }
     }
 
@@ -603,6 +840,8 @@ mod tests {
         let mut world = World::new();
         world.insert_resource(Physics2d::new(Vec2::ZERO));
         world.insert_resource(PhysicsNodes::new());
+        world.insert_resource(Physics3d::new(Vec3::ZERO));
+        world.insert_resource(PhysicsNodes3d::new());
         world
     }
 
@@ -611,6 +850,7 @@ mod tests {
     fn simulate(mirror: &mut ScriptNodes, world: &mut World) {
         TransformPropagation::new().run(world).unwrap();
         step_node_physics(world, FRAME).unwrap();
+        step_node_physics_3d(world, FRAME).unwrap();
         mirror.read_bodies(world);
     }
 
@@ -620,7 +860,7 @@ mod tests {
         let mut mirror = ScriptNodes::new();
         let mut shot = node(1, None, "Shot");
         shot.body = Some(ScriptBody {
-            velocity: Vec2::new(6.0, 0.0),
+            velocity: Vec3::new(6.0, 0.0, 0.0),
             ..ball(0.25)
         });
 
@@ -629,7 +869,9 @@ mod tests {
         simulate(&mut mirror, &mut world);
         for _ in 0..9 {
             let state = mirror.body_state(&world, 1).unwrap();
-            shot.transform = state.transform;
+            assert!(!state.is_3d);
+            shot.transform.position = Vec2::new(state.position.x, state.position.y);
+            shot.transform.rotation = state.angles.z;
             shot.body = Some(ScriptBody {
                 velocity: state.velocity,
                 ..ball(0.25)
@@ -640,10 +882,7 @@ mod tests {
 
         let state = mirror.body_state(&world, 1).unwrap();
         assert!((state.velocity.x - 6.0).abs() < TOLERANCE, "{state:?}");
-        assert!(
-            (state.transform.position.x - 1.0).abs() < TOLERANCE,
-            "{state:?}"
-        );
+        assert!((state.position.x - 1.0).abs() < TOLERANCE, "{state:?}");
     }
 
     #[test]
@@ -707,6 +946,162 @@ mod tests {
         crate_node.body = None;
         frame(&mut mirror, &mut world, &[crate_node]);
         assert!(!world.has::<Body2D>(entity));
+    }
+
+    fn node_3d(id: u64, name: &str, position: Vec3) -> ScriptNode<'_> {
+        ScriptNode {
+            transform_3d: Some(Transform3D::from_position(position)),
+            ..node(id, None, name)
+        }
+    }
+
+    fn crate_mesh(shape: &str) -> ScriptMesh<'_> {
+        ScriptMesh {
+            shape,
+            width: 2.0,
+            height: 1.0,
+            depth: 1.0,
+            radius: 0.5,
+            color: Color::rgb(0.8, 0.6, 0.4),
+            metallic: 0.0,
+            roughness: 0.8,
+            texture: "crate.png",
+            pixelated: true,
+        }
+    }
+
+    #[test]
+    fn nodes_3d_get_3d_transforms_meshes_and_lights() {
+        let mut world = World::new();
+        let mut mirror = ScriptNodes::new();
+        let mut crate_node = node_3d(1, "Crate", Vec3::new(1.0, 2.0, 3.0));
+        crate_node.mesh = Some(crate_mesh(CUBE));
+        let mut lamp = node_3d(2, "Lamp", Vec3::UP);
+        lamp.light = Some(ScriptLight {
+            kind: POINT,
+            color: Color::WHITE,
+            intensity: 3.0,
+            range: 6.0,
+        });
+
+        frame(&mut mirror, &mut world, &[crate_node, lamp]);
+
+        let entity = mirror.entity(1).unwrap();
+        assert!(!world.has::<Transform2D>(entity));
+        assert_eq!(
+            world.get::<Transform3D>(entity).unwrap().position,
+            Vec3::new(1.0, 2.0, 3.0)
+        );
+        let file = world.get::<MeshFile>(entity).unwrap().clone();
+        assert_eq!(
+            file.shape,
+            star_render::MeshShape::Cube {
+                size: Vec3::new(2.0, 1.0, 1.0)
+            }
+        );
+        assert_eq!(file.texture.unwrap().as_str(), "crate.png");
+        assert_eq!(file.filter, TextureFilter::Pixelated);
+        let light = *world.get::<LightNode>(mirror.entity(2).unwrap()).unwrap();
+        assert!(matches!(light, LightNode::Point { range: 6.0, .. }));
+
+        crate_node.mesh = Some(crate_mesh("teapot"));
+        lamp.light = None;
+        frame(&mut mirror, &mut world, &[crate_node, lamp]);
+
+        assert!(!world.has::<MeshFile>(entity));
+        assert!(!world.has::<LightNode>(mirror.entity(2).unwrap()));
+    }
+
+    #[test]
+    fn meshes_and_lights_need_3d_nodes() {
+        let mut world = World::new();
+        let mut mirror = ScriptNodes::new();
+        let mut flat = node(1, None, "Flat");
+        flat.mesh = Some(crate_mesh(CUBE));
+
+        frame(&mut mirror, &mut world, &[flat]);
+
+        assert!(!world.has::<MeshFile>(mirror.entity(1).unwrap()));
+    }
+
+    #[test]
+    fn bodies_3d_move_their_nodes_in_space() {
+        let mut world = physics_world();
+        let mut mirror = ScriptNodes::new();
+        let mut ball = node_3d(1, "Ball", Vec3::ZERO);
+        let sphere = ScriptBody::from_settings_3d(&BodySettings::new(
+            BodyKind::Dynamic,
+            Shape3d::sphere(0.5).unwrap(),
+        ));
+        ball.body = Some(ScriptBody {
+            velocity: Vec3::new(0.0, 0.0, -3.0),
+            ..sphere
+        });
+
+        frame(&mut mirror, &mut world, &[ball]);
+        simulate(&mut mirror, &mut world);
+        for _ in 0..9 {
+            let state = mirror.body_state(&world, 1).unwrap();
+            assert!(state.is_3d);
+            ball.transform_3d = Some(
+                Transform3D::from_position(state.position)
+                    .with_rotation(Quat::from_euler(state.angles)),
+            );
+            ball.body = Some(ScriptBody {
+                velocity: state.velocity,
+                ..sphere
+            });
+            frame(&mut mirror, &mut world, &[ball]);
+            simulate(&mut mirror, &mut world);
+        }
+
+        let entity = mirror.entity(1).unwrap();
+        assert!(world.has::<Body3D>(entity) && !world.has::<Body2D>(entity));
+        let state = mirror.body_state(&world, 1).unwrap();
+        assert!((state.position.z + 0.5).abs() < TOLERANCE, "{state:?}");
+
+        ball.body = Some(ScriptBody {
+            shape: CIRCLE,
+            ..sphere
+        });
+        frame(&mut mirror, &mut world, &[ball]);
+        assert!(!world.has::<Body3D>(entity));
+    }
+
+    #[test]
+    fn cameras_3d_look_along_their_nodes() {
+        let mut world = World::new();
+        let mut mirror = ScriptNodes::new();
+        let mut rig = node_3d(1, "Rig", Vec3::new(0.0, 0.0, 5.0));
+        rig.transform_3d = rig
+            .transform_3d
+            .map(|place| place.with_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)));
+        let eye = ScriptNode {
+            parent: Some(1),
+            ..node_3d(2, "Eye", Vec3::ZERO)
+        };
+        frame(&mut mirror, &mut world, &[rig, eye]);
+        TransformPropagation::new().run(&mut world).unwrap();
+        let camera = ScriptCamera3D {
+            id: 2,
+            position: Vec3::ZERO,
+            angles: Vec3::ZERO,
+            field_of_view: 1.0,
+        };
+
+        let view = mirror.camera_3d(&world, &camera);
+
+        assert!((view.position - Vec3::new(0.0, 0.0, 5.0)).length() < TOLERANCE);
+        // Turned a quarter left, -z becomes -x.
+        let forward = view.target - view.position;
+        assert!(
+            (forward - Vec3::new(-1.0, 0.0, 0.0)).length() < TOLERANCE,
+            "{forward:?}"
+        );
+        assert_eq!(
+            view.projection,
+            Projection::Perspective { vertical_fov: 1.0 }
+        );
     }
 
     #[test]

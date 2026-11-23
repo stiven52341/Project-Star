@@ -2,7 +2,7 @@
 
 pub use crate::app::App;
 pub use crate::game::{Game, GameContext};
-pub use crate::{EngineWorld, SpriteFile};
+pub use crate::{EngineWorld, MeshFile, SpriteFile};
 pub use star_assets::{AssetFolder, AssetPath};
 pub use star_audio::{Audio, PlaySettings, VoiceId};
 pub use star_core::{ENGINE_NAME, ENGINE_VERSION, EngineError, EngineResult, Sound, Time};

@@ -6,9 +6,11 @@ use std::time::Duration;
 use star_assets::{AssetFolder, AssetPath};
 use star_core::{EngineResult, Sound};
 use star_ecs::World;
+use star_math::Mat4;
 use star_render::{Frame, Mesh3dId, MeshShape, Renderer, TextureFilter, TextureId};
-use star_scene::{GlobalTransform2D, Scene, SceneAssets, SpriteNode};
+use star_scene::{GlobalTransform2D, GlobalTransform3D, Scene, SceneAssets, SpriteNode};
 
+use crate::mesh_file::MeshFile;
 use crate::sound_library::SoundLibrary;
 use crate::sprite_file::SpriteFile;
 use crate::texture_library::TextureLibrary;
@@ -107,6 +109,33 @@ impl GameAssets {
                     .with_color(file.color);
                 frame.draw_sprite(sprite.to_sprite(*global));
             }
+        })
+    }
+
+    /// Adds to `frame` the mesh of every node with a [`MeshFile`] and a
+    /// global 3D transform, building the meshes and loading the images it
+    /// needs. A mesh that cannot be built logs a warning once, and is not
+    /// drawn; an image that cannot be loaded logs one, and the mesh is
+    /// drawn without it.
+    pub(crate) fn draw_mesh_files(
+        &mut self,
+        world: &World,
+        renderer: &mut Renderer,
+        frame: &mut Frame,
+    ) -> EngineResult<()> {
+        world.each::<(&GlobalTransform3D, &mut MeshFile)>(|_, (global, file)| {
+            let built = file
+                .unit_shape()
+                .and_then(|(unit, scale)| Ok((self.mesh(renderer, unit)?, scale)));
+            let (mesh, scale) = match built {
+                Ok(built) => built,
+                Err(error) => return file.reject(&error, |error| log::warn!("{error}")),
+            };
+            let material = file.material(
+                |path, filter| self.load_texture(renderer, path.clone(), filter),
+                |error| log::warn!("{error}"),
+            );
+            frame.draw_mesh_3d(mesh, material, global.matrix() * Mat4::from_scale(scale));
         })
     }
 

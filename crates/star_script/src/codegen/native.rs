@@ -973,8 +973,11 @@ fn mirror_nodes_(
                         parent: parent_,
                         name: name_,
                         transform: transform_,
+                        transform_3d: ::std::option::Option::None,
                         sprite: sprite_,
                         body: body_,
+                        mesh: ::std::option::Option::None,
+                        light: ::std::option::Option::None,
                     };
                     mirror_.mirror(world_, &described_);
                 });
@@ -1028,14 +1031,15 @@ fn with_body_(
                 radius: body_.radius.get(),
                 width: body_.width.get(),
                 height: body_.height.get(),
+                depth: 1.0,
                 gravity_scale: body_.gravity_scale.get(),
                 fixed_rotation: body_.fixed_rotation.get(),
                 friction: body_.friction.get(),
                 bounciness: body_.bounciness.get(),
                 density: body_.density.get(),
                 sensor: body_.sensor.get(),
-                velocity: ::star_engine::star_math::Vec2::new(body_.velocity_x.get(), body_.velocity_y.get()),
-                impulse: ::star_engine::star_math::Vec2::new(impulse_x_, impulse_y_),
+                velocity: ::star_engine::star_math::Vec3::new(body_.velocity_x.get(), body_.velocity_y.get(), 0.0),
+                impulse: ::star_engine::star_math::Vec3::new(impulse_x_, impulse_y_, 0.0),
             }));
         });
     });
@@ -1067,9 +1071,9 @@ fn sync_bodies_(
         let ::std::option::Option::Some(state_) = mirror_.body_state(world_, *id_) else {
             continue;
         };
-        fields_.x.set(state_.transform.position.x);
-        fields_.y.set(state_.transform.position.y);
-        fields_.rotation.set(state_.transform.rotation);
+        fields_.x.set(state_.position.x);
+        fields_.y.set(state_.position.y);
+        fields_.rotation.set(state_.angles.z);
         let body_ = crate::classes::Body::HasFields::fields(&*body_);
         body_.velocity_x.set(state_.velocity.x);
         body_.velocity_y.set(state_.velocity.y);

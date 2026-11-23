@@ -5,6 +5,8 @@ use star_core::EngineResult;
 use star_math::Vec2;
 use star_render::{Color, TextureFilter, TextureId};
 
+use crate::texture_slot::TextureSlot;
+
 /// Shows an image of the asset folder at a 2D node, like a
 /// [`SpriteNode`](star_scene::SpriteNode), but named by its file: the engine
 /// loads the texture the first time it draws it, and again whenever `path`
@@ -22,17 +24,7 @@ pub struct SpriteFile {
     pub layer: i32,
     /// Multiplied by the image's colors.
     pub color: Color,
-    loaded: Option<LoadedImage>,
-}
-
-/// The image a [`SpriteFile`] last loaded, or tried to.
-#[derive(Debug, Clone, PartialEq)]
-struct LoadedImage {
-    path: AssetPath,
-    filter: TextureFilter,
-    /// `None` if it could not be loaded; it is not tried again until the
-    /// path or the filter change.
-    texture: Option<TextureId>,
+    loaded: TextureSlot,
 }
 
 impl SpriteFile {
@@ -46,7 +38,7 @@ impl SpriteFile {
             size,
             layer: 0,
             color: Color::WHITE,
-            loaded: None,
+            loaded: TextureSlot::EMPTY,
         }
     }
 
@@ -79,21 +71,7 @@ impl SpriteFile {
         load: impl FnOnce(&AssetPath, TextureFilter) -> EngineResult<TextureId>,
         on_error: impl FnOnce(&star_core::EngineError),
     ) -> Option<TextureId> {
-        if let Some(loaded) = &self.loaded
-            && loaded.path == self.path
-            && loaded.filter == self.filter
-        {
-            return loaded.texture;
-        }
-        let texture = load(&self.path, self.filter)
-            .inspect_err(|error| on_error(error))
-            .ok();
-        self.loaded = Some(LoadedImage {
-            path: self.path.clone(),
-            filter: self.filter,
-            texture,
-        });
-        texture
+        self.loaded.texture(&self.path, self.filter, load, on_error)
     }
 }
 
