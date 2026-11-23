@@ -226,7 +226,9 @@ fn apply_writing_aids(context: &egui::Context, text: &mut String, id: egui::Id) 
 /// What a writing aid may do for `event`.
 fn action_of(event: &egui::Event) -> Option<Action> {
     match event {
-        egui::Event::Text(typed) => {
+        // With an input method on (as on Linux while typing), characters
+        // arrive as what it commits.
+        egui::Event::Text(typed) | egui::Event::Ime(egui::ImeEvent::Commit(typed)) => {
             let mut characters = typed.chars();
             match (characters.next(), characters.next()) {
                 (Some(character), None) => Some(Action::Type(character)),
@@ -257,6 +259,7 @@ const fn changes_text(event: &egui::Event) -> bool {
     matches!(
         event,
         egui::Event::Text(_)
+            | egui::Event::Ime(_)
             | egui::Event::Paste(_)
             | egui::Event::Cut
             | egui::Event::Key { pressed: true, .. }
@@ -348,6 +351,17 @@ mod tests {
     fn positions_past_a_line_stay_on_it() {
         assert_eq!(char_index_of(TEXT, at(1, 99)), 9);
         assert_eq!(char_index_of(TEXT, at(99, 1)), TEXT.chars().count());
+    }
+
+    #[test]
+    fn typed_characters_reach_the_writing_aids_however_they_arrive() {
+        let typed = egui::Event::Text("(".to_owned());
+        let committed = egui::Event::Ime(egui::ImeEvent::Commit("{".to_owned()));
+        let pasted = egui::Event::Text("ab".to_owned());
+
+        assert_eq!(action_of(&typed), Some(Action::Type('(')));
+        assert_eq!(action_of(&committed), Some(Action::Type('{')));
+        assert_eq!(action_of(&pasted), None);
     }
 
     #[test]
