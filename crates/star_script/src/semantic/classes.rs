@@ -133,11 +133,28 @@ pub struct MethodInfo {
     pub is_private: bool,
     /// Redefines a method of a base class.
     pub is_override: bool,
+    /// How a call runs: at once, or as a coroutine.
+    pub execution: Execution,
     /// Where its name is written; `None` for native methods.
     pub span: Option<Span>,
 }
 
+/// How a call of a method runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Execution {
+    /// At once, until the method returns.
+    Direct,
+    /// `async`: as a coroutine, which can wait across frames with `await`.
+    Async,
+}
+
 impl MethodInfo {
+    /// Whether the method is `async`.
+    #[must_use]
+    pub fn is_async(&self) -> bool {
+        self.execution == Execution::Async
+    }
+
     /// Whether `other` takes the same parameter types and returns the same type.
     #[must_use]
     pub fn has_same_signature(&self, other: &Self) -> bool {

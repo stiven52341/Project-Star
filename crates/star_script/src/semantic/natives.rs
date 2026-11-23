@@ -2,7 +2,7 @@
 //! methods of basic types and lists.
 
 use super::{
-    ClassId, ClassInfo, ClassOrigin, ClassTable, ConstructorInfo, FieldInfo, MethodInfo,
+    ClassId, ClassInfo, ClassOrigin, ClassTable, ConstructorInfo, Execution, FieldInfo, MethodInfo,
     ParameterInfo, Type,
 };
 use crate::Span;
@@ -60,6 +60,9 @@ pub const SOUND_CLASS: &str = "Sound";
 
 /// Name of the engine class of the game's audio as a whole.
 pub const AUDIO_CLASS: &str = "Audio";
+
+/// Name of the engine class of what coroutines wait for.
+pub const TIME_CLASS: &str = "Time";
 
 /// Name of the engine class of the physics bodies of nodes.
 pub const BODY_CLASS: &str = "Body";
@@ -159,6 +162,14 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
         native_method("set_volume", &[("volume", Type::Float)], Type::Void, true),
     ];
     classes.add(audio);
+
+    // What coroutines wait for: seconds of the game, or the next frame.
+    let mut time = ClassInfo::new(TIME_CLASS.to_owned(), ClassOrigin::Native);
+    time.methods = vec![
+        native_async_method("wait", &[("seconds", Type::Float)]),
+        native_async_method("next_frame", &[]),
+    ];
+    classes.add(time);
 
     // A game: the engine calls `start` once and `update` every frame, until
     // `quit` is called or the window is closed. Its nodes hang from it.
@@ -484,7 +495,17 @@ fn native_method(
         is_static,
         is_private: false,
         is_override: false,
+        execution: Execution::Direct,
         span: None,
+    }
+}
+
+/// A static method of an engine class that coroutines wait for, with
+/// `await`; it gives nothing back.
+fn native_async_method(name: &str, parameters: &[(&str, Type)]) -> MethodInfo {
+    MethodInfo {
+        execution: Execution::Async,
+        ..native_method(name, parameters, Type::Void, true)
     }
 }
 

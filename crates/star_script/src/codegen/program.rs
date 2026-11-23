@@ -6,7 +6,8 @@ use super::native;
 use super::statements::{Body, BodyKind};
 use super::writer::Writer;
 use super::{
-    CodegenError, CodegenErrorKind, Context, EntryPoint, GeneratedProgram, Result, internal,
+    CodegenError, CodegenErrorKind, Context, EntryPoint, GeneratedProgram, Result,
+    coroutines_not_translated, internal,
 };
 use crate::Span;
 use crate::ast::{ClassDecl, ConstructorDecl, Expr, MemberKind, MethodDecl, VariableKind};
@@ -500,6 +501,9 @@ impl Context<'_> {
             .iter()
             .find(|info| info.span == Some(span))
             .ok_or_else(|| internal("method without analysis", span))?;
+        if info.is_async() {
+            return Err(coroutines_not_translated(span));
+        }
         let parameters = parameter_list(self, &info.parameters, span)?;
         let (receiver, kind) = if info.is_static {
             ("", BodyKind::Static)

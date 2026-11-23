@@ -27,6 +27,7 @@ impl Checker<'_> {
                 value,
             } => self.assignment(target, *operator, value, statement.span),
             StatementKind::Expression(expression) => {
+                self.context.free_call = Some(expression.span);
                 self.expression(expression, None);
                 // `await f()` is a call too; `await` reports what is not.
                 if !matches!(expression.kind, ExprKind::Call { .. } | ExprKind::Await(_)) {

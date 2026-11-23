@@ -5,8 +5,8 @@
 use super::checker::{BodyContext, Checker, ContextKind, Initialization};
 use super::natives::{BASIC_TYPE_NAMES, basic_type};
 use super::{
-    ClassId, ClassInfo, ClassOrigin, ConstantInfo, ConstructorInfo, FieldInfo, MemberRef,
-    MethodInfo, ParameterInfo, SemanticErrorKind, Type, flow,
+    ClassId, ClassInfo, ClassOrigin, ConstantInfo, ConstructorInfo, Execution, FieldInfo,
+    MemberRef, MethodInfo, ParameterInfo, SemanticErrorKind, Type, flow,
 };
 use crate::Span;
 use crate::ast::{
@@ -182,11 +182,17 @@ impl Checker<'_> {
             ModifierKind::Private,
             ModifierKind::Static,
             ModifierKind::Override,
+            ModifierKind::Async,
         ];
         self.check_modifiers(member, &all, "a method");
         let is_static = member.has_modifier(ModifierKind::Static);
         let is_private = member.has_modifier(ModifierKind::Private);
         let is_override = member.has_modifier(ModifierKind::Override);
+        let execution = if member.has_modifier(ModifierKind::Async) {
+            Execution::Async
+        } else {
+            Execution::Direct
+        };
         if is_override && (is_static || is_private) {
             let what = if is_static {
                 "a static method"
@@ -214,6 +220,7 @@ impl Checker<'_> {
                 is_static,
                 is_private,
                 is_override,
+                execution,
                 span: Some(method.name.span),
             });
     }
@@ -433,6 +440,7 @@ impl Checker<'_> {
             ContextKind::Instance
         };
         self.context = BodyContext::new(id, kind, info.return_type.clone());
+        self.context.is_async = info.is_async();
         self.check_body(&method.parameters, &info.parameters, &method.body);
         if info.return_type != Type::Void && !flow::always_returns(&method.body) {
             let kind = SemanticErrorKind::MissingReturn(info.name.clone());
@@ -566,6 +574,12 @@ fn override_problem(
         Some(SemanticErrorKind::MissingOverride { name, base })
     } else if !method.has_same_signature(base_method) {
         Some(SemanticErrorKind::OverrideMismatch { name, base })
+    } else if method.execution != base_method.execution {
+        Some(SemanticErrorKind::AsyncOverrideMismatch {
+            name,
+            base,
+            base_is_async: base_method.is_async(),
+        })
     } else {
         None
     }

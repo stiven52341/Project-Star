@@ -347,3 +347,17 @@ fn other_engine_classes_cannot_be_extended() {
         "classes cannot inherit from the engine class `Debug` yet"
     );
 }
+
+#[test]
+fn coroutines_are_not_translated_yet() {
+    let errors = compile_source(
+        "class Lamp {\n async func blink() { await Time.wait(1.0) }\n func start() { Time.next_frame() }\n}",
+    )
+    .expect_err("coroutines are not translated");
+
+    let messages: Vec<String> = errors.iter().map(ToString::to_string).collect();
+    assert_eq!(
+        messages,
+        ["coroutines (`async` and `await`) cannot be translated to Rust yet"]
+    );
+}

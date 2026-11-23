@@ -1108,11 +1108,106 @@ fn only_nodes_can_join_the_tree() {
     );
 }
 
+// --- Coroutines ---
+
+/// `Lamp`, with an `async` method `wait_for(seconds) -> int`, and `extra`.
+fn with_lamp(extra: &str) -> String {
+    format!(
+        "class Lamp {{\n async func wait_for(seconds: float) -> int {{\n await Time.wait(seconds)\n await Time.next_frame()\n return 1\n }}\n{extra}\n}}"
+    )
+}
+
+#[test]
+fn async_methods_await_other_async_methods_and_get_their_value() {
+    assert_valid(&with_lamp(
+        "async func blink() {\n var waited: int = await wait_for(0.5) + 1\n await blink()\n }",
+    ));
+}
+
+#[test]
+fn async_methods_called_alone_start_coroutines() {
+    assert_valid(&with_lamp(
+        "func start() {\n wait_for(1.0)\n Time.wait(2.0)\n var lamp: Lamp? = null\n lamp?.wait_for(1.0)\n }",
+    ));
+}
+
+#[test]
+fn async_calls_inside_expressions_need_await() {
+    assert_eq!(
+        errors(&with_lamp(
+            "func f() {\n var n = wait_for(1.0)\n Debug.print(wait_for(1.0).to_string())\n }"
+        )),
+        [
+            Kind::AsyncCallNotAwaited("wait_for".to_owned()),
+            Kind::AsyncCallNotAwaited("wait_for".to_owned())
+        ]
+    );
+}
+
 #[test]
 fn await_outside_async_methods_is_reported() {
     assert_eq!(
-        errors("class T {\n func wait() {}\n func f() { await wait() }\n}"),
-        [SemanticErrorKind::AwaitOutsideAsync]
+        errors(&with_lamp("func f() { await wait_for(1.0) }")),
+        [Kind::AwaitOutsideAsync]
+    );
+}
+
+#[test]
+fn only_calls_of_async_methods_can_be_awaited() {
+    assert_eq!(
+        errors(&with_lamp(
+            "func plain() {}\n async func f() {\n await plain()\n var n = await 3\n }"
+        )),
+        [Kind::AwaitWithoutAsyncCall, Kind::AwaitWithoutAsyncCall]
+    );
+}
+
+#[test]
+fn await_cannot_wait_through_safe_access() {
+    assert_eq!(
+        errors(&with_lamp(
+            "async func f(other: Lamp?) { await other?.wait_for(1.0) }"
+        )),
+        [Kind::NullSafeAwait]
+    );
+}
+
+#[test]
+fn overrides_are_async_exactly_when_their_base_is() {
+    let source = "class Base { async func a() {}\n func b() {} }\n\
+                  class Child extends Base { override func a() {}\n override async func b() {} }\n\
+                  class G extends Game { override async func update(delta: float) {} }";
+
+    assert_eq!(
+        errors(source),
+        [
+            Kind::AsyncOverrideMismatch {
+                name: "a".to_owned(),
+                base: "Base".to_owned(),
+                base_is_async: true
+            },
+            Kind::AsyncOverrideMismatch {
+                name: "b".to_owned(),
+                base: "Base".to_owned(),
+                base_is_async: false
+            },
+            Kind::AsyncOverrideMismatch {
+                name: "update".to_owned(),
+                base: "Game".to_owned(),
+                base_is_async: false
+            }
+        ]
+    );
+}
+
+#[test]
+fn constructors_cannot_be_async() {
+    assert_eq!(
+        errors("class A { async init() {} }"),
+        [Kind::InvalidModifier {
+            modifier: ModifierKind::Async,
+            member: "`init`"
+        }]
     );
 }
 
@@ -1121,8 +1216,8 @@ fn awaited_values_are_still_checked() {
     assert_eq!(
         body_errors("await missing()"),
         [
-            SemanticErrorKind::AwaitOutsideAsync,
-            SemanticErrorKind::UnknownName("missing".to_owned())
+            Kind::AwaitOutsideAsync,
+            Kind::UnknownName("missing".to_owned())
         ]
     );
 }

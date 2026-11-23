@@ -92,6 +92,16 @@ pub enum SemanticErrorKind {
         /// The base class that defines it.
         base: String,
     },
+    /// An override that is `async` when its base method is not, or the
+    /// other way round.
+    AsyncOverrideMismatch {
+        /// The method.
+        name: String,
+        /// The base class that defines it.
+        base: String,
+        /// Whether the base method is `async`.
+        base_is_async: bool,
+    },
     /// A modifier that does not apply to this kind of member.
     InvalidModifier {
         /// The modifier.
@@ -183,6 +193,12 @@ pub enum SemanticErrorKind {
     InvalidSuper,
     /// `await` outside an `async` method.
     AwaitOutsideAsync,
+    /// `await` before something that is not a call of an `async` method.
+    AwaitWithoutAsyncCall,
+    /// `await object?.method()`: there may be nothing to wait for.
+    NullSafeAwait,
+    /// An `async` method called inside an expression without `await`.
+    AsyncCallNotAwaited(String),
     /// Assigning to a constant, parameter or loop variable.
     AssignToImmutable(String),
 
@@ -263,6 +279,15 @@ impl fmt::Display for SemanticErrorKind {
             Self::OverrideMismatch { name, base } => write!(
                 formatter,
                 "`{name}` must take the same parameters and return the same type as in `{base}`"
+            ),
+            Self::AsyncOverrideMismatch {
+                name,
+                base,
+                base_is_async: true,
+            } => write!(formatter, "`{name}` must be `async`, as in `{base}`"),
+            Self::AsyncOverrideMismatch { name, base, .. } => write!(
+                formatter,
+                "`{name}` cannot be `async`: it is not in `{base}`"
             ),
             Self::InvalidModifier { modifier, member } => {
                 write!(formatter, "`{modifier}` cannot be used on {member}")
@@ -349,6 +374,17 @@ impl fmt::Display for SemanticErrorKind {
             }
             Self::AwaitOutsideAsync => formatter.write_str(
                 "`await` can only be used inside an `async` method",
+            ),
+            Self::AwaitWithoutAsyncCall => {
+                formatter.write_str("only calls of `async` methods can be awaited")
+            }
+            Self::NullSafeAwait => formatter.write_str(
+                "`await` cannot wait through `?.`: check that the object is not `null` first",
+            ),
+            Self::AsyncCallNotAwaited(name) => write!(
+                formatter,
+                "`{name}` is `async`: write `await {name}(…)` to wait for it, \
+                 or call it on a line of its own to start it"
             ),
             Self::AssignToImmutable(name) => write!(formatter, "`{name}` cannot be changed"),
             Self::MissingReturn(name) => write!(

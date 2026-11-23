@@ -310,6 +310,10 @@ impl Checker<'_> {
         } else {
             wrap_null_safe(method.return_type.clone(), null_safe)
         };
+        if method.is_async() && self.context.free_call != Some(span) {
+            let kind = SemanticErrorKind::AsyncCallNotAwaited(method.name.clone());
+            self.error(kind, callee.span);
+        }
         let resolution = Resolution::Method { class, index };
         self.analysis
             .record(callee, result.clone(), Some(resolution));

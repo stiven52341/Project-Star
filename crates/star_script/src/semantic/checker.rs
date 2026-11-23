@@ -40,6 +40,11 @@ pub(super) struct BodyContext {
     /// Number of scopes at the top level of the body (parameters + body block).
     pub(super) top_level_depth: usize,
     pub(super) initialization: Option<Initialization>,
+    /// Whether the body is an `async` method, where `await` can be used.
+    pub(super) is_async: bool,
+    /// The call that may be of an `async` method: the one right after
+    /// `await`, or a statement of its own, which starts a coroutine.
+    pub(super) free_call: Option<Span>,
 }
 
 impl BodyContext {
@@ -52,6 +57,8 @@ impl BodyContext {
             scopes: Vec::new(),
             top_level_depth: 2,
             initialization: None,
+            is_async: false,
+            free_call: None,
         }
     }
 }

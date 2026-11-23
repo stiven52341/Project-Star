@@ -21,8 +21,8 @@ mod types;
 
 pub use analysis::{Analysis, ExprInfo, LocalId, LocalInfo, Resolution};
 pub use classes::{
-    ClassId, ClassInfo, ClassOrigin, ClassTable, ConstantInfo, ConstructorInfo, FieldInfo,
-    FoundMember, MemberRef, MethodInfo, ParameterInfo,
+    ClassId, ClassInfo, ClassOrigin, ClassTable, ConstantInfo, ConstructorInfo, Execution,
+    FieldInfo, FoundMember, MemberRef, MethodInfo, ParameterInfo,
 };
 pub use error::{SemanticError, SemanticErrorKind};
 pub use natives::{

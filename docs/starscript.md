@@ -40,7 +40,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes), sounds (`Sound`, `Audio`), physics (`Body`) and 3D (`Node3D`, `Mesh`, `Light`, `Camera3D`) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; “Play” builds and runs the game; the editor has a code editor for `.star` files (colors, writing aids, mistakes while writing, suggestions) |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
-| 9 | Concurrency and parallelism | In progress: designed (section 7); the syntax is read (`async`, `parallel`, `await`), but no method can be `async` or `parallel` yet |
+| 9 | Concurrency and parallelism | In progress: designed (section 7); coroutines are checked (`async`, `await`, `Time`) but not translated to Rust yet; `parallel` is read but not allowed yet |
 
 ## 1. Lexicon (final)
 
@@ -372,6 +372,7 @@ The engine provides them; their names cannot be used for other classes.
 | `Scene` | `static load(path: string) -> Node?` |
 | `Sound` | no `init`: `static load(path: string) -> Sound?`; fields `volume: float` (1.0), `looping: bool` (`false`); `play()`, `stop()`, `is_playing() -> bool` |
 | `Audio` | `static volume() -> float`, `static set_volume(volume: float)` |
+| `Time` | `static async wait(seconds: float)`, `static async next_frame()`: what coroutines wait for (section 7) |
 | `Body` | no `init`: `static circle(kind: string, radius: float) -> Body`, `static rectangle(kind: string, width: float, height: float) -> Body`, `static capsule(kind: string, height: float, radius: float) -> Body`, `static sphere(kind: string, radius: float) -> Body`, `static box(kind: string, width: float, height: float, depth: float) -> Body`; fields `kind`, `shape: string`, `radius` (0.5), `width`, `height`, `depth` (1.0), `gravity_scale` (1.0), `friction` (0.5), `bounciness` (0.0), `density` (1.0), `velocity_x`, `velocity_y`, `velocity_z: float` (0.0), `fixed_rotation`, `sensor: bool` (`false`); `apply_impulse(x: float, y: float)`, `apply_impulse_3d(x: float, y: float, z: float)`, `touching() -> [Node]`, `just_touched() -> [Node]`, `just_separated() -> [Node]` |
 | `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool`, `static strength(action: string) -> float`, `static axis(negative: string, positive: string) -> float`, `static pointer_x() -> float`, `static pointer_y() -> float`, `static has_pointer() -> bool` |
 
@@ -996,7 +997,10 @@ class Lamp extends Sprite {
   they start coroutines instead of waiting.
 - `await call` waits until an `async` method finishes and gives its value:
   `var path = await find_path()`. It can only be written inside an `async`
-  method, and only before a call of something that waits.
+  method, and only before a call of something that waits. Not through
+  `?.`: `await lamp?.blink()` might have nothing to wait for, so the
+  object is checked first (`lamp?.blink()` alone, which starts it, is
+  valid).
 - **An `async` method called without `await`** starts a **coroutine**: it
   runs at once until its first `await`, and the caller goes on. That call
   can only be a statement on its own (its value, if any, is lost).

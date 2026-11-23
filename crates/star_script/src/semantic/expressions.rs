@@ -3,7 +3,7 @@
 use super::checker::{Checker, ContextKind, NameTarget};
 use super::narrowing::is_null;
 use super::natives::builtin_method;
-use super::{ClassId, FoundMember, MemberRef, Resolution, SemanticErrorKind, Type};
+use super::{ClassId, FoundMember, MemberRef, MethodInfo, Resolution, SemanticErrorKind, Type};
 use crate::Span;
 use crate::ast::{BinaryOperator, Expr, ExprKind, Literal, Name, TypeRef, UnaryOperator};
 
@@ -71,12 +71,46 @@ impl Checker<'_> {
         (ty, None)
     }
 
-    /// `await value`. No method can wait yet, so it is always misplaced;
-    /// the value is still checked for its own mistakes.
+    /// `await call`: the value of an `async` method once it finishes.
     fn await_value(&mut self, value: &Expr, span: Span) -> Type {
-        self.expression(value, None);
-        self.error(SemanticErrorKind::AwaitOutsideAsync, span);
-        Type::Error
+        if !self.context.is_async {
+            self.error(SemanticErrorKind::AwaitOutsideAsync, span);
+        }
+        self.context.free_call = Some(value.span);
+        let ty = self.expression(value, None);
+        if !self.is_async_call(value) {
+            self.error(SemanticErrorKind::AwaitWithoutAsyncCall, value.span);
+            return Type::Error;
+        }
+        if let ExprKind::Call { callee, .. } = &value.kind
+            && let ExprKind::Member {
+                null_safe: true, ..
+            } = callee.kind
+        {
+            self.error(SemanticErrorKind::NullSafeAwait, value.span);
+        }
+        ty
+    }
+
+    /// Whether `value` calls an `async` method. Calls whose method is
+    /// unknown count, so their mistake is reported once.
+    fn is_async_call(&self, value: &Expr) -> bool {
+        let ExprKind::Call { callee, .. } = &value.kind else {
+            return false;
+        };
+        match self.analysis.expression(callee) {
+            Some(info) => match info.resolution {
+                Some(Resolution::Method { class, index }) => self
+                    .analysis
+                    .classes
+                    .class(class)
+                    .methods
+                    .get(index)
+                    .is_some_and(MethodInfo::is_async),
+                _ => info.ty == Type::Error,
+            },
+            None => true,
+        }
     }
 
     // --- Names and members ---

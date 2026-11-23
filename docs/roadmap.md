@@ -228,7 +228,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 13.10a Syntax: the keywords `async`, `await` and `parallel`;
           `async` and `parallel` as modifiers of methods, `await` before
           an expression.
-    - [ ] 13.10b Coroutines in the analysis: `async` methods and their
+    - [x] 13.10b Coroutines in the analysis: `async` methods and their
           overrides, where `await` goes, starting coroutines, and
           `Time.wait` and `Time.next_frame`.
     - [ ] 13.10c Coroutines in Rust: `async` methods as futures, run once
