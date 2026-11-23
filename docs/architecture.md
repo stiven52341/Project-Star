@@ -718,9 +718,13 @@ project's code is checked by a thread that lives while the project is open
 (`project_check::CheckWorker`; it takes request after request, skipping to
 the newest texts if several waited), reading the open scripts' texts
 instead of their files (`OpenTexts`, `check_project_with`), saved or not.
-Its goal is `CheckGoal::Writing`: the program is not translated to Rust
-and scenes are not checked, which only “Compile” (`CheckGoal::Compile`,
-on a thread of its own each time) needs. Its problems are only marked in the
+Its goal is `CheckGoal::Writing`: the program is translated to Rust too,
+for the mistakes only the translation finds (several entry points, a game
+that needs arguments, a script class that extends a class of the engine
+that cannot be extended), but the Rust is not kept, and scenes are not
+checked, which only “Compile” (`CheckGoal::Compile`, on a thread of its own
+each time) needs. Translating takes about as long as checking (under a
+millisecond for a few hundred lines). Its problems are only marked in the
 code: “Problems” and “Play” still follow “Compile”. Each mistake of the
 script shown is marked with a wavy red line under the name, number or
 string it starts at, or under its one character (`mistakes.rs`, with

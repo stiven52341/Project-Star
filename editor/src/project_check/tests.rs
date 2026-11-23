@@ -161,14 +161,16 @@ fn programs_that_cannot_be_translated_are_problems() {
         &[(MANIFEST_FILE_NAME, MANIFEST), ("assets/demo.star", game)],
     );
 
-    let check = check_project(directory.path());
+    for goal in [CheckGoal::Compile, CheckGoal::Writing] {
+        let check = check_project_with(directory.path(), &OpenTexts::new(), goal);
 
-    assert_eq!(check.problems.len(), 1, "{:?}", messages(&check));
-    assert!(
-        check.problems[0]
-            .to_string()
-            .starts_with("assets/demo.star:")
-    );
+        assert_eq!(check.problems.len(), 1, "{:?}", messages(&check));
+        assert!(
+            check.problems[0]
+                .to_string()
+                .starts_with("assets/demo.star:")
+        );
+    }
 }
 
 /// `Rock`, as a blueprint: `update` sets `speed` to the value of node 3.

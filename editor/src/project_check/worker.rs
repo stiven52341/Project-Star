@@ -94,7 +94,7 @@ mod tests {
         assert_eq!(first.problems.len(), 1);
         assert_eq!(second.problems, []);
         assert!(second.outline.is_some());
-        // Checks while writing never translate the program.
+        // Checks while writing never keep the program's Rust.
         assert!(second.program.is_none());
     }
 }

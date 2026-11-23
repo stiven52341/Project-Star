@@ -120,9 +120,8 @@ pub(crate) enum CheckGoal {
     /// “Play”.
     Compile,
     /// Marking mistakes and suggesting names while scripts are written:
-    /// only the program's code is checked, and it is not translated (the
-    /// translation only finds constructs Rust cannot have yet, which
-    /// “Compile” reports).
+    /// only the program's code is checked (its translation to Rust too, for
+    /// the mistakes only it finds, but the Rust is not kept).
     Writing,
 }
 
@@ -247,7 +246,10 @@ fn asset_name(path: &str) -> String {
     format!("{ASSETS_DIRECTORY}/{path}")
 }
 
-/// Checks the program, and translates it to Rust if `goal` asks for it.
+/// Checks the program and translates it to Rust; the Rust is kept if
+/// `goal` asks for it. Translating takes about as long as checking (under
+/// a millisecond for a few hundred lines), so writing finds its mistakes
+/// too.
 fn check_program(
     program: &Program,
     settings: &GameSettings,
@@ -261,9 +263,11 @@ fn check_program(
             .collect::<Vec<_>>()
     };
     match check_program_with(program.sources(), settings) {
-        Ok(checked) if goal == CheckGoal::Writing => (Some(checked), None),
         Ok(checked) => match codegen::generate(&checked.syntax, &checked.analysis) {
-            Ok(generated) => (Some(checked), Some(generated)),
+            Ok(generated) => {
+                let kept = (goal == CheckGoal::Compile).then_some(generated);
+                (Some(checked), kept)
+            }
             Err(error) => {
                 problems.extend(report(vec![CompileError::Codegen(error)]));
                 (Some(checked), None)
