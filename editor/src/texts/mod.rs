@@ -1,8 +1,10 @@
 //! Every text the editor shows, in every language it speaks: English (the
 //! default) and Spanish. Each language is a [`Texts`] with the same fields,
 //! so the compiler checks that none is missing a text; texts built from
-//! values are methods of [`Texts`] (see `messages` and `scene_messages`).
+//! values are methods of [`Texts`] (see `messages`, `scene_messages` and
+//! `console_messages`).
 
+mod console_messages;
 mod english;
 mod messages;
 mod scene_messages;
@@ -188,6 +190,10 @@ pub(crate) struct Texts {
     pub(crate) stop: &'static str,
     pub(crate) stop_hint: &'static str,
     pub(crate) output: &'static str,
+    pub(crate) console: &'static str,
+    pub(crate) clear: &'static str,
+    pub(crate) show_levels: &'static str,
+    pub(crate) console_empty: &'static str,
     pub(crate) output_empty: &'static str,
     pub(crate) building_game: &'static str,
     pub(crate) game_running: &'static str,

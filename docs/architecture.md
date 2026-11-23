@@ -520,13 +520,22 @@ of the StarScript compiler and of the project check stay in English:
    drag = pan in 2D / orbit in 3D, wheel = zoom), always there and named
    after the open scene file, and one tab per open **blueprint** (see
    below), **Inspector** (the node selected in the scene, or the project's
-   properties), a bottom panel with three tabs, **Assets** (tree of
+   properties), a bottom panel with four tabs, **Assets** (tree of
    `assets/`, with “Refresh”; a double click on a `.blueprint` or a
-   `.scene` opens it) and **Problems** (what the last
+   `.scene` opens it), **Problems** (what the last
    “Compile” found, as `file:line:column` and a message; it opens by itself
-   when there are problems) and **Output** (what Cargo and the game write
-   while playing), and a status bar (with the result of the last
+   when there are problems), **Output** (what Cargo and the game write
+   while playing) and **Console** (the editor's own log), and a status bar (with the result of the last
    “Compile” and whether the game is building or running).
+
+The editor's log (`editor_log.rs`) is its own `log` logger: it writes to
+the terminal through `env_logger` (same `RUST_LOG` filter as before) and
+keeps the last 2000 messages in a `LogHistory`, shared behind a mutex so
+any thread can log. The **Console** tab shows them with their time since
+start, level (errors and warnings in color), module and text, filtered
+from a chosen level up (info by default), with “Clear”; it scrolls with
+new messages while it is at the bottom. Messages logged before a project
+is opened (in the project manager) are kept too.
 
 The view uses `OffscreenRenderer` on egui's wgpu device and registers its
 texture in `egui_wgpu` (it is registered again when its size changes). The

@@ -5,6 +5,7 @@ use eframe::egui;
 pub(crate) const TITLE_SIZE: f32 = 28.0;
 pub(crate) const SECTION_SPACING: f32 = 12.0;
 pub(crate) const ERROR_COLOR: egui::Color32 = egui::Color32::from_rgb(235, 100, 90);
+pub(crate) const WARNING_COLOR: egui::Color32 = egui::Color32::from_rgb(230, 190, 80);
 pub(crate) const SUCCESS_COLOR: egui::Color32 = egui::Color32::from_rgb(110, 200, 120);
 /// Space between the columns and the rows of a grid of properties.
 pub(crate) const PROPERTY_SPACING: [f32; 2] = [12.0, 8.0];

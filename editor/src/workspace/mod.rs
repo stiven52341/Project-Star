@@ -1,6 +1,7 @@
 //! Main editor window: menu, scene hierarchy, viewport, inspector and assets.
 
 mod assets_panel;
+mod console_panel;
 mod documents;
 mod editor_camera;
 mod grid;
@@ -16,6 +17,7 @@ use eframe::{egui, egui_wgpu};
 use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
 
 use self::assets_panel::{AssetsPanel, OpenedAsset};
+use self::console_panel::ConsolePanel;
 use self::documents::{ActiveDocument, Documents};
 use self::inspector_panel::show_inspector;
 use self::menu_bar::{MenuAction, MenuState, SAVE_SHORTCUT, show_menu_bar};
@@ -23,6 +25,7 @@ use self::output_panel::OutputPanel;
 use self::problems_panel::{CheckEnd, ProblemsPanel};
 use self::unsaved_dialog::{UnsavedChoice, show_unsaved_dialog};
 use self::viewport::SceneViewport;
+use crate::editor_log::LogHistory;
 use crate::game_run::PlayRequest;
 use crate::project::{ASSETS_DIRECTORY, Project};
 use crate::project_check::Problem;
@@ -61,6 +64,7 @@ enum BottomTab {
     Assets,
     Problems,
     Output,
+    Console,
 }
 
 /// Editor for one open project.
@@ -69,6 +73,7 @@ pub(crate) struct EditorWindow {
     assets: AssetsPanel,
     problems: ProblemsPanel,
     output: OutputPanel,
+    console: ConsolePanel,
     /// “Play” waits for its check: the game is played if it finds nothing.
     play_after_check: bool,
     bottom_tab: BottomTab,
@@ -83,8 +88,13 @@ pub(crate) struct EditorWindow {
 }
 
 impl EditorWindow {
-    /// Opens `project`, rendering its scene on the UI's GPU (`render_state`).
-    pub(crate) fn new(project: Project, render_state: Option<&egui_wgpu::RenderState>) -> Self {
+    /// Opens `project`, rendering its scene on the UI's GPU (`render_state`)
+    /// and showing the messages of `log_history` in its console.
+    pub(crate) fn new(
+        project: Project,
+        render_state: Option<&egui_wgpu::RenderState>,
+        log_history: LogHistory,
+    ) -> Self {
         let assets = AssetsPanel::new(project.directory());
         let dimension = project.settings().dimension();
         let viewport = render_state
@@ -101,6 +111,7 @@ impl EditorWindow {
             assets,
             problems: ProblemsPanel::new(),
             output: OutputPanel::new(),
+            console: ConsolePanel::new(log_history),
             play_after_check: false,
             bottom_tab: BottomTab::Assets,
             documents: Documents::new(),
@@ -334,6 +345,11 @@ impl EditorWindow {
                 BottomTab::Output,
                 texts::current().output,
             );
+            ui.selectable_value(
+                &mut self.bottom_tab,
+                BottomTab::Console,
+                texts::current().console,
+            );
         });
         ui.separator();
         match self.bottom_tab {
@@ -352,6 +368,7 @@ impl EditorWindow {
                 }
             }
             BottomTab::Output => self.output.show(ui),
+            BottomTab::Console => self.console.show(ui),
         }
     }
 

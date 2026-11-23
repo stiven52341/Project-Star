@@ -3,6 +3,7 @@
 use eframe::{egui, egui_wgpu};
 use star_engine::prelude::ENGINE_NAME;
 
+use crate::editor_log::LogHistory;
 use crate::launcher::{Launcher, LauncherAction};
 use crate::preferences::PreferencesStore;
 use crate::project::Project;
@@ -21,14 +22,18 @@ enum Screen {
 pub(crate) struct EditorApp {
     screen: Screen,
     preferences: PreferencesStore,
+    /// The log's messages, for the console of each project opened.
+    log_history: LogHistory,
 }
 
 impl EditorApp {
-    /// Starts on the launcher, shown as `preferences` say.
-    pub(crate) fn new(preferences: PreferencesStore) -> Self {
+    /// Starts on the launcher, shown as `preferences` say; the editor's
+    /// console shows the messages of `log_history`.
+    pub(crate) fn new(preferences: PreferencesStore, log_history: LogHistory) -> Self {
         Self {
             screen: Screen::Launcher(Launcher::new()),
             preferences,
+            log_history,
         }
     }
 
@@ -44,8 +49,9 @@ impl EditorApp {
         context: &egui::Context,
         render_state: Option<&egui_wgpu::RenderState>,
         project: Project,
+        log_history: LogHistory,
     ) -> Screen {
-        let editor = EditorWindow::new(project, render_state);
+        let editor = EditorWindow::new(project, render_state, log_history);
         context.send_viewport_cmd(egui::ViewportCommand::Title(editor.title()));
         context.send_viewport_cmd(egui::ViewportCommand::Maximized(true));
         Screen::Editor(Box::new(editor))
@@ -73,6 +79,7 @@ impl eframe::App for EditorApp {
                     &context,
                     frame.wgpu_render_state(),
                     project,
+                    self.log_history.clone(),
                 )),
                 Some(LauncherAction::ChangeLanguage(language)) => {
                     self.change_language(&context, language);

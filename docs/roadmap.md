@@ -108,7 +108,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `main`. `App::with_development_assets` keeps the packaged assets
         on Android; `physics_2d` and `sounds_2d` also answer taps.
   - [ ] 11d iOS (needs macOS and Xcode).
-- [ ] **Phase 12 — Visual editor** (egui):
+- [x] **Phase 12 — Visual editor** (egui):
   - [x] Project manager: new project (name, location, 2D/3D, platforms),
         recent projects, open project, native folder picker.
   - [x] Main window: menu, Scene / View / Inspector / Files panels, status bar.
@@ -116,7 +116,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         editor camera (pan/orbit and zoom).
   - [x] Editor in English (default) and Spanish, chosen from a “Language”
         menu and remembered between sessions.
-  - [ ] Real hierarchy and inspector, log console, in parts:
+  - [x] Real hierarchy and inspector, log console, in parts:
     - [x] 12a Open a `.scene` from “Assets” in the “Scene” tab: its tree
           of nodes in the “Scene” panel, and the parts of the node
           selected in the inspector (read only).
@@ -125,7 +125,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           the file (`SceneOutline::to_text`, `add_node`, `remove_node`).
     - [x] 12c Draw the open scene in the view (sprites, meshes, lights),
           with the selected node marked.
-    - [ ] 12d Log console in the bottom panel.
+    - [x] 12d Log console in the bottom panel: the editor's log, kept
+          while writing to the terminal, filtered by level.
 - [ ] **Phase 13 — StarScript and Blueprints** (`star_script`, see `docs/starscript.md`):
   - [x] 13.1 Lexical specification and lexer (tokens, errors with line and column).
   - [x] 13.2 Parser and AST (error recovery, all errors at once).
