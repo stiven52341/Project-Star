@@ -52,6 +52,8 @@ pub(super) static ENGLISH: Texts = Texts {
     add_child_node_hint: "Adds a child to the selected node (or to the root)",
     root_cannot_be_deleted: "Every scene needs its root node.",
     new_node_name: "Node",
+    search_nodes: "Search nodes",
+    no_nodes_match: "No node matches.",
     circle: "Circle",
     rectangle: "Rectangle",
     capsule: "Capsule",

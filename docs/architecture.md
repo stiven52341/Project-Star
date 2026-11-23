@@ -549,7 +549,13 @@ The “Scene” panel draws its tree from the parent each node names, every
 branch open at first, under two buttons: “Add node” (a child of the
 selected node, or of the root, named `Node`, `Node2`… among its siblings,
 placed in 2D or 3D as the project is) and “Delete node” (with its
-descendants; never the root). A click selects a node, and the inspector
+descendants; never the root). The tree (`tree_view.rs`) draws one row
+per node across the panel, striped, with guides down to the children, an
+arrow to close and open them (closed nodes are kept by path, so they stay
+closed while others come and go), an icon for what the node shows most
+(light, mesh, sprite, body or nothing) and its class on the right. A
+search field lists the nodes whose name contains the text. A node chosen
+in the view opens its parents and scrolls into sight. A click selects a node, and the inspector
 edits its parts in sections (node, transform, sprite, mesh, light, 2D and
 3D body): angles in degrees, colors with egui's picker, images chosen
 among those of `assets/`, shapes rebuilt through the physics' own

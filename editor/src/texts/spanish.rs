@@ -52,6 +52,8 @@ pub(super) static SPANISH: Texts = Texts {
     add_child_node_hint: "Añade un hijo al nodo seleccionado (o a la raíz)",
     root_cannot_be_deleted: "Toda escena necesita su nodo raíz.",
     new_node_name: "Nodo",
+    search_nodes: "Buscar nodos",
+    no_nodes_match: "Ningún nodo coincide.",
     circle: "Círculo",
     rectangle: "Rectángulo",
     capsule: "Cápsula",

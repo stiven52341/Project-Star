@@ -9,6 +9,7 @@ mod fields;
 mod picking;
 mod properties;
 mod tree;
+mod tree_view;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,7 +21,7 @@ use self::components::new_node;
 pub(crate) use self::drawing::{Marks, SceneGpu, cross_lines, cube_lines, square_lines};
 pub(crate) use self::picking::Ray;
 use self::properties::{NodeContext, edit_node};
-use self::tree::children_of;
+use self::tree_view::{TreeState, TreeView};
 use crate::project::ProjectDimension;
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -41,6 +42,8 @@ pub(crate) struct SceneDocument {
     unsaved: bool,
     /// Why the last save failed, until one works.
     save_error: Option<String>,
+    /// The nodes closed in the tree and the text searched in it.
+    tree: TreeState,
 }
 
 impl SceneDocument {
@@ -59,6 +62,7 @@ impl SceneDocument {
             selected: None,
             unsaved: false,
             save_error: None,
+            tree: TreeState::default(),
         }
     }
 
@@ -121,6 +125,7 @@ impl SceneDocument {
     pub(crate) fn select_at(&mut self, ray: Ray) {
         if let Ok(outline) = &self.content {
             self.selected = picking::node_at(outline, ray);
+            self.tree.reveal_selected();
         }
     }
 
@@ -144,13 +149,7 @@ impl SceneDocument {
         };
         self.unsaved |= editor.show_buttons(ui);
         ui.separator();
-        let tree = SceneTree {
-            outline: editor.outline,
-            children: children_of(editor.outline.nodes()),
-        };
-        egui::ScrollArea::vertical()
-            .auto_shrink(false)
-            .show(ui, |ui| tree.show_node(ui, ROOT, editor.selected));
+        TreeView::new(editor.outline.nodes(), &mut self.tree, editor.selected).show(ui);
     }
 
     /// The node selected, to edit, choosing images among `images`. Returns
@@ -266,53 +265,6 @@ fn unique_child_name(outline: &SceneOutline, parent: usize, base: &str) -> Strin
         .map(|number| format!("{base}{number}"))
         .find(|name| !taken(name))
         .unwrap_or_else(|| base.to_owned())
-}
-
-/// The nodes of an outline with the children of each, to draw them as a
-/// tree.
-struct SceneTree<'scene> {
-    outline: &'scene SceneOutline,
-    children: Vec<Vec<usize>>,
-}
-
-impl SceneTree<'_> {
-    /// Draws the node at `index` and, under it, its children; a click
-    /// selects it.
-    fn show_node(&self, ui: &mut egui::Ui, index: usize, selected: &mut Option<usize>) {
-        let Some(node) = self.outline.nodes().get(index) else {
-            return;
-        };
-        let children = self.children.get(index).map_or(&[][..], Vec::as_slice);
-        let mut label = |ui: &mut egui::Ui| {
-            let response = ui.selectable_label(*selected == Some(index), node.name.as_str());
-            let response = match &node.class {
-                Some(class) => response.on_hover_text(class.as_str()),
-                None => response,
-            };
-            if response.clicked() {
-                *selected = Some(index);
-            }
-        };
-        if children.is_empty() {
-            // Leaves line up with the names of the nodes that can open.
-            ui.horizontal(|ui| {
-                ui.add_space(ui.spacing().indent);
-                label(ui);
-            });
-            return;
-        }
-        egui::collapsing_header::CollapsingState::load_with_default_open(
-            ui.ctx(),
-            ui.make_persistent_id(("scene_node", index)),
-            true,
-        )
-        .show_header(ui, label)
-        .body(|ui| {
-            for &child in children {
-                self.show_node(ui, child, selected);
-            }
-        });
-    }
 }
 
 #[cfg(test)]

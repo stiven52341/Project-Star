@@ -128,6 +128,8 @@ pub(crate) struct Texts {
     pub(crate) add_child_node_hint: &'static str,
     pub(crate) root_cannot_be_deleted: &'static str,
     pub(crate) new_node_name: &'static str,
+    pub(crate) search_nodes: &'static str,
+    pub(crate) no_nodes_match: &'static str,
     pub(crate) circle: &'static str,
     pub(crate) rectangle: &'static str,
     pub(crate) capsule: &'static str,
