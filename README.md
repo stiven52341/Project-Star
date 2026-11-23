@@ -33,7 +33,8 @@ workflow of Unity and Godot.
   (35 for NDK r28), build-tools 37 (36 cannot read Java 25 classes) and the
   NDK, with `ANDROID_HOME` and `ANDROID_NDK_ROOT` pointing at them.
 - `cargo install cargo-apk2`, then, in a game whose library calls
-  `star_engine::android_main!` (see `examples/scene_3d`):
+  `star_engine::android_main!` (see `examples/scene_3d`, and
+  `examples/scene_2d` for a game whose assets go inside the APK):
 
 ```bash
 cd examples/scene_3d

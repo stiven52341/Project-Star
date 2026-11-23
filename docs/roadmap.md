@@ -97,11 +97,11 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `cargo apk2`; the renderer lets go of its surface in the
         background and draws again on return. `scene_3d` runs on the
         emulator.
-  - [ ] 11b Android assets: reading the asset folder from the APK.
-        Done: `AssetFolder::packaged` (`PackagedFiles`), read on Android
-        through `star_platform::PackagedAssets`, used by `App` by default.
-        Pending: an example that ships assets in its APK, tried on the
-        emulator.
+  - [x] 11b Android assets: `AssetFolder::packaged` (`PackagedFiles`),
+        read on Android from the APK through `star_platform::PackagedAssets`
+        and used by `App` by default. `scene_2d` ships its scene and images
+        in its APK (`assets = "assets"`) and adds systems with a tap; both
+        tried on the emulator.
   - [ ] 11c Android in CI, and the other examples as APKs.
   - [ ] 11d iOS (needs macOS and Xcode).
 - [ ] **Phase 12 — Visual editor** (egui):
