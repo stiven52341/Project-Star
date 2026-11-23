@@ -39,6 +39,16 @@ Rules:
 - **`unsafe` is forbidden** by default (`unsafe_code = "deny"`). It is only
   allowed in FFI/platform layers, with a justified crate-level
   `#![allow(unsafe_code)]` and a `// SAFETY:` comment explaining each block.
+  - **Only agreed exception** (approved by the owner for this one place):
+    the `android_main!` macro in `star_platform/src/entry.rs`. Android does
+    not call `main`: its NativeActivity glue loads the game's library and
+    looks up a C function named exactly `android_main`. Rust only exports a
+    function under its plain name with `#[no_mangle]`, which edition 2024
+    marks `#[unsafe(no_mangle)]` (two symbols with the same name would be
+    undefined behavior). The symbol must live in the game's own crate, so
+    the macro expands there, with an allow on that one function and its
+    `// SAFETY:` comment. `unsafe` stays forbidden everywhere else, and
+    this macro must not grow any other unsafe code.
 
 ### 3.2 Clean Code
 - Clear, descriptive names; no cryptic abbreviations.

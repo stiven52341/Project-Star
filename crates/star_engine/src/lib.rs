@@ -33,5 +33,6 @@ pub use star_input;
 pub use star_math;
 pub use star_physics;
 pub use star_platform;
+pub use star_platform::android_main;
 pub use star_render;
 pub use star_scene;

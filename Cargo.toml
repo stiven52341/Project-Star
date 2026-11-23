@@ -30,7 +30,10 @@ star_blueprint = { path = "crates/star_blueprint" }
 
 # External dependencies. Each one is wrapped by an engine crate (see CLAUDE.md 3.5).
 wgpu = "30.0"              # GPU abstraction: DX12, Vulkan, Metal, OpenGL
-winit = "0.30"             # Cross-platform windows and OS events
+winit = { version = "0.30", features = [
+    "android-native-activity",
+] }                        # Cross-platform windows and OS events (NativeActivity on Android)
+android_logger = "0.15"    # Log output to logcat on Android
 gilrs = "0.11"             # Gamepads (needs libudev headers to build on Linux)
 png = "0.18"               # PNG image decoding for textures
 zune-jpeg = "0.5"           # JPEG image decoding for textures

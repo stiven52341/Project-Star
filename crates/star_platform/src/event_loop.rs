@@ -31,6 +31,21 @@ pub trait WindowEventHandler {
     /// An error stops the event loop and is returned by [`run_event_loop`].
     fn on_redraw_requested(&mut self) -> EngineResult<()>;
 
+    /// Called when the system takes the window's surface away: an Android
+    /// app going to the background. Nothing is drawn until
+    /// [`on_resumed`](Self::on_resumed). By default it is ignored.
+    fn on_suspended(&mut self) {}
+
+    /// Called when the window can be drawn into again after
+    /// [`on_suspended`](Self::on_suspended). By default it is ignored.
+    ///
+    /// # Errors
+    ///
+    /// An error stops the event loop and is returned by [`run_event_loop`].
+    fn on_resumed(&mut self) -> EngineResult<()> {
+        Ok(())
+    }
+
     /// Called for each input event, between frames. By default it is ignored.
     fn on_input(&mut self, _event: InputEvent) {}
 
@@ -51,10 +66,7 @@ pub fn run_event_loop(
     config: WindowConfig,
     handler: &mut impl WindowEventHandler,
 ) -> EngineResult<()> {
-    let event_loop = EventLoop::new().map_err(|error| EngineError::Initialization {
-        subsystem: "event loop",
-        reason: error.to_string(),
-    })?;
+    let event_loop = new_event_loop()?;
     // Games redraw continuously instead of waiting for OS events.
     event_loop.set_control_flow(ControlFlow::Poll);
 
@@ -62,6 +74,7 @@ pub fn run_event_loop(
         config,
         handler,
         window: None,
+        suspended: false,
         gamepads: GamepadEvents::new(),
         error: None,
     };
@@ -72,11 +85,35 @@ pub fn run_event_loop(
     adapter.error.map_or(Ok(()), Err)
 }
 
+/// The OS event loop. On Android it runs in the app the system started the
+/// game in (see [`android_main!`](crate::android_main)).
+fn new_event_loop() -> EngineResult<EventLoop<()>> {
+    let mut builder = EventLoop::builder();
+    #[cfg(target_os = "android")]
+    {
+        use winit::platform::android::EventLoopBuilderExtAndroid as _;
+        let app = crate::android::app().ok_or_else(|| EngineError::Initialization {
+            subsystem: "event loop",
+            reason: "the game was not started with `android_main!`".to_owned(),
+        })?;
+        builder.with_android_app(app);
+    }
+    builder
+        .build()
+        .map_err(|error| EngineError::Initialization {
+            subsystem: "event loop",
+            reason: error.to_string(),
+        })
+}
+
 /// Translates `winit` callbacks into [`WindowEventHandler`] calls.
 struct WinitAdapter<'handler, H> {
     config: WindowConfig,
     handler: &'handler mut H,
     window: Option<Window>,
+    /// Whether the system took the window's surface away; no frames are
+    /// asked for until it gives it back.
+    suspended: bool,
     gamepads: Option<GamepadEvents>,
     error: Option<EngineError>,
 }
@@ -119,11 +156,23 @@ impl<H: WindowEventHandler> WinitAdapter<'_, H> {
 
 impl<H: WindowEventHandler> ApplicationHandler for WinitAdapter<'_, H> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.window.is_some() {
-            return;
-        }
-        if let Err(error) = self.open_window(event_loop) {
+        let resumed = if self.window.is_none() {
+            self.open_window(event_loop)
+        } else if self.suspended {
+            self.handler.on_resumed()
+        } else {
+            Ok(())
+        };
+        self.suspended = false;
+        if let Err(error) = resumed {
             self.stop_with_error(event_loop, error);
+        }
+    }
+
+    fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
+        if self.window.is_some() && !self.suspended {
+            self.suspended = true;
+            self.handler.on_suspended();
         }
     }
 
@@ -156,7 +205,7 @@ impl<H: WindowEventHandler> ApplicationHandler for WinitAdapter<'_, H> {
             return;
         }
         self.poll_gamepads();
-        if let Some(window) = &self.window {
+        if let Some(window) = self.window.as_ref().filter(|_| !self.suspended) {
             window.request_redraw();
         }
     }

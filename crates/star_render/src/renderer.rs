@@ -32,7 +32,9 @@ impl Default for RendererConfig {
 pub struct Renderer {
     window: Window,
     instance: wgpu::Instance,
-    surface: wgpu::Surface<'static>,
+    /// `None` while the system took the window's surface away (an Android
+    /// app in the background).
+    surface: Option<wgpu::Surface<'static>>,
     surface_config: wgpu::SurfaceConfiguration,
     gpu_info: GpuInfo,
     scene: SceneRenderer,
@@ -68,7 +70,7 @@ impl Renderer {
         let renderer = Self {
             window: window.clone(),
             instance,
-            surface,
+            surface: Some(surface),
             surface_config,
             gpu_info: GpuInfo::from_wgpu(&adapter.get_info()),
             scene,
@@ -155,10 +157,34 @@ impl Renderer {
         self.scene.resize(size.width, size.height);
     }
 
+    /// Lets go of the window's surface, which the system is taking away
+    /// (an Android app going to the background). Frames are skipped until
+    /// [`Renderer::resume`].
+    pub fn suspend(&mut self) {
+        self.surface = None;
+    }
+
+    /// Draws into the window again after [`Renderer::suspend`], with a new
+    /// surface of its current size. Textures and meshes are kept.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Initialization`] if the window cannot be drawn
+    /// into.
+    pub fn resume(&mut self) -> EngineResult<()> {
+        let size = self.window.size();
+        if !size.is_empty() {
+            self.surface_config.width = size.width;
+            self.surface_config.height = size.height;
+            self.scene.resize(size.width, size.height);
+        }
+        self.recreate_surface()
+    }
+
     /// Draws `frame` and shows it on screen.
     ///
     /// Frames that cannot be drawn right now (minimized window, outdated
-    /// surface) are skipped silently.
+    /// surface, suspended renderer) are skipped silently.
     ///
     /// # Errors
     ///
@@ -181,7 +207,10 @@ impl Renderer {
     }
 
     fn acquire_frame(&mut self) -> EngineResult<Option<wgpu::SurfaceTexture>> {
-        match self.surface.get_current_texture() {
+        let Some(surface) = &self.surface else {
+            return Ok(None);
+        };
+        match surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => Ok(Some(frame)),
             wgpu::CurrentSurfaceTexture::Suboptimal(frame) => {
                 drop(frame);
@@ -206,12 +235,13 @@ impl Renderer {
     }
 
     fn configure_surface(&self) {
-        self.surface
-            .configure(self.scene.device(), &self.surface_config);
+        if let Some(surface) = &self.surface {
+            surface.configure(self.scene.device(), &self.surface_config);
+        }
     }
 
     fn recreate_surface(&mut self) -> EngineResult<()> {
-        self.surface = create_surface(&self.instance, &self.window)?;
+        self.surface = Some(create_surface(&self.instance, &self.window)?);
         self.configure_surface();
         Ok(())
     }

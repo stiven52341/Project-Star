@@ -136,6 +136,21 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
         Ok(())
     }
 
+    fn on_suspended(&mut self) {
+        log::info!("The game is in the background: drawing stops");
+        if let Some(renderer) = &mut self.renderer {
+            renderer.suspend();
+        }
+    }
+
+    fn on_resumed(&mut self) -> EngineResult<()> {
+        // The time in the background is not a frame: the game goes on
+        // where it stopped.
+        self.last_frame_start = None;
+        log::info!("The game is back: drawing again");
+        self.renderer.as_mut().map_or(Ok(()), Renderer::resume)
+    }
+
     fn on_resized(&mut self, size: WindowSize) {
         self.world.insert_resource(size);
         if let Some(renderer) = &mut self.renderer {

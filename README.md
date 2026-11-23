@@ -26,6 +26,26 @@ workflow of Unity and Godot.
   (audio), e.g. on Debian/Ubuntu:
   `sudo apt install libudev-dev libasound2-dev pkg-config`.
 
+### Android
+
+- The Rust targets: `rustup target add aarch64-linux-android x86_64-linux-android`.
+- The Android SDK with platform-tools, a platform within the NDK's range
+  (35 for NDK r28), build-tools 37 (36 cannot read Java 25 classes) and the
+  NDK, with `ANDROID_HOME` and `ANDROID_NDK_ROOT` pointing at them.
+- `cargo install cargo-apk2`, then, in a game whose library calls
+  `star_engine::android_main!` (see `examples/scene_3d`):
+
+```bash
+cd examples/scene_3d
+cargo apk2 run --lib --release   # build, install and start it on the connected device
+```
+
+A release APK is signed with the keystore of
+`[package.metadata.android.signing.release]`, or of the
+`CARGO_APK_RELEASE_KEYSTORE` and `CARGO_APK_RELEASE_KEYSTORE_PASSWORD`
+variables. On the emulator, use release builds: its Vulkan driver crashes
+on the object names that debug builds give to GPU objects.
+
 ## Commands
 
 ```bash

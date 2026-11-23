@@ -6,6 +6,9 @@
 //! Console support (PlayStation, Xbox) will be added in isolated modules
 //! because their SDKs are under NDA.
 
+#[cfg(target_os = "android")]
+pub mod android;
+mod entry;
 mod event_loop;
 mod gilrs_input;
 mod input_event;

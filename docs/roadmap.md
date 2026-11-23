@@ -92,6 +92,14 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         a kinematic bar sweeping the floor and a sensor plate that paints
         green what goes through it. StarScript has 3D bodies since 13.5k.
 - [ ] **Phase 11 — Mobile**: Android and iOS packaging.
+  - [x] 11a Android: games run as a NativeActivity (`android_main!` in
+        the game's library, logs in `adb logcat`), packaged with
+        `cargo apk2`; the renderer lets go of its surface in the
+        background and draws again on return. `scene_3d` runs on the
+        emulator.
+  - [ ] 11b Android assets: reading the asset folder from the APK.
+  - [ ] 11c Android in CI, and the other examples as APKs.
+  - [ ] 11d iOS (needs macOS and Xcode).
 - [ ] **Phase 12 — Visual editor** (egui):
   - [x] Project manager: new project (name, location, 2D/3D, platforms),
         recent projects, open project, native folder picker.

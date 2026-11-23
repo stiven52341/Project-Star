@@ -3,4 +3,4 @@ allow-expect-in-tests = true
 allow-panic-in-tests = true
 
 # ".." keeps clippy's default list (e.g. "macOS", "iOS") and adds our own names.
-doc-valid-idents = ["ProjectStar", "PlayStation", "StarScript", ".."]
+doc-valid-idents = ["ProjectStar", "PlayStation", "StarScript", "NativeActivity", ".."]
