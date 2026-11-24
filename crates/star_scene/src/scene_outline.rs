@@ -158,14 +158,7 @@ impl SceneOutline {
                 "cannot remove node {index}: it is the root or it does not exist"
             )));
         }
-        // Parents come first, so one pass finds every descendant.
-        let mut removed = vec![false; self.nodes.len()];
-        for position in index..self.nodes.len() {
-            removed[position] = position == index
-                || self.nodes[position]
-                    .parent
-                    .is_some_and(|parent| removed[parent]);
-        }
+        let removed = self.subtree(index);
         let new_positions = new_positions(&removed);
         let mut position = 0;
         self.nodes.retain(|_| {
@@ -178,6 +171,67 @@ impl SceneOutline {
                 .and_then(|parent| new_positions.get(parent).copied().flatten());
         }
         Ok(())
+    }
+
+    /// Moves the node at `index`, with all its descendants, to be the last
+    /// child of the node at `parent`. The nodes keep their order otherwise,
+    /// with the ones moved after the rest, so parents still come first.
+    /// Returns the node's new position.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Scene`] if `index` is the root, if there is
+    /// no node at `index` or `parent`, or if `parent` is the node itself or
+    /// one of its descendants, which would leave them out of the tree.
+    pub fn move_node(&mut self, index: usize, parent: usize) -> EngineResult<usize> {
+        let count = self.nodes.len();
+        if index == 0 || index >= count || parent >= count {
+            return Err(EngineError::Scene(format!(
+                "cannot move node {index} under node {parent}: the root cannot move, \
+                 and both must exist"
+            )));
+        }
+        let moved = self.subtree(index);
+        if moved[parent] {
+            return Err(EngineError::Scene(format!(
+                "cannot move node {index} under node {parent}, which is inside it"
+            )));
+        }
+        let order: Vec<usize> = (0..count)
+            .filter(|&position| !moved[position])
+            .chain((0..count).filter(|&position| moved[position]))
+            .collect();
+        let mut new_positions = vec![0; count];
+        for (new, &old) in order.iter().enumerate() {
+            new_positions[old] = new;
+        }
+        let mut old_nodes: Vec<Option<NodeOutline>> = std::mem::take(&mut self.nodes)
+            .into_iter()
+            .map(Some)
+            .collect();
+        self.nodes = order
+            .iter()
+            .filter_map(|&old| old_nodes[old].take())
+            .collect();
+        for node in &mut self.nodes {
+            node.parent = node.parent.map(|parent| new_positions[parent]);
+        }
+        let new_index = new_positions[index];
+        self.nodes[new_index].parent = Some(new_positions[parent]);
+        Ok(new_index)
+    }
+
+    /// Marks the node at `index` and its descendants. Parents come first,
+    /// so one pass finds them all.
+    fn subtree(&self, index: usize) -> Vec<bool> {
+        let mut inside = vec![false; self.nodes.len()];
+        for position in index..self.nodes.len() {
+            inside[position] = position == index
+                || self.nodes[position]
+                    .parent
+                    .is_some_and(|parent| inside[parent]);
+        }
+        inside
     }
 
     /// Writes the outline as the text of a `.scene` file.
@@ -521,6 +575,41 @@ mod tests {
             names_and_parents(&outline),
             vec![("Root", None), ("B", Some(0)), ("B1", Some(1))]
         );
+    }
+
+    #[test]
+    fn moved_nodes_take_their_descendants_after_the_rest() {
+        let mut outline = SceneOutline::from_text(TREE).unwrap();
+
+        let index = outline.move_node(1, 2).unwrap();
+
+        assert_eq!(index, 3);
+        assert_eq!(
+            names_and_parents(&outline),
+            vec![
+                ("Root", None),
+                ("B", Some(0)),
+                ("B1", Some(1)),
+                ("A", Some(1)),
+                ("A1", Some(3)),
+            ]
+        );
+        assert_eq!(
+            outline.nodes()[3].transform,
+            SceneOutline::from_text(TREE).unwrap().nodes()[1].transform
+        );
+        assert!(SceneOutline::from_text(&outline.to_text().unwrap()).is_ok());
+    }
+
+    #[test]
+    fn nodes_cannot_move_into_themselves_and_the_root_cannot_move() {
+        let mut outline = SceneOutline::from_text(TREE).unwrap();
+
+        assert!(outline.move_node(1, 1).is_err());
+        assert!(outline.move_node(1, 3).is_err());
+        assert!(outline.move_node(0, 2).is_err());
+        assert!(outline.move_node(1, 9).is_err());
+        assert_eq!(outline, SceneOutline::from_text(TREE).unwrap());
     }
 
     #[test]

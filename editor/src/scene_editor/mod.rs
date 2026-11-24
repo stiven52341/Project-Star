@@ -1,6 +1,7 @@
 //! The scene editor: a `.scene` file of the assets folder, open in the
 //! “Scene” tab. The “Scene” panel shows its nodes as a tree, whose menus
-//! create, duplicate and delete nodes, and the inspector edits the node selected in
+//! create, duplicate and delete nodes, dragging a node moves it to another
+//! parent, and the inspector edits the node selected in
 //! it. Changes are kept until the scene is saved, and can be undone.
 
 mod components;
@@ -11,6 +12,7 @@ mod gizmo;
 mod history;
 mod picking;
 mod properties;
+mod reparenting;
 mod tree;
 mod tree_view;
 
@@ -288,6 +290,7 @@ impl SceneDocument {
             TreeAction::Create { parent, template } => editor.add_child(parent, template, images),
             TreeAction::Duplicate(index) => editor.duplicate(index),
             TreeAction::Delete(index) => editor.delete(index),
+            TreeAction::Move { node, parent } => editor.reparent(node, parent),
         };
         if changed {
             self.mark_changed();
@@ -384,7 +387,7 @@ impl SceneDocument {
 /// Every scene has its root first.
 const ROOT: usize = 0;
 
-/// What changes the tree: adding and deleting nodes.
+/// What changes the tree: adding, moving and deleting nodes.
 struct TreeEditor<'scene> {
     outline: &'scene mut SceneOutline,
     selected: &'scene mut Option<usize>,
@@ -449,6 +452,45 @@ impl TreeEditor<'_> {
         true
     }
 
+    /// Moves the node at `index`, with its descendants, to be the last
+    /// child of `parent`, where it stays in the same place of the world,
+    /// with a name free among its new siblings, and selects it.
+    fn reparent(&mut self, index: usize, parent: usize) -> bool {
+        let nodes = self.outline.nodes();
+        let Some(node) = nodes
+            .get(index)
+            .filter(|_| tree::can_move(nodes, index, parent))
+        else {
+            return false;
+        };
+        let handed = drawing::handed_down(nodes);
+        let (from_flat, from_solid) = drawing::parent_place(node, &handed);
+        let Some(&(to_flat, to_solid)) = handed.get(parent) else {
+            return false;
+        };
+        let transform = node
+            .transform
+            .map(|local| reparenting::keep_in_place_2d(local, from_flat, to_flat));
+        let transform_3d = node
+            .transform_3d
+            .map(|local| reparenting::keep_in_place_3d(local, from_solid, to_solid));
+        let name = unique_child_name(self.outline, parent, &node.name);
+        let moved = match self.outline.move_node(index, parent) {
+            Ok(moved) => moved,
+            Err(error) => {
+                log::warn!("{error}");
+                return false;
+            }
+        };
+        if let Some(node) = self.outline.node_mut(moved) {
+            node.name = name;
+            node.transform = transform;
+            node.transform_3d = transform_3d;
+        }
+        *self.selected = Some(moved);
+        true
+    }
+
     /// Deletes the node at `index` with its descendants, and selects its
     /// parent.
     fn delete(&mut self, index: usize) -> bool {
@@ -500,6 +542,7 @@ fn unique_child_name(outline: &SceneOutline, parent: usize, base: &str) -> Strin
 mod tests {
     use super::*;
     use crate::project::TestDirectory;
+    use star_engine::prelude::{Transform2D, Vec2};
 
     const LEVEL: &str = "format = 1\n[[node]]\nname = \"One\"";
 
@@ -598,6 +641,41 @@ mod tests {
         assert_eq!(nodes[4].parent, Some(3));
         assert!(nodes[4].sprite.is_some());
         assert_eq!(scene.selected, Some(3));
+    }
+
+    #[test]
+    fn moved_nodes_stay_in_place_with_a_free_name() {
+        let (_assets, mut scene) = open_level("scene_document_move");
+        let mut editor = tree_editor(&mut scene);
+        editor.add_child(ROOT, NodeTemplate::Empty, &[]);
+        editor.add_child(ROOT, NodeTemplate::Empty, &[]);
+        editor.add_child(1, NodeTemplate::Empty, &[]);
+        editor.outline.node_mut(1).unwrap().transform =
+            Some(Transform2D::from_position(Vec2::new(5.0, 0.0)));
+        editor.outline.node_mut(3).unwrap().name = "Node2".to_owned();
+        editor.outline.node_mut(3).unwrap().transform =
+            Some(Transform2D::from_position(Vec2::new(1.0, 0.0)));
+
+        assert!(editor.reparent(3, ROOT));
+
+        let nodes = editor.outline.nodes();
+        let names: Vec<_> = nodes.iter().map(|node| node.name.as_str()).collect();
+        assert_eq!(names, ["One", "Node", "Node2", "Node22"]);
+        assert_eq!(nodes[3].parent, Some(ROOT));
+        assert_eq!(nodes[3].transform.unwrap().position, Vec2::new(6.0, 0.0));
+        assert_eq!(scene.selected, Some(3));
+    }
+
+    #[test]
+    fn nodes_never_move_into_themselves() {
+        let (_assets, mut scene) = open_level("scene_document_move_inside");
+        let mut editor = tree_editor(&mut scene);
+        editor.add_child(ROOT, NodeTemplate::Empty, &[]);
+        editor.add_child(1, NodeTemplate::Empty, &[]);
+
+        assert!(!editor.reparent(1, 2));
+        assert!(!editor.reparent(ROOT, 1));
+        assert_eq!(editor.outline.nodes()[2].parent, Some(1));
     }
 
     #[test]

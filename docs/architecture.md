@@ -566,7 +566,15 @@ plane, a directional or a point light in 3D; named after the template,
 `Cube`, `Cube2`… among its siblings), “Duplicate” (`Ctrl+D`: the node
 and its descendants, under the same parent) and “Delete” (`Delete`: with
 its descendants); the root can be neither duplicated nor deleted. A right
-click under the rows creates under the root. The tree (`tree_view.rs`) draws one row
+click under the rows creates under the root. A row dragged onto another
+row moves its node, with its descendants, to be that node's last child
+(dropped under the rows, the root's), through `SceneOutline::move_node`,
+which puts the nodes moved after the rest so parents still come first;
+rows it cannot land on (itself, its descendants, its own parent) are not
+outlined. The node keeps its place in the world: its transform is
+recomputed for the new parent (the closest one when uneven scales and
+rotations would skew it), and it gets a name free among its new
+siblings. The tree (`tree_view.rs`) draws one row
 per node across the panel, striped, with guides down to the children, an
 arrow to close and open them (closed nodes are kept by path, so they stay
 closed while others come and go), an icon for what the node shows most

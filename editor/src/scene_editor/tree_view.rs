@@ -3,7 +3,8 @@
 //! to the children of every node, an icon for what the node is and its
 //! class on the right. A search field narrows the list to the nodes whose
 //! name matches. Right clicks open menus to create, duplicate and delete
-//! nodes.
+//! nodes, and rows dragged onto another node (or under the rows, for the
+//! root) move there.
 
 use std::collections::HashSet;
 use std::f32::consts::FRAC_1_SQRT_2;
@@ -15,7 +16,7 @@ use star_engine::star_scene::NodeOutline;
 use super::ROOT;
 use super::components::NodeTemplate;
 use super::dropping::ImageDrop;
-use super::tree::children_of;
+use super::tree::{can_move, children_of};
 use crate::project::ProjectDimension;
 use crate::texts;
 
@@ -33,8 +34,11 @@ const CLASS_TEXT_SIZE: f32 = 11.0;
 /// The keys shown next to the menu entries they also do.
 const DUPLICATE_SHORTCUT: &str = "Ctrl+D";
 const DELETE_SHORTCUT: &str = "Del";
-/// The width of the outline of a row an image would be dropped on.
+/// The width of the outline of a row an image or a node would be dropped
+/// on.
 const DROP_TARGET_WIDTH: f32 = 2.0;
+/// How far from the pointer the name of a node dragged is shown.
+const DRAGGED_OFFSET: f32 = 12.0;
 
 const SPRITE_COLOR: egui::Color32 = egui::Color32::from_rgb(110, 190, 120);
 const MESH_COLOR: egui::Color32 = egui::Color32::from_rgb(95, 155, 230);
@@ -125,7 +129,13 @@ pub(super) enum TreeAction {
     Duplicate(usize),
     /// Delete the node with its descendants.
     Delete(usize),
+    /// Move `node`, with its descendants, to be the last child of `parent`.
+    Move { node: usize, parent: usize },
 }
+
+/// What a row carries while it is dragged: the position of its node.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct NodeDrag(usize);
 
 /// What happened in the tree this frame.
 #[derive(Default)]
@@ -208,7 +218,69 @@ impl<'scene> TreeView<'scene> {
                 self.show_background(ui);
             });
         self.state.reveal = false;
+        self.show_dragged_node(ui);
         self.outcome
+    }
+
+    /// While a row is dragged, its node's name follows the pointer.
+    fn show_dragged_node(&self, ui: &egui::Ui) {
+        let ctx = ui.ctx();
+        let Some(name) = egui::DragAndDrop::payload::<NodeDrag>(ctx)
+            .and_then(|drag| self.nodes.get(drag.0))
+            .map(|node| node.name.as_str())
+        else {
+            return;
+        };
+        let Some(cursor) = ctx.pointer_latest_pos() else {
+            return;
+        };
+        ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
+        let painter = ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Tooltip,
+            egui::Id::unique("dragged_scene_node"),
+        ));
+        painter.text(
+            cursor + egui::Vec2::splat(DRAGGED_OFFSET),
+            egui::Align2::LEFT_TOP,
+            name,
+            egui::TextStyle::Body.resolve(ui.style()),
+            ui.visuals().strong_text_color(),
+        );
+    }
+
+    /// Outlines `rect` while something that can land on the node at
+    /// `target` is held over `response`, and takes a node released there
+    /// as a move under that node.
+    fn drop_target(
+        &mut self,
+        ui: &egui::Ui,
+        response: &egui::Response,
+        target: usize,
+        image_lands: bool,
+    ) {
+        let nodes = self.nodes;
+        let fits = |drag: &NodeDrag| can_move(nodes, drag.0, target);
+        let node_lands = response
+            .dnd_hover_payload::<NodeDrag>()
+            .is_some_and(|drag| fits(&drag));
+        let image_held = image_lands && response.dnd_hover_payload::<ImageDrop>().is_some();
+        if node_lands || image_held {
+            ui.painter().rect_stroke(
+                response.rect,
+                0.0,
+                egui::Stroke::new(DROP_TARGET_WIDTH, ui.visuals().selection.stroke.color),
+                egui::StrokeKind::Inside,
+            );
+        }
+        if let Some(drag) = response
+            .dnd_release_payload::<NodeDrag>()
+            .filter(|drag| fits(drag))
+        {
+            self.outcome.action = Some(TreeAction::Move {
+                node: drag.0,
+                parent: target,
+            });
+        }
     }
 
     /// The space under the rows: a click there selects nothing, and its
@@ -222,6 +294,7 @@ impl<'scene> TreeView<'scene> {
         let mut action = None;
         background.context_menu(|ui| create_menu(ui, ROOT, self.menu, &mut action));
         self.outcome.action = self.outcome.action.or(action);
+        self.drop_target(ui, &background, ROOT, false);
     }
 
     fn open_parents_of_selected(&mut self) {
@@ -282,10 +355,14 @@ impl<'scene> TreeView<'scene> {
         let Some(node) = self.nodes.get(index) else {
             return false;
         };
-        let (rect, response) = ui.allocate_exact_size(
-            egui::vec2(ui.available_width(), ROW_HEIGHT),
-            egui::Sense::click(),
-        );
+        // The root stays first: it cannot be dragged.
+        let sense = if index == ROOT {
+            egui::Sense::click()
+        } else {
+            egui::Sense::click_and_drag()
+        };
+        let (rect, response) =
+            ui.allocate_exact_size(egui::vec2(ui.available_width(), ROW_HEIGHT), sense);
         let selected = *self.selected == Some(index);
         let painter = ui.painter_at(rect);
         paint_background(ui, &painter, rect, &response, selected, self.rows);
@@ -340,14 +417,10 @@ impl<'scene> TreeView<'scene> {
         let mut action = None;
         response.context_menu(|ui| node_menu(ui, index, self.menu, &mut action));
         self.outcome.action = self.outcome.action.or(action);
-        if response.dnd_hover_payload::<ImageDrop>().is_some() {
-            painter.rect_stroke(
-                rect,
-                0.0,
-                egui::Stroke::new(DROP_TARGET_WIDTH, ui.visuals().selection.stroke.color),
-                egui::StrokeKind::Inside,
-            );
+        if index != ROOT {
+            response.dnd_set_drag_payload(NodeDrag(index));
         }
+        self.drop_target(ui, &response, index, true);
         if let Some(image) = response.dnd_release_payload::<ImageDrop>() {
             self.outcome.dropped = Some((index, image));
         }
