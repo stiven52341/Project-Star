@@ -209,6 +209,7 @@ impl EditorWindow {
             .show(ui, |ui| self.show_bottom_panel(ui));
         egui::CentralPanel::default().show(ui, |ui| self.show_central_area(ui));
         if let Some(scene) = self.documents.scene_mut() {
+            scene.show_class_choice(ui.ctx());
             scene.settle(ui.ctx());
         }
         if action.is_none() {

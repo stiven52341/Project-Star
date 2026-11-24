@@ -584,8 +584,12 @@ that node its class (`class_drop.rs`): the file is read once, when the
 drag starts, and only its classes that extend another class are offered,
 since a node's class extends `Node` (which classes truly do needs the
 whole program, so the check of the scene catches the rest). One class is
-given at once; several open a small menu where the file was dropped; a
-file with none says so next to the pointer, and no row is outlined. The tree (`tree_view.rs`) draws one row
+given at once; several open a small menu where the file was dropped
+(`class_choice.rs`, owned by the scene so every place can open it); a
+file with none says so next to the pointer, and no row is outlined. The
+same file can be dropped on the view, where it goes to the node under
+the pointer (the view is outlined only while one is there), or on the
+inspector, where it goes to the node selected. The tree (`tree_view.rs`) draws one row
 per node across the panel, striped, with guides down to the children, an
 arrow to close and open them (closed nodes are kept by path, so they stay
 closed while others come and go), an icon for what the node shows most

@@ -19,8 +19,8 @@ use super::viewport_assets::ViewportAssets;
 use super::viewport_tools::{paint_handles, show_toolbar, tool_from_keys};
 use crate::project::ProjectDimension;
 use crate::scene_editor::{
-    Drag, HandleShape, ImageDrop, Lens, Marks, Ray, SceneDocument, Tool, cross_lines, cube_lines,
-    handle_at, shapes, square_lines,
+    ClassDrop, Drag, HandleShape, ImageDrop, Lens, Marks, Ray, SceneDocument, Tool, cross_lines,
+    cube_lines, handle_at, shapes, square_lines,
 };
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -29,7 +29,7 @@ const BACKGROUND: Color = Color::rgb(0.12, 0.12, 0.14);
 const LABEL_MARGIN: f32 = 10.0;
 const LABEL_SIZE: f32 = 14.0;
 /// The width of the outline of the view while an image would be dropped
-/// on it.
+/// on it, or a script on the node under the pointer.
 const DROP_TARGET_WIDTH: f32 = 3.0;
 const FULL_TEXTURE: egui::Rect =
     egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
@@ -116,6 +116,7 @@ impl SceneViewport {
                 self.select_clicked(&response, rect, scene);
             }
             self.drop_image(&response, rect, scene);
+            self.drop_class(&response, rect, scene);
         }
         self.handle_camera_input(ui, &response, rect);
         self.match_target_size(rect, ui.ctx().pixels_per_point());
@@ -129,7 +130,9 @@ impl SceneViewport {
         let handles = self.handles(scene.as_deref(), lens.as_ref());
         let active = self.drag.map(|drag| drag.handle).or(hovered);
         paint_handles(&painter, rect, &handles, active);
-        if response.dnd_hover_payload::<ImageDrop>().is_some() {
+        if response.dnd_hover_payload::<ImageDrop>().is_some()
+            || self.class_lands(&response, rect, scene.as_deref())
+        {
             painter.rect_stroke(
                 rect,
                 0.0,
@@ -241,13 +244,44 @@ impl SceneViewport {
         let Some(image) = response.dnd_release_payload::<ImageDrop>() else {
             return;
         };
-        let ray = response
-            .hover_pos()
-            .zip(self.lens(rect))
-            .map(|(pointer, lens)| lens.ray(in_view(pointer, rect)));
-        if let Some(ray) = ray {
+        if let Some(ray) = self.pointer_ray(response, rect) {
             scene.drop_image_at(&image, ray);
         }
+    }
+
+    /// Gives the node under the pointer the class of the script or
+    /// blueprint dropped on the view, if one was.
+    fn drop_class(&self, response: &egui::Response, rect: egui::Rect, scene: &mut SceneDocument) {
+        let Some(script) = response.dnd_release_payload::<ClassDrop>() else {
+            return;
+        };
+        if let Some((ray, at)) = self.pointer_ray(response, rect).zip(response.hover_pos()) {
+            scene.drop_class_at(&script, ray, at);
+        }
+    }
+
+    /// Whether a script or blueprint with classes is held over a node of
+    /// `scene`.
+    fn class_lands(
+        &self,
+        response: &egui::Response,
+        rect: egui::Rect,
+        scene: Option<&SceneDocument>,
+    ) -> bool {
+        let held = response
+            .dnd_hover_payload::<ClassDrop>()
+            .is_some_and(|script| !script.classes.is_empty());
+        held && scene
+            .zip(self.pointer_ray(response, rect))
+            .is_some_and(|(scene, ray)| scene.node_at(ray).is_some())
+    }
+
+    /// The ray through the point of the view under the pointer.
+    fn pointer_ray(&self, response: &egui::Response, rect: egui::Rect) -> Option<Ray> {
+        response
+            .hover_pos()
+            .zip(self.lens(rect))
+            .map(|(pointer, lens)| lens.ray(in_view(pointer, rect)))
     }
 
     /// Resizes the engine's texture to the viewport's physical pixels and

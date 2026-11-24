@@ -83,17 +83,6 @@ pub(super) struct TreeState {
     collapsed: HashSet<String>,
     search: String,
     reveal: bool,
-    /// The classes of a script dropped on a node, to choose from.
-    class_choice: Option<ClassChoice>,
-}
-
-/// A script with several classes dropped on a node: a menu where it was
-/// dropped asks which one the node is built as.
-#[derive(Debug)]
-struct ClassChoice {
-    node: usize,
-    classes: Vec<String>,
-    at: egui::Pos2,
 }
 
 impl TreeState {
@@ -157,6 +146,9 @@ struct NodeDrag(usize);
 pub(super) struct TreeOutcome {
     /// An image dropped on a row, with that row's node.
     pub(super) dropped: Option<(usize, Arc<ImageDrop>)>,
+    /// A script or blueprint dropped on a row, with that row's node and
+    /// where it was dropped.
+    pub(super) class_dropped: Option<(usize, Arc<ClassDrop>, egui::Pos2)>,
     pub(super) action: Option<TreeAction>,
 }
 
@@ -234,39 +226,7 @@ impl<'scene> TreeView<'scene> {
             });
         self.state.reveal = false;
         self.show_dragged_node(ui);
-        self.show_class_choice(ui);
         self.outcome
-    }
-
-    /// The menu of the classes of a script dropped on a node, until one is
-    /// chosen, `Escape` is pressed or the user clicks elsewhere.
-    fn show_class_choice(&mut self, ui: &egui::Ui) {
-        let Some(choice) = &self.state.class_choice else {
-            return;
-        };
-        let mut chosen = None;
-        let menu = egui::Area::new(egui::Id::unique("scene_class_choice"))
-            .fixed_pos(choice.at)
-            .order(egui::Order::Foreground)
-            .show(ui.ctx(), |ui| {
-                egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.weak(texts::current().choose_class);
-                    for class in &choice.classes {
-                        if ui.button(class).clicked() {
-                            chosen = Some(class.clone());
-                        }
-                    }
-                });
-            });
-        let node = choice.node;
-        let dismissed = menu.response.clicked_elsewhere()
-            || ui.input(|input| input.key_pressed(egui::Key::Escape));
-        if let Some(class) = chosen {
-            self.outcome.action = Some(TreeAction::SetClass { node, class });
-            self.state.class_choice = None;
-        } else if dismissed || node >= self.nodes.len() {
-            self.state.class_choice = None;
-        }
     }
 
     /// While a row is dragged, its node's name follows the pointer.
@@ -336,32 +296,11 @@ impl<'scene> TreeView<'scene> {
             .dnd_release_payload::<ClassDrop>()
             .filter(|_| is_row)
         {
-            self.class_dropped(target, &script.classes, response);
-        }
-    }
-
-    /// A script or blueprint with `classes` dropped on the node at `node`:
-    /// its only class is given to it, or a menu asks which one.
-    fn class_dropped(&mut self, node: usize, classes: &[String], response: &egui::Response) {
-        match classes {
-            [] => {}
-            [class] => {
-                self.outcome.action = Some(TreeAction::SetClass {
-                    node,
-                    class: class.clone(),
-                });
-            }
-            _ => {
-                let at = response
-                    .ctx
-                    .pointer_latest_pos()
-                    .unwrap_or_else(|| response.rect.center());
-                self.state.class_choice = Some(ClassChoice {
-                    node,
-                    classes: classes.to_vec(),
-                    at,
-                });
-            }
+            let at = response
+                .ctx
+                .pointer_latest_pos()
+                .unwrap_or_else(|| response.rect.center());
+            self.outcome.class_dropped = Some((target, script, at));
         }
     }
 

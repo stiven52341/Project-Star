@@ -4,6 +4,7 @@
 //! parent, and the inspector edits the node selected in
 //! it. Changes are kept until the scene is saved, and can be undone.
 
+mod class_choice;
 mod class_drop;
 mod components;
 mod drawing;
@@ -24,6 +25,7 @@ use eframe::egui;
 use star_engine::prelude::{Frame, SceneOutline, Vec3};
 use star_engine::star_scene::NodeOutline;
 
+use self::class_choice::{ChoiceOutcome, ClassChoice};
 pub(crate) use self::class_drop::ClassDrop;
 use self::components::NodeTemplate;
 pub(crate) use self::drawing::{Marks, SceneGpu, cross_lines, cube_lines, square_lines};
@@ -58,6 +60,8 @@ pub(crate) struct SceneDocument {
     save_error: Option<String>,
     /// The nodes closed in the tree and the text searched in it.
     tree: TreeState,
+    /// The classes of a script dropped on a node, to choose from.
+    class_choice: Option<ClassChoice>,
 }
 
 impl SceneDocument {
@@ -83,6 +87,7 @@ impl SceneDocument {
             history,
             save_error: None,
             tree: TreeState::default(),
+            class_choice: None,
         }
     }
 
@@ -256,6 +261,74 @@ impl SceneDocument {
         }
         if let Some((parent, image)) = outcome.dropped {
             self.add_image(&image, parent, None);
+        }
+        if let Some((node, script, at)) = outcome.class_dropped {
+            self.drop_class(node, &script, at);
+        }
+    }
+
+    /// The node `ray` meets first, if any.
+    pub(crate) fn node_at(&self, ray: Ray) -> Option<usize> {
+        picking::node_at(self.content.as_ref().ok()?, ray)
+    }
+
+    /// Whether a node is selected.
+    pub(crate) const fn has_selection(&self) -> bool {
+        self.selected.is_some()
+    }
+
+    /// Gives the node `ray` meets first the class of `script`, dropped on
+    /// the view at `at`; nothing if it meets no node.
+    pub(crate) fn drop_class_at(&mut self, script: &ClassDrop, ray: Ray, at: egui::Pos2) {
+        if let Some(node) = self.node_at(ray) {
+            self.drop_class(node, script, at);
+        }
+    }
+
+    /// Gives the node selected the class of `script`, dropped on the
+    /// inspector at `at`.
+    pub(crate) fn drop_class_on_selected(&mut self, script: &ClassDrop, at: egui::Pos2) {
+        if let Some(node) = self.selected {
+            self.drop_class(node, script, at);
+        }
+    }
+
+    /// Gives the node at `node` the only class of `script`, or opens a menu
+    /// at `at` that asks which one if it has several.
+    fn drop_class(&mut self, node: usize, script: &ClassDrop, at: egui::Pos2) {
+        match script.classes.as_slice() {
+            [] => {}
+            [class] => self.change_tree(
+                TreeAction::SetClass {
+                    node,
+                    class: class.clone(),
+                },
+                &[],
+            ),
+            classes => {
+                self.class_choice = Some(ClassChoice {
+                    node,
+                    classes: classes.to_vec(),
+                    at,
+                });
+            }
+        }
+    }
+
+    /// The menu of the classes of a script dropped on a node, while it is
+    /// open.
+    pub(crate) fn show_class_choice(&mut self, ctx: &egui::Context) {
+        let Some(choice) = &self.class_choice else {
+            return;
+        };
+        match choice.show(ctx) {
+            ChoiceOutcome::Open => {}
+            ChoiceOutcome::Chosen(class) => {
+                let node = choice.node;
+                self.class_choice = None;
+                self.change_tree(TreeAction::SetClass { node, class }, &[]);
+            }
+            ChoiceOutcome::Dismissed => self.class_choice = None,
         }
     }
 
@@ -705,6 +778,44 @@ mod tests {
 
         assert_eq!(editor.outline.nodes()[0].class.as_deref(), Some("Level"));
         assert_eq!(scene.selected, Some(ROOT));
+    }
+
+    fn script(classes: &[&str]) -> ClassDrop {
+        ClassDrop {
+            path: "level.star".to_owned(),
+            classes: classes.iter().map(|&class| class.to_owned()).collect(),
+        }
+    }
+
+    #[test]
+    fn scripts_dropped_on_the_selected_node_give_it_their_only_class() {
+        let (_assets, mut scene) = open_level("scene_document_inspector_drop");
+        scene.drop_class_on_selected(&script(&["Level"]), egui::Pos2::ZERO);
+        assert_eq!(scene.content.as_ref().unwrap().nodes()[0].class, None);
+
+        scene.selected = Some(ROOT);
+        scene.drop_class_on_selected(&script(&["Level"]), egui::Pos2::ZERO);
+
+        assert_eq!(
+            scene.content.as_ref().unwrap().nodes()[0].class.as_deref(),
+            Some("Level")
+        );
+        assert!(scene.is_unsaved());
+    }
+
+    #[test]
+    fn scripts_with_several_classes_ask_which_one() {
+        let (_assets, mut scene) = open_level("scene_document_class_choice");
+        scene.selected = Some(ROOT);
+
+        scene.drop_class_on_selected(&script(&[]), egui::Pos2::ZERO);
+        assert!(scene.class_choice.is_none());
+        scene.drop_class_on_selected(&script(&["Level", "Boss"]), egui::Pos2::ZERO);
+
+        let choice = scene.class_choice.as_ref().unwrap();
+        assert_eq!(choice.node, ROOT);
+        assert_eq!(choice.classes, ["Level", "Boss"]);
+        assert!(!scene.is_unsaved());
     }
 
     #[test]
