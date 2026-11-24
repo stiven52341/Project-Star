@@ -1,6 +1,7 @@
 //! Every class a program can use, with its members.
 
 use super::Type;
+use super::natives::COLOR_CLASS;
 use crate::Span;
 
 /// Identifies a class in a [`ClassTable`].
@@ -89,6 +90,8 @@ pub struct FieldInfo {
     pub ty: Type,
     /// Only usable inside its class.
     pub is_private: bool,
+    /// `export`: scenes, and so the editor's inspector, can set it.
+    pub is_exported: bool,
     /// Whether it has `= value`.
     pub has_initializer: bool,
     /// Where its name is written.
@@ -300,6 +303,23 @@ impl ClassTable {
         }
     }
 
+    /// Whether a field of type `ty` can be exported: a scene can write a
+    /// number, a truth value, a text or a color.
+    #[must_use]
+    pub fn is_exportable(&self, ty: &Type) -> bool {
+        match ty {
+            Type::Short
+            | Type::Int
+            | Type::BigInt
+            | Type::Float
+            | Type::Double
+            | Type::Bool
+            | Type::String => true,
+            Type::Class(id) => self.class(*id).name == COLOR_CLASS,
+            _ => false,
+        }
+    }
+
     /// How the type is written in StarScript, for error messages.
     #[must_use]
     pub fn type_name(&self, ty: &Type) -> String {
@@ -372,6 +392,7 @@ mod tests {
             name: "x".into(),
             ty: Type::Float,
             is_private: false,
+            is_exported: false,
             has_initializer: true,
             span: Span::new(0, 0),
         });

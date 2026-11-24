@@ -462,6 +462,7 @@ fn native_field(name: &str, ty: Type) -> FieldInfo {
         name: name.to_owned(),
         ty,
         is_private: false,
+        is_exported: false,
         has_initializer: true,
         span: Span::new(0, 0),
     }

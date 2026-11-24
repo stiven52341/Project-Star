@@ -158,6 +158,17 @@ pub enum SemanticErrorKind {
     CannotInferNull,
     /// A field without type and without value.
     MissingTypeOrValue(String),
+    /// A field both `private` and `export`: scenes set it from outside.
+    PrivateExport(String),
+    /// An `export` field of a class that does not extend `Node`.
+    ExportOutsideNode(String),
+    /// An `export` field of a type scenes cannot write.
+    UnexportableType {
+        /// The field's name.
+        field: String,
+        /// Its type, as written.
+        ty: String,
+    },
     /// An object variable without an initial value.
     MissingValue(String),
     /// Something other than a call used as a statement.
@@ -350,6 +361,18 @@ impl fmt::Display for SemanticErrorKind {
             Self::MissingTypeOrValue(name) => {
                 write!(formatter, "`{name}` needs a type or a value")
             }
+            Self::PrivateExport(name) => write!(
+                formatter,
+                "`{name}` cannot be both `private` and `export`: scenes set it from outside"
+            ),
+            Self::ExportOutsideNode(class) => write!(
+                formatter,
+                "only nodes have `export` fields, and `{class}` does not extend `Node`"
+            ),
+            Self::UnexportableType { field, ty } => write!(
+                formatter,
+                "`{field}` cannot be `export`: its type `{ty}` is not a number, `bool`, `string` or `Color`"
+            ),
             Self::MissingValue(name) => write!(
                 formatter,
                 "`{name}` needs an initial value (objects cannot be empty; use a `?` type to allow `null`)"

@@ -1422,3 +1422,54 @@ fn native_classes_are_listed_with_their_members_and_bases() {
             .all(|(_, class)| class.origin == ClassOrigin::Native)
     );
 }
+
+#[test]
+fn nodes_export_fields_scenes_can_write() {
+    let analysis = check_text(
+        "class Rock extends Sprite {\n\
+         export var speed = 2.5\n\
+         export var lives: int = 3\n\
+         export var tint = Color(1.0, 0.0, 0.0, 1.0)\n\
+         var hidden = 1\n\
+         init() { super.init(\"Rock\", \"rock.png\") }\n\
+         }",
+    )
+    .expect("valid program");
+
+    let classes = analysis.classes();
+    let rock = classes.class(classes.find("Rock").unwrap());
+    let exported: Vec<_> = rock
+        .fields
+        .iter()
+        .filter(|field| field.is_exported)
+        .map(|field| field.name.as_str())
+        .collect();
+    assert_eq!(exported, ["speed", "lives", "tint"]);
+}
+
+#[test]
+fn exports_need_a_node_a_simple_type_and_no_privacy() {
+    assert_eq!(
+        errors(
+            "class Plain { export var a = 1 }\n\
+             class Spot extends Node {\n\
+             export var list: [int] = []\n\
+             private export var secret = 1\n\
+             export const LIMIT = 3\n\
+             init() { super.init(\"Spot\") }\n\
+             }"
+        ),
+        [
+            Kind::ExportOutsideNode("Plain".to_owned()),
+            Kind::UnexportableType {
+                field: "list".to_owned(),
+                ty: "[int]".to_owned()
+            },
+            Kind::PrivateExport("secret".to_owned()),
+            Kind::InvalidModifier {
+                modifier: ModifierKind::Export,
+                member: "a constant"
+            },
+        ]
+    );
+}

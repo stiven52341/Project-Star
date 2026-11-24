@@ -3,7 +3,7 @@
 //! and finally method bodies.
 
 use super::checker::{BodyContext, Checker, ContextKind, Initialization};
-use super::natives::{BASIC_TYPE_NAMES, basic_type};
+use super::natives::{BASIC_TYPE_NAMES, NODE_CLASS, basic_type};
 use super::{
     ClassId, ClassInfo, ClassOrigin, ConstantInfo, ConstructorInfo, Execution, FieldInfo,
     MemberRef, MethodInfo, ParameterInfo, SemanticErrorKind, Type, flow,
@@ -137,7 +137,17 @@ impl Checker<'_> {
     }
 
     fn collect_field(&mut self, id: ClassId, member: &Member, field: &VariableDecl) {
-        self.check_modifiers(member, &[ModifierKind::Private], "a field");
+        self.check_modifiers(
+            member,
+            &[ModifierKind::Private, ModifierKind::Export],
+            "a field",
+        );
+        let is_private = member.has_modifier(ModifierKind::Private);
+        let is_exported = member.has_modifier(ModifierKind::Export);
+        if is_private && is_exported {
+            let name = field.name.text.clone();
+            self.error(SemanticErrorKind::PrivateExport(name), field.name.span);
+        }
         if !self.claim_name(id, &field.name.text, field.name.span) {
             return;
         }
@@ -149,7 +159,8 @@ impl Checker<'_> {
         self.analysis.classes.class_mut(id).fields.push(FieldInfo {
             name: field.name.text.clone(),
             ty,
-            is_private: member.has_modifier(ModifierKind::Private),
+            is_private,
+            is_exported,
             has_initializer: field.initializer.is_some(),
             span: field.name.span,
         });
@@ -407,7 +418,29 @@ impl Checker<'_> {
                     Type::Error
                 }
             };
+            if member.has_modifier(ModifierKind::Export) {
+                self.check_export(id, &field.name.text, &ty, field.name.span);
+            }
             self.analysis.classes.class_mut(id).fields[index].ty = ty;
+        }
+    }
+
+    /// An exported field belongs to a node, the only objects scenes make,
+    /// and holds a value a scene can write.
+    fn check_export(&mut self, id: ClassId, name: &str, ty: &Type, span: Span) {
+        let classes = &self.analysis.classes;
+        let is_node = classes
+            .find(NODE_CLASS)
+            .is_some_and(|node| classes.is_subclass(id, node));
+        if !is_node {
+            let class = classes.class(id).name.clone();
+            self.error(SemanticErrorKind::ExportOutsideNode(class), span);
+        } else if !classes.is_exportable(ty) && *ty != Type::Error {
+            let kind = SemanticErrorKind::UnexportableType {
+                field: name.to_owned(),
+                ty: classes.type_name(ty),
+            };
+            self.error(kind, span);
         }
     }
 

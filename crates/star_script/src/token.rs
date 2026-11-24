@@ -240,6 +240,8 @@ pub enum Keyword {
     Await,
     /// `parallel`: a function that runs on another thread.
     Parallel,
+    /// `export`: a field of a node that scenes and the inspector set.
+    Export,
     /// `interface`, reserved for the future.
     Interface,
     /// `implements`, reserved for the future.
@@ -256,7 +258,7 @@ pub enum Keyword {
 
 impl Keyword {
     /// Every keyword, in the order the specification lists them.
-    pub const ALL: [Self; 33] = [
+    pub const ALL: [Self; 34] = [
         Self::Class,
         Self::Extends,
         Self::Init,
@@ -284,6 +286,7 @@ impl Keyword {
         Self::Async,
         Self::Await,
         Self::Parallel,
+        Self::Export,
         Self::Interface,
         Self::Implements,
         Self::Abstract,
@@ -331,6 +334,7 @@ impl Keyword {
             Self::Async => "async",
             Self::Await => "await",
             Self::Parallel => "parallel",
+            Self::Export => "export",
             Self::Interface => "interface",
             Self::Implements => "implements",
             Self::Abstract => "abstract",

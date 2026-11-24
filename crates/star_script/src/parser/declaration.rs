@@ -66,8 +66,8 @@ impl Parser<'_> {
         })
     }
 
-    /// Reads `private`, `static`, `override`, `async` and `parallel` in any
-    /// order. Which members
+    /// Reads `private`, `static`, `override`, `async`, `parallel` and
+    /// `export` in any order. Which members
     /// accept which modifiers is checked later, by semantic analysis.
     fn modifiers(&mut self) -> Vec<Modifier> {
         let mut modifiers: Vec<Modifier> = Vec::new();

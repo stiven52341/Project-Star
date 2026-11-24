@@ -78,7 +78,7 @@ Convention: `PascalCase` for classes, `snake_case` for variables and methods,
 
 | Use | Words |
 |-----|-------|
-| Classes | `class` `extends` `init` `self` `super` `override` `private` `static` |
+| Classes | `class` `extends` `init` `self` `super` `override` `private` `static` `export` |
 | Concurrency | `async` `await` `parallel` |
 | Declarations | `var` `const` `func` |
 | Control flow | `if` `else` `while` `for` `in` `break` `continue` `return` |
@@ -324,6 +324,11 @@ compiler prevents it.
   declared before.
 - **`private`**: only used inside its class (other objects of the same class
   included).
+- **`export var`**: a field of a node that scenes, and so the editor's
+  inspector, can give a value: `export var speed = 2.5`. Only classes that
+  extend `Node` have them; the field holds a number, a `bool`, a `string`
+  or a `Color`, and cannot be `private`. The value written in the class is
+  the one used when the scene gives none.
 - **`static func`**: belongs to the class and is called as `Class.method()`;
   it has no `self`. `static var` fields do not exist yet.
 - **`is` and `as`**: `x is Player` checks the class. `x as Player` towards a
