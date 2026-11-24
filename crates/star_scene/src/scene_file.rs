@@ -33,6 +33,9 @@ pub(crate) struct NodeData {
     /// The StarScript class the node is built as, by games written in it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) class: Option<String>,
+    /// Words that groups of nodes share, to find them all at once.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) tags: Vec<String>,
     /// Position of the parent in the list; only the root has none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) parent: Option<usize>,
@@ -185,6 +188,7 @@ mod tests {
             nodes: vec![NodeData {
                 name: "Hero".to_owned(),
                 class: Some("Player".to_owned()),
+                tags: vec!["hero".to_owned()],
                 parent: None,
                 position: Some([1.0, 2.0]),
                 rotation: Some(0.5),

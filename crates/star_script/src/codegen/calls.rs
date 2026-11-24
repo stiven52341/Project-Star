@@ -277,7 +277,9 @@ fn with_receiver(receiver: String, arguments: &str) -> String {
 fn native_call(class: &str, method: &str, arguments: &str) -> Option<String> {
     match (class, method) {
         ("Debug", "print") => Some(format!("{RUNTIME}::print(&({arguments}))")),
-        ("Scene", "load") => Some(format!("crate::classes::Scene::load({arguments})")),
+        ("Scene", "load" | "find_by_name" | "find_by_tag") => {
+            Some(format!("crate::classes::Scene::{method}({arguments})"))
+        }
         ("Sound", "load") => Some(format!("crate::classes::Sound::load({arguments})")),
         ("Body", "circle" | "rectangle" | "capsule" | "sphere") => {
             Some(format!("crate::classes::Body::{method}({arguments})"))

@@ -12,14 +12,14 @@ use crate::node_3d_data::MeshOutline;
 use crate::scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
 use crate::{
     Body2D, Body3D, Camera2dNode, Camera3dNode, Children, FieldValue, Hierarchy, Light2dNode,
-    LightNode, MeshNode, Name, SpriteNode, Transform2D, Transform3D,
+    LightNode, MeshNode, Name, SpriteNode, Tags, Transform2D, Transform3D,
 };
 
 /// A tree of nodes that can be added to a world as many times as needed:
 /// a level, an enemy, a bullet. Read from the text of a `.scene` file, or
 /// captured from a world to be saved in one.
 ///
-/// It keeps, for each node, its name, its [`Transform2D`], its
+/// It keeps, for each node, its name, its [`Tags`], its [`Transform2D`], its
 /// [`SpriteNode`], its [`Body2D`], its [`Transform3D`], its [`MeshNode`],
 /// its [`LightNode`], its [`Light2dNode`], its [`Body3D`] and its cameras ([`Camera2dNode`],
 /// [`Camera3dNode`]); other components are not part of
@@ -36,6 +36,7 @@ struct SceneNode {
     /// Kept so a scene read and written again does not lose it; worlds
     /// have no use for it.
     class: Option<String>,
+    tags: Vec<String>,
     parent: Option<usize>,
     transform: Option<Transform2D>,
     sprite: Option<SpriteNode>,
@@ -181,6 +182,9 @@ impl Scene {
             };
             let entity = world.spawn_node(&node.name, node_parent)?;
             entities.push(entity);
+            if !node.tags.is_empty() {
+                world.insert(entity, Tags(node.tags.clone()))?;
+            }
             if let Some(transform) = node.transform {
                 world.insert(entity, transform)?;
             }
@@ -251,6 +255,7 @@ fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResul
     Ok(SceneNode {
         name: outline.name,
         class: outline.class,
+        tags: outline.tags,
         parent: outline.parent,
         transform: outline.transform,
         sprite,
@@ -297,6 +302,7 @@ fn outline_node(node: &SceneNode, sources: &impl SceneSources) -> EngineResult<N
     Ok(NodeOutline {
         name: node.name.clone(),
         class: node.class.clone(),
+        tags: node.tags.clone(),
         parent: node.parent,
         transform: node.transform,
         sprite,
@@ -362,6 +368,10 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
             .map(|name| name.0.clone())
             .unwrap_or_default(),
         class: None,
+        tags: world
+            .get::<Tags>(entity)
+            .map(|tags| tags.0.clone())
+            .unwrap_or_default(),
         parent,
         transform: world.get::<Transform2D>(entity).map(|transform| *transform),
         sprite: world.get::<SpriteNode>(entity).map(|sprite| *sprite),

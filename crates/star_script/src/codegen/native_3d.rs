@@ -22,7 +22,7 @@ struct Method {
 }
 
 /// The methods of `Node`, which every node class implements.
-const NODE_METHODS: [Method; 7] = [
+const NODE_METHODS: [Method; 10] = [
     Method {
         name: "start",
         parameters: "",
@@ -64,6 +64,24 @@ const NODE_METHODS: [Method; 7] = [
         parameters: "name: ::std::string::String",
         arguments: "name",
         returns: " -> ::std::option::Option<crate::classes::Node::Ref>",
+    },
+    Method {
+        name: "has_tag",
+        parameters: "tag: ::std::string::String",
+        arguments: "tag",
+        returns: " -> bool",
+    },
+    Method {
+        name: "find_by_name",
+        parameters: "name: ::std::string::String",
+        arguments: "name",
+        returns: " -> ::std::option::Option<crate::classes::Node::Ref>",
+    },
+    Method {
+        name: "find_by_tag",
+        parameters: "tag: ::std::string::String",
+        arguments: "tag",
+        returns: " -> ::star_script_runtime::List<crate::classes::Node::Ref>",
     },
 ];
 

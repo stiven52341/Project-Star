@@ -36,6 +36,9 @@ pub struct NodeOutline {
     /// The StarScript class it is built as, if the file names one. Games
     /// written in Rust build every node the same way and ignore it.
     pub class: Option<String>,
+    /// Words that groups of nodes share, such as `enemy`, to find them all
+    /// at once.
+    pub tags: Vec<String>,
     /// Position of its parent in [`SceneOutline::nodes`]; only the root,
     /// the first node, has none.
     pub parent: Option<usize>,
@@ -381,6 +384,7 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
     Ok(NodeOutline {
         name: node.name,
         class: node.class,
+        tags: node.tags,
         parent: node.parent,
         transform,
         sprite,
@@ -422,6 +426,7 @@ fn write_node(node: &NodeOutline) -> NodeData {
     NodeData {
         name: node.name.clone(),
         class: node.class.clone(),
+        tags: node.tags.clone(),
         parent: node.parent,
         position: node.transform.map(|transform| array(transform.position)),
         rotation: node.transform.map(|transform| transform.rotation),
@@ -491,6 +496,17 @@ mod tests {
             })
         );
         assert_eq!(outline.nodes()[2].camera_3d, Some(Camera3dNode::default()));
+        assert_eq!(written, outline);
+    }
+
+    #[test]
+    fn tags_are_read_and_written() {
+        let text = "format = 1\n[[node]]\nname = \"Orc\"\ntags = [\"enemy\", \"loud\"]\n";
+
+        let outline = SceneOutline::from_text(text).unwrap();
+        let written = SceneOutline::from_text(&outline.to_text().unwrap()).unwrap();
+
+        assert_eq!(outline.nodes()[0].tags, ["enemy", "loud"]);
         assert_eq!(written, outline);
     }
 

@@ -161,6 +161,19 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
         Type::Class(node).nullable(),
         true,
     ));
+    // Find the nodes of the game's tree, from any script.
+    scene.methods.push(native_method(
+        "find_by_name",
+        &[("name", Type::String)],
+        Type::Class(node).nullable(),
+        true,
+    ));
+    scene.methods.push(native_method(
+        "find_by_tag",
+        &[("tag", Type::String)],
+        Type::list(Type::Class(node)),
+        true,
+    ));
     classes.add(scene);
 
     add_sound_class(classes);
@@ -240,6 +253,7 @@ fn add_node_class(classes: &mut ClassTable, body: ClassId) -> ClassId {
         native_field("scale_x", Type::Float),
         native_field("scale_y", Type::Float),
         native_field("body", Type::Class(body).nullable()),
+        native_field("tags", Type::list(Type::String)),
     ];
     node.constructor = Some(native_constructor(&[("name", Type::String)]));
     let id = classes.add(node);
@@ -259,7 +273,20 @@ fn add_node_class(classes: &mut ClassTable, body: ClassId) -> ClassId {
         native_method(
             "find_child",
             &[("name", Type::String)],
-            node_type.nullable(),
+            node_type.clone().nullable(),
+            false,
+        ),
+        native_method("has_tag", &[("tag", Type::String)], Type::Bool, false),
+        native_method(
+            "find_by_name",
+            &[("name", Type::String)],
+            node_type.clone().nullable(),
+            false,
+        ),
+        native_method(
+            "find_by_tag",
+            &[("tag", Type::String)],
+            Type::list(node_type),
             false,
         ),
     ];

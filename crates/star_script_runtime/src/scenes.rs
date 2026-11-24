@@ -23,6 +23,8 @@ pub struct SceneNode {
     /// The StarScript class it is built as; `None` for a plain `Node`, or a
     /// `Sprite` if it shows an image.
     pub class: Option<String>,
+    /// Its tags, which `find_by_tag` looks for.
+    pub tags: Vec<String>,
     /// Position of its parent in the scene's list; only the root, the first
     /// node, has none.
     pub parent: Option<usize>,
@@ -282,6 +284,7 @@ mod tests {
         SceneNode {
             name: name.to_owned(),
             class: None,
+            tags: Vec::new(),
             parent,
             transform: None,
             sprite: None,

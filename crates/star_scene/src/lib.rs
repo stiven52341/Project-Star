@@ -35,7 +35,7 @@ mod transform;
 pub use body_node::{Body2D, Body3D, NodeBody};
 pub use camera_node::{Camera2dNode, Camera3dNode};
 pub use field_value::FieldValue;
-pub use hierarchy::{Children, Hierarchy, Name, Parent};
+pub use hierarchy::{Children, Hierarchy, Name, Parent, Tags};
 pub use light_2d_node::Light2dNode;
 pub use node_3d::{LightNode, MeshNode, draw_3d_nodes};
 pub use node_3d_data::MeshOutline;

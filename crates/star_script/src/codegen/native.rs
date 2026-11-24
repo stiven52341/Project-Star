@@ -373,6 +373,7 @@ pub mod Node {
         pub scale_x: ::star_script_runtime::Field<f32>,
         pub scale_y: ::star_script_runtime::Field<f32>,
         pub body: ::star_script_runtime::Field<::std::option::Option<crate::classes::Body::Ref>>,
+        pub tags: ::star_script_runtime::Field<::star_script_runtime::List<::std::string::String>>,
         pub id_: u64,
         pub parent_: ::std::cell::RefCell<::std::option::Option<::std::rc::Weak<dyn Object>>>,
         pub children_: ::std::cell::RefCell<::std::vec::Vec<Ref>>,
@@ -393,6 +394,9 @@ pub mod Node {
         fn parent(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref>;
         fn children(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<Ref>;
         fn find_child(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<Ref>;
+        fn has_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> bool;
+        fn find_by_name(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<Ref>;
+        fn find_by_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> ::star_script_runtime::List<Ref>;
     }
 
     /// What nodes do unless a subclass overrides it.
@@ -440,6 +444,44 @@ pub mod Node {
                 .find(|child_| HasFields::fields(&***child_).name.read(|child_name_| *child_name_ == name))
                 .cloned()
         }
+
+        /// `func has_tag`
+        pub fn has_tag(this_: &Ref, tag: ::std::string::String) -> bool {
+            HasFields::fields(&**this_).tags.read(|tags_| tags_.contains(&tag))
+        }
+
+        /// `func find_by_name`: the first descendant named `name`, parents
+        /// before their children and children in order.
+        pub fn find_by_name(this_: &Ref, name: ::std::string::String) -> ::std::option::Option<Ref> {
+            descendants_(this_).into_iter()
+                .find(|node_| HasFields::fields(&**node_).name.read(|node_name_| *node_name_ == name))
+        }
+
+        /// `func find_by_tag`: every descendant with the tag `tag`, parents
+        /// before their children and children in order.
+        pub fn find_by_tag(this_: &Ref, tag: ::std::string::String) -> ::star_script_runtime::List<Ref> {
+            let tagged_ = descendants_(this_).into_iter()
+                .filter(|node_| HasFields::fields(&**node_).tags.read(|tags_| tags_.contains(&tag)))
+                .collect();
+            ::star_script_runtime::List::from_vec(tagged_)
+        }
+    }
+
+    /// The descendants of `node`, not itself: each parent before its
+    /// children, and children in their order.
+    fn descendants_(node: &Ref) -> ::std::vec::Vec<Ref> {
+        let mut found_ = ::std::vec::Vec::new();
+        let mut pending_: ::std::vec::Vec<Ref> = HasFields::fields(&**node).children_.borrow().iter().rev().cloned().collect();
+        while let ::std::option::Option::Some(next_) = pending_.pop() {
+            pending_.extend(HasFields::fields(&*next_).children_.borrow().iter().rev().cloned());
+            found_.push(next_);
+        }
+        found_
+    }
+
+    /// The root of the game's tree; `None` without a game.
+    pub fn game_root_() -> ::std::option::Option<Ref> {
+        GAME_ROOT_.with(|game_root_| game_root_.borrow().as_ref().and_then(::std::rc::Weak::upgrade))
     }
 
     thread_local! {
@@ -523,6 +565,9 @@ pub mod Node {
         fn parent(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref> { Methods::parent(&(self as Ref)) }
         fn children(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<Ref> { Methods::children(&(self as Ref)) }
         fn find_child(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<Ref> { Methods::find_child(&(self as Ref), name) }
+        fn has_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> bool { Methods::has_tag(&(self as Ref), tag) }
+        fn find_by_name(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<Ref> { Methods::find_by_name(&(self as Ref), name) }
+        fn find_by_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> ::star_script_runtime::List<Ref> { Methods::find_by_tag(&(self as Ref), tag) }
     }
 
     /// Prepares an object of this class: `make_` builds it from its fields.
@@ -535,6 +580,7 @@ pub mod Node {
             scale_x: ::star_script_runtime::Field::new(1.0),
             scale_y: ::star_script_runtime::Field::new(1.0),
             body: ::star_script_runtime::Field::new(::std::option::Option::None),
+            tags: ::star_script_runtime::Field::new(::star_script_runtime::List::new()),
             id_: NEXT_ID_.fetch_add(1, ::std::sync::atomic::Ordering::Relaxed),
             parent_: ::std::cell::RefCell::new(::std::option::Option::None),
             children_: ::std::cell::RefCell::new(::std::vec::Vec::new()),
@@ -601,6 +647,9 @@ pub mod Sprite {
         fn parent(self: ::std::rc::Rc<Self>) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::parent(&(self as crate::classes::Node::Ref)) }
         fn children(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::children(&(self as crate::classes::Node::Ref)) }
         fn find_child(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_child(&(self as crate::classes::Node::Ref), name) }
+        fn has_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> bool { crate::classes::Node::Methods::has_tag(&(self as crate::classes::Node::Ref), tag) }
+        fn find_by_name(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_name(&(self as crate::classes::Node::Ref), name) }
+        fn find_by_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_tag(&(self as crate::classes::Node::Ref), tag) }
     }
 
     impl Object for Instance {}
@@ -679,6 +728,9 @@ pub mod Camera2D {
         fn parent(self: ::std::rc::Rc<Self>) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::parent(&(self as crate::classes::Node::Ref)) }
         fn children(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::children(&(self as crate::classes::Node::Ref)) }
         fn find_child(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_child(&(self as crate::classes::Node::Ref), name) }
+        fn has_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> bool { crate::classes::Node::Methods::has_tag(&(self as crate::classes::Node::Ref), tag) }
+        fn find_by_name(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_name(&(self as crate::classes::Node::Ref), name) }
+        fn find_by_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_tag(&(self as crate::classes::Node::Ref), tag) }
     }
 
     impl Object for Instance {}
@@ -714,6 +766,21 @@ pub mod Scene {
                 ::star_script_runtime::scenes::reject(&path, &reason_);
                 ::std::option::Option::None
             }
+        }
+    }
+
+    /// `static func find_by_name`: the first node of the game's tree named
+    /// `name`; `None` without a game.
+    pub fn find_by_name(name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> {
+        crate::classes::Node::game_root_().and_then(|root_| crate::classes::Node::Methods::find_by_name(&root_, name))
+    }
+
+    /// `static func find_by_tag`: every node of the game's tree with the
+    /// tag `tag`; none without a game.
+    pub fn find_by_tag(tag: ::std::string::String) -> ::star_script_runtime::List<crate::classes::Node::Ref> {
+        match crate::classes::Node::game_root_() {
+            ::std::option::Option::Some(root_) => crate::classes::Node::Methods::find_by_tag(&root_, tag),
+            ::std::option::Option::None => ::star_script_runtime::List::new(),
         }
     }
 
@@ -762,6 +829,9 @@ pub mod Scene {
         let class_ = node_.class.as_deref().unwrap_or(\"Node\");
         let fields_ = crate::classes::Node::HasFields::fields(&*object_);
         fields_.name.set(node_.name.clone());
+        if !node_.tags.is_empty() {
+            fields_.tags.set(::star_script_runtime::List::from_vec(node_.tags.clone()));
+        }
         if !node_.fields.is_empty() {
             crate::set_scene_fields_(class_, &object_, &node_.fields)?;
         }
@@ -1425,6 +1495,7 @@ fn read_scene_(
         ::star_script_runtime::scenes::SceneNode {
             name: node_.name,
             class: node_.class,
+            tags: node_.tags,
             parent: node_.parent,
             transform: node_.transform.map(|place_| ::star_script_runtime::scenes::SceneTransform {
                 x: place_.position.x,

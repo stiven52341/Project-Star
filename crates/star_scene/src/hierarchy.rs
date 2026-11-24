@@ -8,6 +8,19 @@ use star_ecs::{Entity, World};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Name(pub String);
 
+/// The tags of a node: words that groups of nodes share, such as `enemy`,
+/// to find them all at once.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Tags(pub Vec<String>);
+
+impl Tags {
+    /// Whether one of the tags is `tag`.
+    #[must_use]
+    pub fn contains(&self, tag: &str) -> bool {
+        self.0.iter().any(|own| own == tag)
+    }
+}
+
 impl Name {
     /// The name as text.
     #[must_use]

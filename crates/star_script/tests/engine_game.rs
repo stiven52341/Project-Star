@@ -90,6 +90,7 @@ class NodeGame extends Game {
         if fleet != null {
             add_child(fleet)
             Debug.print(fleet.name + \" \" + fleet.children().length().to_string())
+            Debug.print(Scene.find_by_tag(\"ship\").length().to_string() + \" \" + (Scene.find_by_name(\"Wingman\") != null).to_string())
             const leader = fleet.find_child(\"Leader\")
             if leader is Sprite {
                 Debug.print(leader.texture + \" \" + leader.x.to_string() + \" \" + leader.color.g.to_string())
@@ -328,6 +329,7 @@ name = "Fleet"
 [[node]]
 name = "Leader"
 parent = 0
+tags = ["ship"]
 position = [1.5, 0.0]
 
 [node.sprite]
@@ -339,6 +341,7 @@ color = [1.0, 0.5, 0.5, 1.0]
 name = "Wingman"
 class = "Drone"
 parent = 0
+tags = ["ship", "drone"]
 position = [-2.0, 0.0]
 
 [node.fields]
@@ -449,7 +452,7 @@ fn games_run_in_the_engine_until_they_quit() {
     );
     assert_eq!(
         stdout,
-        "Fleet 4\nsprites/leader.png 1.5 0.5\nspot 4.0 0.5\ntrue\ntrue\n\
+        "Fleet 4\n2 true\nsprites/leader.png 1.5 0.5\nspot 4.0 0.5\ntrue\ntrue\n\
          game frame 1\nship start\nship x 1.0\ndrone start Wingman -2.0 4.0 wing 0.25\n\
          game frame 2\ncamera Lookout 6.0\nship x 2.0\n\
          game frame 3\ncamera Lookout 6.0\nship x 3.0\n"
