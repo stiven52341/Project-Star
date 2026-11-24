@@ -699,7 +699,9 @@ wire) is allowed while building and reported by “Compile”.
 
 While a blueprint is shown and one node is selected, the **Inspector**
 gives its fields (`properties.rs`; with several selected it says how many): a value's type and value, a variable's name
-(typed or picked from the blueprint), what a call calls, its method, its
+(typed or picked from the blueprint) and whether it is a field of another
+object (“Another object”, which adds a `target` pin and titles the node
+`.x`; renaming a variable of the blueprint leaves those alone), what a call calls, its method, its
 arguments (renaming one keeps its wire), whether it returns a value and
 whether it is pure, and an operator. A change that takes pins away also
 takes their wires.

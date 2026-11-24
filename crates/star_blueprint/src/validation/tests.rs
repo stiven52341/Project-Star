@@ -76,12 +76,14 @@ fn blueprint_errors(blueprint: &Blueprint) -> Vec<(Option<u32>, BlueprintErrorKi
 fn set_speed() -> NodeKind {
     NodeKind::SetVariable {
         variable: "speed".to_owned(),
+        of_value: false,
     }
 }
 
 fn get_speed() -> NodeKind {
     NodeKind::GetVariable {
         variable: "speed".to_owned(),
+        of_value: false,
     }
 }
 

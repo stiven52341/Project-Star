@@ -114,15 +114,25 @@ pub enum NodeKind {
         /// The value.
         value: Literal,
     },
-    /// Reads a field of the blueprint (or of its base).
+    /// Reads a field of the blueprint (or of its base), or of the object
+    /// given to its `target` pin: `enemy.x`.
     GetVariable {
         /// The field's name.
         variable: String,
+        /// Whether the field is of the object given to its `target` pin
+        /// rather than of the blueprint.
+        #[serde(default, skip_serializing_if = "is_false")]
+        of_value: bool,
     },
-    /// Gives a field a new value.
+    /// Gives a field a new value: of the blueprint, or of the object given
+    /// to its `target` pin.
     SetVariable {
         /// The field's name.
         variable: String,
+        /// Whether the field is of the object given to its `target` pin
+        /// rather than of the blueprint.
+        #[serde(default, skip_serializing_if = "is_false")]
+        of_value: bool,
     },
     /// Calls a method.
     Call(Call),

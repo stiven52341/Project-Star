@@ -99,9 +99,15 @@ fn operator(operator: Operator) -> NodeKind {
 fn variable(name: &str, set: bool) -> NodeKind {
     let variable = name.to_owned();
     if set {
-        NodeKind::SetVariable { variable }
+        NodeKind::SetVariable {
+            variable,
+            of_value: false,
+        }
     } else {
-        NodeKind::GetVariable { variable }
+        NodeKind::GetVariable {
+            variable,
+            of_value: false,
+        }
     }
 }
 
@@ -379,4 +385,34 @@ fn every_piece_of_code_has_an_origin() {
         })
     );
     assert_eq!(translation.origin(0), None);
+}
+
+#[test]
+fn variables_of_a_value_read_and_set_its_fields() {
+    let field = |set: bool| {
+        let variable = if set { "x" } else { "y" }.to_owned();
+        if set {
+            NodeKind::SetVariable {
+                variable,
+                of_value: true,
+            }
+        } else {
+            NodeKind::GetVariable {
+                variable,
+                of_value: true,
+            }
+        }
+    };
+    let graph = GraphBuilder::new("follow", &[("other", "Node")], None)
+        .node(2, field(true))
+        .node(3, field(false))
+        .link((1, EXECUTION_OUTPUT), (2, EXECUTION_INPUT))
+        .link((1, "other"), (2, TARGET))
+        .link((1, "other"), (3, TARGET))
+        .link((3, VALUE), (2, VALUE))
+        .build();
+
+    let code = checked_code(&ship(graph));
+
+    assert_eq!(method_lines(&code), ["other.x = other.y"]);
 }

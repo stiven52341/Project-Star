@@ -249,6 +249,11 @@ pub(crate) struct Texts {
     pub(crate) literal_value: &'static str,
     pub(crate) variable: &'static str,
     pub(crate) call_target: &'static str,
+    /// Whose variable a variable node reads or sets.
+    pub(crate) variable_owner: &'static str,
+    /// The box that makes a variable node use the field of another object.
+    pub(crate) of_another_object: &'static str,
+    pub(crate) of_another_object_hint: &'static str,
     pub(crate) class: &'static str,
     pub(crate) method: &'static str,
     pub(crate) arguments: &'static str,

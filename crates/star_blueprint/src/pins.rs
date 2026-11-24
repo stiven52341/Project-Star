@@ -17,7 +17,8 @@ pub const CONDITION: &str = "condition";
 pub const VALUE: &str = "value";
 /// What calls and operators compute.
 pub const RESULT: &str = "result";
-/// The object whose method a call on a value calls.
+/// The object whose method a call on a value calls, or whose field a
+/// variable node of a value reads or sets.
 pub const TARGET: &str = "target";
 /// The first operand of binary operators.
 pub const LEFT: &str = "left";
@@ -94,14 +95,24 @@ impl Node {
                         .map(|parameter| Pin::data_output(&parameter.name)),
                 )
                 .collect(),
-            NodeKind::Literal { .. } | NodeKind::GetVariable { .. } => {
+            NodeKind::Literal { .. }
+            | NodeKind::GetVariable {
+                of_value: false, ..
+            } => {
                 vec![Pin::data_output(VALUE)]
             }
-            NodeKind::SetVariable { .. } => vec![
-                Pin::execution_input(),
-                Pin::data_input(VALUE),
-                Pin::execution_output(EXECUTION_OUTPUT),
-            ],
+            NodeKind::GetVariable { of_value: true, .. } => {
+                vec![Pin::data_input(TARGET), Pin::data_output(VALUE)]
+            }
+            NodeKind::SetVariable { of_value, .. } => {
+                let mut pins = vec![Pin::execution_input()];
+                if *of_value {
+                    pins.push(Pin::data_input(TARGET));
+                }
+                pins.push(Pin::data_input(VALUE));
+                pins.push(Pin::execution_output(EXECUTION_OUTPUT));
+                pins
+            }
             NodeKind::Call(call) => {
                 let mut pins = Vec::new();
                 if !call.pure {

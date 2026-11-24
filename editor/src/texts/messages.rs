@@ -66,11 +66,16 @@ impl Texts {
         match kind {
             NodeKind::Entry => self.pick("Start", "Inicio").to_owned(),
             NodeKind::Literal { value } => literal_text(value),
-            NodeKind::GetVariable { variable } => variable.clone(),
-            NodeKind::SetVariable { variable } => match self.language {
-                Language::English => format!("Set {variable}"),
-                Language::Spanish => format!("Asignar {variable}"),
-            },
+            NodeKind::GetVariable { variable, of_value } => {
+                format!("{}{variable}", field_prefix(*of_value))
+            }
+            NodeKind::SetVariable { variable, of_value } => {
+                let field = format!("{}{variable}", field_prefix(*of_value));
+                match self.language {
+                    Language::English => format!("Set {field}"),
+                    Language::Spanish => format!("Asignar {field}"),
+                }
+            }
             NodeKind::Call(call) => match &call.target {
                 CallTarget::OwnObject => format!("{}()", call.method),
                 CallTarget::Value => format!(".{}()", call.method),
@@ -367,6 +372,12 @@ impl Texts {
 }
 
 /// A constant as StarScript would write it: `2.0`, `"jump"`.
+/// What goes before the name of a field in a node's title: a `.` if it is
+/// a field of another object, as calls of a value show it.
+const fn field_prefix(of_value: bool) -> &'static str {
+    if of_value { "." } else { "" }
+}
+
 fn literal_text(value: &Literal) -> String {
     match value {
         Literal::Bool(value) => value.to_string(),
@@ -405,7 +416,13 @@ mod tests {
         };
         let set = NodeKind::SetVariable {
             variable: "speed".to_owned(),
+            of_value: false,
         };
+        let other = NodeKind::GetVariable {
+            variable: "x".to_owned(),
+            of_value: true,
+        };
+        assert_eq!(ENGLISH.node_title(&other), ".x");
 
         assert_eq!(ENGLISH.node_title(&literal), "\"jump\"");
         assert_eq!(

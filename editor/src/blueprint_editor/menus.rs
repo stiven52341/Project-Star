@@ -95,12 +95,18 @@ fn new_node_menu(ui: &mut egui::Ui, names: &BlueprintNames) -> Option<NodeKind> 
     });
     ui.menu_button(texts::current().menu_get_variable, |ui| {
         if let Some(variable) = variable_menu(ui, names) {
-            chosen = Some(NodeKind::GetVariable { variable });
+            chosen = Some(NodeKind::GetVariable {
+                variable,
+                of_value: false,
+            });
         }
     });
     ui.menu_button(texts::current().menu_set_variable, |ui| {
         if let Some(variable) = variable_menu(ui, names) {
-            chosen = Some(NodeKind::SetVariable { variable });
+            chosen = Some(NodeKind::SetVariable {
+                variable,
+                of_value: false,
+            });
         }
     });
     ui.menu_button(texts::current().menu_call, |ui| {

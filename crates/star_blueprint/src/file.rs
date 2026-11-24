@@ -197,6 +197,32 @@ mod tests {
     }
 
     #[test]
+    fn variables_of_a_value_are_marked_only_when_they_are() {
+        let text = "format = 1\nclass = \"A\"\n\n\
+                    [[graph]]\nname = \"start\"\n\n\
+                    [[graph.node]]\nid = 1\nkind = \"get_variable\"\nvariable = \"x\"\n\n\
+                    [[graph.node]]\nid = 2\nkind = \"set_variable\"\nvariable = \"x\"\n\
+                    of_value = true\n";
+
+        let blueprint = Blueprint::from_text(text).expect("valid file");
+        let written = blueprint.to_text().expect("writable");
+
+        let nodes = &blueprint.graphs[0].nodes;
+        assert!(matches!(
+            nodes[0].kind,
+            NodeKind::GetVariable {
+                of_value: false,
+                ..
+            }
+        ));
+        assert!(matches!(
+            nodes[1].kind,
+            NodeKind::SetVariable { of_value: true, .. }
+        ));
+        assert_eq!(written.matches("of_value").count(), 1, "{written}");
+    }
+
+    #[test]
     fn whole_numbers_and_decimals_stay_apart() {
         let text = "format = 1\nclass = \"A\"\n\n[[variable]]\nname = \"a\"\ndefault = 3\n\n\
                     [[variable]]\nname = \"b\"\ndefault = 3.0\n";

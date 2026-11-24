@@ -163,8 +163,15 @@ pub(super) fn rename_variable(blueprint: &mut Blueprint, old: &str, new: &str) {
         .iter_mut()
         .flat_map(|graph| &mut graph.nodes)
     {
-        if let NodeKind::GetVariable { variable } | NodeKind::SetVariable { variable } =
-            &mut node.kind
+        // A field of another object is not this blueprint's variable.
+        if let NodeKind::GetVariable {
+            variable,
+            of_value: false,
+        }
+        | NodeKind::SetVariable {
+            variable,
+            of_value: false,
+        } = &mut node.kind
             && variable == old
         {
             new.clone_into(variable);
@@ -431,10 +438,18 @@ mod tests {
             &mut graph,
             NodeKind::GetVariable {
                 variable: variable.clone(),
+                of_value: false,
             },
             Pos2::ZERO,
         );
-        add_node(&mut graph, NodeKind::SetVariable { variable }, Pos2::ZERO);
+        add_node(
+            &mut graph,
+            NodeKind::SetVariable {
+                variable,
+                of_value: false,
+            },
+            Pos2::ZERO,
+        );
         let call = |target| {
             NodeKind::Call(star_blueprint::Call {
                 target,
@@ -461,7 +476,7 @@ mod tests {
             .iter()
             .skip(1)
             .map(|node| match &node.kind {
-                NodeKind::GetVariable { variable } | NodeKind::SetVariable { variable } => {
+                NodeKind::GetVariable { variable, .. } | NodeKind::SetVariable { variable, .. } => {
                     variable.clone()
                 }
                 NodeKind::Call(call) => call.method.clone(),
@@ -477,6 +492,26 @@ mod tests {
         rename_variable(&mut blueprint, "speed", "pace");
 
         assert_eq!(titles(&blueprint), ["pace", "pace", "speed", "speed"]);
+    }
+
+    #[test]
+    fn fields_of_other_objects_are_not_renamed_with_the_variable() {
+        let mut blueprint = blueprint_using("speed");
+        add_node(
+            &mut blueprint.graphs[0],
+            NodeKind::GetVariable {
+                variable: "speed".to_owned(),
+                of_value: true,
+            },
+            Pos2::ZERO,
+        );
+
+        rename_variable(&mut blueprint, "speed", "pace");
+
+        assert_eq!(
+            titles(&blueprint),
+            ["pace", "pace", "speed", "speed", "speed"]
+        );
     }
 
     #[test]

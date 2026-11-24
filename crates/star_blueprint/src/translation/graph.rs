@@ -119,9 +119,9 @@ impl<'graph, 'out> GraphTranslator<'graph, 'out> {
     fn statement(&mut self, id: NodeId) -> Option<NodeId> {
         let node = self.graph.node(id)?;
         match &node.kind {
-            NodeKind::SetVariable { variable } => {
+            NodeKind::SetVariable { variable, of_value } => {
                 self.writer.indent();
-                self.member(variable);
+                self.field(id, variable, *of_value);
                 self.writer.write(" = ");
                 self.input(id, VALUE, false);
                 self.writer.newline();
@@ -216,6 +216,17 @@ impl<'graph, 'out> GraphTranslator<'graph, 'out> {
         self.writer.write(")");
     }
 
+    /// The field `name` of the object given to the `target` pin of node
+    /// `id` if `of_value`, or else of the blueprint.
+    fn field(&mut self, id: NodeId, name: &str, of_value: bool) {
+        if of_value {
+            self.input(id, TARGET, true);
+            self.writer.write(&format!(".{name}"));
+        } else {
+            self.member(name);
+        }
+    }
+
     /// A field or method of the object: `self.` only if a parameter hides it.
     fn member(&mut self, name: &str) {
         if self.parameters.contains(name) {
@@ -245,7 +256,7 @@ impl<'graph, 'out> GraphTranslator<'graph, 'out> {
                 Some(code) => self.writer.write(&code),
                 None => self.error(id, BlueprintErrorKind::UnwritableNumber),
             },
-            NodeKind::GetVariable { variable } => self.member(variable),
+            NodeKind::GetVariable { variable, of_value } => self.field(id, variable, *of_value),
             NodeKind::Operator { operator } => {
                 if inside_expression {
                     self.writer.write("(");

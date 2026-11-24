@@ -242,7 +242,7 @@ impl<'check> GraphCheck<'check> {
             self.check_pin_names(node);
             match &node.kind {
                 NodeKind::Entry => entries += 1,
-                NodeKind::GetVariable { variable } | NodeKind::SetVariable { variable } => {
+                NodeKind::GetVariable { variable, .. } | NodeKind::SetVariable { variable, .. } => {
                     self.check_names(Some(node.id), &[variable]);
                 }
                 NodeKind::Call(call) => {

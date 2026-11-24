@@ -33,8 +33,10 @@ pub(super) fn show_node_properties(
         .spacing(PROPERTY_SPACING)
         .show(ui, |ui| match &mut node.kind {
             NodeKind::Literal { value } => literal_row(ui, value),
-            NodeKind::GetVariable { variable } | NodeKind::SetVariable { variable } => {
-                variable_field(ui, variable, names)
+            NodeKind::GetVariable { variable, of_value }
+            | NodeKind::SetVariable { variable, of_value } => {
+                let changed = of_value_field(ui, of_value);
+                variable_field(ui, variable, names) | changed
             }
             NodeKind::Call(call) => call_fields(ui, call, &mut renamed_pins),
             NodeKind::Operator { operator } => operator_field(ui, operator),
@@ -56,6 +58,18 @@ pub(super) fn show_node_properties(
 fn literal_row(ui: &mut egui::Ui, value: &mut Literal) -> bool {
     ui.weak(texts::current().literal_value);
     let changed = literal_field(ui, "node_literal", value);
+    ui.end_row();
+    changed
+}
+
+/// Whether the variable is a field of the object given to the node's
+/// `target` pin rather than of the blueprint.
+fn of_value_field(ui: &mut egui::Ui, of_value: &mut bool) -> bool {
+    ui.weak(texts::current().variable_owner);
+    let changed = ui
+        .checkbox(of_value, texts::current().of_another_object)
+        .on_hover_text(texts::current().of_another_object_hint)
+        .changed();
     ui.end_row();
     changed
 }

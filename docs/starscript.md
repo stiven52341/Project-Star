@@ -850,12 +850,16 @@ values.
 |---------------|--------|---------|
 | `entry` (one per graph) | — | execution `then`; one value per parameter |
 | `literal` (`value`) | — | `value` |
-| `get_variable` (`variable`) | — | `value` |
-| `set_variable` (`variable`) | execution `in`, `value` | execution `then` |
+| `get_variable` (`variable`, `of_value`) | `target` (if `of_value`) | `value` |
+| `set_variable` (`variable`, `of_value`) | execution `in`, `target` (if `of_value`), `value` | execution `then` |
 | `call` (`target`, `method`, `arguments`, `returns_value`, `pure`) | execution `in` (not if pure), `target` (if it calls a method of a value), one per argument | execution `then` (not if pure), `result` (if it returns a value) |
 | `operator` (`add`, `subtract`, `multiply`, `divide`, `remainder`, `equal`, `not_equal`, `less`, `less_or_equal`, `greater`, `greater_or_equal`, `and`, `or`, `not`, `negate`) | `left` and `right`, or `value` for `not` and `negate` | `result` |
 | `branch` (an `if`) | execution `in`, `condition` | execution `true`, `false` |
 | `return` | execution `in`, `value` (if the graph returns one) | — |
+
+A variable node reads or sets a field of the blueprint (or of its base),
+or, with `of_value = true`, the field of the object given to its `target`
+pin: `enemy.x`. Files without `of_value` use the blueprint's own field.
 
 A call's `target` is `"self"` (a method of the blueprint), `"value"` (a
 method of the object given to its `target` pin) or `{ class = "Input" }` (a
