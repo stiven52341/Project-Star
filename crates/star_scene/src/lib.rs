@@ -8,7 +8,8 @@
 //! where it ends up in the world ([`GlobalTransform2D`]), where its
 //! [`SpriteNode`] is drawn. A 3D node is placed by its [`Transform3D`]
 //! ([`GlobalTransform3D`] in the world) and can show a [`MeshNode`] or shine
-//! a [`LightNode`]. A [`Body2D`] makes a 2D node a body of the 2D physics,
+//! a [`LightNode`]. A [`Camera2dNode`] or a [`Camera3dNode`] makes a node a
+//! point of view of the game. A [`Body2D`] makes a 2D node a body of the 2D physics,
 //! which [`step_node_physics`] moves it with, and a [`Body3D`] a 3D node a
 //! body of the 3D physics ([`step_node_physics_3d`]). A [`Scene`] is a tree
 //! of nodes saved in a `.scene` file (TOML) and instanced into a world as
@@ -17,6 +18,7 @@
 
 mod body_data;
 mod body_node;
+mod camera_node;
 mod field_value;
 mod hierarchy;
 mod node_3d;
@@ -30,6 +32,7 @@ mod sprite_node;
 mod transform;
 
 pub use body_node::{Body2D, Body3D, NodeBody};
+pub use camera_node::{Camera2dNode, Camera3dNode};
 pub use field_value::FieldValue;
 pub use hierarchy::{Children, Hierarchy, Name, Parent};
 pub use node_3d::{LightNode, MeshNode, draw_3d_nodes};

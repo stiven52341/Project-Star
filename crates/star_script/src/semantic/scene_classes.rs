@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn engine_node_classes_can_be_used() {
-        for name in ["Node", "Sprite", "Camera"] {
+        for name in ["Node", "Sprite", "Camera2D"] {
             assert_eq!(scene_class("", name), Ok(name.to_owned()));
         }
     }

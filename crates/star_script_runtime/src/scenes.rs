@@ -39,8 +39,30 @@ pub struct SceneNode {
     pub mesh: Option<SceneMesh>,
     /// The light it shines; only `Light` objects can shine one.
     pub light: Option<SceneLight>,
+    /// The 2D camera it is; only `Camera2D` objects can be one.
+    pub camera: Option<SceneCamera>,
+    /// The 3D camera it is; only `Camera3D` objects can be one.
+    pub camera_3d: Option<SceneCamera3D>,
     /// The values of the `export` fields of its class, by name.
     pub fields: Vec<(String, crate::scene_fields::SceneValue)>,
+}
+
+/// The 2D camera a [`SceneNode`] is.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SceneCamera {
+    /// World units shown from the bottom to the top of the window.
+    pub view_height: f32,
+    /// Whether the game is seen from it once it enters the game's tree.
+    pub current: bool,
+}
+
+/// The 3D camera a [`SceneNode`] is.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SceneCamera3D {
+    /// How wide it sees from the bottom to the top, in radians.
+    pub fov: f32,
+    /// Whether the game is seen from it once it enters the game's tree.
+    pub current: bool,
 }
 
 /// Where a [`SceneNode`] is in 3D, relative to its parent.
@@ -260,6 +282,8 @@ mod tests {
             transform_3d: None,
             mesh: None,
             light: None,
+            camera: None,
+            camera_3d: None,
             fields: Vec::new(),
         }
     }

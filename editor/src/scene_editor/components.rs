@@ -8,7 +8,9 @@ use star_engine::prelude::{
 };
 use star_engine::star_assets::AssetPath;
 use star_engine::star_render::{DEFAULT_ROUGHNESS, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS};
-use star_engine::star_scene::{MeshOutline, NodeOutline, SpriteOutline};
+use star_engine::star_scene::{
+    Camera2dNode, Camera3dNode, MeshOutline, NodeOutline, SpriteOutline,
+};
 
 use crate::project::ProjectDimension;
 use crate::texts;
@@ -66,6 +68,9 @@ pub(super) fn add_component_menu(
                 offer(ui, node.body.is_none(), texts.body_section, &mut || {
                     node.body = new_body();
                 });
+                offer(ui, node.camera.is_none(), texts.camera_2d, &mut || {
+                    node.camera = Some(Camera2dNode::default());
+                });
             }
             ProjectDimension::ThreeD => {
                 offer(
@@ -88,6 +93,9 @@ pub(super) fn add_component_menu(
                         node.body_3d = new_body_3d();
                     },
                 );
+                offer(ui, node.camera_3d.is_none(), texts.camera_3d, &mut || {
+                    node.camera_3d = Some(Camera3dNode::default());
+                });
             }
         }
     });
@@ -105,13 +113,15 @@ pub(super) enum NodeTemplate {
     Plane,
     DirectionalLight,
     PointLight,
+    Camera2D,
+    Camera3D,
 }
 
 impl NodeTemplate {
     /// The templates of a project of `dimension`, in the menu's order.
     pub(super) const fn of(dimension: ProjectDimension) -> &'static [Self] {
         match dimension {
-            ProjectDimension::TwoD => &[Self::Empty, Self::Sprite],
+            ProjectDimension::TwoD => &[Self::Empty, Self::Sprite, Self::Camera2D],
             ProjectDimension::ThreeD => &[
                 Self::Empty,
                 Self::Cube,
@@ -119,6 +129,7 @@ impl NodeTemplate {
                 Self::Plane,
                 Self::DirectionalLight,
                 Self::PointLight,
+                Self::Camera3D,
             ],
         }
     }
@@ -134,6 +145,8 @@ impl NodeTemplate {
             Self::Plane => texts.plane,
             Self::DirectionalLight => texts.directional_light,
             Self::PointLight => texts.point_light,
+            Self::Camera2D => texts.camera_2d,
+            Self::Camera3D => texts.camera_3d,
         }
     }
 
@@ -151,7 +164,8 @@ impl NodeTemplate {
     }
 
     /// A node of it named `name`, for a project of `dimension`; sprites
-    /// show the first of `images`.
+    /// show the first of `images`. Cameras are `current`: the scene's
+    /// tree makes them so only if no other camera is.
     pub(super) fn build(
         self,
         name: String,
@@ -177,6 +191,18 @@ impl NodeTemplate {
             Self::Sprite => node.sprite = new_sprite(images),
             Self::DirectionalLight => node.light = Some(new_light(true)),
             Self::PointLight => node.light = Some(new_light(false)),
+            Self::Camera2D => {
+                node.camera = Some(Camera2dNode {
+                    current: true,
+                    ..Camera2dNode::default()
+                });
+            }
+            Self::Camera3D => {
+                node.camera_3d = Some(Camera3dNode {
+                    current: true,
+                    ..Camera3dNode::default()
+                });
+            }
             _ => {}
         }
         node
@@ -200,6 +226,8 @@ pub(super) fn new_node(name: String, dimension: ProjectDimension) -> NodeOutline
         mesh: None,
         light: None,
         body_3d: None,
+        camera: None,
+        camera_3d: None,
         fields: std::collections::BTreeMap::new(),
     }
 }

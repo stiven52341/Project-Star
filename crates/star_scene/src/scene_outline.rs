@@ -10,9 +10,10 @@ use star_render::{Color, Sprite, TextureFilter, TextureRegion};
 use star_physics::{BodySettings, Shape3d};
 
 use crate::body_data::{Body3dData, BodyData};
+use crate::camera_node::{Camera2dData, Camera3dData};
 use crate::node_3d_data::{LightData, MeshOutline, MeshTable, Transform3dData};
 use crate::scene_file::{FORMAT_VERSION, NodeData, SceneFile, SpriteData};
-use crate::{FieldValue, LightNode, Transform2D, Transform3D};
+use crate::{Camera2dNode, Camera3dNode, FieldValue, LightNode, Transform2D, Transform3D};
 
 /// The nodes of a `.scene` file, checked to form one tree, with their images
 /// named by asset path instead of loaded. A [`Scene`](crate::Scene) is built
@@ -49,6 +50,10 @@ pub struct NodeOutline {
     pub light: Option<LightNode>,
     /// Its body in the 3D physics, if any.
     pub body_3d: Option<BodySettings<Shape3d>>,
+    /// The 2D camera the game can be seen from, if it is one.
+    pub camera: Option<Camera2dNode>,
+    /// The 3D camera the game can be seen from, if it is one.
+    pub camera_3d: Option<Camera3dNode>,
     /// The values of the `export` fields of its class, by name.
     pub fields: BTreeMap<String, FieldValue>,
 }
@@ -340,6 +345,18 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         .map(crate::node_3d_data::LightData::to_light)
         .transpose()
         .map_err(named)?;
+    let camera = node
+        .camera
+        .as_ref()
+        .map(Camera2dData::to_camera)
+        .transpose()
+        .map_err(named)?;
+    let camera_3d = node
+        .camera_3d
+        .as_ref()
+        .map(Camera3dData::to_camera)
+        .transpose()
+        .map_err(named)?;
     if node
         .class
         .as_deref()
@@ -364,6 +381,8 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         mesh,
         light,
         body_3d,
+        camera,
+        camera_3d,
         fields: node.fields,
     })
 }
@@ -404,6 +423,8 @@ fn write_node(node: &NodeOutline) -> NodeData {
         mesh: node.mesh.as_ref().map(MeshTable::from_outline),
         light: node.light.as_ref().map(LightData::from_light),
         body_3d: node.body_3d.as_ref().map(Body3dData::from_settings),
+        camera: node.camera.map(Camera2dData::from_camera),
+        camera_3d: node.camera_3d.map(Camera3dData::from_camera),
         fields: node.fields.clone(),
     }
 }
@@ -438,6 +459,36 @@ const fn array(vector: Vec2) -> [f32; 2] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cameras_are_read_and_written() {
+        let text = "format = 1\n[[node]]\nname = \"Level\"\n\
+                    [[node]]\nname = \"Eye\"\nparent = 0\n[node.camera]\n\
+                    view_height = 8.0\ncurrent = true\n\
+                    [[node]]\nname = \"Eye3D\"\nparent = 0\n[node.camera_3d]\n";
+
+        let outline = SceneOutline::from_text(text).unwrap();
+        let written = SceneOutline::from_text(&outline.to_text().unwrap()).unwrap();
+
+        assert_eq!(
+            outline.nodes()[1].camera,
+            Some(Camera2dNode {
+                view_height: 8.0,
+                current: true
+            })
+        );
+        assert_eq!(outline.nodes()[2].camera_3d, Some(Camera3dNode::default()));
+        assert_eq!(written, outline);
+    }
+
+    #[test]
+    fn cameras_that_show_nothing_name_their_node() {
+        let text = "format = 1\n[[node]]\nname = \"Eye\"\n[node.camera]\nview_height = 0.0\n";
+
+        let error = SceneOutline::from_text(text).unwrap_err().to_string();
+
+        assert!(error.contains("\"Eye\""), "{error}");
+    }
 
     #[test]
     fn values_of_export_fields_are_read_and_written() {

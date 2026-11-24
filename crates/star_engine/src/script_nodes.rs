@@ -79,7 +79,7 @@ pub struct ScriptSprite<'a> {
     pub color: Color,
 }
 
-/// A StarScript `Camera`, as the generated game describes it.
+/// A StarScript `Camera2D`, as the generated game describes it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScriptCamera {
     /// The script object, as in [`ScriptNode::id`].

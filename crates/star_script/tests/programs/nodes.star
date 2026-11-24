@@ -64,7 +64,7 @@ class Main {
         Debug.print((Scene.load("levels/one.scene") == null).to_string())
 
         // Cameras are nodes too.
-        const eye = Camera("Eye")
+        const eye = Camera2D("Eye")
         player.add_child(eye)
         eye.view_height *= 2.0
         Debug.print(eye.name + " " + eye.view_height.to_string() + " " + player.children().length().to_string())

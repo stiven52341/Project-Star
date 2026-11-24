@@ -103,6 +103,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 56 | “Show in file explorer” **starts the system's own program**, in `star_platform::show_in_file_explorer` | Every desktop system already has one: `explorer /select,` on Windows and `open -R` on macOS select the file; on Linux the freedesktop `FileManager1.ShowItems` call (through `dbus-send`) selects it in Nautilus, Dolphin, Nemo and the like, and `xdg-open` on its folder is the fallback for the rest. Android and iOS have no file manager to show, so it is an error there. The editor calls it on a thread of its own, since the program may take a while to answer, and only logs a failure. Rejected: a crate such as `opener` or `open` (a dependency for a few lines, and it is platform code, which belongs in `star_platform` anyway) |
 | 57 | Blueprint ready-made functions come from StarScript's own table of the engine's classes | The blueprint editor lists `star_script::semantic::native_classes` instead of a list of its own: one place says what the engine offers, to scripts and blueprints alike, and nothing can fall out of step. Labels are how the code is written (`Input.is_down(action) -> bool`), in every language. Rejected: a hand-written catalog with translated names (a second list to keep, and names that differ from the code users read) |
 | 58 | The program's decorators are **rewritten in the syntax tree** before checking (`star_script::decorated`) | StarScript has no functions as values, so a decorator cannot wrap a method as a closure. Rewriting the method into a hidden one called between `before` and `after` of decorator objects kept in hidden fields reuses all the checks and the translation, with mistakes still pointing at the user's code. `Decorator` is a StarScript class added to every program, not a native one, so classes can extend it without a hand-written Rust module. Hidden names carry `@`, which no written name has, and become Rust names of the generator's own (`open_body_`). Rejected: closures in the language (a large change for one feature) and native hooks in the generated Rust (another path to keep in step with the translation) |
+| 59 | Cameras are **parts of nodes with a `current` flag**, and the 2D one is `Camera2D` | A scene must be able to bring its own point of view, as in Godot, without code. `[node.camera]` and `[node.camera_3d]` are components like `[node.light]`; a camera marked `current` becomes `Game.camera`/`camera_3d` as it enters the game's tree (just before its `start`), so `Game.camera` keeps saying which one is used and scripts can still change it. The editor marks only the first camera created as `current`. `Camera` was renamed `Camera2D` to pair with `Camera3D` (owner's choice, 2026-11-24). Rejected: choosing the camera each frame by searching the tree (a walk every frame, and `Game.camera` would not tell the truth); a project setting naming the camera (scenes would not carry it). |
 
 ## ECS
 
@@ -195,7 +196,10 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   `rings`; and its material: `color`, `metallic`, `roughness`, `texture`,
   `filter`) and an optional `[node.light]` (`kind` `directional` or `point`,
   `color` of three numbers, `intensity`, and the `range` of point lights)
-  and an optional `[node.body_3d]` (see Physics).
+  and an optional `[node.body_3d]` (see Physics). Cameras are an optional
+  `[node.camera]` (`view_height`, `current`) on 2D nodes and
+  `[node.camera_3d]` (`fov` in radians, `current`) on 3D ones; what they
+  leave out takes its default, and the editor draws what each one sees.
   Unknown fields are errors, so typos are not silently ignored. Scenes keep
   names, classes, transforms, sprites, bodies, meshes and lights; other
   components will join them later.

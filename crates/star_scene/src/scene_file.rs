@@ -8,6 +8,7 @@ use star_render::TextureFilter;
 
 use crate::FieldValue;
 use crate::body_data::{Body3dData, BodyData};
+use crate::camera_node::{Camera2dData, Camera3dData};
 use crate::node_3d_data::{LightData, MeshTable, Transform3dData};
 
 /// The version of the layout this engine writes and reads.
@@ -54,6 +55,10 @@ pub(crate) struct NodeData {
     pub(crate) light: Option<LightData>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) body_3d: Option<Body3dData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) camera: Option<Camera2dData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) camera_3d: Option<Camera3dData>,
     /// `[node.fields]`: the values of the `export` fields of its class.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub(crate) fields: BTreeMap<String, FieldValue>,
@@ -195,6 +200,8 @@ mod tests {
                 mesh: None,
                 light: None,
                 body_3d: None,
+                camera: None,
+                camera_3d: None,
                 fields: BTreeMap::new(),
             }],
         };

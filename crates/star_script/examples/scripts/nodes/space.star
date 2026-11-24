@@ -109,7 +109,7 @@ class Twinkle extends Sprite {
 
 // Shows a wider world than the window: it glides after the ship from side
 // to side, without following it up and down.
-class FollowCamera extends Camera {
+class FollowCamera extends Camera2D {
     const CATCH_UP = 3.0
     var ship: Node
 

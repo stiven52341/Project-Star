@@ -279,6 +279,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           `before` and `after`, on methods that return nothing; and
           `Time.now()`.
   - [ ] Ready-made nodes: cameras, 2D and 3D lights, collision shapes…
+    - [x] 9a Cameras in scenes: `[node.camera]`/`[node.camera_3d]` with
+          `current`, “2D camera”/“3D camera” in Create and the inspector,
+          drawn in the view; `Camera` renamed `Camera2D`.
   - [ ] Finding nodes of the scene by name and by tag, in StarScript and
         blueprints.
   - [ ] Global and local position, as separate properties.

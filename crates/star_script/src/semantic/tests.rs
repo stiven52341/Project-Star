@@ -1041,7 +1041,7 @@ fn sprites_and_the_background_have_colors() {
 #[test]
 fn games_are_seen_from_their_camera() {
     assert_valid(
-        "class Shaky extends Camera {\n init() { super.init(\"Eye\") }\n \
+        "class Shaky extends Camera2D {\n init() { super.init(\"Eye\") }\n \
          override func update(delta: float) { view_height = 4.0 }\n}\n\
          class G extends Game {\n override func start() {\n \
          const ship = Node(\"Ship\")\n const eye = Shaky()\n \
@@ -1049,8 +1049,8 @@ fn games_are_seen_from_their_camera() {
          override func update(delta: float) { camera = null }\n}",
     );
     assert_eq!(
-        body_errors("const eye: Camera = Node(\"Eye\")"),
-        [mismatch("Camera", "Node")]
+        body_errors("const eye: Camera2D = Node(\"Eye\")"),
+        [mismatch("Camera2D", "Node")]
     );
 }
 
@@ -1070,8 +1070,8 @@ fn games_show_3d_nodes_from_their_3d_camera() {
          crate_mesh.add_child(ball)\n }\n}",
     );
     assert_eq!(
-        body_errors("const eye: Camera3D = Camera(\"Eye\")"),
-        [mismatch("Camera3D", "Camera")]
+        body_errors("const eye: Camera3D = Camera2D(\"Eye\")"),
+        [mismatch("Camera3D", "Camera2D")]
     );
     assert_eq!(
         body_errors("const flat: Node3D = Node(\"Flat\")"),

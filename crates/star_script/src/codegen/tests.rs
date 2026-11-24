@@ -238,7 +238,9 @@ fn games_run_the_code_of_their_nodes_and_mirror_them() {
     let code =
         rust("class G extends Game {\n override func start() { add_child(Node(\"Level\")) }\n}");
 
-    assert!(code.contains("crate::classes::Node::process_tree_(&root_, delta_, &mut self.nodes);"));
+    assert!(code.contains(
+        "crate::classes::Node::process_tree_(&self.game, &root_, delta_, &mut self.nodes);"
+    ));
     assert!(code.contains("mirror_nodes_(world, &mut self.mirror, &root_, &mut self.pending);"));
 }
 
@@ -259,10 +261,10 @@ fn games_show_the_colors_of_their_sprites_and_background() {
 fn games_are_drawn_from_their_camera() {
     let code = rust(
         "class G extends Game {\n override func start() {\n \
-         const eye = Camera(\"Eye\")\n add_child(eye)\n camera = eye\n }\n}",
+         const eye = Camera2D(\"Eye\")\n add_child(eye)\n camera = eye\n }\n}",
     );
 
-    assert!(code.contains("pub mod Camera {"));
+    assert!(code.contains("pub mod Camera2D {"));
     assert!(code.contains("self.mirror.camera(world, &script_camera_(&**camera_))"));
     assert!(code.contains("frame.set_camera(self.view_(world));"));
 }

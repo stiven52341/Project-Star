@@ -30,7 +30,9 @@ use star_script::semantic::ClassTable;
 use self::class_choice::{ChoiceOutcome, ClassChoice};
 pub(crate) use self::class_drop::ClassDrop;
 use self::components::NodeTemplate;
-pub(crate) use self::drawing::{Marks, SceneGpu, cross_lines, cube_lines, square_lines};
+pub(crate) use self::drawing::{
+    Marks, SceneGpu, cross_lines, cube_lines, pyramid_lines, square_lines, view_lines,
+};
 pub(crate) use self::dropping::ImageDrop;
 pub(crate) use self::gizmo::{
     Drag, Handle, HandleShape, Lens, Target, Tip, Tool, handle_at, shapes,
@@ -471,6 +473,25 @@ impl SceneDocument {
 /// Every scene has its root first.
 const ROOT: usize = 0;
 
+/// Whether a node of `outline` is a camera the game is seen from as soon
+/// as it enters the game.
+fn has_current_camera(outline: &SceneOutline) -> bool {
+    outline.nodes().iter().any(|node| {
+        node.camera.is_some_and(|camera| camera.current)
+            || node.camera_3d.is_some_and(|camera| camera.current)
+    })
+}
+
+/// Makes the camera of `node`, if it is one, wait to be chosen.
+const fn stop_being_current(node: &mut NodeOutline) {
+    if let Some(camera) = &mut node.camera {
+        camera.current = false;
+    }
+    if let Some(camera) = &mut node.camera_3d {
+        camera.current = false;
+    }
+}
+
 /// What changes the tree: adding, moving and deleting nodes.
 struct TreeEditor<'scene> {
     outline: &'scene mut SceneOutline,
@@ -482,7 +503,10 @@ impl TreeEditor<'_> {
     /// Adds a node of `template` under `parent` and selects it.
     fn add_child(&mut self, parent: usize, template: NodeTemplate, images: &[String]) -> bool {
         let name = unique_child_name(self.outline, parent, template.node_name());
-        let node = template.build(name, self.dimension, images);
+        let mut node = template.build(name, self.dimension, images);
+        if has_current_camera(self.outline) {
+            stop_being_current(&mut node);
+        }
         match self.outline.add_node(parent, node) {
             Ok(index) => {
                 *self.selected = Some(index);
@@ -708,6 +732,21 @@ mod tests {
             .collect();
         assert_eq!(names, ["One", "Node", "Node2"]);
         assert_eq!(scene.selected, Some(2));
+    }
+
+    #[test]
+    fn only_the_first_camera_created_is_current() {
+        let (_assets, mut scene) = open_level("scene_document_cameras");
+        let mut editor = tree_editor(&mut scene);
+
+        editor.add_child(ROOT, NodeTemplate::Camera2D, &[]);
+        editor.add_child(ROOT, NodeTemplate::Camera2D, &[]);
+
+        let current: Vec<_> = editor.outline.nodes()[1..]
+            .iter()
+            .map(|node| node.camera.map(|camera| camera.current))
+            .collect();
+        assert_eq!(current, [Some(true), Some(false)]);
     }
 
     #[test]

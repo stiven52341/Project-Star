@@ -34,7 +34,7 @@ mod texture;
 mod vertex;
 
 pub use backend::{GraphicsBackend, UnknownBackendError};
-pub use camera::{Camera, Projection};
+pub use camera::{Camera, DEFAULT_2D_VIEW_HEIGHT, DEFAULT_VERTICAL_FOV, Projection};
 pub use color::Color;
 pub use frame::Frame;
 pub use gpu_info::GpuInfo;

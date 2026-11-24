@@ -48,6 +48,12 @@ const MESH_COLOR: egui::Color32 = egui::Color32::from_rgb(95, 155, 230);
 const LIGHT_COLOR: egui::Color32 = egui::Color32::from_rgb(240, 200, 80);
 const BODY_COLOR: egui::Color32 = egui::Color32::from_rgb(180, 120, 220);
 const EMPTY_COLOR: egui::Color32 = egui::Color32::from_rgb(150, 150, 160);
+const CAMERA_COLOR: egui::Color32 = egui::Color32::from_rgb(90, 200, 210);
+/// The camera icon: a box, as wide as the icon less its lens and as high
+/// as this part of its width, with a lens on its right.
+const CAMERA_BOX_ASPECT: f32 = 0.6;
+const CAMERA_LENS_WIDTH: f32 = 4.0;
+const CAMERA_ROUNDING: f32 = 1.5;
 const ICON_STROKE: f32 = 1.5;
 const LIGHT_RADIUS: f32 = 3.0;
 /// Where the rays of the light icon start and end, from its center.
@@ -97,6 +103,7 @@ impl TreeState {
 /// What a node is, by what it does that shows most: its icon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NodeKind {
+    Camera,
     Light,
     Mesh,
     Sprite,
@@ -106,7 +113,9 @@ enum NodeKind {
 
 impl NodeKind {
     fn of(node: &NodeOutline) -> Self {
-        if node.light.is_some() {
+        if node.camera.is_some() || node.camera_3d.is_some() {
+            Self::Camera
+        } else if node.light.is_some() {
             Self::Light
         } else if node.mesh.is_some() {
             Self::Mesh
@@ -570,7 +579,8 @@ fn paint_arrow(painter: &egui::Painter, center: egui::Pos2, open: bool, color: e
 }
 
 /// The icon of a node of `kind`: a picture for sprites, a cube for meshes,
-/// a sun for lights, a ring for bodies and a hollow dot for the rest.
+/// a sun for lights, a box with a lens for cameras, a ring for bodies and
+/// a hollow dot for the rest.
 fn paint_icon(painter: &egui::Painter, center: egui::Pos2, kind: NodeKind) {
     let half = ICON_SIZE / 2.0;
     match kind {
@@ -627,6 +637,23 @@ fn paint_icon(painter: &egui::Painter, center: egui::Pos2, kind: NodeKind) {
                 );
             }
         }
+        NodeKind::Camera => {
+            let body = egui::Rect::from_min_size(
+                center - egui::vec2(half, half * CAMERA_BOX_ASPECT),
+                egui::vec2(ICON_SIZE - CAMERA_LENS_WIDTH, ICON_SIZE * CAMERA_BOX_ASPECT),
+            );
+            painter.rect_filled(body, CAMERA_ROUNDING, CAMERA_COLOR);
+            let lens = vec![
+                body.right_center(),
+                egui::pos2(center.x + half, body.top()),
+                egui::pos2(center.x + half, body.bottom()),
+            ];
+            painter.add(egui::Shape::convex_polygon(
+                lens,
+                CAMERA_COLOR,
+                egui::Stroke::NONE,
+            ));
+        }
         NodeKind::Body => {
             painter.circle_stroke(
                 center,
@@ -682,7 +709,8 @@ mod tests {
              [node.sprite]\ntexture = \"hero.png\"\nsize = [1.0, 1.0]\n\
              [[node]]\nname = \"Lamp\"\nparent = 1\n[node.transform_3d]\n\
              [node.light]\nkind = \"point\"\nrange = 5.0\n\
-             [[node]]\nname = \"Enemy player\"\nparent = 0\n",
+             [[node]]\nname = \"Enemy player\"\nparent = 0\n\
+             [[node]]\nname = \"Eye\"\nparent = 0\n[node.camera]\n",
         )
         .unwrap()
         .into_nodes()
@@ -696,7 +724,8 @@ mod tests {
                 "Level",
                 "Level/Player",
                 "Level/Player/Lamp",
-                "Level/Enemy player"
+                "Level/Enemy player",
+                "Level/Eye"
             ]
         );
     }
@@ -717,7 +746,8 @@ mod tests {
                 NodeKind::Empty,
                 NodeKind::Sprite,
                 NodeKind::Light,
-                NodeKind::Empty
+                NodeKind::Empty,
+                NodeKind::Camera
             ]
         );
     }

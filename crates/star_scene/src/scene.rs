@@ -11,8 +11,8 @@ use star_render::{Material, Mesh3dId, MeshShape, TextureFilter, TextureId};
 use crate::node_3d_data::MeshOutline;
 use crate::scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
 use crate::{
-    Body2D, Body3D, Children, FieldValue, Hierarchy, LightNode, MeshNode, Name, SpriteNode,
-    Transform2D, Transform3D,
+    Body2D, Body3D, Camera2dNode, Camera3dNode, Children, FieldValue, Hierarchy, LightNode,
+    MeshNode, Name, SpriteNode, Transform2D, Transform3D,
 };
 
 /// A tree of nodes that can be added to a world as many times as needed:
@@ -21,7 +21,8 @@ use crate::{
 ///
 /// It keeps, for each node, its name, its [`Transform2D`], its
 /// [`SpriteNode`], its [`Body2D`], its [`Transform3D`], its [`MeshNode`],
-/// its [`LightNode`] and its [`Body3D`]; other components are not part of
+/// its [`LightNode`], its [`Body3D`] and its cameras ([`Camera2dNode`],
+/// [`Camera3dNode`]); other components are not part of
 /// scenes yet.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scene {
@@ -43,6 +44,8 @@ struct SceneNode {
     mesh: Option<MeshNode>,
     light: Option<LightNode>,
     body_3d: Option<BodySettings<Shape3d>>,
+    camera: Option<Camera2dNode>,
+    camera_3d: Option<Camera3dNode>,
     /// Kept, as `class` is, for the scene to be written again whole.
     fields: BTreeMap<String, FieldValue>,
 }
@@ -198,6 +201,12 @@ impl Scene {
             if let Some(body) = node.body_3d {
                 world.insert(entity, Body3D::new(body))?;
             }
+            if let Some(camera) = node.camera {
+                world.insert(entity, camera)?;
+            }
+            if let Some(camera) = node.camera_3d {
+                world.insert(entity, camera)?;
+            }
         }
         Ok(())
     }
@@ -246,6 +255,8 @@ fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResul
         mesh,
         light: outline.light,
         body_3d: outline.body_3d,
+        camera: outline.camera,
+        camera_3d: outline.camera_3d,
         fields: outline.fields,
     })
 }
@@ -289,6 +300,8 @@ fn outline_node(node: &SceneNode, sources: &impl SceneSources) -> EngineResult<N
         mesh,
         light: node.light,
         body_3d: node.body_3d,
+        camera: node.camera,
+        camera_3d: node.camera_3d,
         fields: node.fields.clone(),
     })
 }
@@ -351,6 +364,8 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
         mesh: world.get::<MeshNode>(entity).map(|mesh| *mesh),
         light: world.get::<LightNode>(entity).map(|light| *light),
         body_3d: world.get::<Body3D>(entity).map(|body| *body.settings()),
+        camera: world.get::<Camera2dNode>(entity).map(|camera| *camera),
+        camera_3d: world.get::<Camera3dNode>(entity).map(|camera| *camera),
         fields: BTreeMap::new(),
     }
 }

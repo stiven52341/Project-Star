@@ -40,7 +40,7 @@ pub const NODE_CLASS: &str = "Node";
 pub const SPRITE_CLASS: &str = "Sprite";
 
 /// Name of the engine class of the nodes the game is seen from.
-pub const CAMERA_CLASS: &str = "Camera";
+pub const CAMERA_CLASS: &str = "Camera2D";
 
 /// Name of the engine class of the nodes placed in 3D.
 pub const NODE_3D_CLASS: &str = "Node3D";
@@ -346,11 +346,15 @@ fn add_sprite_class(classes: &mut ClassTable, node: ClassId, color: ClassId) -> 
     classes.add(sprite)
 }
 
-/// `Camera`: a node the game is seen from, when it is the game's `camera`.
+/// `Camera2D`: a node the game is seen from, when it is the game's `camera`;
+/// a `current` one becomes it when it enters the game's tree.
 fn add_camera_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
     let mut camera = ClassInfo::new(CAMERA_CLASS.to_owned(), ClassOrigin::Native);
     camera.base = Some(node);
-    camera.fields = vec![native_field("view_height", Type::Float)];
+    camera.fields = vec![
+        native_field("view_height", Type::Float),
+        native_field("current", Type::Bool),
+    ];
     camera.constructor = Some(native_constructor(&[("name", Type::String)]));
     classes.add(camera)
 }
@@ -419,11 +423,14 @@ fn add_light_class(classes: &mut ClassTable, node_3d: ClassId, color: ClassId) -
 }
 
 /// `Camera3D`: a 3D node the game is seen from, when it is the game's
-/// `camera_3d`.
+/// `camera_3d`; a `current` one becomes it when it enters the game's tree.
 fn add_camera_3d_class(classes: &mut ClassTable, node_3d: ClassId) -> ClassId {
     let mut camera = ClassInfo::new(CAMERA_3D_CLASS.to_owned(), ClassOrigin::Native);
     camera.base = Some(node_3d);
-    camera.fields = vec![native_field("fov", Type::Float)];
+    camera.fields = vec![
+        native_field("fov", Type::Float),
+        native_field("current", Type::Bool),
+    ];
     camera.constructor = Some(native_constructor(&[("name", Type::String)]));
     classes.add(camera)
 }

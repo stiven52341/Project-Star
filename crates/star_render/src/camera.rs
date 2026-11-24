@@ -12,9 +12,9 @@ const FAR_PLANE: f32 = 1000.0;
 /// How far a 2D camera sits in front of the `z = 0` plane it looks at.
 const CAMERA_2D_DISTANCE: f32 = 10.0;
 /// World units visible from the bottom to the top of the screen by default.
-const DEFAULT_2D_VIEW_HEIGHT: f32 = 2.0;
+pub const DEFAULT_2D_VIEW_HEIGHT: f32 = 2.0;
 /// 60 degrees: a natural-looking default field of view.
-const DEFAULT_VERTICAL_FOV: f32 = FRAC_PI_3;
+pub const DEFAULT_VERTICAL_FOV: f32 = FRAC_PI_3;
 
 /// How the camera flattens the 3D world onto the screen.
 #[derive(Debug, Clone, Copy, PartialEq)]

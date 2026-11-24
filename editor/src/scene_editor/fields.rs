@@ -179,6 +179,39 @@ pub(super) fn choice_row<Choice: Copy + PartialEq>(
     *value != before
 }
 
+/// A row with an angle shown in degrees, on a slider between `degrees`,
+/// kept in radians.
+pub(super) fn angle_slider_row(
+    ui: &mut egui::Ui,
+    name: &str,
+    radians: &mut f32,
+    degrees: std::ops::RangeInclusive<f32>,
+) -> bool {
+    label(ui, name);
+    let mut shown = radians.to_degrees();
+    let changed = ui
+        .add(egui::Slider::new(&mut shown, degrees).suffix("°"))
+        .changed();
+    if changed {
+        *radians = shown.to_radians();
+    }
+    ui.end_row();
+    changed
+}
+
+/// A row with a checkbox that explains itself with `hint`.
+pub(super) fn checkbox_hint_row(
+    ui: &mut egui::Ui,
+    name: &str,
+    value: &mut bool,
+    hint: &str,
+) -> bool {
+    label(ui, name);
+    let changed = ui.checkbox(value, "").on_hover_text(hint).changed();
+    ui.end_row();
+    changed
+}
+
 fn number(ui: &mut egui::Ui, value: &mut f32) -> bool {
     ui.add(egui::DragValue::new(value).speed(DRAG_SPEED))
         .changed()

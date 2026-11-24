@@ -21,7 +21,7 @@ use crate::drag_drop::released;
 use crate::project::ProjectDimension;
 use crate::scene_editor::{
     ClassDrop, Drag, HandleShape, ImageDrop, Lens, Marks, Ray, SceneDocument, Tool, cross_lines,
-    cube_lines, handle_at, shapes, square_lines,
+    cube_lines, handle_at, pyramid_lines, shapes, square_lines, view_lines,
 };
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -69,6 +69,8 @@ impl SceneViewport {
             square: renderer.create_lines(&square_lines())?,
             cube: renderer.create_lines(&cube_lines())?,
             cross: renderer.create_lines(&cross_lines())?,
+            view: renderer.create_lines(&view_lines())?,
+            pyramid: renderer.create_lines(&pyramid_lines())?,
         };
         let texture_id = render_state.renderer.write().register_native_texture(
             &render_state.device,

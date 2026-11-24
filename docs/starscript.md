@@ -37,7 +37,7 @@ Blueprint (.blueprint) ──► StarScript (.star) ──► Rust (.rs) ──�
 | 2 | Syntax (parser and AST) | **Final** |
 | 3 | Types, null safety and semantics | **Final** |
 | 4 | Rust generation | **Final** |
-| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the camera (`Camera`), scenes (`Scene`, with script classes), sounds (`Sound`, `Audio`), physics (`Body`) and 3D (`Node3D`, `Mesh`, `Light`, `Camera3D`) done |
+| 5 | Engine API | In progress: lifecycle (`Game`), input (`Input`: actions, analog strength and the pointer), nodes (`Node`, `Sprite`) and colors (`Color`), the cameras (`Camera2D`, `Camera3D`), scenes (`Scene`, with script classes), sounds (`Sound`, `Audio`), physics (`Body`) and 3D (`Node3D`, `Mesh`, `Light`, `Camera3D`) done |
 | 6 | Editor integration | In progress: “Compile” checks the project's scripts and scenes and lists the problems; “Play” builds and runs the game; the editor has a code editor for `.star` files (colors, writing aids, mistakes while writing, suggestions) |
 | 7–8 | Blueprints | Done: model, rules, files, translation to StarScript, “Compile” in the editor and the visual editor (graphs, class, new blueprints, mistakes on their nodes) |
 | 9 | Concurrency and parallelism | Done: coroutines (`async`, `await`, `Time`) and `parallel` functions (section 7), shown by the code editor; example `examples/scripts/coroutines.star` |
@@ -458,14 +458,14 @@ The engine provides them; their names cannot be used for other classes.
 | Class | Members |
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. |
-| `Game` | fields `background: Color` (black), `camera: Camera?` (`null`), `camera_3d: Camera3D?` (`null`), `ambient: Color` (black: no ambient light); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
+| `Game` | fields `background: Color` (black), `camera: Camera2D?` (`null`), `camera_3d: Camera3D?` (`null`), `ambient: Color` (black: no ambient light); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
 | `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `body: Body?` (`null`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors) |
-| `Camera` (extends `Node`) | `init(name: string)`; field `view_height: float` (2.0) |
+| `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `current: bool` (`false`) |
 | `Node3D` (extends `Node`) | `init(name: string)`; fields `z`, `pitch`, `yaw: float` (0.0), `scale_z: float` (1.0); `look_at(x: float, y: float, z: float)` |
 | `Mesh` (extends `Node3D`) | `init(name: string, shape: string)`; fields `shape: string`, `width`, `height`, `depth` (1.0), `radius` (0.5), `color: Color` (white), `metallic` (0.0), `roughness: float` (0.5), `texture: string` (`""`: none), `pixelated: bool` (`false`) |
 | `Light` (extends `Node3D`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range: float` (10.0) |
-| `Camera3D` (extends `Node3D`) | `init(name: string)`; field `fov: float` (about 1.047 radians: 60°) |
+| `Camera3D` (extends `Node3D`) | `init(name: string)`; fields `fov: float` (about 1.047 radians: 60°), `current: bool` (`false`) |
 | `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
 | `Scene` | `static load(path: string) -> Node?` |
 | `Sound` | no `init`: `static load(path: string) -> Sound?`; fields `volume: float` (1.0), `looping: bool` (`false`); `play()`, `stop()`, `is_playing() -> bool` |
@@ -536,10 +536,15 @@ class Space extends Game {
 - `x`, `y`, `width` and `height` are in world units; `rotation` in radians,
   counterclockwise.
 - The game is seen from its `camera`: the window is centered on where that
-  `Camera` is in the world (so a camera that is the child of a node follows
-  it) and shows `view_height` world units from bottom to top; the width
-  follows the window's shape. The camera's rotation and scale are ignored.
-  Without a camera, the window shows 2 units centered on `(0, 0)`.
+  `Camera2D` is in the world (so a camera that is the child of a node
+  follows it) and shows `view_height` world units from bottom to top; the
+  width follows the window's shape. The camera's rotation and scale are
+  ignored. Without a camera, the window shows 2 units centered on `(0, 0)`.
+- A camera whose `current` is `true` becomes the game's `camera` (or
+  `camera_3d`) when it enters the game's tree, just before its `start`:
+  a scene can bring the camera it is seen from. Cameras that enter later
+  win; `current` changed afterwards does nothing until the camera enters
+  the tree again. The game can still set `camera` itself at any time.
 - `texture` is an asset path such as `"sprites/hero.png"` (PNG or JPEG). An
   image that cannot be loaded is not shown; the engine warns once on the
   error output.
@@ -560,12 +565,14 @@ class Space extends Game {
   to the error output. Console programs have no asset folder: for them it
   is always `null`.
 - A scene node can name the class it is built as, with `class = "Rock"` in
-  its `[[node]]`. The class must extend `Node` (or `Sprite`, `Camera`) and
+  its `[[node]]`. The class must extend `Node` (or `Sprite`, `Camera2D`) and
   its `init` must take no arguments: the object is created with `Rock()`,
   so it runs its own `start` and `update`, and then gets what the scene
   writes, which wins over what `init` set: its name always, its transform
-  and image only if the file has them. `class = "Camera"` gives a plain
-  camera. If a class does not exist, needs arguments, or is not a `Sprite`
+  and image only if the file has them. A node with a
+  `[node.camera]` table (`view_height`, `current`) is a `Camera2D`, or
+  the class it names, which must extend it; `class = "Camera2D"` alone
+  gives a plain camera. If a class does not exist, needs arguments, or is not a `Sprite`
   but the node shows an image, the whole scene is not loaded (`null`) and
   the reason, with the node's name, is written once.
 - A node with a class can give its `export` fields values, in a
@@ -761,8 +768,9 @@ class World3D extends Game {
 - `Scene.load` builds 3D nodes too: a node with `[node.transform_3d]` is a
   `Node3D`, with `[node.mesh]` a `Mesh` and with `[node.light]` a `Light`
   (or the class it names, which must extend them); `[node.body_3d]` gives
-  its body. `class = "Camera3D"` gives a 3D camera. The divisions of a
-  sphere are not kept.
+  its body. A node with `[node.camera_3d]` (`fov` in radians, `current`)
+  is a `Camera3D`, as `class = "Camera3D"` is. The divisions of a sphere
+  are not kept.
 
 **Input works with actions**, declared in the project, not in the scripts.
 The game asks for an action by name, so the same code works with keyboard,

@@ -11,13 +11,16 @@ use star_engine::star_render::{
     DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MAX_SPHERE_DIVISIONS, MIN_SPHERE_RINGS,
     MIN_SPHERE_SEGMENTS,
 };
-use star_engine::star_scene::{MeshOutline, NodeOutline, SpriteOutline};
+use star_engine::star_scene::{
+    Camera2dNode, Camera3dNode, MeshOutline, NodeOutline, SpriteOutline,
+};
 
 use super::components::{DEFAULT_CAPSULE_HEIGHT, DEFAULT_RADIUS, add_component_menu, new_light};
 use super::exported_fields::{edit_exported, exported_fields};
 use super::fields::{
-    MIN_SIZE, angle_row, angles_row, checkbox_row, choice_row, color_row, fraction_row,
-    number_from_row, number_row, size2_row, size3_row, text_row, vec2_row, vec3_row, whole_row,
+    MIN_SIZE, angle_row, angle_slider_row, angles_row, checkbox_hint_row, checkbox_row, choice_row,
+    color_row, fraction_row, number_from_row, number_row, size2_row, size3_row, text_row, vec2_row,
+    vec3_row, whole_row,
 };
 use star_script::semantic::ClassTable;
 
@@ -64,6 +67,8 @@ pub(super) fn edit_node(
     changed |= optional_section(ui, texts.light_section, &mut node.light, edit_light);
     changed |= optional_section(ui, texts.body_section, &mut node.body, edit_body);
     changed |= optional_section(ui, texts.body_3d_section, &mut node.body_3d, edit_body_3d);
+    changed |= optional_section(ui, texts.camera_2d, &mut node.camera, edit_camera_2d);
+    changed |= optional_section(ui, texts.camera_3d, &mut node.camera_3d, edit_camera_3d);
     ui.separator();
     changed | add_component_menu(ui, node, context.dimension, context.images)
 }
@@ -311,6 +316,36 @@ fn edit_light(ui: &mut egui::Ui, light: &mut LightNode) -> bool {
         changed |= number_from_row(ui, texts.range, range, MIN_SIZE);
     }
     changed
+}
+
+/// The narrowest and widest fields of view a 3D camera can be given, in
+/// degrees: scene files take anything between 0 and 180.
+const FIELD_OF_VIEW_DEGREES: std::ops::RangeInclusive<f32> = 1.0..=179.0;
+
+fn edit_camera_2d(ui: &mut egui::Ui, camera: &mut Camera2dNode) -> bool {
+    let texts = texts::current();
+    number_from_row(ui, texts.view_height, &mut camera.view_height, MIN_SIZE)
+        | checkbox_hint_row(
+            ui,
+            texts.current_camera,
+            &mut camera.current,
+            texts.current_camera_hint,
+        )
+}
+
+fn edit_camera_3d(ui: &mut egui::Ui, camera: &mut Camera3dNode) -> bool {
+    let texts = texts::current();
+    angle_slider_row(
+        ui,
+        texts.field_of_view,
+        &mut camera.fov,
+        FIELD_OF_VIEW_DEGREES,
+    ) | checkbox_hint_row(
+        ui,
+        texts.current_camera,
+        &mut camera.current,
+        texts.current_camera_hint,
+    )
 }
 
 /// The kinds of 2D body shape, to choose one.

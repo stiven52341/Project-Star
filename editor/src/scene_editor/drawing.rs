@@ -8,7 +8,8 @@ use star_engine::prelude::{
     TextureFilter, TextureId, Vec2, Vec3, Vertex,
 };
 use star_engine::star_assets::AssetPath;
-use star_engine::star_scene::{NodeOutline, SpriteOutline};
+use star_engine::star_platform::WindowConfig;
+use star_engine::star_scene::{Camera2dNode, Camera3dNode, NodeOutline, SpriteOutline};
 
 /// Lights scenes that have none of their own, so their meshes can be
 /// seen: a sun from above and in front, and a soft ambient light.
@@ -23,6 +24,9 @@ const SPRITE_MARK_MARGIN: f32 = 0.05;
 pub(super) const POINT_MARK_SIZE: f32 = 0.5;
 /// How thick the mark of a selected plane is, so its box is visible.
 const PLANE_MARK_THICKNESS: f32 = 0.02;
+/// How far from a 3D camera the base of the pyramid it sees is drawn, in
+/// world units.
+const CAMERA_PYRAMID_DEPTH: f32 = 1.0;
 
 /// What the drawing needs from the GPU: the textures of image files and
 /// the meshes of shapes, made once each. `None` if they cannot be made;
@@ -41,10 +45,17 @@ pub(crate) struct Marks {
     pub(crate) cube: MeshId,
     /// Three segments from `-0.5` to `0.5` along each axis.
     pub(crate) cross: MeshId,
+    /// A square from `(-0.5, -0.5)` to `(0.5, 0.5)`, on the XY plane, in
+    /// the color of cameras: what a 2D camera shows.
+    pub(crate) view: MeshId,
+    /// A pyramid from `(0, 0, 0)` to a base from `(-1, -1, -1)` to
+    /// `(1, 1, -1)`, in the color of cameras: what a 3D camera sees.
+    pub(crate) pyramid: MeshId,
 }
 
 /// Adds to `frame` what the nodes of `outline` show, where the game would
-/// show them, and the mark of the node `selected`.
+/// show them, what their cameras see, and the mark of the node
+/// `selected`.
 pub(crate) fn draw_scene(
     outline: &SceneOutline,
     selected: Option<usize>,
@@ -58,6 +69,12 @@ pub(crate) fn draw_scene(
     for (node, place) in nodes.iter().zip(&places) {
         if let (Some(sprite), Some(global)) = (&node.sprite, place.flat) {
             draw_sprite(sprite, global, gpu, frame);
+        }
+        if let (Some(camera), Some(global)) = (node.camera, place.flat) {
+            draw_camera_2d(camera, global, marks, frame);
+        }
+        if let (Some(camera), Some(global)) = (node.camera_3d, place.solid) {
+            draw_camera_3d(camera, global, marks, frame);
         }
         if let Some(global) = place.solid {
             draw_mesh(node, global, gpu, frame);
@@ -168,6 +185,55 @@ fn draw_mesh(node: &NodeOutline, global: Mat4, gpu: &mut impl SceneGpu, frame: &
     frame.draw_mesh_3d(mesh, material, global * Mat4::from_scale(scale));
 }
 
+/// The shape of the game's window, width over height: the one it opens
+/// with, since the editor cannot know how players will size it.
+fn game_aspect_ratio() -> f32 {
+    WindowConfig::default().size.aspect_ratio().unwrap_or(1.0)
+}
+
+/// The rectangle a 2D camera placed at `global` shows: centered on it,
+/// neither turned nor scaled, as the game shows it.
+fn draw_camera_2d(camera: Camera2dNode, global: Affine2, marks: Marks, frame: &mut Frame) {
+    let position = GlobalTransform2D::from_affine(global).position();
+    let size = Vec3::new(
+        camera.view_height * game_aspect_ratio(),
+        camera.view_height,
+        1.0,
+    );
+    frame.draw(
+        marks.view,
+        Mat4::from_translation(Vec3::new(position.x, position.y, 0.0)) * Mat4::from_scale(size),
+    );
+}
+
+/// The pyramid a 3D camera placed at `global` sees, a little way along its
+/// -z: turned as it is, but not scaled, as the game sees it.
+fn draw_camera_3d(camera: Camera3dNode, global: Mat4, marks: Marks, frame: &mut Frame) {
+    let half_height = (camera.fov / 2.0).tan() * CAMERA_PYRAMID_DEPTH;
+    let size = Vec3::new(
+        half_height * game_aspect_ratio(),
+        half_height,
+        CAMERA_PYRAMID_DEPTH,
+    );
+    frame.draw(
+        marks.pyramid,
+        without_scale(global) * Mat4::from_scale(size),
+    );
+}
+
+/// `matrix` with its axes made one unit long: placed and turned as it is,
+/// but not scaled.
+fn without_scale(matrix: Mat4) -> Mat4 {
+    let mut columns = matrix.to_columns();
+    for column in columns.iter_mut().take(3) {
+        let [x, y, z, _] = *column;
+        if let Some(Vec3 { x, y, z }) = Vec3::new(x, y, z).normalized() {
+            *column = [x, y, z, 0.0];
+        }
+    }
+    Mat4::from_columns(columns)
+}
+
 fn light_for_preview(frame: &mut Frame) {
     frame.set_ambient_light(AmbientLight::new(Color::WHITE, PREVIEW_AMBIENT_INTENSITY));
     frame.add_light(DirectionalLight {
@@ -265,6 +331,32 @@ pub(crate) fn cube_lines() -> Vec<Vertex> {
     lines
 }
 
+/// The color of what cameras see: unlike the marks, since a camera can be
+/// selected too.
+const CAMERA_COLOR: Color = Color::rgb(0.35, 0.8, 0.85);
+
+/// The segments of [`Marks::view`].
+pub(crate) fn view_lines() -> Vec<Vertex> {
+    let half = 0.5;
+    let corners = [(-half, -half), (half, -half), (half, half), (-half, half)]
+        .map(|(x, y)| Vec3::new(x, y, 0.0));
+    colored_loop(&corners, CAMERA_COLOR)
+}
+
+/// The segments of [`Marks::pyramid`].
+pub(crate) fn pyramid_lines() -> Vec<Vertex> {
+    let base =
+        [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].map(|(x, y)| Vec3::new(x, y, -1.0));
+    let mut lines = colored_loop(&base, CAMERA_COLOR);
+    for corner in base {
+        lines.extend([
+            Vertex::new(Vec3::ZERO, CAMERA_COLOR),
+            Vertex::new(corner, CAMERA_COLOR),
+        ]);
+    }
+    lines
+}
+
 /// The segments of [`Marks::cross`].
 pub(crate) fn cross_lines() -> Vec<Vertex> {
     let half = 0.5;
@@ -285,10 +377,15 @@ pub(crate) fn cross_lines() -> Vec<Vertex> {
 
 /// Segments joining `corners` in order, and the last to the first.
 fn closed_loop(corners: &[Vec3]) -> Vec<Vertex> {
+    colored_loop(corners, MARK_COLOR)
+}
+
+/// [`closed_loop`] in `color`.
+fn colored_loop(corners: &[Vec3], color: Color) -> Vec<Vertex> {
     corners
         .iter()
         .zip(corners.iter().cycle().skip(1))
-        .flat_map(|(from, to)| [Vertex::new(*from, MARK_COLOR), Vertex::new(*to, MARK_COLOR)])
+        .flat_map(|(from, to)| [Vertex::new(*from, color), Vertex::new(*to, color)])
         .collect()
 }
 
@@ -324,6 +421,8 @@ mod tests {
         square: MeshId::from_index(0),
         cube: MeshId::from_index(1),
         cross: MeshId::from_index(2),
+        view: MeshId::from_index(3),
+        pyramid: MeshId::from_index(4),
     };
 
     fn outline(text: &str) -> SceneOutline {
@@ -405,9 +504,45 @@ mod tests {
 
     #[test]
     fn mark_meshes_are_segments() {
-        for lines in [square_lines(), cube_lines(), cross_lines()] {
+        for lines in [
+            square_lines(),
+            cube_lines(),
+            cross_lines(),
+            view_lines(),
+            pyramid_lines(),
+        ] {
             assert!(!lines.is_empty() && lines.len() % 2 == 0);
         }
         assert_eq!(cube_lines().len(), 2 * 12);
+        assert_eq!(pyramid_lines().len(), 2 * 8);
+    }
+
+    #[test]
+    fn cameras_show_what_they_see_whether_selected_or_not() {
+        let cameras = "[[node]]\nname = \"Level\"\nposition = [0.0, 0.0]\n\
+                       [[node]]\nname = \"Eye\"\nparent = 0\nposition = [1.0, 0.0]\n[node.camera]\n\
+                       [[node]]\nname = \"Eye3D\"\nparent = 0\n[node.transform_3d]\n[node.camera_3d]\n\
+                       [[node]]\nname = \"Lost\"\nparent = 0\n[node.camera_3d]\n";
+
+        let (frame, _) = draw(&outline(cameras), None);
+
+        assert_eq!(
+            frame.draw_count(),
+            2,
+            "a camera without its transform shows nothing"
+        );
+    }
+
+    #[test]
+    fn cameras_are_drawn_turned_but_not_scaled() {
+        let turned = Mat4::from_rotation_y(1.0);
+        let scaled = Mat4::from_translation(Vec3::new(1.0, 2.0, 3.0))
+            * turned
+            * Mat4::from_scale(Vec3::new(2.0, 3.0, 4.0));
+
+        let point = without_scale(scaled).transform_point(Vec3::new(0.0, 0.0, -1.0));
+
+        let expected = Vec3::new(1.0, 2.0, 3.0) + turned.transform_point(Vec3::new(0.0, 0.0, -1.0));
+        assert!((point - expected).length() < EPSILON);
     }
 }

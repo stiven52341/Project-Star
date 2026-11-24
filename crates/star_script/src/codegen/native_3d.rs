@@ -1,7 +1,7 @@
 //! Modules of the engine's 3D node classes: `Node3D`, which extends `Node`,
 //! and `Mesh`, `Light` and `Camera3D`, which extend `Node3D`.
 //!
-//! They have the same shape as the modules of `Sprite` and `Camera`, so
+//! They have the same shape as the modules of `Sprite` and `Camera2D`, so
 //! they are written from a description of each class: its fields, the
 //! arguments of its `init`, and its own methods.
 
@@ -164,7 +164,10 @@ const CAMERA_3D: NodeClass = NodeClass {
     name: "Camera3D",
     about: "how wide it sees, in radians",
     ancestors: &["Node", "Node3D"],
-    fields: &[("fov", "f32", "::std::f32::consts::FRAC_PI_3")],
+    fields: &[
+        ("fov", "f32", "::std::f32::consts::FRAC_PI_3"),
+        ("current", "bool", "false"),
+    ],
     parameters: &[],
     methods: &[],
     bodies: &[],

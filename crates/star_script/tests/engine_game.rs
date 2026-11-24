@@ -97,14 +97,18 @@ class NodeGame extends Game {
         Debug.print((Scene.load(\"levels/misspelled.scene\") == null).to_string())
         const ship = Ship()
         add_child(ship)
-        const eye = Camera(\"Eye\")
+        // Not `current`: the scene's camera is the one the game is seen from.
+        const eye = Camera2D(\"Eye\")
         ship.add_child(eye)
-        camera = eye
     }
 
     override func update(delta: float) {
         frames += 1
         Debug.print(\"game frame \" + frames.to_string())
+        const view = camera
+        if view != null {
+            Debug.print(\"camera \" + view.name + \" \" + view.view_height.to_string())
+        }
         if frames == 3 {
             quit()
         }
@@ -318,6 +322,14 @@ position = [-2.0, 0.0]
 speed = 4
 label = "wing"
 tint = [0.25, 1.0, 1.0, 1.0]
+
+[[node]]
+name = "Lookout"
+parent = 0
+
+[node.camera]
+view_height = 6.0
+current = true
 "#;
 
 /// A scene whose node names a class the game does not have.
@@ -404,9 +416,10 @@ fn games_run_in_the_engine_until_they_quit() {
     );
     assert_eq!(
         stdout,
-        "Fleet 2\nsprites/leader.png 1.5 0.5\ntrue\ntrue\n\
-         game frame 1\nship start\nship x 1.0\ndrone start Wingman -2.0 4.0 wing 0.25\ngame frame 2\nship x 2.0\n\
-         game frame 3\nship x 3.0\n"
+        "Fleet 3\nsprites/leader.png 1.5 0.5\ntrue\ntrue\n\
+         game frame 1\nship start\nship x 1.0\ndrone start Wingman -2.0 4.0 wing 0.25\n\
+         game frame 2\ncamera Lookout 6.0\nship x 2.0\n\
+         game frame 3\ncamera Lookout 6.0\nship x 3.0\n"
     );
 
     std::fs::write(levels.join("floor.scene"), FLOOR_SCENE).expect("scene written");
