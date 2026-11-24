@@ -352,6 +352,59 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         editor that opens the main scene, so they play without Cargo
         (decision 63): the warm-up builds the scene player, and “Play”
         only lets Cargo check it (0.26 s) before running it.
-  - [ ] f. To discuss, much bigger: running StarScript without Rust while
-        editing (an interpreter), for instant “Play” and hot reload.
+  - [ ] f. Running StarScript without Rust while editing (an
+        interpreter), for instant “Play” and hot reload: decided by the
+        owner (decision 64) and planned as Phase 14. Before it:
+    - [ ] f1. Move the engine classes and the game loop out of the text
+          templates of `codegen/native.rs` into real Rust, built once with
+          the engine instead of inside every game. They name the classes
+          generated for each program (`crate::classes`, 175 times), so
+          first what does not need them, and then a design for the rest
+          that the interpreter can share.
+    - [ ] f2. Measure “Play” with scripts on a realistic, big project
+          (measured on `pruebas`, 2428 lines of Rust: 2 s after a change
+          to its code), before and after f1.
+- [ ] **Phase 14 — StarScript interpreter** (decision 64, rule 3.7 of
+      `CLAUDE.md`): “Play” in the editor interprets StarScript, and
+      building the project compiles it. Done part by part; each part comes
+      with conformance tests that run the same programs compiled and
+      interpreted and expect the same output.
+  - [ ] 14.1 The crate `star_script_interpreter` and the conformance
+        harness. Its console part only needs `star_script`; games (14.6)
+        also need the engine classes of f1, and its place among the layers
+        is settled then, in `CLAUDE.md`. First: values (`short`,
+        `int`, `bigint`, `float`, `double`, `bool`, `string`, lists,
+        objects, `null`), console programs (`static func main`,
+        `Debug.print`), expressions, statements and control flow.
+  - [ ] 14.2 Classes: fields, methods, constructors and `init`,
+        inheritance and `override`, static members, null safety, number
+        widening and `as`, equality, and the runtime errors of
+        `star_script_runtime::fault` with the same messages.
+  - [ ] 14.3 The rest of the console language: methods of strings, lists
+        and numbers, constants, decorators (the user's `Decorator`
+        classes) and `Time.now`.
+  - [ ] 14.4 Coroutines: `async`/`await`, `Time.wait` and
+        `Time.next_frame`, run once per frame, and ending with their node.
+  - [ ] 14.5 Parallel functions: `parallel static func` on threads, with
+        values copied in and out.
+  - [ ] 14.6 Games: `Game` (`start`, `update`, `quit`) in a window of the
+        engine, `Input` and its actions, `Color`, `Camera2D`, using the
+        engine classes that f1 made shared.
+  - [ ] 14.7 Nodes and scenes: `Node`, `Sprite`, `Scene.load`, script
+        classes named by scenes, `export var` values, tags and
+        `find_by_name`/`find_by_tag`, global and local positions.
+  - [ ] 14.8 Physics, sounds, 2D lights and 3D (`Body`, `Sound`,
+        `Audio`, `Light2D`, `Node3D`, `Mesh`, `Light`, `Camera3D`).
+  - [ ] 14.9 Blueprints: they become StarScript, so they need no
+        interpreter of their own; conformance tests with the blueprint
+        templates.
+  - [ ] 14.10 The interpreted player: the scene player of step e grows
+        into a player that loads the project's scripts when it starts;
+        “Play” uses it for every project, and any project plays in about
+        a second.
+  - [ ] 14.11 Building with the compiler from the editor: a “Build”
+        command (and later the export of games) that compiles the project
+        with Cargo, and a way to play that compiled build to check it.
+  - [ ] 14.12 Hot reload: changed scripts reload while the game is
+        played, keeping the state of the objects that are still valid.
 - [ ] **Future — Consoles** (PlayStation, Xbox).
