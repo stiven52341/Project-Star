@@ -391,9 +391,31 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
               `star_script_runtime::scene_tree` (`Host::create` makes the
               class a node names, `Host::set_exported` its `export`
               values) and `Sound`'s fields in `audio::SoundFields`.
-    - [ ] f2. Measure “Play” with scripts on a realistic, big project
-          (measured on `pruebas`, 2428 lines of Rust: 2 s after a change
-          to its code), before and after f1.
+    - [x] f2. Measure “Play” with scripts on a realistic, big project,
+          before and after f1. Measured on a generated game of 101
+          classes (3348 lines of StarScript: enemies, bullets, pickups
+          and spawners with bodies, tags, lists and input), with the
+          engine already built:
+
+          | Rebuild after… | Before f1 | After f1 |
+          |---|---|---|
+          | Lines of generated Rust | 16 667 | 15 665 |
+          | Nothing changed (only linking) | 2.2 s | 2.1 s |
+          | A change inside a method | 2.6 s | 2.4 s |
+          | A new field in one class | 26 s | 25 s |
+          | The game's code from scratch | 37 s | 37 s |
+
+          With one family of classes (2081 lines of Rust after f1) a new
+          field costs 7.6 s before and 7.3 s after. f1 saves little time
+          by itself: in a big game the user's code outweighs the
+          templates, and the shared code is generic, so it is still
+          instantiated inside every game. What costs is the game's own
+          code at `opt-level = 1`: a change to a class's fields rebuilds
+          most of it with optimizations. With the game's code at
+          `opt-level = 0` (the engine and the dependencies still at 3) a
+          new field took 4 s and a build from scratch 12 s; whether the
+          frame rate allows it is still to be checked. The interpreter
+          (Phase 14) removes this cost from “Play” altogether.
 - [ ] **Phase 14 — StarScript interpreter** (decision 64, rule 3.7 of
       `CLAUDE.md`): “Play” in the editor interprets StarScript, and
       building the project compiles it. Done part by part; each part comes
