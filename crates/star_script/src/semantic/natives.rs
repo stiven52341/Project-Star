@@ -289,6 +289,34 @@ fn add_node_class(classes: &mut ClassTable, body: ClassId) -> ClassId {
             Type::list(node_type),
             false,
         ),
+        native_method("global_x", &[], Type::Float, false),
+        native_method("global_y", &[], Type::Float, false),
+        native_method("global_rotation", &[], Type::Float, false),
+        native_method(
+            "set_global_position",
+            &[("x", Type::Float), ("y", Type::Float)],
+            Type::Void,
+            false,
+        ),
+        native_method(
+            "set_global_rotation",
+            &[("angle", Type::Float)],
+            Type::Void,
+            false,
+        ),
+        native_method(
+            "translate",
+            &[("x", Type::Float), ("y", Type::Float)],
+            Type::Void,
+            false,
+        ),
+        native_method(
+            "translate_global",
+            &[("x", Type::Float), ("y", Type::Float)],
+            Type::Void,
+            false,
+        ),
+        native_method("rotate", &[("angle", Type::Float)], Type::Void, false),
     ];
     classes.class_mut(id).methods = methods.into();
     id
@@ -402,12 +430,14 @@ fn add_node_3d_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
         .map(|name| native_field(name, Type::Float))
         .collect();
     node_3d.constructor = Some(native_constructor(&[("name", Type::String)]));
-    node_3d.methods = vec![native_method(
-        "look_at",
-        &[("x", Type::Float), ("y", Type::Float), ("z", Type::Float)],
-        Type::Void,
-        false,
-    )];
+    let point = [("x", Type::Float), ("y", Type::Float), ("z", Type::Float)];
+    node_3d.methods = vec![
+        native_method("look_at", &point, Type::Void, false),
+        native_method("global_z", &[], Type::Float, false),
+        native_method("set_global_position_3d", &point, Type::Void, false),
+        native_method("translate_3d", &point, Type::Void, false),
+        native_method("translate_global_3d", &point, Type::Void, false),
+    ];
     classes.add(node_3d)
 }
 

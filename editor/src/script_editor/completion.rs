@@ -376,8 +376,8 @@ mod tests {
     fn chains_follow_the_types_of_fields() {
         let names = suggested(&inside_rock("self.friend?.ro|"));
 
-        // `rotation` comes from `Node`.
-        assert_eq!(names, ["rotation", "roll"]);
+        // `rotation` and `rotate` come from `Node`.
+        assert_eq!(names, ["rotation", "roll", "rotate"]);
     }
 
     #[test]

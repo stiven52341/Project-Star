@@ -397,6 +397,14 @@ pub mod Node {
         fn has_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> bool;
         fn find_by_name(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<Ref>;
         fn find_by_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> ::star_script_runtime::List<Ref>;
+        fn global_x(self: ::std::rc::Rc<Self>) -> f32;
+        fn global_y(self: ::std::rc::Rc<Self>) -> f32;
+        fn global_rotation(self: ::std::rc::Rc<Self>) -> f32;
+        fn set_global_position(self: ::std::rc::Rc<Self>, x: f32, y: f32);
+        fn set_global_rotation(self: ::std::rc::Rc<Self>, angle: f32);
+        fn translate(self: ::std::rc::Rc<Self>, x: f32, y: f32);
+        fn translate_global(self: ::std::rc::Rc<Self>, x: f32, y: f32);
+        fn rotate(self: ::std::rc::Rc<Self>, angle: f32);
     }
 
     /// What nodes do unless a subclass overrides it.
@@ -464,6 +472,147 @@ pub mod Node {
                 .filter(|node_| HasFields::fields(&**node_).tags.read(|tags_| tags_.contains(&tag)))
                 .collect();
             ::star_script_runtime::List::from_vec(tagged_)
+        }
+
+        /// `func global_x`: where the node is across, in the world.
+        pub fn global_x(this_: &Ref) -> f32 {
+            global_position_(this_)[0]
+        }
+
+        /// `func global_y`: where the node is up, in the world.
+        pub fn global_y(this_: &Ref) -> f32 {
+            global_position_(this_)[1]
+        }
+
+        /// `func global_rotation`: how much the node is turned in the
+        /// world: its `rotation` and those of its ancestors placed as it
+        /// is (in 2D, or in 3D for a `Node3D`, where it is its roll).
+        pub fn global_rotation(this_: &Ref) -> f32 {
+            let in_3d_ = is_3d_(this_);
+            ancestors_(this_).iter()
+                .filter(|ancestor_| is_3d_(ancestor_) == in_3d_)
+                .chain(::std::iter::once(this_))
+                .map(|node_| HasFields::fields(&**node_).rotation.get())
+                .sum()
+        }
+
+        /// `func set_global_position`: places the node at a point of the
+        /// world; a `Node3D` keeps its depth in the world.
+        pub fn set_global_position(this_: &Ref, x: f32, y: f32) {
+            if is_3d_(this_) {
+                let [_, _, depth_] = global_position_(this_);
+                set_global_position_3d_(this_, [x, y, depth_]);
+            } else if let ::std::option::Option::Some([local_x_, local_y_]) = parent_place_2d_(this_).local_point([x, y]) {
+                let fields_ = HasFields::fields(&**this_);
+                fields_.x.set(local_x_);
+                fields_.y.set(local_y_);
+            }
+        }
+
+        /// `func set_global_rotation`: turns the node to `angle` in the world.
+        pub fn set_global_rotation(this_: &Ref, angle: f32) {
+            let fields_ = HasFields::fields(&**this_);
+            let inherited_ = Self::global_rotation(this_) - fields_.rotation.get();
+            fields_.rotation.set(angle - inherited_);
+        }
+
+        /// `func translate`: moves the node in its parent's space.
+        pub fn translate(this_: &Ref, x: f32, y: f32) {
+            let fields_ = HasFields::fields(&**this_);
+            fields_.x.set(fields_.x.get() + x);
+            fields_.y.set(fields_.y.get() + y);
+        }
+
+        /// `func translate_global`: moves the node in the world.
+        pub fn translate_global(this_: &Ref, x: f32, y: f32) {
+            let [global_x_, global_y_, _] = global_position_(this_);
+            Self::set_global_position(this_, global_x_ + x, global_y_ + y);
+        }
+
+        /// `func rotate`: turns the node a little more.
+        pub fn rotate(this_: &Ref, angle: f32) {
+            let fields_ = HasFields::fields(&**this_);
+            fields_.rotation.set(fields_.rotation.get() + angle);
+        }
+    }
+
+    /// The ancestors of `node`, from the root down to its parent.
+    fn ancestors_(node: &Ref) -> ::std::vec::Vec<Ref> {
+        let mut found_ = ::std::vec::Vec::new();
+        let mut current_ = Methods::parent(node);
+        while let ::std::option::Option::Some(ancestor_) = current_ {
+            current_ = Methods::parent(&ancestor_);
+            found_.push(ancestor_);
+        }
+        found_.reverse();
+        found_
+    }
+
+    /// Whether `node` is placed in 3D: a `Node3D`.
+    fn is_3d_(node: &Ref) -> bool {
+        crate::AnyObject::Node3D(::std::rc::Rc::clone(node)).is_some()
+    }
+
+    /// Where the 2D space a 2D node is placed in is in the world: its
+    /// parent's, through its ancestors placed in 2D, as the engine does.
+    fn parent_place_2d_(node: &Ref) -> ::star_script_runtime::placement::Place2d {
+        ancestors_(node).iter()
+            .filter(|ancestor_| !is_3d_(ancestor_))
+            .fold(::star_script_runtime::placement::Place2d::IDENTITY, |place_, ancestor_| place_.then(place_2d_(ancestor_)))
+    }
+
+    fn place_2d_(node: &Ref) -> ::star_script_runtime::placement::Place2d {
+        let fields_ = HasFields::fields(&**node);
+        ::star_script_runtime::placement::Place2d::of_node(fields_.x.get(), fields_.y.get(), fields_.rotation.get(), fields_.scale_x.get(), fields_.scale_y.get())
+    }
+
+    /// Where the 3D space a `Node3D` is placed in is in the world: its
+    /// parent's, through its ancestors placed in 3D.
+    fn parent_place_3d_(node: &Ref) -> ::star_script_runtime::placement::Place3d {
+        ancestors_(node).iter()
+            .filter_map(place_3d_)
+            .fold(::star_script_runtime::placement::Place3d::IDENTITY, |place_, inner_| place_.then(inner_))
+    }
+
+    /// The place of `node` in its parent's 3D space, if it is a `Node3D`.
+    fn place_3d_(node: &Ref) -> ::std::option::Option<::star_script_runtime::placement::Place3d> {
+        let node_3d_ = crate::AnyObject::Node3D(::std::rc::Rc::clone(node))?;
+        let fields_ = HasFields::fields(&**node);
+        let depth_ = crate::classes::Node3D::HasFields::fields(&*node_3d_);
+        ::std::option::Option::Some(::star_script_runtime::placement::Place3d::of_node(
+            [fields_.x.get(), fields_.y.get(), depth_.z.get()],
+            [depth_.pitch.get(), depth_.yaw.get(), fields_.rotation.get()],
+            [fields_.scale_x.get(), fields_.scale_y.get(), depth_.scale_z.get()],
+        ))
+    }
+
+    /// Where `node` is in the world: in 3D for a `Node3D`, else in 2D with
+    /// a depth of 0.
+    pub fn global_position_(node: &Ref) -> [f32; 3] {
+        let fields_ = HasFields::fields(&**node);
+        match crate::AnyObject::Node3D(::std::rc::Rc::clone(node)) {
+            ::std::option::Option::Some(node_3d_) => {
+                let depth_ = crate::classes::Node3D::HasFields::fields(&*node_3d_).z.get();
+                parent_place_3d_(node).point([fields_.x.get(), fields_.y.get(), depth_])
+            }
+            ::std::option::Option::None => {
+                let [x_, y_] = parent_place_2d_(node).point([fields_.x.get(), fields_.y.get()]);
+                [x_, y_, 0.0]
+            }
+        }
+    }
+
+    /// Places the `Node3D` `node` at `point` of the world; it stays where
+    /// it is if its parent is scaled to nothing.
+    pub fn set_global_position_3d_(node: &Ref, point: [f32; 3]) {
+        let ::std::option::Option::Some(node_3d_) = crate::AnyObject::Node3D(::std::rc::Rc::clone(node)) else {
+            return;
+        };
+        if let ::std::option::Option::Some([x_, y_, z_]) = parent_place_3d_(node).local_point(point) {
+            let fields_ = HasFields::fields(&**node);
+            fields_.x.set(x_);
+            fields_.y.set(y_);
+            crate::classes::Node3D::HasFields::fields(&*node_3d_).z.set(z_);
         }
     }
 
@@ -568,6 +717,14 @@ pub mod Node {
         fn has_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> bool { Methods::has_tag(&(self as Ref), tag) }
         fn find_by_name(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<Ref> { Methods::find_by_name(&(self as Ref), name) }
         fn find_by_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> ::star_script_runtime::List<Ref> { Methods::find_by_tag(&(self as Ref), tag) }
+        fn global_x(self: ::std::rc::Rc<Self>) -> f32 { Methods::global_x(&(self as Ref)) }
+        fn global_y(self: ::std::rc::Rc<Self>) -> f32 { Methods::global_y(&(self as Ref)) }
+        fn global_rotation(self: ::std::rc::Rc<Self>) -> f32 { Methods::global_rotation(&(self as Ref)) }
+        fn set_global_position(self: ::std::rc::Rc<Self>, x: f32, y: f32) { Methods::set_global_position(&(self as Ref), x, y) }
+        fn set_global_rotation(self: ::std::rc::Rc<Self>, angle: f32) { Methods::set_global_rotation(&(self as Ref), angle) }
+        fn translate(self: ::std::rc::Rc<Self>, x: f32, y: f32) { Methods::translate(&(self as Ref), x, y) }
+        fn translate_global(self: ::std::rc::Rc<Self>, x: f32, y: f32) { Methods::translate_global(&(self as Ref), x, y) }
+        fn rotate(self: ::std::rc::Rc<Self>, angle: f32) { Methods::rotate(&(self as Ref), angle) }
     }
 
     /// Prepares an object of this class: `make_` builds it from its fields.
@@ -650,6 +807,14 @@ pub mod Sprite {
         fn has_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> bool { crate::classes::Node::Methods::has_tag(&(self as crate::classes::Node::Ref), tag) }
         fn find_by_name(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_name(&(self as crate::classes::Node::Ref), name) }
         fn find_by_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_tag(&(self as crate::classes::Node::Ref), tag) }
+        fn global_x(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_x(&(self as crate::classes::Node::Ref)) }
+        fn global_y(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_y(&(self as crate::classes::Node::Ref)) }
+        fn global_rotation(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_rotation(&(self as crate::classes::Node::Ref)) }
+        fn set_global_position(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::set_global_position(&(self as crate::classes::Node::Ref), x, y) }
+        fn set_global_rotation(self: ::std::rc::Rc<Self>, angle: f32) { crate::classes::Node::Methods::set_global_rotation(&(self as crate::classes::Node::Ref), angle) }
+        fn translate(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::translate(&(self as crate::classes::Node::Ref), x, y) }
+        fn translate_global(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::translate_global(&(self as crate::classes::Node::Ref), x, y) }
+        fn rotate(self: ::std::rc::Rc<Self>, angle: f32) { crate::classes::Node::Methods::rotate(&(self as crate::classes::Node::Ref), angle) }
     }
 
     impl Object for Instance {}
@@ -731,6 +896,14 @@ pub mod Camera2D {
         fn has_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> bool { crate::classes::Node::Methods::has_tag(&(self as crate::classes::Node::Ref), tag) }
         fn find_by_name(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_name(&(self as crate::classes::Node::Ref), name) }
         fn find_by_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_tag(&(self as crate::classes::Node::Ref), tag) }
+        fn global_x(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_x(&(self as crate::classes::Node::Ref)) }
+        fn global_y(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_y(&(self as crate::classes::Node::Ref)) }
+        fn global_rotation(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_rotation(&(self as crate::classes::Node::Ref)) }
+        fn set_global_position(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::set_global_position(&(self as crate::classes::Node::Ref), x, y) }
+        fn set_global_rotation(self: ::std::rc::Rc<Self>, angle: f32) { crate::classes::Node::Methods::set_global_rotation(&(self as crate::classes::Node::Ref), angle) }
+        fn translate(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::translate(&(self as crate::classes::Node::Ref), x, y) }
+        fn translate_global(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::translate_global(&(self as crate::classes::Node::Ref), x, y) }
+        fn rotate(self: ::std::rc::Rc<Self>, angle: f32) { crate::classes::Node::Methods::rotate(&(self as crate::classes::Node::Ref), angle) }
     }
 
     impl Object for Instance {}

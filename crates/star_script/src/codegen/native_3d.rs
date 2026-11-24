@@ -22,7 +22,7 @@ struct Method {
 }
 
 /// The methods of `Node`, which every node class implements.
-const NODE_METHODS: [Method; 10] = [
+const NODE_METHODS: [Method; 18] = [
     Method {
         name: "start",
         parameters: "",
@@ -83,15 +83,114 @@ const NODE_METHODS: [Method; 10] = [
         arguments: "tag",
         returns: " -> ::star_script_runtime::List<crate::classes::Node::Ref>",
     },
+    Method {
+        name: "global_x",
+        parameters: "",
+        arguments: "",
+        returns: " -> f32",
+    },
+    Method {
+        name: "global_y",
+        parameters: "",
+        arguments: "",
+        returns: " -> f32",
+    },
+    Method {
+        name: "global_rotation",
+        parameters: "",
+        arguments: "",
+        returns: " -> f32",
+    },
+    Method {
+        name: "set_global_position",
+        parameters: "x: f32, y: f32",
+        arguments: "x, y",
+        returns: "",
+    },
+    Method {
+        name: "set_global_rotation",
+        parameters: "angle: f32",
+        arguments: "angle",
+        returns: "",
+    },
+    Method {
+        name: "translate",
+        parameters: "x: f32, y: f32",
+        arguments: "x, y",
+        returns: "",
+    },
+    Method {
+        name: "translate_global",
+        parameters: "x: f32, y: f32",
+        arguments: "x, y",
+        returns: "",
+    },
+    Method {
+        name: "rotate",
+        parameters: "angle: f32",
+        arguments: "angle",
+        returns: "",
+    },
 ];
 
 /// The methods `Node3D` adds.
-const NODE_3D_METHODS: [Method; 1] = [Method {
-    name: "look_at",
-    parameters: "x: f32, y: f32, z: f32",
-    arguments: "x, y, z",
-    returns: "",
-}];
+const NODE_3D_METHODS: [Method; 5] = [
+    Method {
+        name: "look_at",
+        parameters: "x: f32, y: f32, z: f32",
+        arguments: "x, y, z",
+        returns: "",
+    },
+    Method {
+        name: "global_z",
+        parameters: "",
+        arguments: "",
+        returns: " -> f32",
+    },
+    Method {
+        name: "set_global_position_3d",
+        parameters: "x: f32, y: f32, z: f32",
+        arguments: "x, y, z",
+        returns: "",
+    },
+    Method {
+        name: "translate_3d",
+        parameters: "x: f32, y: f32, z: f32",
+        arguments: "x, y, z",
+        returns: "",
+    },
+    Method {
+        name: "translate_global_3d",
+        parameters: "x: f32, y: f32, z: f32",
+        arguments: "x, y, z",
+        returns: "",
+    },
+];
+
+/// `func global_z`: how deep the node is in the world.
+const GLOBAL_Z_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+node_.map_or(0.0, |node_| crate::classes::Node::global_position_(&node_)[2])";
+
+/// `func set_global_position_3d`: places the node at a point of the world.
+const SET_GLOBAL_POSITION_3D_BODY: &str =
+    "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+if let ::std::option::Option::Some(node_) = node_ {
+    crate::classes::Node::set_global_position_3d_(&node_, [x, y, z]);
+}";
+
+/// `func translate_3d`: moves the node in its parent's space.
+const TRANSLATE_3D_BODY: &str = "let place_ = crate::classes::Node::HasFields::fields(&**this_);
+let depth_ = HasFields::fields(&**this_);
+place_.x.set(place_.x.get() + x);
+place_.y.set(place_.y.get() + y);
+depth_.z.set(depth_.z.get() + z);";
+
+/// `func translate_global_3d`: moves the node in the world.
+const TRANSLATE_GLOBAL_3D_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+if let ::std::option::Option::Some(node_) = node_ {
+    let [global_x_, global_y_, global_z_] = crate::classes::Node::global_position_(&node_);
+    crate::classes::Node::set_global_position_3d_(&node_, [global_x_ + x, global_y_ + y, global_z_ + z]);
+}";
 
 /// `func look_at`: turns the node so that its -z axis, where cameras and
 /// lights look, points at a point of its parent's space. Its roll is kept.
@@ -140,7 +239,13 @@ const NODE_3D: NodeClass = NodeClass {
     ],
     parameters: &[],
     methods: &NODE_3D_METHODS,
-    bodies: &[LOOK_AT_BODY],
+    bodies: &[
+        LOOK_AT_BODY,
+        GLOBAL_Z_BODY,
+        SET_GLOBAL_POSITION_3D_BODY,
+        TRANSLATE_3D_BODY,
+        TRANSLATE_GLOBAL_3D_BODY,
+    ],
 };
 
 const MESH: NodeClass = NodeClass {
