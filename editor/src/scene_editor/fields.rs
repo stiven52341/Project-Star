@@ -212,6 +212,49 @@ pub(super) fn checkbox_hint_row(
     changed
 }
 
+/// A row with the tags of a node, each with a button that removes it, and
+/// a field where a new one is written; Enter adds it.
+pub(super) fn tags_row(ui: &mut egui::Ui, name: &str, tags: &mut Vec<String>, hint: &str) -> bool {
+    label(ui, name);
+    let mut changed = false;
+    ui.vertical(|ui| {
+        ui.horizontal_wrapped(|ui| {
+            let mut removed = None;
+            for (index, tag) in tags.iter().enumerate() {
+                if ui.small_button(format!("{tag} ×")).clicked() {
+                    removed = Some(index);
+                }
+            }
+            if let Some(index) = removed {
+                tags.remove(index);
+                changed = true;
+            }
+        });
+        let id = ui.scope_id().with("new_tag");
+        let mut new_tag: String = ui.data_mut(|data| data.get_temp(id).unwrap_or_default());
+        let response = ui.add(egui::TextEdit::singleline(&mut new_tag).hint_text(hint));
+        let entered =
+            response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+        if entered {
+            if let Some(tag) = add_tag(tags, &new_tag) {
+                tags.push(tag);
+                changed = true;
+            }
+            new_tag.clear();
+        }
+        ui.data_mut(|data| data.insert_temp(id, new_tag));
+    });
+    ui.end_row();
+    changed
+}
+
+/// The tag `written` adds to `tags`: without the blanks around it, and
+/// none if it is empty or already there.
+fn add_tag(tags: &[String], written: &str) -> Option<String> {
+    let tag = written.trim();
+    (!tag.is_empty() && !tags.iter().any(|own| own == tag)).then(|| tag.to_owned())
+}
+
 fn number(ui: &mut egui::Ui, value: &mut f32) -> bool {
     ui.add(egui::DragValue::new(value).speed(DRAG_SPEED))
         .changed()
@@ -255,6 +298,15 @@ fn from_byte(byte: u8) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tags_are_trimmed_and_never_repeated() {
+        let tags = vec!["enemy".to_owned()];
+
+        assert_eq!(add_tag(&tags, "  boss "), Some("boss".to_owned()));
+        assert_eq!(add_tag(&tags, "enemy"), None);
+        assert_eq!(add_tag(&tags, "   "), None);
+    }
 
     #[test]
     fn channels_go_to_bytes_and_back() {

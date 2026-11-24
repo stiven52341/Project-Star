@@ -78,6 +78,8 @@ pub(super) static SPANISH: Texts = Texts {
     cone_angle: "Ángulo",
     blend: "Difuminado",
     camera_2d: "Cámara 2D",
+    tags: "Etiquetas",
+    new_tag_hint: "Nueva etiqueta (Intro)",
     physics: "Física",
     static_body: "Cuerpo estático",
     rigid_body: "Cuerpo rígido",

@@ -78,6 +78,8 @@ pub(super) static ENGLISH: Texts = Texts {
     cone_angle: "Angle",
     blend: "Blend",
     camera_2d: "2D camera",
+    tags: "Tags",
+    new_tag_hint: "New tag (Enter)",
     physics: "Physics",
     static_body: "Static body",
     rigid_body: "Rigid body",

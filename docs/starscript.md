@@ -459,7 +459,7 @@ The engine provides them; their names cannot be used for other classes.
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. |
 | `Game` | fields `background: Color` (black), `camera: Camera2D?` (`null`), `camera_3d: Camera3D?` (`null`), `ambient: Color` (black: no ambient light), `ambient_2d: Color` (white: sprites show their own colors); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
-| `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `body: Body?` (`null`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?` |
+| `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `body: Body?` (`null`), `tags: [string]` (`[]`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?`, `has_tag(tag: string) -> bool`, `find_by_name(name: string) -> Node?`, `find_by_tag(tag: string) -> [Node]` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors) |
 | `Light2D` (extends `Node`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (3.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
 | `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `current: bool` (`false`) |
@@ -468,7 +468,7 @@ The engine provides them; their names cannot be used for other classes.
 | `Light` (extends `Node3D`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (10.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
 | `Camera3D` (extends `Node3D`) | `init(name: string)`; fields `fov: float` (about 1.047 radians: 60°), `current: bool` (`false`) |
 | `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
-| `Scene` | `static load(path: string) -> Node?` |
+| `Scene` | `static load(path: string) -> Node?`, `static find_by_name(name: string) -> Node?`, `static find_by_tag(tag: string) -> [Node]` |
 | `Sound` | no `init`: `static load(path: string) -> Sound?`; fields `volume: float` (1.0), `looping: bool` (`false`); `play()`, `stop()`, `is_playing() -> bool` |
 | `Audio` | `static volume() -> float`, `static set_volume(volume: float)` |
 | `Time` | `static async wait(seconds: float)`, `static async next_frame()`: what coroutines wait for (section 7); `static now() -> float`: the seconds of the game so far (the sum of the frames' `delta`s, the clock `wait` counts with) |
@@ -556,6 +556,15 @@ class Space extends Game {
   frame. `Scene.load` makes a node with `[node.light_2d]` (`kind`,
   `color` of three numbers, `intensity`, `range`, and the `angle` and
   `blend` of spots) a `Light2D`.
+- Nodes are found by name or by tag. `find_child` looks only at a node's
+  children; `node.find_by_name` and `node.find_by_tag` look at all its
+  descendants (not the node itself), parents before their children and
+  children in order: the first one named so, or every one with the tag.
+  `Scene.find_by_name` and `Scene.find_by_tag` do the same in the whole
+  game's tree, from any script; in a console program, which has no game,
+  they find nothing. A node's `tags` is a list of words that groups of
+  nodes share (`enemy`, `pickup`): `tags.push("enemy")`, `has_tag("enemy")`,
+  or `tags = ["enemy"]` in its `[[node]]` of a scene.
 - `texture` is an asset path such as `"sprites/hero.png"` (PNG or JPEG). An
   image that cannot be loaded is not shown; the engine warns once on the
   error output.
@@ -963,6 +972,7 @@ values.
 | `call` (`target`, `method`, `arguments`, `returns_value`, `pure`) | execution `in` (not if pure), `target` (if it calls a method of a value), one per argument | execution `then` (not if pure), `result` (if it returns a value) |
 | `operator` (`add`, `subtract`, `multiply`, `divide`, `remainder`, `equal`, `not_equal`, `less`, `less_or_equal`, `greater`, `greater_or_equal`, `and`, `or`, `not`, `negate`) | `left` and `right`, or `value` for `not` and `negate` | `result` |
 | `branch` (an `if`) | execution `in`, `condition` | execution `true`, `false` |
+| `for_each` (a `for` loop) | execution `in`, `list` | execution `body`, `element`, execution `done` |
 | `return` | execution `in`, `value` (if the graph returns one) | — |
 
 A variable node reads or sets a field of the blueprint (or of its base),
@@ -1068,7 +1078,9 @@ class Player extends Sprite {
 
 - Statements follow the execution wires from the `entry`; a `branch` is an
   `if`/`else` (or `if !condition` when only `false` is wired) and nothing
-  follows it, as the flow is a tree.
+  follows it, as the flow is a tree. A `for_each` is `for element_N in
+  list { … }` with the path of its `body` inside, and goes on with the path
+  of `done`; its `element` only exists inside the body.
 - Values are written where they are used: literals, variables, operators and
   pure calls. Operators inside other expressions get parentheses.
 - The result of a call that runs in order is kept in a constant named after

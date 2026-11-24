@@ -160,6 +160,8 @@ pub(crate) struct Texts {
     pub(crate) cone_angle: &'static str,
     pub(crate) blend: &'static str,
     pub(crate) camera_2d: &'static str,
+    pub(crate) tags: &'static str,
+    pub(crate) new_tag_hint: &'static str,
     pub(crate) physics: &'static str,
     pub(crate) static_body: &'static str,
     pub(crate) rigid_body: &'static str,

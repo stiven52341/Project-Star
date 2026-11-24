@@ -21,8 +21,8 @@ use super::components::{
 use super::exported_fields::{edit_exported, exported_fields};
 use super::fields::{
     MIN_SIZE, angle_row, angle_slider_row, angles_row, checkbox_hint_row, checkbox_row, choice_row,
-    color_row, fraction_row, number_from_row, number_row, size2_row, size3_row, text_row, vec2_row,
-    vec3_row, whole_row,
+    color_row, fraction_row, number_from_row, number_row, size2_row, size3_row, tags_row, text_row,
+    vec2_row, vec3_row, whole_row,
 };
 use star_script::semantic::ClassTable;
 
@@ -153,7 +153,7 @@ fn edit_identity(ui: &mut egui::Ui, node: &mut NodeOutline) -> bool {
         node.class = Some(class).filter(|class| !class.trim().is_empty());
         changed = true;
     }
-    changed
+    changed | tags_row(ui, texts.tags, &mut node.tags, texts.new_tag_hint)
 }
 
 fn edit_transform(ui: &mut egui::Ui, transform: &mut Transform2D) -> bool {

@@ -294,7 +294,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           and spot lights; `[node.light_2d]`, StarScript's `Light2D` and
           `Game.ambient_2d`, in Create and the inspector, their reach drawn
           in the view.
-  - [ ] Finding nodes of the scene by name and by tag, in StarScript and
-        blueprints.
+  - [x] Finding nodes of the scene by name and by tag, in StarScript and
+        blueprints: `tags` of nodes (scenes, inspector), `find_by_name` and
+        `find_by_tag` of `Node` (descendants) and `Scene` (the whole
+        game), and the blueprints' “For each” node to go through lists.
   - [ ] Global and local position, as separate properties.
 - [ ] **Future — Consoles** (PlayStation, Xbox).
