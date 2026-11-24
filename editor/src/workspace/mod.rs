@@ -40,6 +40,7 @@ use self::unsaved_dialog::{UnsavedChoice, show_unsaved_dialog};
 use self::viewport::SceneViewport;
 use crate::editor_log::LogHistory;
 use crate::game_run::PlayRequest;
+use crate::last_scenes::LastSceneStore;
 use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, Project, SCRIPT_EXTENSION};
 use crate::project_check::Problem;
 use crate::scene_editor::SceneDocument;
@@ -94,6 +95,8 @@ pub(crate) struct EditorWindow {
     play_after_check: bool,
     bottom_tab: BottomTab,
     documents: Documents,
+    /// The scene to open again the next time the project is opened.
+    last_scene: LastSceneStore,
     /// Checks the open scripts as they are written.
     live_check: LiveCheck,
     /// What is waiting for the answer about unsaved changes.
@@ -128,6 +131,11 @@ impl EditorWindow {
         if let Err(error) = &viewport {
             log::error!("Scene viewport unavailable: {error}");
         }
+        let last_scene = LastSceneStore::new(project.directory());
+        let mut documents = Documents::new();
+        if let Some(scene) = last_scene.scene(assets.directory()) {
+            documents.open_scene(assets.directory(), scene, dimension);
+        }
         Self {
             project,
             assets,
@@ -136,7 +144,8 @@ impl EditorWindow {
             console: ConsolePanel::new(log_history),
             play_after_check: false,
             bottom_tab: BottomTab::Assets,
-            documents: Documents::new(),
+            documents,
+            last_scene,
             live_check: LiveCheck::new(),
             leaving: None,
             quit_confirmed: false,
@@ -367,6 +376,7 @@ impl EditorWindow {
                 None
             }
             Leaving::OpenScene(path) => {
+                self.last_scene.remember(&path);
                 self.documents.open_scene(
                     self.assets.directory(),
                     path,
@@ -472,7 +482,12 @@ impl EditorWindow {
                     self.documents.open_script(self.assets.directory(), path);
                     self.live_check.request();
                 }
-                Some(AssetEvent::Gone(path)) => self.documents.forget(&path),
+                Some(AssetEvent::Gone(path)) => {
+                    self.documents.forget(&path);
+                    if self.documents.scene_mut().is_none() {
+                        self.last_scene.forget();
+                    }
+                }
                 Some(AssetEvent::IconSizeChosen(size)) => self.icon_size_chosen = Some(size),
                 None => {}
             },

@@ -8,6 +8,7 @@ mod file_tree;
 mod folder_dialog;
 mod game_run;
 mod language_menu;
+mod last_scenes;
 mod launcher;
 mod preferences;
 mod project;

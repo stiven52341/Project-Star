@@ -889,7 +889,13 @@ the same way, and their output is shown.
 Modules: `project/` (validated model, creation and opening, no UI and with
 tests), `project_check/` (see above), `file_tree.rs` (snapshot of a folder,
 for the Files tab and the checks), `recent_projects.rs` (recent projects list, at most 10, in
-`<config>/ProjectStar/recent_projects.toml`), `folder_dialog.rs` (rfd),
+`<config>/ProjectStar/recent_projects.toml`), `last_scenes.rs` (the scene
+each project had open, opened again with the project: at most 50 projects,
+in `<config>/ProjectStar/last_scenes.toml`, read again on every change so
+two editors open at once do not undo each other; a scene that no longer
+exists is not opened, and one renamed or deleted is forgotten; it lives
+outside the project because it is the editor's state, not the game's),
+`folder_dialog.rs` (rfd),
 `game_run/` (see above), `texts/` (every visible text, in English and Spanish) and `style.rs`
 (shared visual constants).
 
