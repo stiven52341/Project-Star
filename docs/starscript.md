@@ -458,9 +458,10 @@ The engine provides them; their names cannot be used for other classes.
 | Class | Members |
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. |
-| `Game` | fields `background: Color` (black), `camera: Camera2D?` (`null`), `camera_3d: Camera3D?` (`null`), `ambient: Color` (black: no ambient light); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
+| `Game` | fields `background: Color` (black), `camera: Camera2D?` (`null`), `camera_3d: Camera3D?` (`null`), `ambient: Color` (black: no ambient light), `ambient_2d: Color` (white: sprites show their own colors); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
 | `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `body: Body?` (`null`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors) |
+| `Light2D` (extends `Node`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (3.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
 | `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `current: bool` (`false`) |
 | `Node3D` (extends `Node`) | `init(name: string)`; fields `z`, `pitch`, `yaw: float` (0.0), `scale_z: float` (1.0); `look_at(x: float, y: float, z: float)` |
 | `Mesh` (extends `Node3D`) | `init(name: string, shape: string)`; fields `shape: string`, `width`, `height`, `depth` (1.0), `radius` (0.5), `color: Color` (white), `metallic` (0.0), `roughness: float` (0.5), `texture: string` (`""`: none), `pixelated: bool` (`false`) |
@@ -545,6 +546,16 @@ class Space extends Game {
   a scene can bring the camera it is seen from. Cameras that enter later
   win; `current` changed afterwards does nothing until the camera enters
   the tree again. The game can still set `camera` itself at any time.
+- Sprites are lit by the game's `ambient_2d`, white at first, so they show
+  their own colors, and by its `Light2D` nodes, which add their color to
+  the sprites they reach. Darken `ambient_2d` (a night, a cave) for the
+  lights to be seen. A `Light2D` is `"point"` (from the node, in every
+  direction) or `"spot"` (from the node, in a cone along its +x axis,
+  turned with its `rotation`), with the `angle` and `blend` of a 3D spot;
+  both fade smoothly to nothing at their `range`. At most 16 shine in a
+  frame. `Scene.load` makes a node with `[node.light_2d]` (`kind`,
+  `color` of three numbers, `intensity`, `range`, and the `angle` and
+  `blend` of spots) a `Light2D`.
 - `texture` is an asset path such as `"sprites/hero.png"` (PNG or JPEG). An
   image that cannot be loaded is not shown; the engine warns once on the
   error output.

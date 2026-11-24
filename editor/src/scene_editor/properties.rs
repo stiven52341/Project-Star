@@ -12,11 +12,11 @@ use star_engine::star_render::{
     MIN_SPHERE_SEGMENTS,
 };
 use star_engine::star_scene::{
-    Camera2dNode, Camera3dNode, MeshOutline, NodeOutline, SpriteOutline,
+    Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
 };
 
 use super::components::{
-    DEFAULT_CAPSULE_HEIGHT, DEFAULT_RADIUS, LightKind, add_component_menu, new_light,
+    DEFAULT_CAPSULE_HEIGHT, DEFAULT_RADIUS, LightKind, add_component_menu, new_light, new_light_2d,
 };
 use super::exported_fields::{edit_exported, exported_fields};
 use super::fields::{
@@ -67,6 +67,12 @@ pub(super) fn edit_node(
         edit_mesh(ui, mesh, context.images)
     });
     changed |= optional_section(ui, texts.light_section, &mut node.light, edit_light);
+    changed |= optional_section(
+        ui,
+        texts.light_2d_section,
+        &mut node.light_2d,
+        edit_light_2d,
+    );
     changed |= optional_section(ui, texts.body_section, &mut node.body, edit_body);
     changed |= optional_section(ui, texts.body_3d_section, &mut node.body_3d, edit_body_3d);
     changed |= optional_section(ui, texts.camera_2d, &mut node.camera, edit_camera_2d);
@@ -359,6 +365,35 @@ fn edit_camera_3d(ui: &mut egui::Ui, camera: &mut Camera3dNode) -> bool {
         &mut camera.current,
         texts.current_camera_hint,
     )
+}
+
+fn edit_light_2d(ui: &mut egui::Ui, light: &mut Light2dNode) -> bool {
+    let texts = texts::current();
+    let mut kind = LightKind::of_2d(light);
+    let choices = LightKind::ALL_2D.map(|choice| (choice, texts.light_kind_name(choice)));
+    let mut changed = choice_row(ui, texts.body_kind, &mut kind, &choices);
+    if changed {
+        *light = new_light_2d(kind);
+    }
+    let (Light2dNode::Point {
+        color,
+        intensity,
+        range,
+    }
+    | Light2dNode::Spot {
+        color,
+        intensity,
+        range,
+        ..
+    }) = light;
+    changed |= color_row(ui, texts.color, color);
+    changed |= number_from_row(ui, texts.intensity, intensity, 0.0);
+    changed |= number_from_row(ui, texts.range, range, MIN_SIZE);
+    if let Light2dNode::Spot { angle, blend, .. } = light {
+        changed |= angle_slider_row(ui, texts.cone_angle, angle, SPOT_ANGLE_DEGREES);
+        changed |= fraction_row(ui, texts.blend, blend);
+    }
+    changed
 }
 
 /// The kinds of 2D body shape, to choose one.

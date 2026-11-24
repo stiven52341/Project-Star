@@ -475,6 +475,16 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
   (a zero direction, no range, a spot's cone that is no cone, numbers that
   are not finite) are skipped. A
   light of intensity 1 straight on a white matte surface gives white.
+  Sprites have their own lights: `set_ambient_light_2d` (an
+  `AmbientLight`, `AmbientLight::FULL` unless the game changes it, so
+  sprites show their own colors) and up to `MAX_LIGHTS` `add_light_2d`s:
+  `PointLight2d` and `SpotLight2d` (a direction, `angle` and `blend`). The
+  sprite shader multiplies each sprite by the ambient light plus every 2D
+  light that reaches it, fading as `(1 - (d / range)²)²`, so 2D lights end
+  smoothly at their range instead of falling with the square of the
+  distance. 2D light nodes (`Light2dNode`, `[node.light_2d]`) are drawn by
+  `draw_sprite_nodes`; the editor draws their reach but does not light its
+  view with them, since the 2D ambient light is the game's code.
   Normals use the inverse transpose of the model matrix (`Mat4::inverse`,
   `transposed`), so non-uniform scales keep them right. Lighting happens in
   linear space on sRGB targets; on other targets colors stay as given.

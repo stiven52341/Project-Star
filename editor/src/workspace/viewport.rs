@@ -21,8 +21,8 @@ use crate::drag_drop::released;
 use crate::project::ProjectDimension;
 use crate::scene_editor::{
     BodyMarks, ClassDrop, Drag, HandleShape, ImageDrop, Lens, Marks, Ray, SceneDocument, Tool,
-    cone_lines, cross_lines, cube_lines, handle_at, pyramid_lines, shapes, square_lines,
-    view_lines,
+    cone_lines, cross_lines, cube_lines, handle_at, pyramid_lines, ray_lines, reach_lines, shapes,
+    square_lines, view_lines,
 };
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -73,6 +73,8 @@ impl SceneViewport {
             view: renderer.create_lines(&view_lines())?,
             pyramid: renderer.create_lines(&pyramid_lines())?,
             cone: renderer.create_lines(&cone_lines())?,
+            reach: renderer.create_lines(&reach_lines())?,
+            ray: renderer.create_lines(&ray_lines())?,
             bodies: BodyMarks::create(|lines| renderer.create_lines(lines))?,
         };
         let texture_id = render_state.renderer.write().register_native_texture(

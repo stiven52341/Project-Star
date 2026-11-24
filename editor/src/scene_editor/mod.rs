@@ -34,7 +34,8 @@ pub(crate) use self::class_drop::ClassDrop;
 pub(crate) use self::components::LightKind;
 use self::components::NodeTemplate;
 pub(crate) use self::drawing::{
-    Marks, SceneGpu, cone_lines, cross_lines, cube_lines, pyramid_lines, square_lines, view_lines,
+    Marks, SceneGpu, cone_lines, cross_lines, cube_lines, pyramid_lines, ray_lines, reach_lines,
+    square_lines, view_lines,
 };
 pub(crate) use self::dropping::ImageDrop;
 pub(crate) use self::gizmo::{

@@ -115,7 +115,7 @@ impl NodeKind {
     fn of(node: &NodeOutline) -> Self {
         if node.camera.is_some() || node.camera_3d.is_some() {
             Self::Camera
-        } else if node.light.is_some() {
+        } else if node.light.is_some() || node.light_2d.is_some() {
             Self::Light
         } else if node.mesh.is_some() {
             Self::Mesh

@@ -12,7 +12,7 @@ use star_engine::star_render::{
     DEFAULT_SPOT_BLEND,
 };
 use star_engine::star_scene::{
-    Camera2dNode, Camera3dNode, MeshOutline, NodeOutline, SpriteOutline,
+    Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
 };
 
 use crate::project::ProjectDimension;
@@ -28,6 +28,9 @@ pub(super) const DEFAULT_SUN_INTENSITY: f32 = 1.0;
 pub(super) const DEFAULT_LAMP_INTENSITY: f32 = 5.0;
 /// How far new lamps reach.
 pub(super) const DEFAULT_LAMP_RANGE: f32 = 10.0;
+/// How far new 2D lights reach: a little more than the default view, two
+/// units high.
+pub(super) const DEFAULT_LAMP_RANGE_2D: f32 = 3.0;
 
 /// A menu of the parts `node` does not have yet, for the kind of project
 /// it belongs to. Returns whether one was added.
@@ -71,6 +74,14 @@ pub(super) fn add_component_menu(
                 offer(ui, node.body.is_none(), texts.body_section, &mut || {
                     node.body = new_body();
                 });
+                offer(
+                    ui,
+                    node.light_2d.is_none(),
+                    texts.light_2d_section,
+                    &mut || {
+                        node.light_2d = Some(new_light_2d(LightKind::Point));
+                    },
+                );
                 offer(ui, node.camera.is_none(), texts.camera_2d, &mut || {
                     node.camera = Some(Camera2dNode::default());
                 });
@@ -117,6 +128,8 @@ pub(super) enum NodeTemplate {
     DirectionalLight,
     PointLight,
     SpotLight,
+    PointLight2D,
+    SpotLight2D,
     Camera2D,
     Camera3D,
     Body(BodyTemplate),
@@ -169,7 +182,13 @@ impl NodeTemplate {
     /// The templates of a project of `dimension`, in the menu's order.
     pub(super) const fn of(dimension: ProjectDimension) -> &'static [Self] {
         match dimension {
-            ProjectDimension::TwoD => &[Self::Empty, Self::Sprite, Self::Camera2D],
+            ProjectDimension::TwoD => &[
+                Self::Empty,
+                Self::Sprite,
+                Self::PointLight2D,
+                Self::SpotLight2D,
+                Self::Camera2D,
+            ],
             ProjectDimension::ThreeD => &[
                 Self::Empty,
                 Self::Cube,
@@ -195,6 +214,8 @@ impl NodeTemplate {
             Self::DirectionalLight => texts.directional_light,
             Self::PointLight => texts.point_light,
             Self::SpotLight => texts.spot_light,
+            Self::PointLight2D => texts.point_light_2d,
+            Self::SpotLight2D => texts.spot_light_2d,
             Self::Camera2D => texts.camera_2d,
             Self::Camera3D => texts.camera_3d,
             Self::Body(body) => body.label(),
@@ -243,6 +264,8 @@ impl NodeTemplate {
             Self::DirectionalLight => node.light = Some(new_light(LightKind::Directional)),
             Self::PointLight => node.light = Some(new_light(LightKind::Point)),
             Self::SpotLight => node.light = Some(new_light(LightKind::Spot)),
+            Self::PointLight2D => node.light_2d = Some(new_light_2d(LightKind::Point)),
+            Self::SpotLight2D => node.light_2d = Some(new_light_2d(LightKind::Spot)),
             Self::Camera2D => {
                 node.camera = Some(Camera2dNode {
                     current: true,
@@ -350,6 +373,17 @@ impl LightKind {
     /// Every one, in the menu's order.
     pub(super) const ALL: [Self; 3] = [Self::Directional, Self::Point, Self::Spot];
 
+    /// The kinds a 2D light can be, in the menu's order.
+    pub(super) const ALL_2D: [Self; 2] = [Self::Point, Self::Spot];
+
+    /// The kind of the 2D `light`.
+    pub(super) const fn of_2d(light: &Light2dNode) -> Self {
+        match light {
+            Light2dNode::Point { .. } => Self::Point,
+            Light2dNode::Spot { .. } => Self::Spot,
+        }
+    }
+
     /// The kind of `light`.
     pub(super) const fn of(light: &LightNode) -> Self {
         match light {
@@ -357,6 +391,25 @@ impl LightKind {
             LightNode::Point { .. } => Self::Point,
             LightNode::Spot { .. } => Self::Spot,
         }
+    }
+}
+
+/// A white 2D light of `kind`: a lamp, or a spot if it is not one (2D
+/// lights have no sun).
+pub(super) const fn new_light_2d(kind: LightKind) -> Light2dNode {
+    match kind {
+        LightKind::Point | LightKind::Directional => Light2dNode::Point {
+            color: Color::WHITE,
+            intensity: 1.0,
+            range: DEFAULT_LAMP_RANGE_2D,
+        },
+        LightKind::Spot => Light2dNode::Spot {
+            color: Color::WHITE,
+            intensity: 1.0,
+            range: DEFAULT_LAMP_RANGE_2D,
+            angle: DEFAULT_SPOT_ANGLE,
+            blend: DEFAULT_SPOT_BLEND,
+        },
     }
 }
 

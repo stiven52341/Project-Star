@@ -278,13 +278,22 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 8d Decorators of the user: classes that extend `Decorator`, with
           `before` and `after`, on methods that return nothing; and
           `Time.now()`.
-  - [ ] Ready-made nodes: cameras, 2D and 3D lights, collision shapes…
+  - [x] Ready-made nodes: cameras, 2D and 3D lights, collision shapes…
     - [x] 9a Cameras in scenes: `[node.camera]`/`[node.camera_3d]` with
           `current`, “2D camera”/“3D camera” in Create and the inspector,
           drawn in the view; `Camera` renamed `Camera2D`.
     - [x] 9b Physics nodes: Create → Physics offers static, rigid,
           kinematic bodies and areas (static sensors), 2D or 3D by the
           project, and the view draws the shape of every body.
+    - [x] 9c Spot lights: `SpotLight` in the renderer (a cone with a
+          soft edge), `kind = "spot"` with `angle` and `blend` in scenes
+          and StarScript, in Create and the inspector, and their cone drawn
+          in the view.
+    - [x] 9d 2D lights: sprites lit by a 2D ambient light (white by
+          default, so nothing changes until a game darkens it) and 2D point
+          and spot lights; `[node.light_2d]`, StarScript's `Light2D` and
+          `Game.ambient_2d`, in Create and the inspector, their reach drawn
+          in the view.
   - [ ] Finding nodes of the scene by name and by tag, in StarScript and
         blueprints.
   - [ ] Global and local position, as separate properties.

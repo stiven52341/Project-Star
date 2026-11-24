@@ -9,7 +9,9 @@ use star_engine::prelude::{
 };
 use star_engine::star_assets::AssetPath;
 use star_engine::star_platform::WindowConfig;
-use star_engine::star_scene::{Camera2dNode, Camera3dNode, LightNode, NodeOutline, SpriteOutline};
+use star_engine::star_scene::{
+    Camera2dNode, Camera3dNode, Light2dNode, LightNode, NodeOutline, SpriteOutline,
+};
 
 use super::body_drawing::{BodyMarks, draw_body_2d, draw_body_3d};
 
@@ -56,6 +58,12 @@ pub(crate) struct Marks {
     /// A cone from `(0, 0, 0)` to a circle of radius 1 at `z = -1`, in the
     /// color of lights: what a spot lights.
     pub(crate) cone: MeshId,
+    /// A circle of radius 1 around the origin, on the XY plane, in the
+    /// color of lights: how far a 2D light reaches.
+    pub(crate) reach: MeshId,
+    /// A segment from `(0, 0)` to `(1, 0)`, in the color of lights: an
+    /// edge of the cone of a 2D spot.
+    pub(crate) ray: MeshId,
     /// The meshes of the shapes of bodies.
     pub(crate) bodies: BodyMarks,
 }
@@ -82,6 +90,11 @@ pub(crate) fn draw_scene(
         }
         if let (Some(body), Some(global)) = (&node.body_3d, place.solid) {
             draw_body_3d(body, global, &marks.bodies, frame);
+        }
+        // Not lit by them: the 2D ambient light is set by the game's code,
+        // which the editor cannot know, so only their reach is drawn.
+        if let (Some(light), Some(global)) = (node.light_2d, place.flat) {
+            draw_light_2d_reach(light, global, marks, frame);
         }
         if let (Some(camera), Some(global)) = (node.camera, place.flat) {
             draw_camera_2d(camera, global, marks, frame);
@@ -235,6 +248,25 @@ fn draw_camera_3d(camera: Camera3dNode, global: Mat4, marks: Marks, frame: &mut 
         marks.pyramid,
         without_scale(global) * Mat4::from_scale(size),
     );
+}
+
+/// How far a 2D light placed at `global` reaches, and for spots the edges
+/// of their cone, along the node's +x axis.
+fn draw_light_2d_reach(light: Light2dNode, global: Affine2, marks: Marks, frame: &mut Frame) {
+    let global = GlobalTransform2D::from_affine(global);
+    let position = global.position();
+    let (Light2dNode::Point { range, .. } | Light2dNode::Spot { range, .. }) = light;
+    let place = Mat4::from_translation(Vec3::new(position.x, position.y, 0.0));
+    let size = Mat4::from_scale(Vec3::new(range, range, 1.0));
+    frame.draw(marks.reach, place * size);
+    if let Light2dNode::Spot { angle, .. } = light {
+        for edge in [angle, -angle] {
+            frame.draw(
+                marks.ray,
+                place * Mat4::from_rotation_z(global.rotation() + edge) * size,
+            );
+        }
+    }
 }
 
 /// The cone a spot of `range` and `angle` placed at `global` lights, along
@@ -406,6 +438,26 @@ pub(crate) fn cone_lines() -> Vec<Vertex> {
     lines
 }
 
+/// The segments of [`Marks::reach`].
+pub(crate) fn reach_lines() -> Vec<Vertex> {
+    #[allow(clippy::cast_precision_loss)]
+    let corners: Vec<Vec3> = (0..CONE_SEGMENTS)
+        .map(|step| {
+            let turn = std::f32::consts::TAU * step as f32 / CONE_SEGMENTS as f32;
+            Vec3::new(turn.cos(), turn.sin(), 0.0)
+        })
+        .collect();
+    colored_loop(&corners, LIGHT_COLOR)
+}
+
+/// The segments of [`Marks::ray`].
+pub(crate) fn ray_lines() -> Vec<Vertex> {
+    vec![
+        Vertex::new(Vec3::ZERO, LIGHT_COLOR),
+        Vertex::new(Vec3::new(1.0, 0.0, 0.0), LIGHT_COLOR),
+    ]
+}
+
 /// The segments of [`Marks::cross`].
 pub(crate) fn cross_lines() -> Vec<Vertex> {
     let half = 0.5;
@@ -473,6 +525,8 @@ mod tests {
         view: MeshId::from_index(3),
         pyramid: MeshId::from_index(4),
         cone: MeshId::from_index(5),
+        reach: MeshId::from_index(6),
+        ray: MeshId::from_index(7),
         bodies: super::super::body_drawing::TEST_MARKS,
     };
 
@@ -562,6 +616,8 @@ mod tests {
             view_lines(),
             pyramid_lines(),
             cone_lines(),
+            reach_lines(),
+            ray_lines(),
         ] {
             assert!(!lines.is_empty() && lines.len() % 2 == 0);
         }
@@ -599,6 +655,23 @@ mod tests {
             1 + 3,
             "a rectangle, and a capsule's three pieces"
         );
+    }
+
+    #[test]
+    fn lights_2d_show_their_reach_without_lighting_the_view() {
+        let lights = "[[node]]\nname = \"Torch\"\nposition = [0.0, 0.0]\n\
+                      [node.light_2d]\nkind = \"point\"\nrange = 3.0\n\
+                      [[node]]\nname = \"Beam\"\nparent = 0\nposition = [1.0, 0.0]\n\
+                      [node.light_2d]\nkind = \"spot\"\nrange = 3.0\n";
+
+        let (frame, _) = draw(&outline(lights), None);
+
+        assert_eq!(
+            frame.draw_count(),
+            1 + 3,
+            "a circle, and a circle and two edges"
+        );
+        assert_eq!(frame.lights_2d(), []);
     }
 
     #[test]
