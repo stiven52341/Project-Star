@@ -1,0 +1,190 @@
+# Moves the node in a straight line, velocity_x, velocity_y and velocity_z units a second.
+format = 1
+class = "Mover3D"
+extends = "Node3D"
+base_arguments = ["Mover3D"]
+
+[[variable]]
+name = "velocity_x"
+default = 0.0
+
+[[variable]]
+name = "velocity_y"
+default = 0.0
+
+[[variable]]
+name = "velocity_z"
+default = -1.0
+
+[[graph]]
+name = "update"
+override = true
+parameters = [{ name = "delta", type = "float" }]
+
+[[graph.node]]
+id = 1
+position = [-320.0, 0.0]
+kind = "entry"
+
+[[graph.node]]
+id = 2
+position = [560.0, 0.0]
+kind = "set_variable"
+variable = "x"
+
+[[graph.node]]
+id = 3
+position = [360.0, 60.0]
+kind = "operator"
+operator = "add"
+
+[[graph.node]]
+id = 4
+position = [120.0, 40.0]
+kind = "get_variable"
+variable = "x"
+
+[[graph.node]]
+id = 5
+position = [120.0, 120.0]
+kind = "operator"
+operator = "multiply"
+
+[[graph.node]]
+id = 6
+position = [-120.0, 120.0]
+kind = "get_variable"
+variable = "velocity_x"
+
+[[graph.node]]
+id = 7
+position = [560.0, 180.0]
+kind = "set_variable"
+variable = "y"
+
+[[graph.node]]
+id = 8
+position = [360.0, 240.0]
+kind = "operator"
+operator = "add"
+
+[[graph.node]]
+id = 9
+position = [120.0, 220.0]
+kind = "get_variable"
+variable = "y"
+
+[[graph.node]]
+id = 10
+position = [120.0, 300.0]
+kind = "operator"
+operator = "multiply"
+
+[[graph.node]]
+id = 11
+position = [-120.0, 300.0]
+kind = "get_variable"
+variable = "velocity_y"
+
+[[graph.node]]
+id = 12
+position = [560.0, 360.0]
+kind = "set_variable"
+variable = "z"
+
+[[graph.node]]
+id = 13
+position = [360.0, 420.0]
+kind = "operator"
+operator = "add"
+
+[[graph.node]]
+id = 14
+position = [120.0, 400.0]
+kind = "get_variable"
+variable = "z"
+
+[[graph.node]]
+id = 15
+position = [120.0, 480.0]
+kind = "operator"
+operator = "multiply"
+
+[[graph.node]]
+id = 16
+position = [-120.0, 480.0]
+kind = "get_variable"
+variable = "velocity_z"
+
+[[graph.link]]
+from = { node = 1, pin = "then" }
+to = { node = 2, pin = "in" }
+
+[[graph.link]]
+from = { node = 3, pin = "result" }
+to = { node = 2, pin = "value" }
+
+[[graph.link]]
+from = { node = 4, pin = "value" }
+to = { node = 3, pin = "left" }
+
+[[graph.link]]
+from = { node = 5, pin = "result" }
+to = { node = 3, pin = "right" }
+
+[[graph.link]]
+from = { node = 6, pin = "value" }
+to = { node = 5, pin = "left" }
+
+[[graph.link]]
+from = { node = 1, pin = "delta" }
+to = { node = 5, pin = "right" }
+
+[[graph.link]]
+from = { node = 2, pin = "then" }
+to = { node = 7, pin = "in" }
+
+[[graph.link]]
+from = { node = 8, pin = "result" }
+to = { node = 7, pin = "value" }
+
+[[graph.link]]
+from = { node = 9, pin = "value" }
+to = { node = 8, pin = "left" }
+
+[[graph.link]]
+from = { node = 10, pin = "result" }
+to = { node = 8, pin = "right" }
+
+[[graph.link]]
+from = { node = 11, pin = "value" }
+to = { node = 10, pin = "left" }
+
+[[graph.link]]
+from = { node = 1, pin = "delta" }
+to = { node = 10, pin = "right" }
+
+[[graph.link]]
+from = { node = 7, pin = "then" }
+to = { node = 12, pin = "in" }
+
+[[graph.link]]
+from = { node = 13, pin = "result" }
+to = { node = 12, pin = "value" }
+
+[[graph.link]]
+from = { node = 14, pin = "value" }
+to = { node = 13, pin = "left" }
+
+[[graph.link]]
+from = { node = 15, pin = "result" }
+to = { node = 13, pin = "right" }
+
+[[graph.link]]
+from = { node = 16, pin = "value" }
+to = { node = 15, pin = "left" }
+
+[[graph.link]]
+from = { node = 1, pin = "delta" }
+to = { node = 15, pin = "right" }
+

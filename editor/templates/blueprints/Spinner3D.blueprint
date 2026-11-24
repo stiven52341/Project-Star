@@ -1,0 +1,74 @@
+# Turns the node around its vertical axis all the time, speed radians a second.
+format = 1
+class = "Spinner3D"
+extends = "Node3D"
+base_arguments = ["Spinner3D"]
+
+[[variable]]
+name = "speed"
+default = 1.5
+
+[[graph]]
+name = "update"
+override = true
+parameters = [{ name = "delta", type = "float" }]
+
+[[graph.node]]
+id = 1
+position = [-320.0, 0.0]
+kind = "entry"
+
+[[graph.node]]
+id = 2
+position = [560.0, 0.0]
+kind = "set_variable"
+variable = "yaw"
+
+[[graph.node]]
+id = 3
+position = [360.0, 60.0]
+kind = "operator"
+operator = "add"
+
+[[graph.node]]
+id = 4
+position = [120.0, 40.0]
+kind = "get_variable"
+variable = "yaw"
+
+[[graph.node]]
+id = 5
+position = [120.0, 120.0]
+kind = "operator"
+operator = "multiply"
+
+[[graph.node]]
+id = 6
+position = [-120.0, 120.0]
+kind = "get_variable"
+variable = "speed"
+
+[[graph.link]]
+from = { node = 1, pin = "then" }
+to = { node = 2, pin = "in" }
+
+[[graph.link]]
+from = { node = 3, pin = "result" }
+to = { node = 2, pin = "value" }
+
+[[graph.link]]
+from = { node = 4, pin = "value" }
+to = { node = 3, pin = "left" }
+
+[[graph.link]]
+from = { node = 5, pin = "result" }
+to = { node = 3, pin = "right" }
+
+[[graph.link]]
+from = { node = 6, pin = "value" }
+to = { node = 5, pin = "left" }
+
+[[graph.link]]
+from = { node = 1, pin = "delta" }
+to = { node = 5, pin = "right" }
+

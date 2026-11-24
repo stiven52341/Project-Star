@@ -154,6 +154,7 @@ pub(super) static ENGLISH: Texts = Texts {
     menu_set_variable: "Set variable",
     menu_call: "Call",
     menu_functions: "Functions",
+    blueprint_from_template: "Blueprint from a template",
     search_functions: "Search functions…",
     no_function_matches: "No function matches",
     transform: "Transform",

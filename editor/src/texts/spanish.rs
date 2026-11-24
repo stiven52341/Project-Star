@@ -154,6 +154,7 @@ pub(super) static SPANISH: Texts = Texts {
     menu_set_variable: "Asignar variable",
     menu_call: "Llamar",
     menu_functions: "Funciones",
+    blueprint_from_template: "Blueprint desde una plantilla",
     search_functions: "Buscar funciones…",
     no_function_matches: "Ninguna función coincide",
     transform: "Transform",

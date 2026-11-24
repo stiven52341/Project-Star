@@ -1,6 +1,7 @@
 //! Texts about the files of the assets folder, in each language.
 
 use super::{Language, Texts};
+use crate::blueprint_editor::BlueprintTemplate;
 use crate::workspace::{AssetFileError, NewAsset};
 
 impl Texts {
@@ -12,6 +13,41 @@ impl Texts {
             NewAsset::Blueprint => self.pick("Blueprint", "Blueprint"),
             NewAsset::Script => self.pick("StarScript script", "Script de StarScript"),
             NewAsset::Rust => self.pick("Rust script", "Script de Rust"),
+            NewAsset::Template(template) => template.name(),
+        }
+    }
+
+    /// What a ready-made blueprint does, for its entry in the menu.
+    pub(crate) const fn template_hint(&self, template: BlueprintTemplate) -> &'static str {
+        match template {
+            BlueprintTemplate::Movement2D => self.pick(
+                "Moves the node with the actions left, right, up and down (WASD, arrows or the left stick). Adds the actions the project lacks.",
+                "Mueve el nodo con las acciones left, right, up y down (WASD, flechas o el stick izquierdo). Añade al proyecto las acciones que le falten.",
+            ),
+            BlueprintTemplate::Movement3D => self.pick(
+                "Moves the node over the ground with the actions left, right, up (forward) and down (back). Adds the actions the project lacks.",
+                "Mueve el nodo por el suelo con las acciones left, right, up (adelante) y down (atrás). Añade al proyecto las acciones que le falten.",
+            ),
+            BlueprintTemplate::Spinner2D => self.pick(
+                "Turns the node all the time, speed radians a second.",
+                "Gira el nodo sin parar, speed radianes por segundo.",
+            ),
+            BlueprintTemplate::Spinner3D => self.pick(
+                "Turns the node around its vertical axis, speed radians a second.",
+                "Gira el nodo sobre su eje vertical, speed radianes por segundo.",
+            ),
+            BlueprintTemplate::Mover2D => self.pick(
+                "Moves the node in a straight line at velocity_x and velocity_y units a second: bullets, clouds.",
+                "Mueve el nodo en línea recta a velocity_x y velocity_y unidades por segundo: balas, nubes.",
+            ),
+            BlueprintTemplate::Mover3D => self.pick(
+                "Moves the node in a straight line at velocity_x, velocity_y and velocity_z units a second.",
+                "Mueve el nodo en línea recta a velocity_x, velocity_y y velocity_z unidades por segundo.",
+            ),
+            BlueprintTemplate::Lifetime => self.pick(
+                "Removes the node from the game after seconds seconds: bullets, effects.",
+                "Quita el nodo del juego pasados seconds segundos: balas, efectos.",
+            ),
         }
     }
 
@@ -20,7 +56,9 @@ impl Texts {
         match kind {
             NewAsset::Folder => self.pick("New folder:", "Carpeta nueva:"),
             NewAsset::Scene => self.pick("New scene:", "Escena nueva:"),
-            NewAsset::Blueprint => self.pick("New blueprint:", "Blueprint nuevo:"),
+            NewAsset::Blueprint | NewAsset::Template(_) => {
+                self.pick("New blueprint:", "Blueprint nuevo:")
+            }
             NewAsset::Script => self.pick("New StarScript script:", "Script de StarScript nuevo:"),
             NewAsset::Rust => self.pick("New Rust script:", "Script de Rust nuevo:"),
         }

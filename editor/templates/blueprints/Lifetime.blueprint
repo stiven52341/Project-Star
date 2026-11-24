@@ -1,0 +1,104 @@
+# Removes the node from the game after seconds seconds: bullets, effects.
+format = 1
+class = "Lifetime"
+extends = "Node"
+base_arguments = ["Lifetime"]
+
+[[variable]]
+name = "seconds"
+default = 3.0
+
+[[graph]]
+name = "update"
+override = true
+parameters = [{ name = "delta", type = "float" }]
+
+[[graph.node]]
+id = 1
+position = [-320.0, 0.0]
+kind = "entry"
+
+[[graph.node]]
+id = 2
+position = [360.0, 0.0]
+kind = "set_variable"
+variable = "seconds"
+
+[[graph.node]]
+id = 3
+position = [120.0, 60.0]
+kind = "operator"
+operator = "subtract"
+
+[[graph.node]]
+id = 4
+position = [-120.0, 40.0]
+kind = "get_variable"
+variable = "seconds"
+
+[[graph.node]]
+id = 5
+position = [600.0, 0.0]
+kind = "branch"
+
+[[graph.node]]
+id = 6
+position = [360.0, 160.0]
+kind = "operator"
+operator = "less_or_equal"
+
+[[graph.node]]
+id = 7
+position = [120.0, 160.0]
+kind = "get_variable"
+variable = "seconds"
+
+[[graph.node]]
+id = 8
+position = [120.0, 240.0]
+kind = "literal"
+value = 0.0
+
+[[graph.node]]
+id = 9
+position = [840.0, 0.0]
+kind = "call"
+target = "self"
+method = "remove"
+
+[[graph.link]]
+from = { node = 1, pin = "then" }
+to = { node = 2, pin = "in" }
+
+[[graph.link]]
+from = { node = 3, pin = "result" }
+to = { node = 2, pin = "value" }
+
+[[graph.link]]
+from = { node = 4, pin = "value" }
+to = { node = 3, pin = "left" }
+
+[[graph.link]]
+from = { node = 1, pin = "delta" }
+to = { node = 3, pin = "right" }
+
+[[graph.link]]
+from = { node = 2, pin = "then" }
+to = { node = 5, pin = "in" }
+
+[[graph.link]]
+from = { node = 6, pin = "result" }
+to = { node = 5, pin = "condition" }
+
+[[graph.link]]
+from = { node = 7, pin = "value" }
+to = { node = 6, pin = "left" }
+
+[[graph.link]]
+from = { node = 8, pin = "value" }
+to = { node = 6, pin = "right" }
+
+[[graph.link]]
+from = { node = 5, pin = "true" }
+to = { node = 9, pin = "in" }
+

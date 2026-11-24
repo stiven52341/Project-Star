@@ -533,13 +533,25 @@ of the StarScript compiler and of the project check stay in English:
    by `thumbnails.rs`; a click selects, a double click goes into a folder
    or opens a `.blueprint` or a `.scene`. A right click on the background
    opens “Create” (folder, scene with its root, blueprint, StarScript
-   script —the same a new blueprint translates to, so it compiles— or
-   Rust script), “Refresh” and “Show in file explorer” (the folder shown);
+   script —the same a new blueprint translates to, so it compiles—,
+   Rust script, or a “Blueprint from a template”), “Refresh” and “Show in file explorer” (the folder shown);
    on a tile, also “Open”, “Rename” (`F2`), “Delete” (`Delete`, asked
    first), “Copy path” and “Show in file explorer” (that file or folder,
    selected; see decision 56). A slider next to “Refresh” sizes the icons
    from 60 % to 200 %; the editor's preferences remember it, written once
-   the slider is let go. Names are given in a
+   the slider is let go. The **templates** (`blueprint_editor/templates.rs`,
+   files in `editor/templates/blueprints/`) are ready-made blueprints copied
+   into the project under the name given, so they are the project's own:
+   `Movement2D` and `Movement3D` (the actions `left`, `right`, `up` and
+   `down`, through `Input.axis`), `Spinner2D` and `Spinner3D`, `Mover2D` and
+   `Mover3D` (straight lines), and `Lifetime` (removes the node after some
+   seconds). The menu lists those of the project's kind. A template that
+   reads input actions adds those the project lacks to `project.toml`
+   (`project/input_actions.rs`), with keys, arrows and the left stick,
+   writing lines into its text so its comments and order stay; if its
+   actions are written another way, nothing is changed and “Compile” names
+   them. Every template is checked by a test that validates it, translates
+   it and compiles it. Names are given in a
    row over the grid; `asset_files.rs` checks them and never overwrites.
    What is renamed or deleted closes the tabs open from it), **Problems** (what the last
    “Compile” found, as `file:line:column` and a message; it opens by itself

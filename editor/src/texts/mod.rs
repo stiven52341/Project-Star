@@ -233,6 +233,8 @@ pub(crate) struct Texts {
     pub(crate) menu_call: &'static str,
     /// The ready-made functions of the blueprint menu, and their groups.
     pub(crate) menu_functions: &'static str,
+    /// The submenu of “Create” with the ready-made blueprints.
+    pub(crate) blueprint_from_template: &'static str,
     pub(crate) search_functions: &'static str,
     pub(crate) no_function_matches: &'static str,
     pub(crate) transform: &'static str,

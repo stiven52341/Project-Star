@@ -15,6 +15,7 @@ use super::asset_actions::{AssetActions, Choice, Outcome, Target};
 use super::asset_files::NewAsset;
 use super::asset_icons::{AssetKind, paint_icon};
 use super::thumbnails::Thumbnails;
+use crate::blueprint_editor::BlueprintTemplate;
 use crate::file_tree::{FileNode, file_paths, scan_directory};
 use crate::project::{
     ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, ProjectDimension, SCENE_EXTENSION, SCRIPT_EXTENSION,
@@ -208,8 +209,9 @@ impl AssetsPanel {
                 if background.clicked() {
                     self.selected = None;
                 }
+                let dimension = self.actions.dimension();
                 background.context_menu(|ui| {
-                    create_menu(ui, &mut choice);
+                    create_menu(ui, dimension, &mut choice);
                     if ui.button(texts::current().refresh).clicked() {
                         choice = Some(MenuChoice::Refresh);
                     }
@@ -422,7 +424,8 @@ impl AssetsPanel {
         let mut choice = response
             .double_clicked()
             .then(|| MenuChoice::Open(entry.clone()));
-        response.context_menu(|ui| tile_menu(ui, entry, &mut choice));
+        let dimension = self.actions.dimension();
+        response.context_menu(|ui| tile_menu(ui, entry, dimension, &mut choice));
         choice
     }
 
@@ -511,7 +514,12 @@ fn entries_of(nodes: &[FileNode], open_folder: &[String]) -> Option<Vec<Entry>> 
 
 /// The menu of a tile: open it, rename it, delete it, copy its path, show
 /// it in the file manager, or create something next to it.
-fn tile_menu(ui: &mut egui::Ui, entry: &Entry, choice: &mut Option<MenuChoice>) {
+fn tile_menu(
+    ui: &mut egui::Ui,
+    entry: &Entry,
+    dimension: ProjectDimension,
+    choice: &mut Option<MenuChoice>,
+) {
     let texts = texts::current();
     let opens = entry.kind == AssetKind::Folder || OpenedAsset::of(entry.path.clone()).is_some();
     if opens && ui.button(texts.open).clicked() {
@@ -530,7 +538,7 @@ fn tile_menu(ui: &mut egui::Ui, entry: &Entry, choice: &mut Option<MenuChoice>) 
         *choice = Some(MenuChoice::ShowInFileExplorer(entry.path.clone()));
     }
     ui.separator();
-    create_menu(ui, choice);
+    create_menu(ui, dimension, choice);
 }
 
 /// Opens the system's file manager at `path` on a thread of its own, so
@@ -543,8 +551,9 @@ fn show_in_file_explorer(path: PathBuf) {
     });
 }
 
-/// “Create”, with a kind of file or folder to create in the folder shown.
-fn create_menu(ui: &mut egui::Ui, choice: &mut Option<MenuChoice>) {
+/// “Create”, with a kind of file or folder to create in the folder shown,
+/// and the ready-made blueprints of a project of `dimension`.
+fn create_menu(ui: &mut egui::Ui, dimension: ProjectDimension, choice: &mut Option<MenuChoice>) {
     let texts = texts::current();
     ui.menu_button(texts.create, |ui| {
         for kind in NewAsset::ALL {
@@ -552,6 +561,17 @@ fn create_menu(ui: &mut egui::Ui, choice: &mut Option<MenuChoice>) {
                 *choice = Some(MenuChoice::Act(Choice::Create(kind)));
             }
         }
+        ui.menu_button(texts.blueprint_from_template, |ui| {
+            for template in BlueprintTemplate::of(dimension) {
+                let kind = NewAsset::Template(template);
+                let button = ui
+                    .button(texts.new_asset_name(kind))
+                    .on_hover_text(texts.template_hint(template));
+                if button.clicked() {
+                    *choice = Some(MenuChoice::Act(Choice::Create(kind)));
+                }
+            }
+        });
     });
 }
 

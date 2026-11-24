@@ -63,6 +63,11 @@ struct Deleting {
 }
 
 impl AssetActions {
+    /// The kind of project it creates files for.
+    pub(super) const fn dimension(&self) -> ProjectDimension {
+        self.dimension
+    }
+
     /// Creates scenes for a project of `dimension`.
     pub(super) const fn new(dimension: ProjectDimension) -> Self {
         Self {

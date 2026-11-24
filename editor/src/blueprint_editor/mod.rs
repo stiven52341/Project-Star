@@ -15,6 +15,7 @@ mod names;
 mod painting;
 mod properties;
 mod selection;
+mod templates;
 mod view;
 
 use std::fs;
@@ -26,6 +27,7 @@ use star_blueprint::{Blueprint, Origin};
 use self::canvas::{CanvasState, NodeMistakes};
 pub(crate) use self::creation::{new_blueprint_text, new_script_text};
 use self::names::BlueprintNames;
+pub(crate) use self::templates::BlueprintTemplate;
 use crate::project::ASSETS_DIRECTORY;
 use crate::project_check::Problem;
 use crate::style::ERROR_COLOR;

@@ -1,0 +1,196 @@
+# Moves the node with the actions left, right, up and down (keys, arrows or the left stick).
+format = 1
+class = "Movement2D"
+extends = "Node"
+base_arguments = ["Movement2D"]
+
+[[variable]]
+name = "speed"
+default = 3.0
+
+[[graph]]
+name = "update"
+override = true
+parameters = [{ name = "delta", type = "float" }]
+
+[[graph.node]]
+id = 1
+position = [-320.0, 0.0]
+kind = "entry"
+
+[[graph.node]]
+id = 9
+position = [120.0, -160.0]
+kind = "operator"
+operator = "multiply"
+
+[[graph.node]]
+id = 10
+position = [-120.0, -180.0]
+kind = "get_variable"
+variable = "speed"
+
+[[graph.node]]
+id = 2
+position = [760.0, 0.0]
+kind = "set_variable"
+variable = "x"
+
+[[graph.node]]
+id = 3
+position = [560.0, 60.0]
+kind = "operator"
+operator = "add"
+
+[[graph.node]]
+id = 4
+position = [360.0, 40.0]
+kind = "get_variable"
+variable = "x"
+
+[[graph.node]]
+id = 5
+position = [360.0, 120.0]
+kind = "operator"
+operator = "multiply"
+
+[[graph.node]]
+id = 6
+position = [120.0, 100.0]
+kind = "call"
+target = { class = "Input" }
+method = "axis"
+arguments = ["negative", "positive"]
+returns_value = true
+pure = true
+
+[[graph.node]]
+id = 7
+position = [-120.0, 80.0]
+kind = "literal"
+value = "left"
+
+[[graph.node]]
+id = 8
+position = [-120.0, 140.0]
+kind = "literal"
+value = "right"
+
+[[graph.node]]
+id = 11
+position = [760.0, 220.0]
+kind = "set_variable"
+variable = "y"
+
+[[graph.node]]
+id = 12
+position = [560.0, 280.0]
+kind = "operator"
+operator = "add"
+
+[[graph.node]]
+id = 13
+position = [360.0, 260.0]
+kind = "get_variable"
+variable = "y"
+
+[[graph.node]]
+id = 14
+position = [360.0, 340.0]
+kind = "operator"
+operator = "multiply"
+
+[[graph.node]]
+id = 15
+position = [120.0, 320.0]
+kind = "call"
+target = { class = "Input" }
+method = "axis"
+arguments = ["negative", "positive"]
+returns_value = true
+pure = true
+
+[[graph.node]]
+id = 16
+position = [-120.0, 300.0]
+kind = "literal"
+value = "down"
+
+[[graph.node]]
+id = 17
+position = [-120.0, 360.0]
+kind = "literal"
+value = "up"
+
+[[graph.link]]
+from = { node = 10, pin = "value" }
+to = { node = 9, pin = "left" }
+
+[[graph.link]]
+from = { node = 1, pin = "delta" }
+to = { node = 9, pin = "right" }
+
+[[graph.link]]
+from = { node = 1, pin = "then" }
+to = { node = 2, pin = "in" }
+
+[[graph.link]]
+from = { node = 3, pin = "result" }
+to = { node = 2, pin = "value" }
+
+[[graph.link]]
+from = { node = 4, pin = "value" }
+to = { node = 3, pin = "left" }
+
+[[graph.link]]
+from = { node = 5, pin = "result" }
+to = { node = 3, pin = "right" }
+
+[[graph.link]]
+from = { node = 6, pin = "result" }
+to = { node = 5, pin = "left" }
+
+[[graph.link]]
+from = { node = 9, pin = "result" }
+to = { node = 5, pin = "right" }
+
+[[graph.link]]
+from = { node = 7, pin = "value" }
+to = { node = 6, pin = "negative" }
+
+[[graph.link]]
+from = { node = 8, pin = "value" }
+to = { node = 6, pin = "positive" }
+
+[[graph.link]]
+from = { node = 2, pin = "then" }
+to = { node = 11, pin = "in" }
+
+[[graph.link]]
+from = { node = 12, pin = "result" }
+to = { node = 11, pin = "value" }
+
+[[graph.link]]
+from = { node = 13, pin = "value" }
+to = { node = 12, pin = "left" }
+
+[[graph.link]]
+from = { node = 14, pin = "result" }
+to = { node = 12, pin = "right" }
+
+[[graph.link]]
+from = { node = 15, pin = "result" }
+to = { node = 14, pin = "left" }
+
+[[graph.link]]
+from = { node = 9, pin = "result" }
+to = { node = 14, pin = "right" }
+
+[[graph.link]]
+from = { node = 16, pin = "value" }
+to = { node = 15, pin = "negative" }
+
+[[graph.link]]
+from = { node = 17, pin = "value" }
+to = { node = 15, pin = "positive" }
+

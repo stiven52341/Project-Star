@@ -8,10 +8,10 @@ use std::path::Path;
 
 use star_engine::prelude::SceneOutline;
 
-use crate::blueprint_editor::{new_blueprint_text, new_script_text};
+use crate::blueprint_editor::{BlueprintTemplate, new_blueprint_text, new_script_text};
 use crate::project::{
     BLUEPRINT_EXTENSION, MAX_NAME_LENGTH, ProjectDimension, RUST_EXTENSION, SCENE_EXTENSION,
-    SCRIPT_EXTENSION,
+    SCRIPT_EXTENSION, add_missing_actions,
 };
 
 /// The scene new scenes start from: a root, placed in the project's space.
@@ -28,6 +28,8 @@ pub(crate) enum NewAsset {
     Blueprint,
     Script,
     Rust,
+    /// A copy of a ready-made blueprint.
+    Template(BlueprintTemplate),
 }
 
 impl NewAsset {
@@ -48,6 +50,7 @@ impl NewAsset {
             Self::Blueprint => "NewBlueprint",
             Self::Script => "NewScript",
             Self::Rust => "new_module",
+            Self::Template(template) => template.name(),
         }
     }
 
@@ -55,7 +58,7 @@ impl NewAsset {
         match self {
             Self::Folder => "",
             Self::Scene => SCENE_EXTENSION,
-            Self::Blueprint => BLUEPRINT_EXTENSION,
+            Self::Blueprint | Self::Template(_) => BLUEPRINT_EXTENSION,
             Self::Script => SCRIPT_EXTENSION,
             Self::Rust => RUST_EXTENSION,
         }
@@ -118,7 +121,32 @@ pub(super) fn create(
         .create_new(true)
         .open(&target)?;
     io::Write::write_all(&mut file, contents.as_bytes())?;
+    if let NewAsset::Template(template) = kind {
+        add_template_actions(assets, template);
+    }
     Ok(path)
+}
+
+/// Adds to the project the input actions `template` reads, if it lacks
+/// them. The blueprint is made either way, so a failure is only logged:
+/// “Compile” then names the actions missing.
+fn add_template_actions(assets: &Path, template: BlueprintTemplate) {
+    let Some(project) = assets.parent() else {
+        return;
+    };
+    match add_missing_actions(project, template.actions()) {
+        Ok(added) if !added.is_empty() => {
+            log::info!(
+                "Added the input actions {} to project.toml",
+                added.join(", ")
+            );
+        }
+        Ok(_) => {}
+        Err(error) => log::warn!(
+            "Cannot add the input actions of {}: {error}",
+            template.name()
+        ),
+    }
 }
 
 /// What a new `kind` called `stem` starts with.
@@ -132,6 +160,14 @@ fn contents(
         NewAsset::Scene => new_scene(stem, dimension),
         NewAsset::Blueprint => new_blueprint_text(stem).ok_or(AssetFileError::InvalidCodeName),
         NewAsset::Script => new_script_text(stem).ok_or(AssetFileError::InvalidCodeName),
+        NewAsset::Template(template) => {
+            if !is_code_name(stem) {
+                return Err(AssetFileError::InvalidCodeName);
+            }
+            template
+                .text(stem)
+                .ok_or_else(|| AssetFileError::Io(io::Error::other("unreadable template")))
+        }
         NewAsset::Rust => {
             if !is_code_name(stem) {
                 return Err(AssetFileError::InvalidCodeName);
@@ -280,6 +316,23 @@ mod tests {
             let path = create_in(&assets, kind, kind.default_name());
             assert!(assets.path().join(path).exists());
         }
+    }
+
+    #[test]
+    fn templates_are_copied_with_their_name_and_bring_their_actions() {
+        let project = TestDirectory::new("asset_files_template");
+        let assets = project.path().join("assets");
+        fs::create_dir_all(&assets).unwrap();
+        fs::write(project.path().join("project.toml"), "[project]\n").unwrap();
+
+        let template = NewAsset::Template(BlueprintTemplate::Movement2D);
+        let path = create(&assets, "", template, "Player", ProjectDimension::TwoD).unwrap();
+
+        assert_eq!(path, "Player.blueprint");
+        let text = fs::read_to_string(assets.join(&path)).unwrap();
+        assert!(text.contains("class = \"Player\""), "{text}");
+        let manifest = fs::read_to_string(project.path().join("project.toml")).unwrap();
+        assert!(manifest.contains("left = [\"A\", \"ArrowLeft\""), "{manifest}");
     }
 
     #[test]
