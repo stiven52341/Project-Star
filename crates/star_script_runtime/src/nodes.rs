@@ -14,6 +14,8 @@ use crate::bodies::BodyFields;
 use crate::game::GameFields;
 use crate::node_classes::{Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields};
 use crate::placement::{Place2d, Place3d};
+use crate::scene_fields::SceneValue;
+use crate::scene_tree::NewNode;
 use crate::{Field, List};
 
 /// What the objects of a way of running StarScript are: references to
@@ -76,6 +78,27 @@ pub trait Host: Sized + 'static {
     fn color(r: f32, g: f32, b: f32, a: f32) -> Self::Color;
     /// The channels of `color`, in the order `[r, g, b, a]`.
     fn channels(color: &Self::Color) -> [f32; 4];
+    /// A new node of `class`, called `name`, as its `init` leaves it.
+    ///
+    /// # Errors
+    ///
+    /// Why a class of the program cannot be created for a scene: it does
+    /// not exist, is not a node, or its `init` needs arguments.
+    fn create(name: String, class: NewNode<'_>) -> Result<Self::Node, String>;
+    /// Gives the `export` fields of `node`, an object of `class`, the
+    /// values a scene writes.
+    ///
+    /// # Errors
+    ///
+    /// Why a value cannot be given: the class has no such `export` field,
+    /// or the value does not fit it.
+    fn set_exported(
+        class: &str,
+        node: &Self::Node,
+        values: &[(String, SceneValue)],
+    ) -> Result<(), String>;
+    /// A new body with the fields `fields`.
+    fn new_body(fields: BodyFields<Self>) -> Self::Body;
     /// Runs the `start` of `node`: its script's, or `Node`'s.
     fn start(node: &Self::Node);
     /// Runs the `update` of `node`: its script's, or `Node`'s.

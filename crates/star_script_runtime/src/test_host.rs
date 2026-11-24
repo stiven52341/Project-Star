@@ -8,6 +8,8 @@ use crate::bodies::BodyFields;
 use crate::game::GameFields;
 use crate::node_classes::{Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields};
 use crate::nodes::{self, Host, Node3dFields, NodeFields};
+use crate::scene_fields::SceneValue;
+use crate::scene_tree::NewNode;
 
 pub(crate) struct TestHost;
 
@@ -147,6 +149,45 @@ impl Host for TestHost {
 
     fn channels(color: &Self::Color) -> [f32; 4] {
         *color
+    }
+
+    fn create(name: String, class: NewNode<'_>) -> Result<Self::Node, String> {
+        let mut node = TestNode::new(&name);
+        match class {
+            NewNode::Node | NewNode::Script("Enemy") => {}
+            NewNode::Node3D => node.is_3d = true,
+            NewNode::Camera2D => node.camera = Some(Camera2dFields::new()),
+            NewNode::Camera3D => {
+                node.is_3d = true;
+                node.camera_3d = Some(Camera3dFields::new());
+            }
+            NewNode::Sprite { texture } => {
+                node.sprite = Some(SpriteFields::new(texture.to_owned()));
+            }
+            other => return Err(format!("the test host cannot create {other:?}")),
+        }
+        Ok(Rc::new(node))
+    }
+
+    fn set_exported(
+        class: &str,
+        node: &Self::Node,
+        values: &[(String, SceneValue)],
+    ) -> Result<(), String> {
+        for (field, value) in values {
+            match (class, field.as_str(), value) {
+                // Recorded, so the tests can see it was given.
+                ("Enemy", "speed", SceneValue::Float(speed)) => {
+                    node.calls.borrow_mut().push(format!("speed {speed}"));
+                }
+                _ => return Err(format!("`{class}` has no `export var {field}`")),
+            }
+        }
+        Ok(())
+    }
+
+    fn new_body(fields: BodyFields<Self>) -> Self::Body {
+        Rc::new(fields)
     }
 
     fn start(node: &Self::Node) {

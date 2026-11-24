@@ -204,7 +204,7 @@ fn any_object(context: Context<'_>, out: &mut Writer, classes: &[ClassId]) {
 /// `new_scene_object_`, which `Scene.load` calls to create a node of the
 /// class a scene names: the program's classes that extend `Node` and are
 /// created without arguments. The others get the reason they cannot be used.
-/// The engine's node classes are created by the `Scene` module itself.
+/// The engine's node classes are created by `Host_::create` itself.
 fn scene_classes(context: Context<'_>, out: &mut Writer) {
     let classes = context.analysis.classes();
     out.line("");

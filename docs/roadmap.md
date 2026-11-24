@@ -364,7 +364,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       - [x] f1a. The new crate `star_script_engine` (decision 65) holds
             what did not need them, about 250 lines: reading scenes, the
             audio backend, sharing input, the scene player's arguments.
-      - [ ] f1b. The engine classes (`Game`, `Node`, `Sprite`,
+      - [x] f1b. The engine classes (`Game`, `Node`, `Sprite`,
             `Camera2D`, `Scene`, `Body`, `Sound`, `Color`, the 3D ones),
             mirroring nodes and the game loop: their state and methods as
             types of `star_script_engine` that generated classes and the
@@ -387,7 +387,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
               syncing bodies, cameras, drawing, `EngineGame`) generic in
               `star_script_engine::game`. A generated game only creates
               its game and calls `star_script_engine::game::run`.
-        - [ ] f1b5. `Scene` and `Sound` (`Host` creates classes by name).
+        - [x] f1b5. `Scene` and `Sound`: building a scene's nodes in
+              `star_script_runtime::scene_tree` (`Host::create` makes the
+              class a node names, `Host::set_exported` its `export`
+              values) and `Sound`'s fields in `audio::SoundFields`.
     - [ ] f2. Measure “Play” with scripts on a realistic, big project
           (measured on `pruebas`, 2428 lines of Rust: 2 s after a change
           to its code), before and after f1.

@@ -549,6 +549,30 @@ impl ::star_script_runtime::nodes::Host for Host_ {
         crate::classes::Color::HasFields::fields(&**color).channels()
     }
 
+    fn create(name: ::std::string::String, class: ::star_script_runtime::scene_tree::NewNode<'_>) -> ::std::result::Result<Self::Node, ::std::string::String> {
+        use ::star_script_runtime::scene_tree::NewNode;
+        let node_: crate::classes::Node::Ref = match class {
+            NewNode::Node => crate::classes::Node::new(name),
+            NewNode::Sprite { texture } => crate::classes::Sprite::new(name, ::std::string::String::from(texture)),
+            NewNode::Camera2D => crate::classes::Camera2D::new(name),
+            NewNode::Light2D { kind } => crate::classes::Light2D::new(name, ::std::string::String::from(kind)),
+            NewNode::Node3D => crate::classes::Node3D::new(name),
+            NewNode::Mesh { shape } => crate::classes::Mesh::new(name, ::std::string::String::from(shape)),
+            NewNode::Light { kind } => crate::classes::Light::new(name, ::std::string::String::from(kind)),
+            NewNode::Camera3D => crate::classes::Camera3D::new(name),
+            NewNode::Script(class_) => crate::new_scene_object_(class_)?,
+        };
+        ::std::result::Result::Ok(node_)
+    }
+
+    fn set_exported(class: &str, node: &Self::Node, values: &[(::std::string::String, ::star_script_runtime::scene_fields::SceneValue)]) -> ::std::result::Result<(), ::std::string::String> {
+        crate::set_scene_fields_(class, node, values)
+    }
+
+    fn new_body(fields: ::star_script_runtime::bodies::BodyFields<Self>) -> Self::Body {
+        crate::classes::Body::of_(fields)
+    }
+
     fn start(node: &Self::Node) {
         crate::classes::Node::Object::start(::std::rc::Rc::clone(node));
     }
@@ -575,14 +599,7 @@ pub mod Scene {
     /// `static func load`: a new tree with the nodes of the scene at `path`,
     /// out of the game until it is added; `None` if it cannot be loaded.
     pub fn load(path: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> {
-        let nodes_ = ::star_script_runtime::scenes::load(&path)?;
-        match build_(&nodes_) {
-            ::std::result::Result::Ok(root_) => ::std::option::Option::Some(root_),
-            ::std::result::Result::Err(reason_) => {
-                ::star_script_runtime::scenes::reject(&path, &reason_);
-                ::std::option::Option::None
-            }
-        }
+        ::star_script_runtime::scene_tree::load::<crate::classes::Host_>(&path)
     }
 
     /// `static func find_by_name`: the first node of the game's tree named
@@ -599,180 +616,6 @@ pub mod Scene {
             ::std::option::Option::None => ::star_script_runtime::List::new(),
         }
     }
-
-    /// The objects of `nodes_`, each one added to its parent; the root first.
-    fn build_(nodes_: &[::star_script_runtime::scenes::SceneNode]) -> ::std::result::Result<crate::classes::Node::Ref, ::std::string::String> {
-        let mut built_: ::std::vec::Vec<crate::classes::Node::Ref> = ::std::vec::Vec::with_capacity(nodes_.len());
-        for node_ in nodes_ {
-            let object_ = build_node_(node_).map_err(|reason_| ::std::format!(\"node \\\"{}\\\": {reason_}\", node_.name))?;
-            if let ::std::option::Option::Some(parent_) = node_.parent.and_then(|index_| built_.get(index_)) {
-                crate::classes::Node::Methods::add_child(parent_, ::std::rc::Rc::clone(&object_));
-            }
-            built_.push(object_);
-        }
-        built_.into_iter().next().ok_or_else(|| ::std::string::String::from(\"it has no nodes\"))
-    }
-
-    /// The object of one node: of its class, created as `init()` leaves it,
-    /// with what the scene writes on top.
-    fn build_node_(node_: &::star_script_runtime::scenes::SceneNode) -> ::std::result::Result<crate::classes::Node::Ref, ::std::string::String> {
-        let name_ = node_.name.clone();
-        let missing_ = |what_: &str| ::std::result::Result::Err(::std::format!(\"a `{what_}` needs a `[node.{}]`\", what_.to_lowercase()));
-        let object_: crate::classes::Node::Ref = match node_.class.as_deref() {
-            ::std::option::Option::None => default_object_(node_, name_),
-            ::std::option::Option::Some(\"Node\") => crate::classes::Node::new(name_),
-            ::std::option::Option::Some(\"Sprite\") => match &node_.sprite {
-                ::std::option::Option::Some(image_) => crate::classes::Sprite::new(name_, image_.texture.clone()),
-                ::std::option::Option::None => return missing_(\"Sprite\"),
-            },
-            ::std::option::Option::Some(\"Camera2D\") => crate::classes::Camera2D::new(name_),
-            ::std::option::Option::Some(\"Light2D\") => match &node_.light_2d {
-                ::std::option::Option::Some(light_) => crate::classes::Light2D::new(name_, light_.kind.clone()),
-                ::std::option::Option::None => return ::std::result::Result::Err(::std::string::String::from(\"a `Light2D` needs a `[node.light_2d]`\")),
-            },
-            ::std::option::Option::Some(\"Node3D\") => crate::classes::Node3D::new(name_),
-            ::std::option::Option::Some(\"Mesh\") => match &node_.mesh {
-                ::std::option::Option::Some(mesh_) => crate::classes::Mesh::new(name_, mesh_.shape.clone()),
-                ::std::option::Option::None => return missing_(\"Mesh\"),
-            },
-            ::std::option::Option::Some(\"Light\") => match &node_.light {
-                ::std::option::Option::Some(light_) => crate::classes::Light::new(name_, light_.kind.clone()),
-                ::std::option::Option::None => return missing_(\"Light\"),
-            },
-            ::std::option::Option::Some(\"Camera3D\") => crate::classes::Camera3D::new(name_),
-            ::std::option::Option::Some(class_) => crate::new_scene_object_(class_)?,
-        };
-        let class_ = node_.class.as_deref().unwrap_or(\"Node\");
-        let fields_ = crate::classes::Node::HasFields::fields(&*object_);
-        fields_.name.set(node_.name.clone());
-        if !node_.tags.is_empty() {
-            fields_.tags.set(::star_script_runtime::List::from_vec(node_.tags.clone()));
-        }
-        if !node_.fields.is_empty() {
-            crate::set_scene_fields_(class_, &object_, &node_.fields)?;
-        }
-        if let ::std::option::Option::Some(place_) = &node_.transform {
-            fields_.x.set(place_.x);
-            fields_.y.set(place_.y);
-            fields_.rotation.set(place_.rotation);
-            fields_.scale_x.set(place_.scale_x);
-            fields_.scale_y.set(place_.scale_y);
-        }
-        if let ::std::option::Option::Some(place_) = &node_.transform_3d {
-            let node_3d_ = crate::AnyObject::Node3D(::std::rc::Rc::clone(&object_))
-                .ok_or_else(|| ::std::format!(\"it is placed in 3D, but `{class_}` is not a `Node3D`\"))?;
-            fields_.x.set(place_.x);
-            fields_.y.set(place_.y);
-            fields_.rotation.set(place_.roll);
-            fields_.scale_x.set(place_.scale_x);
-            fields_.scale_y.set(place_.scale_y);
-            let depth_ = crate::classes::Node3D::HasFields::fields(&*node_3d_);
-            depth_.z.set(place_.z);
-            depth_.pitch.set(place_.pitch);
-            depth_.yaw.set(place_.yaw);
-            depth_.scale_z.set(place_.scale_z);
-        }
-        if let ::std::option::Option::Some(image_) = &node_.sprite {
-            let sprite_ = crate::AnyObject::Sprite(::std::rc::Rc::clone(&object_))
-                .ok_or_else(|| ::std::format!(\"it shows an image, but `{class_}` is not a `Sprite`\"))?;
-            let look_ = crate::classes::Sprite::HasFields::fields(&*sprite_);
-            look_.texture.set(image_.texture.clone());
-            look_.width.set(image_.width);
-            look_.height.set(image_.height);
-            look_.layer.set(image_.layer);
-            look_.pixelated.set(image_.pixelated);
-            let [r_, g_, b_, a_] = image_.color;
-            look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
-        }
-        if let ::std::option::Option::Some(shown_) = &node_.mesh {
-            let mesh_ = crate::AnyObject::Mesh(::std::rc::Rc::clone(&object_))
-                .ok_or_else(|| ::std::format!(\"it shows a mesh, but `{class_}` is not a `Mesh`\"))?;
-            let look_ = crate::classes::Mesh::HasFields::fields(&*mesh_);
-            look_.shape.set(shown_.shape.clone());
-            look_.width.set(shown_.width);
-            look_.height.set(shown_.height);
-            look_.depth.set(shown_.depth);
-            look_.radius.set(shown_.radius);
-            let [r_, g_, b_, a_] = shown_.color;
-            look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
-            look_.metallic.set(shown_.metallic);
-            look_.roughness.set(shown_.roughness);
-            look_.texture.set(shown_.texture.clone());
-            look_.pixelated.set(shown_.pixelated);
-        }
-        if let ::std::option::Option::Some(shone_) = &node_.light {
-            let light_ = crate::AnyObject::Light(::std::rc::Rc::clone(&object_))
-                .ok_or_else(|| ::std::format!(\"it shines a light, but `{class_}` is not a `Light`\"))?;
-            let look_ = crate::classes::Light::HasFields::fields(&*light_);
-            look_.kind.set(shone_.kind.clone());
-            let [r_, g_, b_, a_] = shone_.color;
-            look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
-            look_.intensity.set(shone_.intensity);
-            look_.range.set(shone_.range);
-            look_.angle.set(shone_.angle);
-            look_.blend.set(shone_.blend);
-        }
-        if let ::std::option::Option::Some(shone_) = &node_.light_2d {
-            let light_ = crate::AnyObject::Light2D(::std::rc::Rc::clone(&object_))
-                .ok_or_else(|| ::std::format!(\"it lights the sprites, but `{class_}` is not a `Light2D`\"))?;
-            let look_ = crate::classes::Light2D::HasFields::fields(&*light_);
-            look_.kind.set(shone_.kind.clone());
-            let [r_, g_, b_, a_] = shone_.color;
-            look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
-            look_.intensity.set(shone_.intensity);
-            look_.range.set(shone_.range);
-            look_.angle.set(shone_.angle);
-            look_.blend.set(shone_.blend);
-        }
-        if let ::std::option::Option::Some(view_) = &node_.camera {
-            let camera_ = crate::AnyObject::Camera2D(::std::rc::Rc::clone(&object_))
-                .ok_or_else(|| ::std::format!(\"it is a 2D camera, but `{class_}` is not a `Camera2D`\"))?;
-            let look_ = crate::classes::Camera2D::HasFields::fields(&*camera_);
-            look_.view_height.set(view_.view_height);
-            look_.main.set(view_.main);
-        }
-        if let ::std::option::Option::Some(view_) = &node_.camera_3d {
-            let camera_ = crate::AnyObject::Camera3D(::std::rc::Rc::clone(&object_))
-                .ok_or_else(|| ::std::format!(\"it is a 3D camera, but `{class_}` is not a `Camera3D`\"))?;
-            let look_ = crate::classes::Camera3D::HasFields::fields(&*camera_);
-            look_.fov.set(view_.fov);
-            look_.main.set(view_.main);
-        }
-        if let ::std::option::Option::Some(solid_) = &node_.body {
-            let body_ = crate::classes::Body::of_(crate::classes::Body::Fields::new(solid_.kind.clone(), &solid_.shape, solid_.radius, [solid_.width, solid_.height, solid_.depth]));
-            let surface_ = crate::classes::Body::HasFields::fields(&*body_);
-            surface_.gravity_scale.set(solid_.gravity_scale);
-            surface_.fixed_rotation.set(solid_.fixed_rotation);
-            surface_.friction.set(solid_.friction);
-            surface_.bounciness.set(solid_.bounciness);
-            surface_.density.set(solid_.density);
-            surface_.sensor.set(solid_.sensor);
-            fields_.body.set(::std::option::Option::Some(body_));
-        }
-        ::std::result::Result::Ok(object_)
-    }
-
-    /// The object of a node whose class the scene does not name: of the
-    /// engine class that can show what it has.
-    fn default_object_(node_: &::star_script_runtime::scenes::SceneNode, name_: ::std::string::String) -> crate::classes::Node::Ref {
-        if let ::std::option::Option::Some(image_) = &node_.sprite {
-            crate::classes::Sprite::new(name_, image_.texture.clone())
-        } else if let ::std::option::Option::Some(mesh_) = &node_.mesh {
-            crate::classes::Mesh::new(name_, mesh_.shape.clone())
-        } else if let ::std::option::Option::Some(light_) = &node_.light {
-            crate::classes::Light::new(name_, light_.kind.clone())
-        } else if let ::std::option::Option::Some(light_) = &node_.light_2d {
-            crate::classes::Light2D::new(name_, light_.kind.clone())
-        } else if node_.camera_3d.is_some() {
-            crate::classes::Camera3D::new(name_)
-        } else if node_.camera.is_some() {
-            crate::classes::Camera2D::new(name_)
-        } else if node_.transform_3d.is_some() {
-            crate::classes::Node3D::new(name_)
-        } else {
-            crate::classes::Node::new(name_)
-        }
-    }
 }";
 
 const SOUND_MODULE: &str = "/// `class Sound`, provided by the engine.
@@ -782,12 +625,7 @@ pub mod Sound {
 
     /// The fields of a sound: how it plays, which sound of the runtime it
     /// is, and the playings it started that may still sound.
-    pub struct Fields {
-        pub volume: ::star_script_runtime::Field<f32>,
-        pub looping: ::star_script_runtime::Field<bool>,
-        pub sound_: ::star_script_runtime::audio::SoundId,
-        pub voices_: ::std::cell::RefCell<::std::vec::Vec<::star_script_runtime::audio::VoiceId>>,
-    }
+    pub type Fields = ::star_script_runtime::audio::SoundFields;
 
     /// Gives access to the fields of this class.
     pub trait HasFields {
@@ -801,32 +639,24 @@ pub mod Sound {
         fn is_playing(self: ::std::rc::Rc<Self>) -> bool;
     }
 
-    /// The methods of a sound.
+    /// The methods of a sound: what `star_script_runtime::audio` does with
+    /// its fields.
     pub struct Methods;
 
     impl Methods {
-        /// `func play`: starts the sound once more, at its `volume`.
+        /// `func play`
         pub fn play(this_: &Ref) {
-            let fields_ = HasFields::fields(&**this_);
-            let mut voices_ = fields_.voices_.borrow_mut();
-            voices_.retain(|voice_| ::star_script_runtime::audio::is_playing(*voice_));
-            if let ::std::option::Option::Some(voice_) = ::star_script_runtime::audio::play(fields_.sound_, fields_.volume.get(), fields_.looping.get()) {
-                voices_.push(voice_);
-            }
+            HasFields::fields(&**this_).play();
         }
 
-        /// `func stop`: stops every playing this sound started.
+        /// `func stop`
         pub fn stop(this_: &Ref) {
-            for voice_ in HasFields::fields(&**this_).voices_.borrow_mut().drain(..) {
-                ::star_script_runtime::audio::stop(voice_);
-            }
+            HasFields::fields(&**this_).stop();
         }
 
-        /// `func is_playing`: whether a playing it started still sounds.
+        /// `func is_playing`
         pub fn is_playing(this_: &Ref) -> bool {
-            let mut voices_ = HasFields::fields(&**this_).voices_.borrow_mut();
-            voices_.retain(|voice_| ::star_script_runtime::audio::is_playing(*voice_));
-            !voices_.is_empty()
+            HasFields::fields(&**this_).is_playing()
         }
     }
 
@@ -849,19 +679,10 @@ pub mod Sound {
         fn is_playing(self: ::std::rc::Rc<Self>) -> bool { Methods::is_playing(&(self as Ref)) }
     }
 
-    /// `static func load`: the sound at `path`, at full volume and not
-    /// looping; `None` if it cannot be loaded. Sounds of the same file
-    /// share its samples.
+    /// `static func load`
     pub fn load(path: ::std::string::String) -> ::std::option::Option<Ref> {
-        let sound_ = ::star_script_runtime::audio::load(&path)?;
-        ::std::option::Option::Some(::std::rc::Rc::new(Instance {
-            Sound: Fields {
-                volume: ::star_script_runtime::Field::new(1.0),
-                looping: ::star_script_runtime::Field::new(false),
-                sound_,
-                voices_: ::std::cell::RefCell::new(::std::vec::Vec::new()),
-            },
-        }))
+        let fields_ = Fields::load(&path)?;
+        ::std::option::Option::Some(::std::rc::Rc::new(Instance { Sound: fields_ }))
     }
 }";
 

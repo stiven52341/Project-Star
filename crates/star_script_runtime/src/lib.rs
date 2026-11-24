@@ -26,6 +26,7 @@ pub mod parallel;
 pub mod placement;
 mod plain;
 pub mod scene_fields;
+pub mod scene_tree;
 pub mod scenes;
 pub mod tasks;
 #[cfg(test)]

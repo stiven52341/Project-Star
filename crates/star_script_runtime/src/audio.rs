@@ -13,6 +13,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Write as _;
 
+use crate::Field;
+
 /// A sound the backend loaded, by its number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SoundId(pub usize);
@@ -132,6 +134,56 @@ pub fn set_volume(volume: f32) {
     with_backend(|backend| backend.set_volume(volume), || ());
 }
 
+/// The fields of a `Sound`: how it plays, which sound of the backend it
+/// is, and the playings it started that may still sound.
+pub struct SoundFields {
+    /// `volume`
+    pub volume: Field<f32>,
+    /// `looping`
+    pub looping: Field<bool>,
+    sound: SoundId,
+    voices: RefCell<Vec<VoiceId>>,
+}
+
+impl SoundFields {
+    /// `static func load`: the sound at `path`, at full volume and not
+    /// looping; `None` if it cannot be loaded. Sounds of the same file
+    /// share its samples.
+    #[must_use]
+    pub fn load(path: &str) -> Option<Self> {
+        Some(Self {
+            volume: Field::new(DEFAULT_VOLUME),
+            looping: Field::new(false),
+            sound: load(path)?,
+            voices: RefCell::new(Vec::new()),
+        })
+    }
+
+    /// `func play`: starts the sound once more, at its `volume`.
+    pub fn play(&self) {
+        let mut voices = self.voices.borrow_mut();
+        voices.retain(|voice| is_playing(*voice));
+        if let Some(voice) = play(self.sound, self.volume.get(), self.looping.get()) {
+            voices.push(voice);
+        }
+    }
+
+    /// `func stop`: stops every playing this sound started.
+    pub fn stop(&self) {
+        for voice in self.voices.borrow_mut().drain(..) {
+            stop(voice);
+        }
+    }
+
+    /// `func is_playing`: whether a playing it started still sounds.
+    #[must_use]
+    pub fn is_playing(&self) -> bool {
+        let mut voices = self.voices.borrow_mut();
+        voices.retain(|voice| is_playing(*voice));
+        !voices.is_empty()
+    }
+}
+
 /// Runs `action` on the backend, or gives `missing()` without one.
 fn with_backend<T>(
     action: impl FnOnce(&mut dyn AudioBackend) -> T,
@@ -238,6 +290,20 @@ mod tests {
 
         stop(voice);
         assert!(!is_playing(voice));
+    }
+
+    #[test]
+    fn sounds_play_and_stop_every_playing_they_started() {
+        set_backend(FakeBackend::default());
+        let sound = SoundFields::load("sounds/jump.wav").unwrap();
+
+        sound.play();
+        sound.play();
+        assert!(sound.is_playing());
+
+        sound.stop();
+        assert!(!sound.is_playing());
+        assert!(SoundFields::load("notes/jump.txt").is_none());
     }
 
     #[test]
