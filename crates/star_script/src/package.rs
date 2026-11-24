@@ -108,12 +108,14 @@ impl Package {
              # Its own workspace, wherever it is written.\n\
              [workspace]\n\
              \n\
-             # The engine stays fast even in debug builds, as in ProjectStar.\n\
+             # The engine stays fast even in debug builds, as in ProjectStar,\n\
+             # with the same profile so they can share builds.\n\
              [profile.dev]\n\
              opt-level = 1\n\
              \n\
              [profile.dev.package.\"*\"]\n\
-             opt-level = 3\n",
+             opt-level = 3\n\
+             debug = \"line-tables-only\"\n",
             self.name,
             dependencies.join("\n")
         )
@@ -197,6 +199,13 @@ mod tests {
         )));
         assert!(!manifest.contains("star_engine"));
         assert!(manifest.contains("[workspace]"));
+    }
+
+    #[test]
+    fn dependencies_keep_only_their_line_tables() {
+        let manifest = game_package().manifest();
+
+        assert!(manifest.contains("opt-level = 3\ndebug = \"line-tables-only\"\n"));
     }
 
     #[test]

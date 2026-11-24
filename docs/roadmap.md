@@ -327,10 +327,16 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] b. Prepare the engine in the background when a project opens (a
         build of a small package with the same dependencies), so the first
         “Play” finds it built; show that it is being prepared.
-  - [ ] c. Measure lighter profiles: the engine's crates at
+  - [x] c. Measure lighter profiles: the engine's crates at
         `opt-level = 1` and dependencies without full debug information
         (`debug = "line-tables-only"`), checking the frame rate of the
-        examples.
+        examples. Measured with a game of 1000 physics bodies and 4000
+        spinning sprites (CPU-bound at 60 FPS): line tables only cut the
+        full build from 568 s to 485 s and its folder from 2.8 GB to
+        1.8 GB, with the same frame rate, so games and the repository use
+        it. The engine at `opt-level = 1` only saved 12 s more and dropped
+        to 58 FPS, so it stays at 3; a change to the engine's code rebuilds
+        in about 4 s either way (incremental builds), not minutes.
   - [ ] d. Try sharing the third-party builds with the editor's `target`
         (same lockfile and profile); keep it only if it really reuses them.
   - [ ] e. Projects without scripts: a ready-made player built with the
