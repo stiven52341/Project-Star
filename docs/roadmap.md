@@ -310,4 +310,29 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         its main camera, which it must have (decision 62).
   - [x] A small preview of what a camera sees, in 2D and 3D: the camera
         selected, or else the main one, in a corner of the view.
+- [ ] **Faster “Play” (planned 2026-11-24)**. Measured on the test
+      project (4 cores): a change to the game's code alone rebuilds in
+      1.6 s, but a full build takes 10 min 37 s, almost all of it
+      third-party crates (naga, wgpu-core, rapier, parry, x11rb, winit) at
+      `opt-level = 3`; the engine's own crates take about 3 min of it.
+      Full builds happen because each game package resolves its own
+      `Cargo.lock` (10 versions differed from the repository's and drift
+      when Cargo re-resolves), after toolchain updates, and the engine's
+      crates are rebuilt at `opt-level = 3` after every engine change.
+  - [ ] a. Write the repository's `Cargo.lock` into the game package, so
+        every project shares the same versions and builds; write
+        `Cargo.toml` and the code only when they changed.
+  - [ ] b. Prepare the engine in the background when a project opens (a
+        build of a small package with the same dependencies), so the first
+        “Play” finds it built; show that it is being prepared.
+  - [ ] c. Measure lighter profiles: the engine's crates at
+        `opt-level = 1` and dependencies without full debug information
+        (`debug = "line-tables-only"`), checking the frame rate of the
+        examples.
+  - [ ] d. Try sharing the third-party builds with the editor's `target`
+        (same lockfile and profile); keep it only if it really reuses them.
+  - [ ] e. Projects without scripts: a ready-made player built with the
+        editor that opens the main scene, so they play without Cargo.
+  - [ ] f. To discuss, much bigger: running StarScript without Rust while
+        editing (an interpreter), for instant “Play” and hot reload.
 - [ ] **Future — Consoles** (PlayStation, Xbox).
