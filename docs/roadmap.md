@@ -319,9 +319,11 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       `Cargo.lock` (10 versions differed from the repository's and drift
       when Cargo re-resolves), after toolchain updates, and the engine's
       crates are rebuilt at `opt-level = 3` after every engine change.
-  - [ ] a. Write the repository's `Cargo.lock` into the game package, so
+  - [x] a. Write the repository's `Cargo.lock` into the game package, so
         every project shares the same versions and builds; write
-        `Cargo.toml` and the code only when they changed.
+        `Cargo.toml` and the code only when they changed. Measured: after
+        one project caught up with the repository's versions, a second
+        project built in 11.8 s instead of a full build.
   - [ ] b. Prepare the engine in the background when a project opens (a
         build of a small package with the same dependencies), so the first
         “Play” finds it built; show that it is being prepared.

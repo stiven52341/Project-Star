@@ -17,6 +17,7 @@ pub struct Package {
     name: String,
     engine_crates: PathBuf,
     programs: Vec<(String, GeneratedProgram)>,
+    lockfile: Option<String>,
 }
 
 impl Package {
@@ -33,7 +34,20 @@ impl Package {
             name: name.to_owned(),
             engine_crates: engine_crates.to_path_buf(),
             programs: Vec::new(),
+            lockfile: None,
         })
+    }
+
+    /// The package with `lockfile` as its `Cargo.lock`: the versions of the
+    /// dependencies it builds with.
+    ///
+    /// Given ProjectStar's own `Cargo.lock`, every package builds the same
+    /// versions as the engine, so they can share one build of them; Cargo
+    /// only adds the package itself and drops what it does not use.
+    #[must_use]
+    pub fn with_lockfile(mut self, lockfile: String) -> Self {
+        self.lockfile = Some(lockfile);
+        self
     }
 
     /// Adds a program: a binary called `name` with the generated code.
@@ -50,15 +64,21 @@ impl Package {
 
     /// Writes the package in `directory`, creating it if needed.
     ///
+    /// Files that already hold the same text are left alone: Cargo rebuilds
+    /// a package whose files were written again, even if nothing changed.
+    ///
     /// # Errors
     ///
-    /// Returns any error writing the files.
+    /// Returns any error reading or writing the files.
     pub fn write(&self, directory: &Path) -> io::Result<()> {
         let binaries = directory.join("src").join("bin");
         fs::create_dir_all(&binaries)?;
-        fs::write(directory.join("Cargo.toml"), self.manifest())?;
+        write_if_changed(&directory.join("Cargo.toml"), &self.manifest())?;
+        if let Some(lockfile) = &self.lockfile {
+            write_if_changed(&directory.join(LOCKFILE), lockfile)?;
+        }
         for (name, program) in &self.programs {
-            fs::write(binaries.join(format!("{name}.rs")), &program.code)?;
+            write_if_changed(&binaries.join(format!("{name}.rs")), &program.code)?;
         }
         Ok(())
     }
@@ -110,6 +130,18 @@ impl Package {
 const RUNTIME_CRATE: &str = "star_script_runtime";
 /// Crate that games depend on.
 const ENGINE_CRATE: &str = "star_engine";
+/// The file with the versions of the package's dependencies.
+const LOCKFILE: &str = "Cargo.lock";
+
+/// Writes `text` to `path` unless it already holds exactly that.
+fn write_if_changed(path: &Path, text: &str) -> io::Result<()> {
+    match fs::read_to_string(path) {
+        Ok(current) if current == text => Ok(()),
+        Ok(_) => fs::write(path, text),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => fs::write(path, text),
+        Err(error) => Err(error),
+    }
+}
 
 /// Package and binary names: what Cargo and every platform accept.
 fn check_name(name: &str) -> io::Result<()> {
@@ -175,6 +207,92 @@ mod tests {
             .expect("valid name");
 
         assert!(package.manifest().contains("star_engine = { path = "));
+    }
+
+    /// A folder of its own under the system's temporary folder, emptied first.
+    fn test_directory(name: &str) -> PathBuf {
+        let directory = std::env::temp_dir().join(format!("star_script_package_{name}"));
+        let _ = fs::remove_dir_all(&directory);
+        directory
+    }
+
+    fn game_package() -> Package {
+        let mut package = Package::new("demo", Path::new("/engine")).expect("valid name");
+        package
+            .add_program(
+                "game",
+                GeneratedProgram {
+                    code: "fn main() {}\n".to_owned(),
+                    entry_point: EntryPoint::Main,
+                },
+            )
+            .expect("valid name");
+        package
+    }
+
+    #[test]
+    fn the_lockfile_is_written_when_given() {
+        let directory = test_directory("lockfile");
+
+        game_package()
+            .with_lockfile("version = 4\n".to_owned())
+            .write(&directory)
+            .expect("written");
+
+        let lockfile = fs::read_to_string(directory.join(LOCKFILE)).expect("lockfile");
+        assert_eq!(lockfile, "version = 4\n");
+    }
+
+    #[test]
+    fn without_a_lockfile_cargo_chooses_the_versions() {
+        let directory = test_directory("no_lockfile");
+
+        game_package().write(&directory).expect("written");
+
+        assert!(!directory.join(LOCKFILE).exists());
+    }
+
+    #[test]
+    fn unchanged_files_are_not_written_again() {
+        let directory = test_directory("unchanged");
+        let package = game_package();
+        package.write(&directory).expect("written");
+        let code = directory.join("src").join("bin").join("game.rs");
+        let old = std::time::SystemTime::UNIX_EPOCH;
+        fs::File::options()
+            .write(true)
+            .open(&code)
+            .and_then(|file| file.set_modified(old))
+            .expect("modification time set");
+
+        package.write(&directory).expect("written again");
+
+        let modified = fs::metadata(&code)
+            .and_then(|metadata| metadata.modified())
+            .expect("modification time");
+        assert_eq!(modified, old);
+    }
+
+    #[test]
+    fn changed_files_are_written_again() {
+        let directory = test_directory("changed");
+        game_package().write(&directory).expect("written");
+        let mut package = Package::new("demo", Path::new("/engine")).expect("valid name");
+        package
+            .add_program(
+                "game",
+                GeneratedProgram {
+                    code: "fn main() { println!(); }\n".to_owned(),
+                    entry_point: EntryPoint::Main,
+                },
+            )
+            .expect("valid name");
+
+        package.write(&directory).expect("written again");
+
+        let code =
+            fs::read_to_string(directory.join("src").join("bin").join("game.rs")).expect("code");
+        assert_eq!(code, "fn main() { println!(); }\n");
     }
 
     #[test]

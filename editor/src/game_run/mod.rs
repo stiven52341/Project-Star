@@ -9,6 +9,7 @@ mod process;
 
 use std::env;
 use std::ffi::OsString;
+use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -25,6 +26,9 @@ use crate::texts;
 
 /// The `crates` folder of the repository, with the runtime and the engine.
 const ENGINE_CRATES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../crates");
+/// The repository's `Cargo.lock`: games build the same versions as the
+/// engine and the editor, so every project shares one build of them.
+const ENGINE_LOCKFILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.lock");
 /// A crate that is always in the engine's folder, to tell that it is there.
 const ENGINE_CRATE: &str = "star_engine";
 /// Where games are written and built, inside the repository's `target`: one
@@ -206,7 +210,8 @@ fn write_package(
     engine: &Path,
     directory: &Path,
 ) -> io::Result<()> {
-    let mut package = Package::new(name, engine)?;
+    let lockfile = fs::read_to_string(ENGINE_LOCKFILE)?;
+    let mut package = Package::new(name, engine)?.with_lockfile(lockfile);
     package.add_program(name, program.clone())?;
     package.write(directory)
 }
@@ -272,6 +277,25 @@ mod tests {
     #[test]
     fn the_engine_is_found_in_the_repository() {
         assert!(Path::new(ENGINE_CRATES).join(ENGINE_CRATE).is_dir());
+    }
+
+    #[test]
+    fn games_share_the_engine_lockfile() {
+        let package = Path::new(BUILD_DIRECTORY).join("editor_test_lockfile");
+        let program = star_script::compile_source("class Main {\n static func main() {}\n}\n")
+            .expect("valid program");
+
+        write_package(
+            "editor_test_lockfile",
+            &program,
+            Path::new(ENGINE_CRATES),
+            &package,
+        )
+        .expect("written");
+
+        let written = fs::read_to_string(package.join("Cargo.lock")).expect("lockfile");
+        let engine = fs::read_to_string(ENGINE_LOCKFILE).expect("engine lockfile");
+        assert_eq!(written, engine);
     }
 
     #[test]
