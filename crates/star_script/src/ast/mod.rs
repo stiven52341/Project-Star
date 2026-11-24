@@ -25,6 +25,9 @@ use crate::Span;
 pub struct SourceFile {
     /// The classes declared in the file, in source order.
     pub classes: Vec<ClassDecl>,
+    /// The first number no expression of the file has: code made later
+    /// (decorated methods) numbers its expressions from it.
+    pub next_expression_id: u32,
 }
 
 /// A name written in the source, such as a class, variable or method name.

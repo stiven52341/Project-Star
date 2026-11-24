@@ -465,7 +465,13 @@ fn each_stray_closing_brace_is_reported_without_hanging() {
 
 #[test]
 fn empty_token_list_is_an_empty_file() {
-    assert_eq!(parse(&[]), Ok(crate::ast::SourceFile { classes: vec![] }));
+    assert_eq!(
+        parse(&[]),
+        Ok(crate::ast::SourceFile {
+            classes: vec![],
+            next_expression_id: 0
+        })
+    );
 }
 
 #[test]

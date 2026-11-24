@@ -6,6 +6,7 @@
 //! arguments are plain values, read while checking.
 
 use crate::ast::{ClassDecl, Decorator, Member, MemberKind, ModifierKind};
+use crate::decorated::DECORATOR_CLASS;
 
 use super::checker::Checker;
 use super::field_defaults::{FieldDefault, plain_value};
@@ -101,8 +102,7 @@ impl Checker<'_> {
             }
             seen.push(name);
             if !ENGINE_DECORATORS.contains(&name) {
-                let kind = SemanticErrorKind::UnknownDecorator(name.to_owned());
-                self.error(kind, decorator.name.span);
+                self.check_program_decorator(member, decorator);
                 continue;
             }
             let Some(index) = field else {
@@ -114,6 +114,46 @@ impl Checker<'_> {
             self.read_engine_decorator(decorator, &ty, &mut hints);
         }
         hints
+    }
+
+    /// A decorator of the program: a class that extends `Decorator`, on a
+    /// method that returns nothing and runs at once on an object.
+    fn check_program_decorator(&mut self, member: &Member, decorator: &Decorator) {
+        let name = &decorator.name.text;
+        if self.decorator_class(name).is_none() {
+            let kind = if self.analysis.classes.find(name).is_some() {
+                SemanticErrorKind::NotADecorator(name.clone())
+            } else {
+                SemanticErrorKind::UnknownDecorator(name.clone())
+            };
+            self.error(kind, decorator.name.span);
+            return;
+        }
+        let fits = match &member.kind {
+            MemberKind::Method(method) => {
+                method.return_type.is_none()
+                    && ![
+                        ModifierKind::Static,
+                        ModifierKind::Async,
+                        ModifierKind::Parallel,
+                    ]
+                    .iter()
+                    .any(|modifier| member.has_modifier(*modifier))
+            }
+            MemberKind::Variable(_) | MemberKind::Constructor(_) => false,
+        };
+        if !fits {
+            let kind = SemanticErrorKind::DecoratorNeedsMethod(name.clone());
+            self.error(kind, decorator.span);
+        }
+    }
+
+    /// The class called `name`, if it extends `Decorator`.
+    pub(super) fn decorator_class(&self, name: &str) -> Option<ClassId> {
+        let classes = &self.analysis.classes;
+        let decorator = classes.find(DECORATOR_CLASS)?;
+        let class = classes.find(name)?;
+        (class != decorator && classes.is_subclass(class, decorator)).then_some(class)
     }
 
     /// Reads one of the engine's decorators on a field of type `ty` into

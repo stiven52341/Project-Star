@@ -160,6 +160,11 @@ pub enum SemanticErrorKind {
     MissingTypeOrValue(String),
     /// A decorator that is neither the engine's nor a class.
     UnknownDecorator(String),
+    /// A decorator that names a class which does not extend `Decorator`.
+    NotADecorator(String),
+    /// A decorator of the program on something other than a method that
+    /// returns nothing and runs at once on an object.
+    DecoratorNeedsMethod(String),
     /// The same decorator twice on one member.
     DuplicateDecorator(String),
     /// One of the engine's decorators on something other than an `export`
@@ -384,7 +389,15 @@ impl fmt::Display for SemanticErrorKind {
             }
             Self::UnknownDecorator(name) => write!(
                 formatter,
-                "there is no decorator `@{name}`: the engine's are `@range`, `@tooltip`, `@header` and `@multiline`"
+                "there is no decorator `@{name}`: the engine's are `@range`, `@tooltip`, `@header` and `@multiline`, and the program's are classes that extend `Decorator`"
+            ),
+            Self::NotADecorator(name) => write!(
+                formatter,
+                "`{name}` is not a decorator: a decorator class extends `Decorator`"
+            ),
+            Self::DecoratorNeedsMethod(name) => write!(
+                formatter,
+                "`@{name}` only goes on methods that return nothing and are not `static`, `async` or `parallel`"
             ),
             Self::DuplicateDecorator(name) => {
                 write!(formatter, "`@{name}` is written twice on the same member")

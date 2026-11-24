@@ -287,6 +287,7 @@ fn native_call(class: &str, method: &str, arguments: &str) -> Option<String> {
         ("Audio", "volume") => Some(format!("{RUNTIME}::audio::volume()")),
         ("Audio", "set_volume") => Some(format!("{RUNTIME}::audio::set_volume({arguments})")),
         ("Time", "wait") => Some(format!("{RUNTIME}::tasks::wait({arguments})")),
+        ("Time", "now") => Some(format!("{RUNTIME}::tasks::now()")),
         ("Time", "next_frame") => Some(format!("{RUNTIME}::tasks::next_frame()")),
         _ => None,
     }

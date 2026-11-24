@@ -6,6 +6,9 @@
 //! - Rust keywords become raw identifiers: `type` → `r#type`.
 //! - A name ending in `_`, or one that Rust cannot use at all (`crate`,
 //!   `Self`, `None`, …), gets an extra `_`: `count_` → `count__`.
+//! - The hidden names of decorated methods (`open@body`, `@0@open`) have
+//!   their `@` written as `_` and end in a single `_`, among the
+//!   generator's own: `open_body_`, `_0_open_`.
 //!
 //! So the translation never gives two names the same Rust name, and the
 //! generator's own names (`this_`, `object_`, `field0_`, …) end in a single
@@ -30,7 +33,9 @@ const UNUSABLE_NAMES: &[&str] = &[
 /// The Rust identifier for a StarScript name.
 #[must_use]
 pub(super) fn ident(name: &str) -> String {
-    if name.ends_with('_') || UNUSABLE_NAMES.contains(&name) {
+    if name.contains('@') {
+        format!("{}_", name.replace('@', "_"))
+    } else if name.ends_with('_') || UNUSABLE_NAMES.contains(&name) {
         format!("{name}_")
     } else if RUST_KEYWORDS.contains(&name) {
         format!("r#{name}")
@@ -47,6 +52,12 @@ mod tests {
     fn ordinary_names_are_kept() {
         assert_eq!(ident("speed"), "speed");
         assert_eq!(ident("Player"), "Player");
+    }
+
+    #[test]
+    fn hidden_names_join_the_generators_own() {
+        assert_eq!(ident("open@body"), "open_body_");
+        assert_eq!(ident("@0@open"), "_0_open_");
     }
 
     #[test]

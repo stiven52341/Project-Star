@@ -173,6 +173,7 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     time.methods = vec![
         native_async_method("wait", &[("seconds", Type::Float)]),
         native_async_method("next_frame", &[]),
+        native_method("now", &[], Type::Float, true),
     ];
     classes.add(time);
 

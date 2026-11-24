@@ -6,6 +6,7 @@
 //! being written, the classes, keywords and basic types.
 //! What names mean there is the `scope` module's.
 
+use star_script::decorated::is_hidden_name;
 use star_script::semantic::{
     BASIC_TYPE_NAMES, BuiltinSignature, ClassTable, Execution, MethodInfo, Type, builtin_methods,
 };
@@ -193,10 +194,12 @@ fn members(classes: &ClassTable, receiver: Receiver, everything: bool) -> Vec<Ca
         let wanted = |is_static: bool, is_private: bool| {
             (everything || is_static == receiver.statics) && (receiver.private || !is_private)
         };
+        // The members the compiler made for decorated methods are not
+        // written by anyone, so they are not offered.
         for field in class
             .fields
             .iter()
-            .filter(|field| wanted(false, field.is_private))
+            .filter(|field| wanted(false, field.is_private) && !is_hidden_name(&field.name))
         {
             candidates.push(Candidate {
                 signature: Some(classes.type_name(&field.ty)),
@@ -213,11 +216,9 @@ fn members(classes: &ClassTable, receiver: Receiver, everything: bool) -> Vec<Ca
                 ..plain(constant.name.clone(), CandidateKind::Value)
             });
         }
-        for method in class
-            .methods
-            .iter()
-            .filter(|method| wanted(method.is_static, method.is_private))
-        {
+        for method in class.methods.iter().filter(|method| {
+            wanted(method.is_static, method.is_private) && !is_hidden_name(&method.name)
+        }) {
             candidates.push(Candidate {
                 signature: Some(format!(
                     "{}{}",
@@ -289,7 +290,7 @@ mod tests {
 
     use super::*;
 
-    const PROGRAM: &str = "class Rock extends Node {\n  var size: int = 1\n  private var secret = 2\n  var friend: Rock? = null\n  static func make(size: int) -> Rock {\n    return Rock()\n  }\n  func roll() {}\n}\n";
+    const PROGRAM: &str = "class Rock extends Node {\n  var size: int = 1\n  private var secret = 2\n  var friend: Rock? = null\n  static func make(size: int) -> Rock {\n    return Rock()\n  }\n  func roll() {}\n  @Once\n  func knock() {}\n}\nclass Once extends Decorator {}\n";
 
     fn classes() -> ClassTable {
         let mut sources = SourceSet::new();
@@ -342,6 +343,14 @@ mod tests {
         // Inherited from `Node`.
         assert!(names.contains(&"add_child".to_owned()));
         assert!(!names.contains(&"make".to_owned()));
+    }
+
+    #[test]
+    fn members_made_for_decorators_are_not_offered() {
+        let names = suggested(&inside_rock("self.|"));
+
+        assert!(names.contains(&"knock".to_owned()));
+        assert!(names.iter().all(|name| !name.contains('@')), "{names:?}");
     }
 
     #[test]

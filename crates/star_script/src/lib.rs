@@ -21,6 +21,7 @@
 
 pub mod ast;
 pub mod codegen;
+pub mod decorated;
 mod diagnostic;
 pub mod lexer;
 pub mod package;
@@ -71,7 +72,10 @@ pub fn parse_program(sources: &SourceSet) -> Result<ast::SourceFile, Vec<Compile
         }
     }
     if errors.is_empty() {
-        Ok(ast::SourceFile { classes })
+        Ok(ast::SourceFile {
+            classes,
+            next_expression_id,
+        })
     } else {
         Err(errors)
     }
@@ -156,14 +160,16 @@ pub fn analyze_program_with(
     sources: &SourceSet,
     settings: &GameSettings,
 ) -> Option<semantic::Analysis> {
-    let syntax = parse_program(sources).ok()?;
+    let mut syntax = parse_program(sources).ok()?;
+    decorated::prepare(&mut syntax);
     Some(semantic::analyze_with(&syntax, settings).0)
 }
 
 fn check_syntax(
-    syntax: ast::SourceFile,
+    mut syntax: ast::SourceFile,
     settings: &GameSettings,
 ) -> Result<CheckedSource, Vec<CompileError>> {
+    decorated::prepare(&mut syntax);
     let analysis = semantic::check_with(&syntax, settings).map_err(|errors| {
         errors
             .into_iter()

@@ -140,6 +140,14 @@ pub fn run_until_finished() {
     }
 }
 
+/// `Time.now()`: the seconds of the game so far, the sum of the frames'
+/// `delta`s: the clock `Time.wait` counts with.
+#[must_use]
+#[allow(clippy::cast_possible_truncation)] // `float` is how StarScript keeps decimals.
+pub fn now() -> f32 {
+    NOW.with(Cell::get) as f32
+}
+
 /// `Time.wait(seconds)`: waits until `seconds` of the game have passed,
 /// counted from when it is awaited.
 #[must_use]
@@ -203,6 +211,16 @@ mod tests {
 
     fn clear() {
         WAITING.with(|waiting| waiting.borrow_mut().clear());
+    }
+
+    #[test]
+    fn the_clock_is_the_sum_of_the_frames() {
+        let start = now();
+
+        frame(0.25);
+        frame(0.5);
+
+        assert!((now() - start - 0.75).abs() < 1e-6);
     }
 
     #[test]

@@ -357,6 +357,46 @@ export var notes = ""
 
 A name that is not one of these is an error, as is the same decorator
 twice on one member, or one on a field of a type it does not fit.
+
+**Decorators of the program** are classes that extend `Decorator`, an
+engine class written in StarScript. They go on methods that return
+nothing and are not `static`, `async` or `parallel`, and run around them:
+`before(method)` first (if it gives `false`, the method does not run) and
+`after(method)` when it ends. Their arguments are given to their `init`.
+
+```
+class Cooldown extends Decorator {
+    var seconds: float
+    var last = -1000.0
+
+    init(seconds: float) {
+        self.seconds = seconds
+    }
+
+    override func before(method: string) -> bool {
+        if Time.now() - last < seconds {
+            return false
+        }
+        last = Time.now()
+        return true
+    }
+}
+
+class Player extends Node {
+    @Cooldown(0.5)
+    func shoot() { … }
+}
+```
+
+- Each object keeps its own decorator objects, made with it: a cooldown
+  counts for each player apart.
+- Several decorators nest, the first one outermost: `@Log @Once func f()`
+  logs every call, also those `Once` stops.
+- StarScript has no functions as values, so the compiler rewrites each
+  decorated method before checking it: the code moves to a hidden method,
+  and the method calls `before`, that code and `after` of each decorator,
+  kept in hidden fields. Hidden names have `@`, so no program can name
+  them, and the editor does not suggest them.
 - **`static func`**: belongs to the class and is called as `Class.method()`;
   it has no `self`. `static var` fields do not exist yet.
 - **`is` and `as`**: `x is Player` checks the class. `x as Player` towards a
@@ -430,7 +470,8 @@ The engine provides them; their names cannot be used for other classes.
 | `Scene` | `static load(path: string) -> Node?` |
 | `Sound` | no `init`: `static load(path: string) -> Sound?`; fields `volume: float` (1.0), `looping: bool` (`false`); `play()`, `stop()`, `is_playing() -> bool` |
 | `Audio` | `static volume() -> float`, `static set_volume(volume: float)` |
-| `Time` | `static async wait(seconds: float)`, `static async next_frame()`: what coroutines wait for (section 7) |
+| `Time` | `static async wait(seconds: float)`, `static async next_frame()`: what coroutines wait for (section 7); `static now() -> float`: the seconds of the game so far (the sum of the frames' `delta`s, the clock `wait` counts with) |
+| `Decorator` | `before(method: string) -> bool` (`true`), `after(method: string)`: what the program's decorators redefine (see “Decorators”) |
 | `Body` | no `init`: `static circle(kind: string, radius: float) -> Body`, `static rectangle(kind: string, width: float, height: float) -> Body`, `static capsule(kind: string, height: float, radius: float) -> Body`, `static sphere(kind: string, radius: float) -> Body`, `static box(kind: string, width: float, height: float, depth: float) -> Body`; fields `kind`, `shape: string`, `radius` (0.5), `width`, `height`, `depth` (1.0), `gravity_scale` (1.0), `friction` (0.5), `bounciness` (0.0), `density` (1.0), `velocity_x`, `velocity_y`, `velocity_z: float` (0.0), `fixed_rotation`, `sensor: bool` (`false`); `apply_impulse(x: float, y: float)`, `apply_impulse_3d(x: float, y: float, z: float)`, `touching() -> [Node]`, `just_touched() -> [Node]`, `just_separated() -> [Node]` |
 | `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool`, `static strength(action: string) -> float`, `static axis(negative: string, positive: string) -> float`, `static pointer_x() -> float`, `static pointer_y() -> float`, `static has_pointer() -> bool` |
 

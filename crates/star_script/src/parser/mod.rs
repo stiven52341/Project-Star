@@ -74,7 +74,10 @@ impl<'tokens> Parser<'tokens> {
         loop {
             self.skip_separators();
             if self.at(&TokenKind::EndOfFile) {
-                return SourceFile { classes };
+                return SourceFile {
+                    classes,
+                    next_expression_id: self.next_expression_id,
+                };
             }
             if self.at_keyword(Keyword::Class) {
                 match self.class_declaration() {

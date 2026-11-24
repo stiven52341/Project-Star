@@ -12,9 +12,10 @@ use super::{
 };
 use crate::Span;
 use crate::ast::{
-    ClassDecl, ConstructorDecl, Expr, Member, MemberKind, MethodDecl, ModifierKind, Parameter,
-    SourceFile, VariableDecl, VariableKind,
+    ClassDecl, ConstructorDecl, Expr, ExprKind, Member, MemberKind, MethodDecl, ModifierKind,
+    Parameter, SourceFile, VariableDecl, VariableKind,
 };
+use crate::decorated::is_hidden_name;
 
 impl Checker<'_> {
     pub(super) fn check_file(&mut self) {
@@ -409,6 +410,11 @@ impl Checker<'_> {
             let Some(index) = self.own_field(id, field) else {
                 continue;
             };
+            if is_hidden_name(&field.name.text) && !self.makes_a_decorator(field) {
+                // Its decorator is reported as unknown where it is written.
+                self.analysis.classes.class_mut(id).fields[index].ty = Type::Error;
+                continue;
+            }
             self.context = BodyContext::new(id, ContextKind::FieldInitializer, Type::Void);
             let declared = field
                 .type_annotation
@@ -428,6 +434,22 @@ impl Checker<'_> {
             }
             self.analysis.classes.class_mut(id).fields[index].ty = ty;
         }
+    }
+
+    /// Whether the hidden `field` of a decorated method makes an object of
+    /// a decorator class.
+    fn makes_a_decorator(&self, field: &VariableDecl) -> bool {
+        let class = field
+            .initializer
+            .as_ref()
+            .and_then(|value| match &value.kind {
+                ExprKind::Call { callee, .. } => match &callee.kind {
+                    ExprKind::Name(name) => Some(name),
+                    _ => None,
+                },
+                _ => None,
+            });
+        class.is_some_and(|class| self.decorator_class(class).is_some())
     }
 
     /// An exported field belongs to a node, the only objects scenes make,
