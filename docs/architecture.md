@@ -632,6 +632,10 @@ last check of the scripts (the live check, asked for when the project
 opens): each shows the value the scene gives it, in bold, or the class's
 own (`FieldInfo::default`, when the class writes a plain value), and
 changing it writes it in `[node.fields]`; “Reset” takes it out again.
+The field's decorators (`FieldInfo::hints`) shape its row: `@header` puts
+a title before it, `@tooltip` a help over its name, `@range` a slider
+(whole numbers keep to the whole values inside it) and `@multiline` a box
+of several lines.
 Values for fields the class does not export are shown in red, to remove.
 Changes mark the tab (`•`) until “Save” (`Ctrl+S`),
 “Compile” or “Play” writes the file with `SceneOutline::to_text`; opening

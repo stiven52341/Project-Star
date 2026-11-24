@@ -6,7 +6,9 @@ use std::collections::BTreeMap;
 
 use eframe::egui;
 use star_engine::star_scene::FieldValue;
-use star_script::semantic::{COLOR_CLASS, ClassTable, FieldDefault, FieldInfo, Type};
+use star_script::semantic::{
+    COLOR_CLASS, ClassTable, FieldDefault, FieldInfo, InspectorHints, NumberRange, Type,
+};
 
 use super::fields::DRAG_SPEED;
 use crate::style::ERROR_COLOR;
@@ -34,6 +36,8 @@ pub(super) struct ExportedField {
     /// What the class gives it, or the empty value of its kind if the
     /// class computes it.
     pub(super) default: FieldValue,
+    /// What its decorators say: its range, help, title and text box.
+    pub(super) hints: InspectorHints,
 }
 
 /// The `export` fields of the class `class` and its bases, bases first;
@@ -81,6 +85,7 @@ fn exported_field(classes: &ClassTable, field: &FieldInfo) -> Option<ExportedFie
         name: field.name.clone(),
         kind,
         default,
+        hints: field.hints.clone(),
     })
 }
 
@@ -162,19 +167,26 @@ fn field_row(
     values: &mut BTreeMap<String, FieldValue>,
     field: &ExportedField,
 ) -> bool {
+    if let Some(header) = &field.hints.header {
+        ui.strong(header);
+        ui.end_row();
+    }
     let given = values
         .get(&field.name)
         .and_then(|value| shown(field.kind, value));
-    if given.is_some() {
-        ui.strong(&field.name);
+    let name = if given.is_some() {
+        ui.strong(&field.name)
     } else {
-        ui.weak(&field.name);
+        ui.weak(&field.name)
+    };
+    if let Some(tooltip) = &field.hints.tooltip {
+        name.on_hover_text(tooltip);
     }
     let mut value = given.clone().unwrap_or_else(|| field.default.clone());
     let mut reset = false;
     let edited = ui
         .horizontal(|ui| {
-            let edited = edit_value(ui, field.kind, &mut value);
+            let edited = edit_value(ui, field.kind, &field.hints, &mut value);
             if given.is_some() || values.contains_key(&field.name) {
                 reset = ui
                     .small_button(texts::current().reset)
@@ -195,22 +207,64 @@ fn field_row(
     edited
 }
 
-/// What edits `value`, a value of `kind`. Returns whether it changed.
-fn edit_value(ui: &mut egui::Ui, kind: FieldKind, value: &mut FieldValue) -> bool {
+/// What edits `value`, a value of `kind`, as `hints` say: a slider for
+/// numbers with a range, a box of several lines for a multiline text.
+/// Returns whether it changed.
+fn edit_value(
+    ui: &mut egui::Ui,
+    kind: FieldKind,
+    hints: &InspectorHints,
+    value: &mut FieldValue,
+) -> bool {
     match (kind, value) {
-        (FieldKind::Whole { min, max }, FieldValue::Int(number)) => ui
-            .add(egui::DragValue::new(number).range(min..=max))
-            .changed(),
-        (FieldKind::Decimal, FieldValue::Float(number)) => ui
-            .add(egui::DragValue::new(number).speed(DRAG_SPEED))
-            .changed(),
+        (FieldKind::Whole { min, max }, FieldValue::Int(number)) => match hints.range {
+            Some(range) => {
+                let (low, high) = whole_limits(range, min, max);
+                let step = range.step.unwrap_or(1.0).max(1.0);
+                ui.add(egui::Slider::new(number, low..=high).step_by(step))
+                    .changed()
+            }
+            None => ui
+                .add(egui::DragValue::new(number).range(min..=max))
+                .changed(),
+        },
+        (FieldKind::Decimal, FieldValue::Float(number)) => match hints.range {
+            Some(range) => {
+                let slider = egui::Slider::new(number, range.min..=range.max);
+                let slider = match range.step {
+                    Some(step) => slider.step_by(step),
+                    None => slider,
+                };
+                ui.add(slider).changed()
+            }
+            None => ui
+                .add(egui::DragValue::new(number).speed(DRAG_SPEED))
+                .changed(),
+        },
         (FieldKind::Bool, FieldValue::Bool(truth)) => ui.checkbox(truth, "").changed(),
+        (FieldKind::Text, FieldValue::Text(text)) if hints.multiline => ui
+            .add(egui::TextEdit::multiline(text).desired_rows(MULTILINE_ROWS))
+            .changed(),
         (FieldKind::Text, FieldValue::Text(text)) => ui.text_edit_singleline(text).changed(),
         (FieldKind::Color, FieldValue::Color(parts)) => {
             ui.color_edit_button_rgba_unmultiplied(parts).changed()
         }
         _ => false,
     }
+}
+
+/// How many lines a multiline text box shows.
+const MULTILINE_ROWS: usize = 3;
+
+/// The whole numbers of `range` that a field between `min` and `max` can
+/// hold: its limits rounded inwards, and kept within the field's.
+#[allow(clippy::cast_possible_truncation)] // Clamped to the field's limits.
+fn whole_limits(range: NumberRange, min: i64, max: i64) -> (i64, i64) {
+    #[allow(clippy::cast_precision_loss)] // Limits of whole fields are exact enough.
+    let (field_min, field_max) = (min as f64, max as f64);
+    let low = range.min.ceil().clamp(field_min, field_max) as i64;
+    let high = range.max.floor().clamp(field_min, field_max) as i64;
+    (low, high.max(low))
 }
 
 #[cfg(test)]
@@ -248,6 +302,30 @@ mod tests {
             }
         );
         assert_eq!(exported_fields(&classes(), "Ghost"), None);
+    }
+
+    #[test]
+    fn whole_ranges_are_rounded_inwards_and_kept_within_the_field() {
+        let range = |min, max| NumberRange {
+            min,
+            max,
+            step: None,
+        };
+
+        assert_eq!(whole_limits(range(0.5, 9.5), -100, 100), (1, 9));
+        assert_eq!(whole_limits(range(-1000.0, 1000.0), -100, 100), (-100, 100));
+    }
+
+    #[test]
+    fn decorators_reach_the_fields() {
+        let source = "class Rock extends Node {\n  @header(\"Motion\")\n  @range(0, 5)\n  \
+                      export var speed = 2.0\n  init() {\n    super.init(\"Rock\")\n  }\n}\n";
+        let checked = star_script::check_source(source).expect("valid program");
+
+        let fields = exported_fields(checked.analysis.classes(), "Rock").unwrap();
+
+        assert_eq!(fields[0].hints.header.as_deref(), Some("Motion"));
+        assert!(fields[0].hints.range.is_some());
     }
 
     #[test]

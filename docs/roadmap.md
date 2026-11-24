@@ -273,7 +273,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [ ] Decorators (`@`) in StarScript.
     - [x] 8a The syntax and the engine's decorators (`@range`, `@tooltip`,
           `@header`, `@multiline`) for `export` fields.
-    - [ ] 8b The inspector follows them.
+    - [x] 8b The inspector follows them.
     - [ ] 8c Blueprint variables have them.
     - [ ] 8d Decorators of the user: classes that extend `Decorator`, with
           `before` and `after`, on methods that return nothing; and
