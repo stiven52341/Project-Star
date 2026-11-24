@@ -191,11 +191,10 @@ mod tests {
     use std::rc::Rc;
 
     use super::*;
-    use crate::nodes::NodeFields;
-    use crate::nodes::tests::{TestHost, TestNode};
+    use crate::test_host::{TestHost, TestNode};
 
     fn node(name: &str) -> Rc<TestNode> {
-        Rc::new(TestNode::flat(NodeFields::new(name.to_owned())))
+        Rc::new(TestNode::new(name))
     }
 
     #[test]

@@ -8,7 +8,9 @@
 //! The StarScript interpreter will use it too (decision 64).
 
 pub mod audio;
+pub mod game;
 pub mod input;
+mod mirror;
 pub mod player;
 pub mod scenes;
 

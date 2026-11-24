@@ -381,7 +381,12 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         - [x] f1b3. `Body`: its fields, impulses and contacts in
               `star_script_runtime::bodies`; the generated game only
               passes them to the engine and back.
-        - [ ] f1b4. `Game`, mirroring nodes and the game loop.
+        - [x] f1b4. `Game`, mirroring nodes and the game loop: the
+              fields of `Game` and running a frame of the tree in
+              `star_script_runtime::game`; the engine's side (mirroring,
+              syncing bodies, cameras, drawing, `EngineGame`) generic in
+              `star_script_engine::game`. A generated game only creates
+              its game and calls `star_script_engine::game::run`.
         - [ ] f1b5. `Scene` and `Sound` (`Host` creates classes by name).
     - [ ] f2. Measure “Play” with scripts on a realistic, big project
           (measured on `pruebas`, 2428 lines of Rust: 2 s after a change

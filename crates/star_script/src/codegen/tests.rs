@@ -4,6 +4,12 @@
 use super::EntryPoint;
 use crate::compile_source;
 
+/// How games hand themselves to `star_script_engine`, which shares their
+/// input, runs their nodes and coroutines each frame, mirrors them in the
+/// engine's world and lets them load scenes and play sounds.
+const RUN_BY_THE_ENGINE: &str =
+    "::star_script_engine::game::run::<crate::classes::Host_>(app_, &ACTION_NAMES_, || {";
+
 fn rust(source: &str) -> String {
     match compile_source(source) {
         Ok(program) => program.code,
@@ -230,8 +236,7 @@ fn input_calls_read_the_shared_action_state() {
     let code = game_with_jump_action().code;
 
     assert!(code.contains("::star_script_runtime::input::action_state(\"jump\").just_pressed"));
-    assert!(code.contains("::star_script_engine::input::share_actions(&input, &ACTION_NAMES_);"));
-    assert!(code.contains("world.input()"));
+    assert!(code.contains(RUN_BY_THE_ENGINE));
 }
 
 #[test]
@@ -281,10 +286,13 @@ fn games_run_the_code_of_their_nodes_and_mirror_them() {
     let code =
         rust("class G extends Game {\n override func start() { add_child(Node(\"Level\")) }\n}");
 
-    assert!(code.contains(
-        "crate::classes::Node::process_tree_(&self.game, &root_, delta_, &mut self.nodes);"
-    ));
-    assert!(code.contains("mirror_nodes_(world, &mut self.mirror, &root_, &mut self.pending);"));
+    assert!(code.contains(RUN_BY_THE_ENGINE));
+    assert!(
+        code.contains("crate::classes::Node::Object::update(::std::rc::Rc::clone(node), delta);")
+    );
+    assert!(
+        code.contains("crate::classes::Game::Object::update(::std::rc::Rc::clone(game), delta);")
+    );
 }
 
 #[test]
@@ -296,8 +304,7 @@ fn games_show_the_colors_of_their_sprites_and_background() {
 
     assert!(code.contains("pub mod Color {"));
     assert!(code.contains("crate::classes::Color::new(0.0_f32, 0.0_f32, 0.2_f32, 1.0_f32)"));
-    assert!(code.contains("color: look_.color.read(|color_| engine_color_(&**color_)),"));
-    assert!(code.contains("frame.set_clear_color("));
+    assert!(code.contains("crate::classes::Color::HasFields::fields(&**color).channels()"));
 }
 
 #[test]
@@ -308,8 +315,8 @@ fn games_are_drawn_from_their_camera() {
     );
 
     assert!(code.contains("pub mod Camera2D {"));
-    assert!(code.contains("self.mirror.camera(world, &script_camera_(&**camera_))"));
-    assert!(code.contains("frame.set_camera(self.view_(world));"));
+    assert!(code.contains("type Camera2D = crate::classes::Camera2D::Ref;"));
+    assert!(code.contains("crate::AnyObject::Camera2D(::std::rc::Rc::clone(node))"));
 }
 
 #[test]
@@ -319,9 +326,7 @@ fn games_share_the_pointer_seen_from_their_camera() {
          if Input.has_pointer() { Debug.print(Input.pointer_x().to_string()) }\n }\n}",
     );
 
-    assert!(code.contains(
-        "::star_script_engine::input::share_pointer(&input, &self.view_(world), world.window_size());"
-    ));
+    assert!(code.contains(RUN_BY_THE_ENGINE));
     assert!(code.contains("::star_script_runtime::input::pointer().is_present"));
     assert!(code.contains("::star_script_runtime::input::pointer().x"));
 }
@@ -335,9 +340,7 @@ fn games_read_scenes_through_the_engine() {
 
     assert!(code.contains("pub mod Scene {"));
     assert!(code.contains("crate::classes::Scene::load("));
-    assert!(
-        code.contains("let audio_ = ::star_script_engine::connect_runtime(app_.asset_folder());")
-    );
+    assert!(code.contains(RUN_BY_THE_ENGINE));
 }
 
 #[test]
@@ -350,7 +353,7 @@ fn games_move_bodies_with_the_engine() {
 
     assert!(code.contains("pub mod Body {"));
     assert!(code.contains("crate::classes::Body::circle("));
-    assert!(code.contains("sync_bodies_(world, &mut self.mirror, &root_"));
+    assert!(code.contains("crate::classes::Body::HasFields::fields(&**body)"));
 }
 
 #[test]
@@ -366,10 +369,11 @@ fn games_mirror_their_3d_nodes() {
         assert!(code.contains(&format!("pub mod {module} {{")), "{module}");
     }
     assert!(code.contains("crate::classes::Body::box_("));
-    assert!(code.contains("with_mesh_(&node_, |mesh_| {"));
-    assert!(code.contains("transform_3d: transform_3d_,"));
-    assert!(code.contains("self.mirror.camera_3d(world, &script_camera_3d_(&*camera_))"));
-    assert!(code.contains("frame.set_ambient_light("));
+    for class in ["Mesh", "Light", "Camera3D", "Node3D"] {
+        assert!(code.contains(&format!(
+            "crate::AnyObject::{class}(::std::rc::Rc::clone(node))"
+        )));
+    }
 }
 
 #[test]
@@ -382,8 +386,7 @@ fn games_play_sounds_through_the_engine() {
     assert!(code.contains("pub mod Sound {"));
     assert!(code.contains("crate::classes::Sound::load("));
     assert!(code.contains("::star_script_runtime::audio::set_volume(0.5_f32)"));
-    assert!(code.contains("::star_script_engine::connect_runtime("));
-    assert!(code.contains("*self.audio.borrow_mut() = context.world().audio();"));
+    assert!(code.contains(RUN_BY_THE_ENGINE));
 }
 
 #[test]
@@ -457,8 +460,7 @@ fn async_calls_alone_start_coroutines() {
 fn games_move_the_clock_and_resume_coroutines_each_frame() {
     let code = rust("class G extends Game {}");
 
-    assert!(code.contains("::star_script_runtime::tasks::frame_started(delta_);"));
-    assert!(code.contains("::star_script_runtime::tasks::resume();"));
+    assert!(code.contains(RUN_BY_THE_ENGINE));
 }
 
 #[test]

@@ -194,7 +194,7 @@ fn white<H: Host>() -> H::Color {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nodes::tests::TestHost;
+    use crate::test_host::TestHost;
 
     #[test]
     fn new_nodes_start_white_and_unscaled() {

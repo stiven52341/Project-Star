@@ -12,10 +12,6 @@ use crate::InputAction;
 /// The crate that connects StarScript's runtime with the engine.
 const SCRIPT_ENGINE: &str = "::star_script_engine";
 
-/// Hidden field of `Game` that `quit()` sets. It ends in a single `_`, so no
-/// StarScript field can have the same Rust name.
-const QUIT_FIELD: &str = "quit_requested_";
-
 /// The module of the engine class `Game`.
 pub(super) fn game_module(out: &mut Writer) {
     for line in GAME_MODULE.lines() {
@@ -30,15 +26,7 @@ pub mod Game {
 
     /// The fields of a game: the public ones, whether it asked to close, and
     /// the root of its tree of nodes.
-    pub struct Fields {
-        pub background: ::star_script_runtime::Field<crate::classes::Color::Ref>,
-        pub camera: ::star_script_runtime::Field<::std::option::Option<crate::classes::Camera2D::Ref>>,
-        pub camera_3d: ::star_script_runtime::Field<::std::option::Option<crate::classes::Camera3D::Ref>>,
-        pub ambient: ::star_script_runtime::Field<crate::classes::Color::Ref>,
-        pub ambient_2d: ::star_script_runtime::Field<crate::classes::Color::Ref>,
-        pub quit_requested_: ::star_script_runtime::Field<bool>,
-        pub root_: crate::classes::Node::Ref,
-    }
+    pub type Fields = ::star_script_runtime::game::GameFields<crate::classes::Host_>;
 
     /// Gives access to the fields of this class, in objects of any subclass.
     pub trait HasFields {
@@ -65,12 +53,12 @@ pub mod Game {
 
         /// `func quit`: closes the game after the current frame.
         pub fn quit(this_: &Ref) {
-            HasFields::fields(&**this_).quit_requested_.set(true);
+            HasFields::fields(&**this_).quit();
         }
 
         /// `func add_child`: puts `node` in the game's tree, at the top.
         pub fn add_child(this_: &Ref, node: crate::classes::Node::Ref) {
-            crate::classes::Node::Methods::add_child(&HasFields::fields(&**this_).root_, node);
+            HasFields::fields(&**this_).add_child(node);
         }
     }
 
@@ -94,33 +82,9 @@ pub mod Game {
         fn add_child(self: ::std::rc::Rc<Self>, node: crate::classes::Node::Ref) { Methods::add_child(&(self as Ref), node) }
     }
 
-    /// Makes `node` the game's `camera` or `camera_3d` if it is a camera
-    /// marked `main`: called as it enters the game's tree, before its
-    /// `start`.
-    pub fn see_from_if_main_(this_: &Ref, node: &crate::classes::Node::Ref) {
-        let fields_ = HasFields::fields(&**this_);
-        if let ::std::option::Option::Some(camera_) = crate::AnyObject::Camera2D(::std::rc::Rc::clone(node)) {
-            if crate::classes::Camera2D::HasFields::fields(&*camera_).main.get() {
-                fields_.camera.set(::std::option::Option::Some(camera_));
-            }
-        } else if let ::std::option::Option::Some(camera_) = crate::AnyObject::Camera3D(::std::rc::Rc::clone(node)) {
-            if crate::classes::Camera3D::HasFields::fields(&*camera_).main.get() {
-                fields_.camera_3d.set(::std::option::Option::Some(camera_));
-            }
-        }
-    }
-
     /// Prepares an object of this class: `make_` builds it from its fields.
     pub fn init_<O: Object + 'static>(make_: impl FnOnce(Fields) -> ::std::rc::Rc<O>) -> ::std::rc::Rc<O> {
-        make_(Fields {
-            background: ::star_script_runtime::Field::new(crate::classes::Color::new(0.0, 0.0, 0.0, 1.0)),
-            camera: ::star_script_runtime::Field::new(::std::option::Option::None),
-            camera_3d: ::star_script_runtime::Field::new(::std::option::Option::None),
-            ambient: ::star_script_runtime::Field::new(crate::classes::Color::new(0.0, 0.0, 0.0, 1.0)),
-            ambient_2d: ::star_script_runtime::Field::new(crate::classes::Color::new(1.0, 1.0, 1.0, 1.0)),
-            quit_requested_: ::star_script_runtime::Field::new(false),
-            root_: crate::classes::Node::new_root_(),
-        })
+        make_(Fields::new(crate::classes::Node::new_root_()))
     }
 
     /// Creates an object of this class.
@@ -448,30 +412,6 @@ pub mod Node {
         }
     }
 
-    /// Runs `start` (the first time) and `update` of every node of the tree
-    /// of `root`, parents first. Nodes added during the frame start in the
-    /// next one; nodes removed during it are skipped. `nodes_` is a reused
-    /// list, left empty.
-    pub fn process_tree_(game_: &crate::classes::Game::Ref, root: &Ref, delta: f32, nodes_: &mut ::std::vec::Vec<Ref>) {
-        nodes_.push(::std::rc::Rc::clone(root));
-        let mut next_ = 0;
-        while let ::std::option::Option::Some(node_) = nodes_.get(next_).cloned() {
-            nodes_.extend(HasFields::fields(&*node_).children().iter().cloned());
-            next_ += 1;
-        }
-        for node_ in nodes_.iter() {
-            if !::star_script_runtime::nodes::is_same_or_ancestor::<crate::classes::Host_>(root, node_) {
-                continue;
-            }
-            if HasFields::fields(&**node_).start_once() {
-                crate::classes::Game::see_from_if_main_(game_, node_);
-                Object::start(::std::rc::Rc::clone(node_));
-            }
-            Object::update(::std::rc::Rc::clone(node_), delta);
-        }
-        nodes_.clear();
-    }
-
     /// An object created as this class (not as a subclass).
     pub struct Instance {
         pub Node: Fields,
@@ -525,8 +465,11 @@ impl ::star_script_runtime::nodes::Host for Host_ {
     type Node = crate::classes::Node::Ref;
     type WeakNode = ::std::rc::Weak<dyn crate::classes::Node::Object>;
     type Node3D = crate::classes::Node3D::Ref;
+    type Camera2D = crate::classes::Camera2D::Ref;
+    type Camera3D = crate::classes::Camera3D::Ref;
     type Body = crate::classes::Body::Ref;
     type Color = crate::classes::Color::Ref;
+    type Game = crate::classes::Game::Ref;
 
     fn node(node: &Self::Node) -> &crate::classes::Node::Fields {
         crate::classes::Node::HasFields::fields(&**node)
@@ -552,12 +495,78 @@ impl ::star_script_runtime::nodes::Host for Host_ {
         crate::classes::Node3D::HasFields::fields(&**node)
     }
 
+    fn as_camera_2d(node: &Self::Node) -> ::std::option::Option<Self::Camera2D> {
+        crate::AnyObject::Camera2D(::std::rc::Rc::clone(node))
+    }
+
+    fn camera_2d(camera: &Self::Camera2D) -> &::star_script_runtime::node_classes::Camera2dFields {
+        crate::classes::Camera2D::HasFields::fields(&**camera)
+    }
+
+    fn camera_2d_node(camera: &Self::Camera2D) -> Self::Node {
+        let camera_: crate::classes::Camera2D::Ref = ::std::rc::Rc::clone(camera);
+        camera_
+    }
+
+    fn as_camera_3d(node: &Self::Node) -> ::std::option::Option<Self::Camera3D> {
+        crate::AnyObject::Camera3D(::std::rc::Rc::clone(node))
+    }
+
+    fn camera_3d(camera: &Self::Camera3D) -> &::star_script_runtime::node_classes::Camera3dFields {
+        crate::classes::Camera3D::HasFields::fields(&**camera)
+    }
+
+    fn camera_3d_node(camera: &Self::Camera3D) -> Self::Node {
+        let camera_: crate::classes::Camera3D::Ref = ::std::rc::Rc::clone(camera);
+        camera_
+    }
+
+    fn with_sprite<R>(node: &Self::Node, read: impl FnOnce(&::star_script_runtime::node_classes::SpriteFields<Self>) -> R) -> ::std::option::Option<R> {
+        crate::AnyObject::Sprite(::std::rc::Rc::clone(node)).map(|sprite_| read(crate::classes::Sprite::HasFields::fields(&*sprite_)))
+    }
+
+    fn with_mesh<R>(node: &Self::Node, read: impl FnOnce(&::star_script_runtime::node_classes::MeshFields<Self>) -> R) -> ::std::option::Option<R> {
+        crate::AnyObject::Mesh(::std::rc::Rc::clone(node)).map(|mesh_| read(crate::classes::Mesh::HasFields::fields(&*mesh_)))
+    }
+
+    fn with_light<R>(node: &Self::Node, read: impl FnOnce(&::star_script_runtime::node_classes::LightFields<Self>) -> R) -> ::std::option::Option<R> {
+        crate::AnyObject::Light(::std::rc::Rc::clone(node)).map(|light_| read(crate::classes::Light::HasFields::fields(&*light_)))
+    }
+
+    fn with_light_2d<R>(node: &Self::Node, read: impl FnOnce(&::star_script_runtime::node_classes::LightFields<Self>) -> R) -> ::std::option::Option<R> {
+        crate::AnyObject::Light2D(::std::rc::Rc::clone(node)).map(|light_| read(crate::classes::Light2D::HasFields::fields(&*light_)))
+    }
+
     fn body(body: &Self::Body) -> &::star_script_runtime::bodies::BodyFields<Self> {
         crate::classes::Body::HasFields::fields(&**body)
     }
 
     fn color(r: f32, g: f32, b: f32, a: f32) -> Self::Color {
         crate::classes::Color::new(r, g, b, a)
+    }
+
+    fn channels(color: &Self::Color) -> [f32; 4] {
+        crate::classes::Color::HasFields::fields(&**color).channels()
+    }
+
+    fn start(node: &Self::Node) {
+        crate::classes::Node::Object::start(::std::rc::Rc::clone(node));
+    }
+
+    fn update(node: &Self::Node, delta: f32) {
+        crate::classes::Node::Object::update(::std::rc::Rc::clone(node), delta);
+    }
+
+    fn game(game: &Self::Game) -> &::star_script_runtime::game::GameFields<Self> {
+        crate::classes::Game::HasFields::fields(&**game)
+    }
+
+    fn start_game(game: &Self::Game) {
+        crate::classes::Game::Object::start(::std::rc::Rc::clone(game));
+    }
+
+    fn update_game(game: &Self::Game, delta: f32) {
+        crate::classes::Game::Object::update(::std::rc::Rc::clone(game), delta);
     }
 }";
 
@@ -856,85 +865,6 @@ pub mod Sound {
     }
 }";
 
-/// `EngineGame_`: connects the StarScript game with the engine's game loop.
-fn engine_game_loop() -> String {
-    format!(
-        "
-/// Connects the StarScript game with the engine's game loop.
-struct EngineGame_ {{
-    /// Where `Sound`s play: silent until the engine gives the game its audio.
-    audio: ::std::rc::Rc<::std::cell::RefCell<::star_engine::star_audio::Audio>>,
-    game: crate::classes::Game::Ref,
-    /// Reused list of the nodes whose code runs in a frame.
-    nodes: ::std::vec::Vec<crate::classes::Node::Ref>,
-    /// Reused list of the nodes still to mirror, with their parent's number.
-    pending: ::std::vec::Vec<(crate::classes::Node::Ref, ::std::option::Option<u64>)>,
-    /// Reused map of the nodes of the tree by their number, to tell bodies
-    /// what they touch.
-    known: ::std::collections::HashMap<u64, crate::classes::Node::Ref>,
-    /// The node of the engine's world that mirrors each node of the game.
-    mirror: ::star_engine::script_nodes::ScriptNodes,
-}}
-
-impl ::star_engine::game::Game for EngineGame_ {{
-    fn start(
-        &mut self,
-        context: &mut ::star_engine::game::GameContext<'_>,
-    ) -> ::star_engine::star_core::EngineResult<()> {{
-        use ::star_engine::EngineWorld as _;
-        *self.audio.borrow_mut() = context.world().audio();
-        crate::classes::Game::Object::start(::std::rc::Rc::clone(&self.game));
-        ::std::result::Result::Ok(())
-    }}
-
-    fn update(&mut self, world: &mut ::star_engine::star_ecs::World) {{
-        use ::star_engine::EngineWorld as _;
-        if let ::std::option::Option::Some(input) = world.input() {{
-            {SCRIPT_ENGINE}::input::share_actions(&input, &ACTION_NAMES_);
-            {SCRIPT_ENGINE}::input::share_pointer(&input, &self.view_(world), world.window_size());
-        }}
-        let delta_ = world.time().delta_seconds();
-        let root_ = ::std::rc::Rc::clone(&crate::classes::Game::HasFields::fields(&*self.game).root_);
-        sync_bodies_(world, &mut self.mirror, &root_, &mut self.known, &mut self.nodes);
-        {RUNTIME}::tasks::frame_started(delta_);
-        crate::classes::Game::Object::update(::std::rc::Rc::clone(&self.game), delta_);
-        crate::classes::Node::process_tree_(&self.game, &root_, delta_, &mut self.nodes);
-        {RUNTIME}::tasks::resume();
-        mirror_nodes_(world, &mut self.mirror, &root_, &mut self.pending);
-    }}
-
-    fn draw(&self, world: &::star_engine::star_ecs::World, frame: &mut ::star_engine::star_render::Frame) {{
-        let fields_ = crate::classes::Game::HasFields::fields(&*self.game);
-        frame.set_clear_color(fields_.background.read(|color_| engine_color_(&**color_)));
-        let ambient_ = fields_.ambient.read(|color_| engine_color_(&**color_));
-        frame.set_ambient_light(::star_engine::star_render::AmbientLight::new(ambient_, 1.0));
-        let ambient_2d_ = fields_.ambient_2d.read(|color_| engine_color_(&**color_));
-        frame.set_ambient_light_2d(::star_engine::star_render::AmbientLight::new(ambient_2d_, 1.0));
-        frame.set_camera(self.view_(world));
-    }}
-
-    fn is_finished(&self) -> bool {{
-        crate::classes::Game::HasFields::fields(&*self.game).{QUIT_FIELD}.get()
-    }}
-}}
-
-impl EngineGame_ {{
-    /// The engine's camera that shows the game from its `camera_3d`, or
-    /// else from its `camera`.
-    fn view_(&self, world: &::star_engine::star_ecs::World) -> ::star_engine::star_render::Camera {{
-        let fields_ = crate::classes::Game::HasFields::fields(&*self.game);
-        if let ::std::option::Option::Some(camera_) = fields_.camera_3d.get() {{
-            return self.mirror.camera_3d(world, &script_camera_3d_(&*camera_));
-        }}
-        fields_.camera.read(|camera_| match camera_ {{
-            ::std::option::Option::Some(camera_) => self.mirror.camera(world, &script_camera_(&**camera_)),
-            ::std::option::Option::None => ::star_engine::star_render::Camera::default(),
-        }})
-    }}
-}}"
-    )
-}
-
 /// `fn main` that runs the game `class_path` in a window of the engine, with
 /// the input `actions` of the project.
 /// `new_game` and `title` are Rust expressions, run inside `run_`: the
@@ -965,28 +895,14 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
     let app_ = ::star_engine::app::App::new()
         .with_title({title})
         .with_actions(actions_);
-    let audio_ = {SCRIPT_ENGINE}::connect_runtime(app_.asset_folder());
-    // Created after the loaders are set, so its `init` can load scenes and
-    // sounds too.
-    let game_ = EngineGame_ {{
-        audio: audio_,
-        game: {new_game},
-        nodes: ::std::vec::Vec::new(),
-        pending: ::std::vec::Vec::new(),
-        known: ::std::collections::HashMap::new(),
-        mirror: ::star_engine::script_nodes::ScriptNodes::new(),
-    }};
-    app_.run_game(game_)
+    {SCRIPT_ENGINE}::game::run::<crate::classes::Host_>(app_, &ACTION_NAMES_, || {{
+        let game_: crate::classes::Game::Ref = {new_game};
+        ::std::result::Result::Ok(game_)
+    }})
 }}
 "
     );
-    let engine_game = engine_game_loop();
-    for line in main
-        .lines()
-        .chain(engine_game.lines())
-        .chain([""])
-        .chain(MIRROR_NODES.lines())
-    {
+    for line in main.lines() {
         out.line(line);
     }
 }
@@ -1008,267 +924,6 @@ fn main_scene_game_(path_: &str) -> ::star_engine::star_core::EngineResult<crate
     })?;
     crate::classes::Game::Object::add_child(::std::rc::Rc::clone(&game_), scene_);
     ::std::result::Result::Ok(game_)
-}";
-
-const MIRROR_NODES: &str = "/// Describes every node of the game's tree to the engine, parents first, so
-/// the world has a node in step with each one.
-fn mirror_nodes_(
-    world_: &mut ::star_engine::star_ecs::World,
-    mirror_: &mut ::star_engine::script_nodes::ScriptNodes,
-    root_: &crate::classes::Node::Ref,
-    pending_: &mut ::std::vec::Vec<(crate::classes::Node::Ref, ::std::option::Option<u64>)>,
-) {
-    mirror_.begin_frame();
-    pending_.push((::std::rc::Rc::clone(root_), ::std::option::Option::None));
-    while let ::std::option::Option::Some((node_, parent_)) = pending_.pop() {
-        let fields_ = crate::classes::Node::HasFields::fields(&*node_);
-        let transform_ = ::star_engine::star_scene::Transform2D {
-            position: ::star_engine::star_math::Vec2::new(fields_.x.get(), fields_.y.get()),
-            rotation: fields_.rotation.get(),
-            scale: ::star_engine::star_math::Vec2::new(fields_.scale_x.get(), fields_.scale_y.get()),
-        };
-        let transform_3d_ = crate::AnyObject::Node3D(::std::rc::Rc::clone(&node_)).map(|node_3d_| {
-            let depth_ = crate::classes::Node3D::HasFields::fields(&*node_3d_);
-            let angles_ = ::star_engine::star_math::Vec3::new(depth_.pitch.get(), depth_.yaw.get(), fields_.rotation.get());
-            ::star_engine::star_scene::Transform3D {
-                position: ::star_engine::star_math::Vec3::new(fields_.x.get(), fields_.y.get(), depth_.z.get()),
-                rotation: ::star_engine::star_math::Quat::from_euler(angles_),
-                scale: ::star_engine::star_math::Vec3::new(fields_.scale_x.get(), fields_.scale_y.get(), depth_.scale_z.get()),
-            }
-        });
-        fields_.name.read(|name_| {
-            with_sprite_(&node_, |sprite_| {
-                with_body_(fields_, |body_| {
-                    with_mesh_(&node_, |mesh_| {
-                        with_light_(&node_, |light_| {
-                          with_light_2d_(&node_, |light_2d_| {
-                            let described_ = ::star_engine::script_nodes::ScriptNode {
-                                id: fields_.id(),
-                                parent: parent_,
-                                name: name_,
-                                transform: transform_,
-                                transform_3d: transform_3d_,
-                                sprite: sprite_,
-                                body: body_,
-                                mesh: mesh_,
-                                light: light_,
-                                light_2d: light_2d_,
-                            };
-                            mirror_.mirror(world_, &described_);
-                          });
-                        });
-                    });
-                });
-            });
-        });
-        for child_ in fields_.children().iter().rev() {
-            pending_.push((::std::rc::Rc::clone(child_), ::std::option::Option::Some(fields_.id())));
-        }
-    }
-    mirror_.finish_frame(world_);
-}
-
-/// Runs `then_` with what the engine needs to know about the image `node_`
-/// shows, if it is a `Sprite`.
-fn with_sprite_(
-    node_: &crate::classes::Node::Ref,
-    then_: impl FnOnce(::std::option::Option<::star_engine::script_nodes::ScriptSprite<'_>>),
-) {
-    let ::std::option::Option::Some(sprite_) = crate::AnyObject::Sprite(::std::rc::Rc::clone(node_)) else {
-        return then_(::std::option::Option::None);
-    };
-    let look_ = crate::classes::Sprite::HasFields::fields(&*sprite_);
-    look_.texture.read(|texture_| {
-        then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptSprite {
-            texture: texture_,
-            size: ::star_engine::star_math::Vec2::new(look_.width.get(), look_.height.get()),
-            layer: look_.layer.get(),
-            pixelated: look_.pixelated.get(),
-            color: look_.color.read(|color_| engine_color_(&**color_)),
-        }));
-    });
-}
-
-/// Runs `then_` with what the engine needs to know about the node's body,
-/// if it has one, and forgets the impulses given to it.
-fn with_body_(
-    fields_: &crate::classes::Node::Fields,
-    then_: impl FnOnce(::std::option::Option<::star_engine::script_nodes::ScriptBody<'_>>),
-) {
-    let ::std::option::Option::Some(body_) = fields_.body.get() else {
-        return then_(::std::option::Option::None);
-    };
-    let body_ = crate::classes::Body::HasFields::fields(&*body_);
-    let [impulse_x_, impulse_y_, impulse_z_] = body_.take_impulse();
-    body_.kind.read(|kind_| {
-        body_.shape.read(|shape_| {
-            then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptBody {
-                kind: kind_,
-                shape: shape_,
-                radius: body_.radius.get(),
-                width: body_.width.get(),
-                height: body_.height.get(),
-                depth: body_.depth.get(),
-                gravity_scale: body_.gravity_scale.get(),
-                fixed_rotation: body_.fixed_rotation.get(),
-                friction: body_.friction.get(),
-                bounciness: body_.bounciness.get(),
-                density: body_.density.get(),
-                sensor: body_.sensor.get(),
-                velocity: ::star_engine::star_math::Vec3::new(body_.velocity_x.get(), body_.velocity_y.get(), body_.velocity_z.get()),
-                impulse: ::star_engine::star_math::Vec3::new(impulse_x_, impulse_y_, impulse_z_),
-            }));
-        });
-    });
-}
-
-/// Runs `then_` with what the engine needs to know about the mesh `node_`
-/// shows, if it is a `Mesh`.
-fn with_mesh_(
-    node_: &crate::classes::Node::Ref,
-    then_: impl FnOnce(::std::option::Option<::star_engine::script_nodes::ScriptMesh<'_>>),
-) {
-    let ::std::option::Option::Some(mesh_) = crate::AnyObject::Mesh(::std::rc::Rc::clone(node_)) else {
-        return then_(::std::option::Option::None);
-    };
-    let look_ = crate::classes::Mesh::HasFields::fields(&*mesh_);
-    look_.shape.read(|shape_| {
-        look_.texture.read(|texture_| {
-            then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptMesh {
-                shape: shape_,
-                width: look_.width.get(),
-                height: look_.height.get(),
-                depth: look_.depth.get(),
-                radius: look_.radius.get(),
-                color: look_.color.read(|color_| engine_color_(&**color_)),
-                metallic: look_.metallic.get(),
-                roughness: look_.roughness.get(),
-                texture: texture_,
-                pixelated: look_.pixelated.get(),
-            }));
-        });
-    });
-}
-
-/// Runs `then_` with what the engine needs to know about the light `node_`
-/// shines, if it is a `Light`.
-fn with_light_(
-    node_: &crate::classes::Node::Ref,
-    then_: impl FnOnce(::std::option::Option<::star_engine::script_nodes::ScriptLight<'_>>),
-) {
-    let ::std::option::Option::Some(light_) = crate::AnyObject::Light(::std::rc::Rc::clone(node_)) else {
-        return then_(::std::option::Option::None);
-    };
-    let look_ = crate::classes::Light::HasFields::fields(&*light_);
-    look_.kind.read(|kind_| {
-        then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptLight {
-            kind: kind_,
-            color: look_.color.read(|color_| engine_color_(&**color_)),
-            intensity: look_.intensity.get(),
-            range: look_.range.get(),
-            angle: look_.angle.get(),
-            blend: look_.blend.get(),
-        }));
-    });
-}
-
-/// Runs `then_` with what the engine needs to know about the light `node_`
-/// shines on the sprites, if it is a `Light2D`.
-fn with_light_2d_(
-    node_: &crate::classes::Node::Ref,
-    then_: impl FnOnce(::std::option::Option<::star_engine::script_nodes::ScriptLight<'_>>),
-) {
-    let ::std::option::Option::Some(light_) = crate::AnyObject::Light2D(::std::rc::Rc::clone(node_)) else {
-        return then_(::std::option::Option::None);
-    };
-    let look_ = crate::classes::Light2D::HasFields::fields(&*light_);
-    look_.kind.read(|kind_| {
-        then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptLight {
-            kind: kind_,
-            color: look_.color.read(|color_| engine_color_(&**color_)),
-            intensity: look_.intensity.get(),
-            range: look_.range.get(),
-            angle: look_.angle.get(),
-            blend: look_.blend.get(),
-        }));
-    });
-}
-
-/// Tells the nodes with a body of the game's tree what the simulation did
-/// in the last frame: where they are, how fast they move and what they
-/// touch. `known_` and `queue_` are reused, left empty.
-fn sync_bodies_(
-    world_: &::star_engine::star_ecs::World,
-    mirror_: &mut ::star_engine::script_nodes::ScriptNodes,
-    root_: &crate::classes::Node::Ref,
-    known_: &mut ::std::collections::HashMap<u64, crate::classes::Node::Ref>,
-    queue_: &mut ::std::vec::Vec<crate::classes::Node::Ref>,
-) {
-    mirror_.read_bodies(world_);
-    let mut next_ = ::std::option::Option::Some(::std::rc::Rc::clone(root_));
-    while let ::std::option::Option::Some(node_) = next_ {
-        let fields_ = crate::classes::Node::HasFields::fields(&*node_);
-        queue_.extend(fields_.children().iter().cloned());
-        known_.insert(fields_.id(), ::std::rc::Rc::clone(&node_));
-        next_ = queue_.pop();
-    }
-    for (id_, node_) in known_.iter() {
-        let fields_ = crate::classes::Node::HasFields::fields(&**node_);
-        let ::std::option::Option::Some(body_) = fields_.body.get() else {
-            continue;
-        };
-        let ::std::option::Option::Some(state_) = mirror_.body_state(world_, *id_) else {
-            continue;
-        };
-        fields_.x.set(state_.position.x);
-        fields_.y.set(state_.position.y);
-        fields_.rotation.set(state_.angles.z);
-        if let (true, ::std::option::Option::Some(node_3d_)) = (state_.is_3d, crate::AnyObject::Node3D(::std::rc::Rc::clone(node_))) {
-            let depth_ = crate::classes::Node3D::HasFields::fields(&*node_3d_);
-            depth_.z.set(state_.position.z);
-            depth_.pitch.set(state_.angles.x);
-            depth_.yaw.set(state_.angles.y);
-        }
-        let body_ = crate::classes::Body::HasFields::fields(&*body_);
-        body_.set_velocity([state_.velocity.x, state_.velocity.y, state_.velocity.z]);
-        let contacts_ = [
-            (::star_script_runtime::bodies::Contact::Touching, state_.touching),
-            (::star_script_runtime::bodies::Contact::JustTouched, state_.just_touched),
-            (::star_script_runtime::bodies::Contact::JustSeparated, state_.just_separated),
-        ];
-        for (which_, ids_) in contacts_ {
-            body_.set_contacts(which_, ids_.iter().filter_map(|other_| known_.get(other_)));
-        }
-    }
-    known_.clear();
-}
-
-/// The engine's value of a script `Color`.
-fn engine_color_(color_: &dyn crate::classes::Color::Object) -> ::star_engine::star_render::Color {
-    let [r_, g_, b_, a_] = crate::classes::Color::HasFields::fields(color_).channels();
-    ::star_engine::star_render::Color::rgba(r_, g_, b_, a_)
-}
-
-/// What the engine needs to know about the game's camera.
-fn script_camera_(camera_: &dyn crate::classes::Camera2D::Object) -> ::star_engine::script_nodes::ScriptCamera {
-    let node_ = crate::classes::Node::HasFields::fields(camera_);
-    ::star_engine::script_nodes::ScriptCamera {
-        id: node_.id(),
-        position: ::star_engine::star_math::Vec2::new(node_.x.get(), node_.y.get()),
-        view_height: crate::classes::Camera2D::HasFields::fields(camera_).view_height.get(),
-    }
-}
-
-/// What the engine needs to know about the game's 3D camera.
-fn script_camera_3d_(camera_: &dyn crate::classes::Camera3D::Object) -> ::star_engine::script_nodes::ScriptCamera3D {
-    let node_ = crate::classes::Node::HasFields::fields(camera_);
-    let depth_ = crate::classes::Node3D::HasFields::fields(camera_);
-    ::star_engine::script_nodes::ScriptCamera3D {
-        id: node_.id(),
-        position: ::star_engine::star_math::Vec3::new(node_.x.get(), node_.y.get(), depth_.z.get()),
-        angles: ::star_engine::star_math::Vec3::new(depth_.pitch.get(), depth_.yaw.get(), node_.rotation.get()),
-        field_of_view: crate::classes::Camera3D::HasFields::fields(camera_).fov.get(),
-    }
 }";
 
 /// The names of the actions and the function that builds their map. The

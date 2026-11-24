@@ -1,86 +1,17 @@
 use std::f32::consts::FRAC_PI_2;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 use super::*;
-use crate::bodies::BodyFields;
-
-/// Nodes made of plain `Rc`s, as a way of running StarScript could have.
-pub(crate) struct TestHost;
-
-pub(crate) struct TestNode {
-    node: NodeFields<TestHost>,
-    /// Only used by nodes placed in 3D.
-    node_3d: Node3dFields,
-    is_3d: bool,
-}
-
-impl Host for TestHost {
-    type Node = Rc<TestNode>;
-    type WeakNode = Weak<TestNode>;
-    type Node3D = Rc<TestNode>;
-    type Body = Rc<BodyFields<Self>>;
-    type Color = [f32; 4];
-
-    fn node(node: &Self::Node) -> &NodeFields<Self> {
-        &node.node
-    }
-
-    fn downgrade(node: &Self::Node) -> Self::WeakNode {
-        Rc::downgrade(node)
-    }
-
-    fn upgrade(weak: &Self::WeakNode) -> Option<Self::Node> {
-        weak.upgrade()
-    }
-
-    fn same(node: &Self::Node, other: &Self::Node) -> bool {
-        Rc::ptr_eq(node, other)
-    }
-
-    fn as_node_3d(node: &Self::Node) -> Option<Self::Node3D> {
-        node.is_3d.then(|| Rc::clone(node))
-    }
-
-    fn node_3d(node: &Self::Node3D) -> &Node3dFields {
-        &node.node_3d
-    }
-
-    fn body(body: &Self::Body) -> &BodyFields<Self> {
-        body
-    }
-
-    fn color(r: f32, g: f32, b: f32, a: f32) -> Self::Color {
-        [r, g, b, a]
-    }
-}
+use crate::test_host::{TestHost, TestNode};
 
 type Node = Rc<TestNode>;
 
-impl TestNode {
-    /// A node placed in 2D with the fields `node`.
-    pub(crate) fn flat(node: NodeFields<TestHost>) -> Self {
-        Self {
-            node,
-            node_3d: Node3dFields::new(),
-            is_3d: false,
-        }
-    }
-}
-
 fn node(name: &str) -> Node {
-    Rc::new(TestNode {
-        node: NodeFields::new(name.to_owned()),
-        node_3d: Node3dFields::new(),
-        is_3d: false,
-    })
+    Rc::new(TestNode::new(name))
 }
 
 fn node_3d(name: &str) -> Node {
-    Rc::new(TestNode {
-        node: NodeFields::new(name.to_owned()),
-        node_3d: Node3dFields::new(),
-        is_3d: true,
-    })
+    Rc::new(TestNode::new_3d(name))
 }
 
 fn names(nodes: &[Node]) -> Vec<String> {

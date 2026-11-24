@@ -11,10 +11,14 @@ use std::io::Write as _;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::bodies::BodyFields;
+use crate::game::GameFields;
+use crate::node_classes::{Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields};
 use crate::placement::{Place2d, Place3d};
 use crate::{Field, List};
 
-/// What the nodes of a way of running StarScript are.
+/// What the objects of a way of running StarScript are: references to
+/// its nodes, bodies, colors and game, how to reach their fields, and how
+/// to run their scripts' code.
 pub trait Host: Sized + 'static {
     /// A reference to a node: an object of `Node` or of a subclass.
     type Node: Clone;
@@ -22,10 +26,16 @@ pub trait Host: Sized + 'static {
     type WeakNode;
     /// A reference to a node placed in 3D: a `Node3D` or a subclass.
     type Node3D;
+    /// A reference to a `Camera2D` or a subclass.
+    type Camera2D: Clone;
+    /// A reference to a `Camera3D` or a subclass.
+    type Camera3D: Clone;
     /// A reference to a body, which a node may have.
     type Body: Clone;
     /// A reference to a color.
     type Color: Clone;
+    /// A reference to the game: a `Game` or a subclass.
+    type Game;
 
     /// The fields of `Node` in `node`.
     fn node(node: &Self::Node) -> &NodeFields<Self>;
@@ -39,10 +49,43 @@ pub trait Host: Sized + 'static {
     fn as_node_3d(node: &Self::Node) -> Option<Self::Node3D>;
     /// The fields of `Node3D` in `node`.
     fn node_3d(node: &Self::Node3D) -> &Node3dFields;
+    /// `node` as a `Camera2D`, if it is one.
+    fn as_camera_2d(node: &Self::Node) -> Option<Self::Camera2D>;
+    /// The fields of `Camera2D` in `camera`.
+    fn camera_2d(camera: &Self::Camera2D) -> &Camera2dFields;
+    /// `camera` as a node.
+    fn camera_2d_node(camera: &Self::Camera2D) -> Self::Node;
+    /// `node` as a `Camera3D`, if it is one.
+    fn as_camera_3d(node: &Self::Node) -> Option<Self::Camera3D>;
+    /// The fields of `Camera3D` in `camera`.
+    fn camera_3d(camera: &Self::Camera3D) -> &Camera3dFields;
+    /// `camera` as a node.
+    fn camera_3d_node(camera: &Self::Camera3D) -> Self::Node;
+    /// Runs `read` on the fields of `Sprite` in `node`, if it is one.
+    fn with_sprite<R>(node: &Self::Node, read: impl FnOnce(&SpriteFields<Self>) -> R) -> Option<R>;
+    /// Runs `read` on the fields of `Mesh` in `node`, if it is one.
+    fn with_mesh<R>(node: &Self::Node, read: impl FnOnce(&MeshFields<Self>) -> R) -> Option<R>;
+    /// Runs `read` on the fields of `Light` in `node`, if it is one.
+    fn with_light<R>(node: &Self::Node, read: impl FnOnce(&LightFields<Self>) -> R) -> Option<R>;
+    /// Runs `read` on the fields of `Light2D` in `node`, if it is one.
+    fn with_light_2d<R>(node: &Self::Node, read: impl FnOnce(&LightFields<Self>) -> R)
+    -> Option<R>;
     /// The fields of the body `body`.
     fn body(body: &Self::Body) -> &BodyFields<Self>;
     /// A new color with the channels `r`, `g`, `b` and `a`.
     fn color(r: f32, g: f32, b: f32, a: f32) -> Self::Color;
+    /// The channels of `color`, in the order `[r, g, b, a]`.
+    fn channels(color: &Self::Color) -> [f32; 4];
+    /// Runs the `start` of `node`: its script's, or `Node`'s.
+    fn start(node: &Self::Node);
+    /// Runs the `update` of `node`: its script's, or `Node`'s.
+    fn update(node: &Self::Node, delta: f32);
+    /// The fields of `Game` in `game`.
+    fn game(game: &Self::Game) -> &GameFields<Self>;
+    /// Runs the `start` of `game`.
+    fn start_game(game: &Self::Game);
+    /// Runs the `update` of `game`.
+    fn update_game(game: &Self::Game, delta: f32);
 }
 
 /// Gives every node its own number, which the engine knows it by.
@@ -435,4 +478,4 @@ fn warn(message: &str) {
 }
 
 #[cfg(test)]
-pub(crate) mod tests;
+mod tests;

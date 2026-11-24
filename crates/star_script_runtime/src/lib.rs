@@ -16,6 +16,7 @@ pub mod color;
 mod equality;
 mod fault;
 mod field;
+pub mod game;
 pub mod input;
 mod list;
 pub mod node_classes;
@@ -27,6 +28,8 @@ mod plain;
 pub mod scene_fields;
 pub mod scenes;
 pub mod tasks;
+#[cfg(test)]
+mod test_host;
 
 pub use equality::StarEq;
 pub use fault::{fault, proven};
