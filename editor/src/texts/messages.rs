@@ -221,6 +221,17 @@ impl Texts {
         }
     }
 
+    pub(crate) fn main_scene_missing(&self, path: &str) -> String {
+        match self.language {
+            Language::English => format!(
+                "The main scene, \"{path}\", is not in the assets folder: choose another one (right click on a scene: “Set as main scene”)."
+            ),
+            Language::Spanish => format!(
+                "La escena principal, \"{path}\", no está en la carpeta de assets: elige otra (clic derecho en una escena: «Usar como escena principal»)."
+            ),
+        }
+    }
+
     pub(crate) fn game_not_written(&self, error: &std::io::Error) -> String {
         match self.language {
             Language::English => format!("Could not write the game's Rust code: {error}"),

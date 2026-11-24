@@ -305,7 +305,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
 - [ ] **Owner's requests (2026-11-24)**:
   - [x] One main camera per scene: the cameras' flag is `main`, a scene
         with two is an error, and the editor keeps only one marked.
-  - [ ] Playing without scripts: the project's main scene, seen from its
-        main camera, which it must have.
+  - [x] Playing without scripts: the project's main scene (`main_scene`
+        in `project.toml`, “Set as main scene” in the assets), seen from
+        its main camera, which it must have (decision 62).
   - [ ] A small preview of what the main camera sees, in 2D and 3D.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

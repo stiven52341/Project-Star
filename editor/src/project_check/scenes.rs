@@ -7,6 +7,7 @@ use star_engine::star_scene::{FieldValue, NodeOutline, SceneOutline};
 use star_script::semantic::{COLOR_CLASS, ClassTable, FieldInfo, NODE_CLASS, Type};
 
 use super::Problem;
+use crate::texts;
 
 /// The problems of the scene called `name` with the text `text`.
 ///
@@ -29,6 +30,18 @@ pub(super) fn check_scene(name: &str, text: &str, classes: Option<&ClassTable>) 
                 .map(|problem| Problem::in_file(name, format!("node \"{}\": {problem}", node.name)))
         })
         .collect()
+}
+
+/// The problem of the main scene called `name` with the text `text`, a
+/// project without a `Game` class plays: it must be seen from a main
+/// camera. A scene that cannot be read has its problem given by
+/// [`check_scene`].
+pub(super) fn check_main_scene(name: &str, text: &str) -> Option<Problem> {
+    let outline = SceneOutline::from_text(text).ok()?;
+    outline
+        .main_camera()
+        .is_none()
+        .then(|| Problem::in_file(name, texts::current().main_scene_without_camera.to_owned()))
 }
 
 /// What is wrong with the class of `node` and the values it gives fields.

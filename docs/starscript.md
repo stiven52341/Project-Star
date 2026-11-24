@@ -590,6 +590,11 @@ class Space extends Game {
   sprites given the same `Color` change together when it changes.
 - Fields of the engine classes are not redeclared by subclasses, and their
   own fields with a default value are assigned after `super.init(…)`.
+- A program in which no class extends `Game` (and none has `static func
+  main`) plays the project's main scene (`main_scene` in `project.toml`),
+  if it has one, as a plain `Game` with that scene added to its tree: the
+  scene's nodes run their classes' code and it is seen from its main
+  camera. Programs compiled outside the editor do not have one.
 - `Scene.load("levels/one.scene")` builds the nodes of a `.scene` file of
   the asset folder: a new tree, out of the game until it is added, whose
   root is returned. Nodes with an image become `Sprite` objects (with their

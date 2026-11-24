@@ -138,7 +138,10 @@ fn game_settings(script: &Path) -> Result<GameSettings, String> {
         .map(|(name, bindings)| input_action(name, bindings))
         .collect::<Result<_, _>>()
         .map_err(|error| format!("{}: {error}", project.display()))?;
-    Ok(GameSettings { actions })
+    Ok(GameSettings {
+        actions,
+        main_scene: None,
+    })
 }
 
 /// `name = ["Space", "GamepadSouth"]`

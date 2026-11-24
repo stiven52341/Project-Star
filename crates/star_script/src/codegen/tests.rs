@@ -124,6 +124,31 @@ fn games_run_in_the_engine() {
 }
 
 #[test]
+fn programs_without_a_game_play_the_main_scene() {
+    let settings = crate::GameSettings {
+        actions: Vec::new(),
+        main_scene: Some(crate::MainScene {
+            path: "scenes/level.scene".to_owned(),
+            title: "Space Game".to_owned(),
+        }),
+    };
+
+    let empty = crate::compile_source_with("", &settings).expect("valid program");
+    let with_game =
+        crate::compile_source_with("class MyGame extends Game {}", &settings).expect("valid");
+
+    assert_eq!(empty.entry_point, EntryPoint::MainScene);
+    assert!(empty.uses_engine());
+    assert!(
+        empty
+            .code
+            .contains("main_scene_game_(\"scenes/level.scene\")?")
+    );
+    assert!(empty.code.contains(".with_title(\"Space Game\")"));
+    assert_eq!(with_game.entry_point, EntryPoint::Game);
+}
+
+#[test]
 fn console_programs_do_not_need_the_engine() {
     let program = compile_source("class A { static func main() {} }").expect("valid program");
 
@@ -161,6 +186,7 @@ fn game_with_jump_action() -> super::GeneratedProgram {
             name: "jump".into(),
             bindings: vec!["Space".into(), "GamepadSouth".into()],
         }],
+        main_scene: None,
     };
     crate::compile_source_with(
         "class G extends Game {\n override func update(delta: float) {\n \

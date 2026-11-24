@@ -1,16 +1,31 @@
-//! The input actions of `project.toml`, which scripts name.
+//! The parts of `project.toml` that change how scripts are compiled: the
+//! input actions scripts name, and the scene a game without a `Game` class
+//! plays.
 
 use std::collections::BTreeMap;
 
 use serde::Deserialize;
-use star_script::{GameSettings, InputAction};
+use star_script::{GameSettings, InputAction, MainScene};
 
 /// The parts of `project.toml` that change how scripts are compiled; the
 /// rest of the file is read by the project's manifest.
 #[derive(Debug, Default, Deserialize)]
 struct ScriptSettingsFile {
     #[serde(default)]
+    project: ProjectSection,
+    #[serde(default)]
     input: InputSection,
+}
+
+/// `[project]`: only what scripts need of it.
+#[derive(Debug, Default, Deserialize)]
+struct ProjectSection {
+    /// The project's name, the title of its window.
+    #[serde(default)]
+    name: String,
+    /// The scene played when no class extends `Game`, in the assets folder.
+    #[serde(default)]
+    main_scene: Option<String>,
 }
 
 /// `[input]`
@@ -37,12 +52,35 @@ pub(super) fn read_game_settings(text: &str) -> Result<GameSettings, String> {
         .into_iter()
         .map(|(name, bindings)| InputAction { name, bindings })
         .collect();
-    Ok(GameSettings { actions })
+    let title = file.project.name;
+    let main_scene = file
+        .project
+        .main_scene
+        .map(|path| MainScene { path, title });
+    Ok(GameSettings {
+        actions,
+        main_scene,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_main_scene_is_played_with_the_name_of_the_project() {
+        let text = "[project]\nname = \"Demo\"\nmain_scene = \"scenes/one.scene\"\n";
+
+        let settings = read_game_settings(text).expect("valid settings");
+
+        assert_eq!(
+            settings.main_scene,
+            Some(MainScene {
+                path: "scenes/one.scene".to_owned(),
+                title: "Demo".to_owned(),
+            })
+        );
+    }
 
     #[test]
     fn actions_are_read_with_their_bindings() {

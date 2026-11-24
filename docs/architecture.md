@@ -106,6 +106,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 59 | Cameras are **parts of nodes with a `main` flag**, and the 2D one is `Camera2D` | A scene must be able to bring its own point of view, as in Godot, without code. `[node.camera]` and `[node.camera_3d]` are components like `[node.light]`; a camera marked `main` becomes `Game.camera`/`camera_3d` as it enters the game's tree (just before its `start`), so `Game.camera` keeps saying which one is used and scripts can still change it. A scene has at most one main camera, 2D or 3D (owner's choice, 2026-11-24: the flag was first called `current`): a file with two is a scene error, and the editor marks only the first camera created as `main`, never marks copies, and unmarks the others when one is marked. `Camera` was renamed `Camera2D` to pair with `Camera3D` (owner's choice, 2026-11-24). Rejected: choosing the camera each frame by searching the tree (a walk every frame, and `Game.camera` would not tell the truth); a project setting naming the camera (scenes would not carry it). |
 | 60 | Nodes are found **by walking the tree when asked**, and blueprints got a **For each** node | `find_by_name`/`find_by_tag` walk a node's descendants (or the game's, for the static ones of `Scene`, through the root the generated game already keeps), parents first. Games have few nodes and search rarely, so no index is kept that every rename, tag change or move would have to update. Both scopes exist (owner's choice, 2026-11-24): `Scene.*` from any script, `node.*` inside a part of the tree. `find_by_tag` gives a list, and blueprints had no loops, so `for_each` became a node: its body is a nested path, like a branch's, which keeps the execution a tree (decision 41). Rejected: a map of tags kept up to date (more state for little gain), and a first-tagged-only search (a list covers it). |
 | 61 | Global positions are **methods computed from the ancestors** (`star_script_runtime::placement`) | StarScript has neither properties nor vectors, so a global place is read with `global_x()`… and changed with `set_global_position(x, y)` (owner's choice, 2026-11-24, over adding properties to the language). They are computed when asked, walking the parents with the same scale-turn-move order as the engine, in the runtime crate so console programs give the same numbers without the engine. The fields stay local, as the engine and scenes keep them. Rejected: properties `global_x = …` (a language feature for one use), a global place kept up to date in every node (every move of a parent would have to update its subtree). |
+| 62 | A project **without a `Game` class plays its main scene**, which must have a main camera | A game made only of scenes (and their nodes' scripts, if any) must run without writing a `Game` class (owner's request, 2026-11-24). `project.toml` names the scene (`[project] main_scene`), the compiler receives it in `GameSettings::main_scene`, and a program with no entry point and a main scene gets `EntryPoint::MainScene`: a plain `Game` with the scene added to its tree, so the scene's main camera becomes `Game.camera`/`camera_3d` as any scene's does. A missing scene stops the game with an error. “Compile” refuses a main scene without a main camera, as the owner asked, since the game would show nothing. A project with a `Game` class plays it, as before: it loads its own scenes. Rejected: playing the scene open in the editor (what plays would change with the tab chosen) |
 
 ## ECS
 
@@ -937,7 +938,8 @@ comments written by hand in it are not kept.
 “Compile” runs `project_check/` (no UI, with tests) on a thread of its own
 (`CheckJob`), which asks egui to redraw when it finishes. It checks:
 
-- `project.toml`: its `[input.actions]`, which scripts name.
+- `project.toml`: its `[input.actions]`, which scripts name, and its
+  `main_scene`.
 - Every `.star` and `.blueprint` file of `assets/` (any subfolder), as
   **one program** (`star_script::SourceSet`), including its translation to
   Rust. Blueprints are translated to StarScript first (`star_blueprint`);
@@ -948,6 +950,10 @@ comments written by hand in it are not kept.
 - Every `.scene` file of `assets/`: that it can be read and, if the project
   has scripts, that the classes its nodes name can build them
   (`ClassTable::scene_class`, the same rule the generated code follows).
+
+- The main scene, when no class extends `Game` (the program then plays
+  it, even with no scripts at all): that it is in `assets/` and has a
+  main camera.
 
 When it finds no problems, the check keeps the program's Rust
 (`ProjectCheck::program`).
@@ -992,4 +998,9 @@ name = "My Space Game"
 engine_version = "0.1.0"
 dimension = "3d"
 platforms = ["windows", "linux", "android"]
+main_scene = "scenes/level.scene"
 ```
+
+The main scene is chosen with a right click on a scene in the assets
+(“Set as main scene”); the first scene created becomes it, and renaming
+it (or its folder) keeps it.

@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use star_script::codegen::{self, GeneratedProgram};
+use star_script::codegen::{self, EntryPoint, GeneratedProgram};
 use star_script::semantic::{Analysis, ClassTable, LocalInfo};
 use star_script::{
     CompileError, GameSettings, Position, SourceSet, Span, analyze_program_with, check_program_with,
@@ -30,6 +30,7 @@ use crate::file_tree::{file_paths, scan_directory};
 use crate::project::{
     ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, MANIFEST_FILE_NAME, SCENE_EXTENSION, SCRIPT_EXTENSION,
 };
+use crate::texts;
 
 /// What checking a project found.
 #[derive(Debug, Clone)]
@@ -128,10 +129,10 @@ pub(crate) enum CheckGoal {
 /// Checks the project in `directory` for `goal`, reading the files of
 /// `open` from there instead of from the disk.
 ///
-/// A project without scripts is a game written in Rust: its scenes are not
-/// checked against StarScript classes, which such games ignore. If a
-/// blueprint cannot become StarScript, only its problems are given for the
-/// program: the rest would only miss its class.
+/// A project without scripts or a main scene is a game written in Rust: its
+/// scenes are not checked against StarScript classes, which such games
+/// ignore. If a blueprint cannot become StarScript, only its problems are
+/// given for the program: the rest would only miss its class.
 pub(crate) fn check_project_with(
     directory: &Path,
     open: &OpenTexts,
@@ -143,13 +144,32 @@ pub(crate) fn check_project_with(
     let assets = list_assets(directory, &mut problems);
     let program = read_program(&assets_folder, &assets, &mut problems);
     let scripts = assets.iter().filter(|path| is_program_file(path)).count();
-    let readable = !program.sources().is_empty() && program.is_complete();
+    // A main scene plays even without scripts, through the program.
+    let plays_scene = goal == CheckGoal::Compile && settings.main_scene.is_some();
+    let readable = (plays_scene || !program.sources().is_empty()) && program.is_complete();
     let (checked, generated) = if readable {
         check_program(&program, &settings, goal, &mut problems)
     } else {
         (None, None)
     };
-    if scripts > 0 && goal == CheckGoal::Compile {
+    if let Some(generated) = &generated
+        && generated.entry_point == EntryPoint::MainScene
+        && let Some(main_scene) = &settings.main_scene
+    {
+        let path = &main_scene.path;
+        let problem = if assets.contains(path) {
+            assets_folder
+                .read(path, &mut problems)
+                .and_then(|text| scenes::check_main_scene(&asset_name(path), &text))
+        } else {
+            Some(Problem::in_file(
+                MANIFEST_FILE_NAME,
+                texts::current().main_scene_missing(path),
+            ))
+        };
+        problems.extend(problem);
+    }
+    if (scripts > 0 || plays_scene) && goal == CheckGoal::Compile {
         let classes = checked.as_ref().map(|checked| checked.analysis.classes());
         for path in assets.iter().filter(|path| path.ends_with(SCENE_EXTENSION)) {
             if let Some(text) = assets_folder.read(path, &mut problems) {

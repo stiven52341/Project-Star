@@ -125,6 +125,7 @@ fn checked_code(blueprint: &Blueprint) -> String {
             name: "fast".to_owned(),
             bindings: vec!["ShiftLeft".to_owned()],
         }],
+        main_scene: None,
     };
     if let Err(errors) = check_source_with(&source, &settings) {
         panic!("{source}\n{errors:?}");

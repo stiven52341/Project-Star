@@ -268,7 +268,7 @@ fn entry_point(
         .map(|item| (item, EntryPoint::Game, item.span()));
     let mut entries = mains.chain(games);
     let Some((item, kind, _)) = entries.next() else {
-        return Ok(EntryPoint::None);
+        return Ok(main_scene_entry_point(context, out));
     };
     if let Some((_, _, span)) = entries.next() {
         return Err(CodegenError {
@@ -307,11 +307,29 @@ fn entry_point(
     }
     native::game_entry_point(
         out,
-        &path,
+        &format!("{path}::new()"),
         &class.name,
         &context.analysis.settings().actions,
     );
     Ok(kind)
+}
+
+/// Writes `fn main` for a program without an entry point that plays the
+/// project's main scene, if the project has one.
+fn main_scene_entry_point(context: Context<'_>, out: &mut Writer) -> EntryPoint {
+    let settings = context.analysis.settings();
+    let Some(scene) = &settings.main_scene else {
+        return EntryPoint::None;
+    };
+    out.line("");
+    native::game_entry_point(
+        out,
+        &format!("main_scene_game_({:?})?", scene.path),
+        &scene.title,
+        &settings.actions,
+    );
+    native::main_scene_game(out);
+    EntryPoint::MainScene
 }
 
 /// Whether `class` is the game: it extends `Game` and no class extends it,

@@ -1305,7 +1305,7 @@ impl EngineGame_ {{
 /// the input `actions` of the project.
 pub(super) fn game_entry_point(
     out: &mut Writer,
-    class_path: &str,
+    new_game: &str,
     title: &str,
     actions: &[InputAction],
 ) {
@@ -1341,7 +1341,7 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
     // sounds too.
     let game_ = EngineGame_ {{
         audio: audio_,
-        game: {class_path}::new(),
+        game: {new_game},
         nodes: ::std::vec::Vec::new(),
         pending: ::std::vec::Vec::new(),
         known: ::std::collections::HashMap::new(),
@@ -1361,6 +1361,25 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
         out.line(line);
     }
 }
+
+/// Writes `main_scene_game_`: the game of a program without a `Game`
+/// class, which only shows a scene.
+pub(super) fn main_scene_game(out: &mut Writer) {
+    for line in std::iter::once("").chain(MAIN_SCENE_GAME.lines()) {
+        out.line(line);
+    }
+}
+
+const MAIN_SCENE_GAME: &str = "/// A game with nothing but the scene at `path`: the main scene of a
+/// project without a `Game` class.
+fn main_scene_game_(path_: &str) -> ::star_engine::star_core::EngineResult<crate::classes::Game::Ref> {
+    let game_ = crate::classes::Game::new();
+    let scene_ = crate::classes::Scene::load(::std::string::String::from(path_)).ok_or_else(|| {
+        ::star_engine::star_core::EngineError::Scene(::std::format!(\"the main scene, \\\"{path_}\\\", could not be loaded\"))
+    })?;
+    crate::classes::Game::Object::add_child(::std::rc::Rc::clone(&game_), scene_);
+    ::std::result::Result::Ok(game_)
+}";
 
 const SHARE_INPUT: &str =
     "/// Copies where the player points, in world units, where `Input` reads it.

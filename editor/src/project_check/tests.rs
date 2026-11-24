@@ -315,3 +315,81 @@ fn the_outline_knows_the_locals_of_each_script() {
     assert_eq!(local.name, "delta");
     assert_eq!(outline.classes.type_name(&local.ty), "float");
 }
+
+/// `project.toml` of a project whose main scene is `scenes/main.scene`.
+const MAIN_SCENE_MANIFEST: &str = "[project]\nname = \"Demo\"\nengine_version = \"0.1.0\"\ndimension = \"2d\"\nplatforms = [\"linux\"]\nmain_scene = \"scenes/main.scene\"\n";
+
+const SEEN_SCENE: &str = "format = 1\n[[node]]\nname = \"Level\"\n[[node]]\nname = \"Eye\"\nparent = 0\n[node.camera]\nmain = true\n";
+
+#[test]
+fn projects_without_scripts_play_their_main_scene() {
+    let directory = project(
+        "check_main_scene",
+        &[
+            (MANIFEST_FILE_NAME, MAIN_SCENE_MANIFEST),
+            ("assets/scenes/main.scene", SEEN_SCENE),
+        ],
+    );
+
+    let check = check_project(directory.path());
+
+    assert!(check.problems.is_empty(), "{:?}", messages(&check));
+    let program = check.program.expect("the game's Rust");
+    assert_eq!(program.entry_point, EntryPoint::MainScene);
+}
+
+#[test]
+fn main_scenes_need_a_main_camera_and_to_exist() {
+    let unseen = project(
+        "check_main_scene_unseen",
+        &[
+            (MANIFEST_FILE_NAME, MAIN_SCENE_MANIFEST),
+            ("assets/scenes/main.scene", SCENE),
+        ],
+    );
+    let missing = project(
+        "check_main_scene_missing",
+        &[(MANIFEST_FILE_NAME, MAIN_SCENE_MANIFEST)],
+    );
+
+    let unseen = check_project(unseen.path());
+    let missing = check_project(missing.path());
+
+    assert!(unseen.program.is_none());
+    assert_eq!(unseen.problems.len(), 2, "{:?}", messages(&unseen));
+    assert!(
+        unseen.problems[0]
+            .to_string()
+            .contains("assets/scenes/main.scene"),
+        "{:?}",
+        messages(&unseen)
+    );
+    assert!(missing.program.is_none());
+    assert_eq!(missing.problems.len(), 1, "{:?}", messages(&missing));
+}
+
+#[test]
+fn games_ignore_the_main_camera_of_the_main_scene() {
+    let directory = project(
+        "check_main_scene_game",
+        &[
+            (
+                MANIFEST_FILE_NAME,
+                MAIN_SCENE_MANIFEST
+                    .replace(
+                        "[project]",
+                        "[input.actions]\njump = [\"Space\"]\n\n[project]",
+                    )
+                    .as_str(),
+            ),
+            ("assets/demo.star", GAME),
+            ("assets/enemies/rock.star", ROCK),
+            ("assets/scenes/main.scene", SCENE),
+        ],
+    );
+
+    let check = check_project(directory.path());
+
+    assert!(check.problems.is_empty(), "{:?}", messages(&check));
+    assert_eq!(check.program.unwrap().entry_point, EntryPoint::Game);
+}

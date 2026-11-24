@@ -14,7 +14,7 @@ use std::process::Command;
 
 use common::{ENGINE_CRATES, binary, build, compile_with, package_directory};
 use star_script::package::Package;
-use star_script::{GameSettings, InputAction};
+use star_script::{GameSettings, InputAction, MainScene};
 
 /// Counts its frames and closes itself after the third one. Nobody presses
 /// `jump` while the test runs.
@@ -383,6 +383,7 @@ fn settings(bindings: &[&str]) -> GameSettings {
             name: "jump".to_owned(),
             bindings: bindings.iter().map(|&binding| binding.to_owned()).collect(),
         }],
+        main_scene: None,
     }
 }
 
@@ -435,6 +436,17 @@ fn games_run_in_the_engine_until_they_quit() {
             compile_with("coroutine_game", COROUTINE_GAME, &valid),
         )
         .expect("valid name");
+    // Never quits by itself: played only with a scene it cannot load.
+    let scene_only = GameSettings {
+        main_scene: Some(MainScene {
+            path: "levels/nowhere.scene".to_owned(),
+            title: "Scene only".to_owned(),
+        }),
+        ..valid.clone()
+    };
+    package
+        .add_program("scene_game", compile_with("scene_game", "", &scene_only))
+        .expect("valid name");
     package.write(&directory).expect("package written");
 
     build(&directory);
@@ -474,6 +486,20 @@ fn games_run_in_the_engine_until_they_quit() {
     assert_eq!(
         stdout,
         "frame 1\nblink\nframe 2\nlater\nblink\nframe 3\nframe 4\nframe 5\n"
+    );
+
+    let output = Command::new(binary(&directory, "scene_game"))
+        .current_dir(&directory)
+        .output()
+        .expect("the game runs");
+    assert!(
+        !output.status.success(),
+        "a missing main scene stops the game"
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("the main scene, \"levels/nowhere.scene\", could not be loaded"),
+        "the error names the scene"
     );
 
     let output = Command::new(binary(&directory, "misspelled_game"))

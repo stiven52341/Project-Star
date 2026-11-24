@@ -4,6 +4,7 @@ mod asset_kinds;
 mod creation;
 mod dimension;
 mod input_actions;
+mod main_scene;
 mod manifest;
 mod name;
 mod opening;
@@ -20,6 +21,7 @@ pub(crate) use creation::{
 };
 pub(crate) use dimension::ProjectDimension;
 pub(crate) use input_actions::add_missing_actions;
+pub(crate) use main_scene::{read_main_scene, set_main_scene};
 pub(crate) use manifest::MANIFEST_FILE_NAME;
 pub(crate) use name::{MAX_NAME_LENGTH, ProjectNameError};
 pub(crate) use opening::{OpenProjectError, Project, open_project};

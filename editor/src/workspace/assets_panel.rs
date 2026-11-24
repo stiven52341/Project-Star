@@ -19,6 +19,7 @@ use crate::blueprint_editor::BlueprintTemplate;
 use crate::file_tree::{FileNode, file_paths, scan_directory};
 use crate::project::{
     ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, ProjectDimension, SCENE_EXTENSION, SCRIPT_EXTENSION,
+    read_main_scene, set_main_scene,
 };
 use crate::scene_editor::{ClassDrop, ImageDrop};
 use crate::style::ERROR_COLOR;
@@ -67,6 +68,8 @@ enum MenuChoice {
     /// Show the file or folder at this path, inside the assets folder, in
     /// the system's file manager.
     ShowInFileExplorer(String),
+    /// Make the scene at this path the project's main scene.
+    SetMainScene(String),
 }
 
 /// The side of a tile's icon at 100 %.
@@ -95,6 +98,10 @@ const ICON_SLIDER_WIDTH: f32 = 80.0;
 
 /// Contents of the assets folder, refreshed on demand.
 pub(crate) struct AssetsPanel {
+    /// The project's folder, where `project.toml` is.
+    project_directory: PathBuf,
+    /// The project's main scene, as a path inside the assets folder.
+    main_scene: Option<String>,
     directory: PathBuf,
     contents: io::Result<Vec<FileNode>>,
     /// The folder shown, by the names of the folders down to it.
@@ -121,6 +128,8 @@ impl AssetsPanel {
         let directory = project_directory.join(ASSETS_DIRECTORY);
         let contents = scan_directory(&directory);
         Self {
+            project_directory: project_directory.to_path_buf(),
+            main_scene: read_main_scene(project_directory),
             images: image_paths(&contents),
             thumbnails: Thumbnails::new(&directory),
             directory,
@@ -282,6 +291,19 @@ impl AssetsPanel {
                 show_in_file_explorer(self.directory.join(path));
                 None
             }
+            MenuChoice::SetMainScene(path) => {
+                self.set_main_scene(path);
+                None
+            }
+        }
+    }
+
+    /// Makes the scene at `path` the project's main scene; a failure is
+    /// only logged.
+    fn set_main_scene(&mut self, path: String) {
+        match set_main_scene(&self.project_directory, &path) {
+            Ok(()) => self.main_scene = Some(path),
+            Err(error) => log::warn!("{error}"),
         }
     }
 
@@ -290,10 +312,21 @@ impl AssetsPanel {
         self.refresh();
         match outcome {
             Outcome::Created(path) => {
+                // The first scene of a project is the one it plays.
+                if self.main_scene.is_none() && path.ends_with(SCENE_EXTENSION) {
+                    self.set_main_scene(path.clone());
+                }
                 self.selected = Some(path);
                 None
             }
             Outcome::Renamed { from, to } => {
+                if let Some(moved) = self
+                    .main_scene
+                    .as_deref()
+                    .and_then(|main_scene| renamed_path(main_scene, &from, &to))
+                {
+                    self.set_main_scene(moved);
+                }
                 self.selected = Some(to.clone());
                 Some(AssetEvent::Renamed { from, to })
             }
@@ -427,7 +460,8 @@ impl AssetsPanel {
             .double_clicked()
             .then(|| MenuChoice::Open(entry.clone()));
         let dimension = self.actions.dimension();
-        response.context_menu(|ui| tile_menu(ui, entry, dimension, &mut choice));
+        let is_main_scene = self.main_scene.as_deref() == Some(entry.path.as_str());
+        response.context_menu(|ui| tile_menu(ui, entry, dimension, is_main_scene, &mut choice));
         choice
     }
 
@@ -520,12 +554,26 @@ fn tile_menu(
     ui: &mut egui::Ui,
     entry: &Entry,
     dimension: ProjectDimension,
+    is_main_scene: bool,
     choice: &mut Option<MenuChoice>,
 ) {
     let texts = texts::current();
     let opens = entry.kind == AssetKind::Folder || OpenedAsset::of(entry.path.clone()).is_some();
     if opens && ui.button(texts.open).clicked() {
         *choice = Some(MenuChoice::Open(entry.clone()));
+    }
+    if entry.path.ends_with(SCENE_EXTENSION) {
+        let mut checked = is_main_scene;
+        let set = ui
+            .add_enabled(
+                !is_main_scene,
+                egui::Checkbox::new(&mut checked, texts.set_main_scene),
+            )
+            .on_hover_text(texts.main_scene_hint)
+            .on_disabled_hover_text(texts.main_scene_hint);
+        if set.clicked() {
+            *choice = Some(MenuChoice::SetMainScene(entry.path.clone()));
+        }
     }
     if ui.button(texts.rename).clicked() {
         *choice = Some(MenuChoice::Act(Choice::Rename(entry.target())));
@@ -541,6 +589,16 @@ fn tile_menu(
     }
     ui.separator();
     create_menu(ui, dimension, choice);
+}
+
+/// Where `path` is once the file or folder at `from` is renamed `to`, if
+/// it is that one or inside it.
+fn renamed_path(path: &str, from: &str, to: &str) -> Option<String> {
+    if path == from {
+        return Some(to.to_owned());
+    }
+    let inside = path.strip_prefix(from)?.strip_prefix('/')?;
+    Some(format!("{to}/{inside}"))
 }
 
 /// Opens the system's file manager at `path` on a thread of its own, so
@@ -627,6 +685,19 @@ fn show_dragged_class(ui: &egui::Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn renaming_a_scene_or_its_folder_moves_it() {
+        assert_eq!(
+            renamed_path("a.scene", "a.scene", "b.scene").as_deref(),
+            Some("b.scene")
+        );
+        assert_eq!(
+            renamed_path("levels/a.scene", "levels", "worlds").as_deref(),
+            Some("worlds/a.scene")
+        );
+        assert_eq!(renamed_path("levels2/a.scene", "levels", "worlds"), None);
+    }
 
     fn file(name: &str) -> FileNode {
         FileNode::File {

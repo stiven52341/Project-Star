@@ -64,7 +64,7 @@ impl GeneratedProgram {
     /// Whether the code needs the engine (`star_engine`) besides the runtime.
     #[must_use]
     pub fn uses_engine(&self) -> bool {
-        self.entry_point == EntryPoint::Game
+        matches!(self.entry_point, EntryPoint::Game | EntryPoint::MainScene)
     }
 }
 
@@ -77,6 +77,9 @@ pub enum EntryPoint {
     Main,
     /// It runs a game in a window of the engine.
     Game,
+    /// It has no game class: it plays the project's main scene in a window
+    /// of the engine.
+    MainScene,
 }
 
 /// Why a program could not be translated to Rust.

@@ -130,7 +130,10 @@ mod tests {
                 bindings: bindings.iter().map(|&binding| binding.to_owned()).collect(),
             })
             .collect();
-        GameSettings { actions }
+        GameSettings {
+            actions,
+            main_scene: None,
+        }
     }
 
     #[test]
