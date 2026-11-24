@@ -574,7 +574,13 @@ rows it cannot land on (itself, its descendants, its own parent) are not
 outlined. The node keeps its place in the world: its transform is
 recomputed for the new parent (the closest one when uneven scales and
 rotations would skew it), and it gets a name free among its new
-siblings. The tree (`tree_view.rs`) draws one row
+siblings. A script or a blueprint dragged from “Assets” onto a row gives
+that node its class (`class_drop.rs`): the file is read once, when the
+drag starts, and only its classes that extend another class are offered,
+since a node's class extends `Node` (which classes truly do needs the
+whole program, so the check of the scene catches the rest). One class is
+given at once; several open a small menu where the file was dropped; a
+file with none says so next to the pointer, and no row is outlined. The tree (`tree_view.rs`) draws one row
 per node across the panel, striped, with guides down to the children, an
 arrow to close and open them (closed nodes are kept by path, so they stay
 closed while others come and go), an icon for what the node shows most

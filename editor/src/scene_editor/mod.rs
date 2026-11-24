@@ -4,6 +4,7 @@
 //! parent, and the inspector edits the node selected in
 //! it. Changes are kept until the scene is saved, and can be undone.
 
+mod class_drop;
 mod components;
 mod drawing;
 mod dropping;
@@ -23,6 +24,7 @@ use eframe::egui;
 use star_engine::prelude::{Frame, SceneOutline, Vec3};
 use star_engine::star_scene::NodeOutline;
 
+pub(crate) use self::class_drop::ClassDrop;
 use self::components::NodeTemplate;
 pub(crate) use self::drawing::{Marks, SceneGpu, cross_lines, cube_lines, square_lines};
 pub(crate) use self::dropping::ImageDrop;
@@ -291,6 +293,7 @@ impl SceneDocument {
             TreeAction::Duplicate(index) => editor.duplicate(index),
             TreeAction::Delete(index) => editor.delete(index),
             TreeAction::Move { node, parent } => editor.reparent(node, parent),
+            TreeAction::SetClass { node, class } => editor.set_class(node, class),
         };
         if changed {
             self.mark_changed();
@@ -491,6 +494,19 @@ impl TreeEditor<'_> {
         true
     }
 
+    /// Builds the node at `index` as `class`, and selects it.
+    fn set_class(&mut self, index: usize, class: String) -> bool {
+        let Some(node) = self.outline.node_mut(index) else {
+            return false;
+        };
+        *self.selected = Some(index);
+        if node.class.as_deref() == Some(class.as_str()) {
+            return false;
+        }
+        node.class = Some(class);
+        true
+    }
+
     /// Deletes the node at `index` with its descendants, and selects its
     /// parent.
     fn delete(&mut self, index: usize) -> bool {
@@ -676,6 +692,19 @@ mod tests {
         assert!(!editor.reparent(1, 2));
         assert!(!editor.reparent(ROOT, 1));
         assert_eq!(editor.outline.nodes()[2].parent, Some(1));
+    }
+
+    #[test]
+    fn dropped_classes_are_given_to_the_node() {
+        let (_assets, mut scene) = open_level("scene_document_class");
+        let mut editor = tree_editor(&mut scene);
+
+        assert!(editor.set_class(ROOT, "Level".to_owned()));
+        assert!(!editor.set_class(ROOT, "Level".to_owned()));
+        assert!(!editor.set_class(7, "Level".to_owned()));
+
+        assert_eq!(editor.outline.nodes()[0].class.as_deref(), Some("Level"));
+        assert_eq!(scene.selected, Some(ROOT));
     }
 
     #[test]

@@ -19,7 +19,7 @@ use crate::file_tree::{FileNode, file_paths, scan_directory};
 use crate::project::{
     ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, ProjectDimension, SCENE_EXTENSION, SCRIPT_EXTENSION,
 };
-use crate::scene_editor::ImageDrop;
+use crate::scene_editor::{ClassDrop, ImageDrop};
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -191,6 +191,7 @@ impl AssetsPanel {
             event = event.or_else(|| self.carry_out(choice));
         }
         self.show_dragged_image(ui);
+        show_dragged_class(ui);
         event
     }
 
@@ -334,6 +335,13 @@ impl AssetsPanel {
                 path: entry.path.clone(),
                 aspect: thumbnail.map(|(_, size)| size.x / size.y),
             });
+        }
+        let carries_classes = matches!(entry.kind, AssetKind::Script | AssetKind::Blueprint);
+        if carries_classes && response.drag_started() {
+            // Read once, when the drag starts, not every frame it lasts.
+            if let Some(classes) = ClassDrop::read(&self.directory, entry.path.clone()) {
+                response.dnd_set_drag_payload(classes);
+            }
         }
         match thumbnail {
             Some((texture, size)) => {
@@ -497,6 +505,38 @@ fn image_paths(contents: &io::Result<Vec<FileNode>>) -> Vec<String> {
                 .is_ok()
         })
         .collect()
+}
+
+/// While a script or a blueprint is dragged, its icon and name follow
+/// the pointer, with a warning if it has no class a node can be built as.
+fn show_dragged_class(ui: &egui::Ui) {
+    let ctx = ui.ctx();
+    let Some(script) = egui::DragAndDrop::payload::<ClassDrop>(ctx) else {
+        return;
+    };
+    let Some(cursor) = ctx.pointer_latest_pos() else {
+        return;
+    };
+    ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Tooltip,
+        egui::Id::unique("dragged_class"),
+    ));
+    let space = egui::Rect::from_min_size(
+        cursor + egui::Vec2::splat(DRAGGED_OFFSET),
+        egui::Vec2::splat(DRAGGED_SIDE),
+    );
+    let name = script.path.rsplit('/').next().unwrap_or(&script.path);
+    paint_icon(&painter, space, AssetKind::of_file(name), name);
+    if script.classes.is_empty() {
+        painter.text(
+            space.left_bottom() + egui::vec2(0.0, DRAGGED_OFFSET),
+            egui::Align2::LEFT_TOP,
+            texts::current().no_node_class,
+            egui::TextStyle::Body.resolve(ui.style()),
+            ERROR_COLOR,
+        );
+    }
 }
 
 #[cfg(test)]

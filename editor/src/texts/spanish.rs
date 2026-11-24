@@ -37,6 +37,8 @@ pub(super) static SPANISH: Texts = Texts {
     menu_edit: "Editar",
     undo: "Deshacer",
     redo: "Rehacer",
+    no_node_class: "Ninguna clase aquí extiende a otra: ninguna puede ser un nodo.",
+    choose_class: "Construir el nodo como",
     quit: "Salir",
     menu_help: "Ayuda",
     about: "Acerca de",

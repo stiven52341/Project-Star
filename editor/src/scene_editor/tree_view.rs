@@ -4,7 +4,8 @@
 //! class on the right. A search field narrows the list to the nodes whose
 //! name matches. Right clicks open menus to create, duplicate and delete
 //! nodes, and rows dragged onto another node (or under the rows, for the
-//! root) move there.
+//! root) move there. Scripts and blueprints dropped on a node give it
+//! their class, or a choice of them if they have several.
 
 use std::collections::HashSet;
 use std::f32::consts::FRAC_1_SQRT_2;
@@ -14,6 +15,7 @@ use eframe::egui;
 use star_engine::star_scene::NodeOutline;
 
 use super::ROOT;
+use super::class_drop::ClassDrop;
 use super::components::NodeTemplate;
 use super::dropping::ImageDrop;
 use super::tree::{can_move, children_of};
@@ -81,6 +83,17 @@ pub(super) struct TreeState {
     collapsed: HashSet<String>,
     search: String,
     reveal: bool,
+    /// The classes of a script dropped on a node, to choose from.
+    class_choice: Option<ClassChoice>,
+}
+
+/// A script with several classes dropped on a node: a menu where it was
+/// dropped asks which one the node is built as.
+#[derive(Debug)]
+struct ClassChoice {
+    node: usize,
+    classes: Vec<String>,
+    at: egui::Pos2,
 }
 
 impl TreeState {
@@ -118,7 +131,7 @@ impl NodeKind {
 }
 
 /// What the user asked the tree to change.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum TreeAction {
     /// Add a node of `template` under `parent`.
     Create {
@@ -131,6 +144,8 @@ pub(super) enum TreeAction {
     Delete(usize),
     /// Move `node`, with its descendants, to be the last child of `parent`.
     Move { node: usize, parent: usize },
+    /// Build `node` as `class`.
+    SetClass { node: usize, class: String },
 }
 
 /// What a row carries while it is dragged: the position of its node.
@@ -219,7 +234,39 @@ impl<'scene> TreeView<'scene> {
             });
         self.state.reveal = false;
         self.show_dragged_node(ui);
+        self.show_class_choice(ui);
         self.outcome
+    }
+
+    /// The menu of the classes of a script dropped on a node, until one is
+    /// chosen, `Escape` is pressed or the user clicks elsewhere.
+    fn show_class_choice(&mut self, ui: &egui::Ui) {
+        let Some(choice) = &self.state.class_choice else {
+            return;
+        };
+        let mut chosen = None;
+        let menu = egui::Area::new(egui::Id::unique("scene_class_choice"))
+            .fixed_pos(choice.at)
+            .order(egui::Order::Foreground)
+            .show(ui.ctx(), |ui| {
+                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    ui.weak(texts::current().choose_class);
+                    for class in &choice.classes {
+                        if ui.button(class).clicked() {
+                            chosen = Some(class.clone());
+                        }
+                    }
+                });
+            });
+        let node = choice.node;
+        let dismissed = menu.response.clicked_elsewhere()
+            || ui.input(|input| input.key_pressed(egui::Key::Escape));
+        if let Some(class) = chosen {
+            self.outcome.action = Some(TreeAction::SetClass { node, class });
+            self.state.class_choice = None;
+        } else if dismissed || node >= self.nodes.len() {
+            self.state.class_choice = None;
+        }
     }
 
     /// While a row is dragged, its node's name follows the pointer.
@@ -256,15 +303,19 @@ impl<'scene> TreeView<'scene> {
         ui: &egui::Ui,
         response: &egui::Response,
         target: usize,
-        image_lands: bool,
+        is_row: bool,
     ) {
         let nodes = self.nodes;
         let fits = |drag: &NodeDrag| can_move(nodes, drag.0, target);
         let node_lands = response
             .dnd_hover_payload::<NodeDrag>()
             .is_some_and(|drag| fits(&drag));
-        let image_held = image_lands && response.dnd_hover_payload::<ImageDrop>().is_some();
-        if node_lands || image_held {
+        let image_held = is_row && response.dnd_hover_payload::<ImageDrop>().is_some();
+        let class_held = is_row
+            && response
+                .dnd_hover_payload::<ClassDrop>()
+                .is_some_and(|script| !script.classes.is_empty());
+        if node_lands || image_held || class_held {
             ui.painter().rect_stroke(
                 response.rect,
                 0.0,
@@ -281,6 +332,37 @@ impl<'scene> TreeView<'scene> {
                 parent: target,
             });
         }
+        if let Some(script) = response
+            .dnd_release_payload::<ClassDrop>()
+            .filter(|_| is_row)
+        {
+            self.class_dropped(target, &script.classes, response);
+        }
+    }
+
+    /// A script or blueprint with `classes` dropped on the node at `node`:
+    /// its only class is given to it, or a menu asks which one.
+    fn class_dropped(&mut self, node: usize, classes: &[String], response: &egui::Response) {
+        match classes {
+            [] => {}
+            [class] => {
+                self.outcome.action = Some(TreeAction::SetClass {
+                    node,
+                    class: class.clone(),
+                });
+            }
+            _ => {
+                let at = response
+                    .ctx
+                    .pointer_latest_pos()
+                    .unwrap_or_else(|| response.rect.center());
+                self.state.class_choice = Some(ClassChoice {
+                    node,
+                    classes: classes.to_vec(),
+                    at,
+                });
+            }
+        }
     }
 
     /// The space under the rows: a click there selects nothing, and its
@@ -293,7 +375,9 @@ impl<'scene> TreeView<'scene> {
         }
         let mut action = None;
         background.context_menu(|ui| create_menu(ui, ROOT, self.menu, &mut action));
-        self.outcome.action = self.outcome.action.or(action);
+        if self.outcome.action.is_none() {
+            self.outcome.action = action;
+        }
         self.drop_target(ui, &background, ROOT, false);
     }
 
@@ -416,7 +500,9 @@ impl<'scene> TreeView<'scene> {
         }
         let mut action = None;
         response.context_menu(|ui| node_menu(ui, index, self.menu, &mut action));
-        self.outcome.action = self.outcome.action.or(action);
+        if self.outcome.action.is_none() {
+            self.outcome.action = action;
+        }
         if index != ROOT {
             response.dnd_set_drag_payload(NodeDrag(index));
         }

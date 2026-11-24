@@ -250,7 +250,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] Undo and redo in the scene editor (`Ctrl+Z`, `Ctrl+Shift+Z` or
         `Ctrl+Y`, and the “Edit” menu).
   - [x] Moving nodes to another parent by dragging them in the tree.
-  - [ ] Dropping a `.star` on a node to give it its class.
+  - [x] Dropping a `.star` (or a `.blueprint`) on a node to give it its
+        class.
   - [ ] “Show in the file explorer” in “Assets” (needs platform code or a
         dependency: ask first).
   - [ ] A slider for the size of the icons of “Assets”.
