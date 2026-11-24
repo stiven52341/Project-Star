@@ -1,0 +1,16 @@
+[package]
+name = "star_script_engine"
+description = "Connects StarScript's runtime with the ProjectStar engine."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+star_engine.workspace = true
+star_script_runtime.workspace = true
+
+[lints]
+workspace = true

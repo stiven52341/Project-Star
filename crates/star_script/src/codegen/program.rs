@@ -339,15 +339,15 @@ fn main_scene_entry_point(context: Context<'_>, out: &mut Writer) -> EntryPoint 
 /// from its arguments. It has no input actions: without scripts, nothing
 /// would read them.
 fn player_entry_point(out: &mut Writer) -> EntryPoint {
+    const PLAYER: &str = "::star_script_engine::player";
     out.line("");
     native::game_entry_point(
         out,
-        "main_scene_game_(&player_argument_(PLAYER_SCENE_, \"scene\")?)?",
-        "player_argument_(PLAYER_TITLE_, \"title\")?",
+        &format!("main_scene_game_(&{PLAYER}::argument({PLAYER}::SCENE_ARGUMENT, \"scene\")?)?"),
+        &format!("{PLAYER}::argument({PLAYER}::TITLE_ARGUMENT, \"title\")?"),
         &[],
     );
     native::main_scene_game(out);
-    native::player_arguments(out);
     EntryPoint::Player
 }
 

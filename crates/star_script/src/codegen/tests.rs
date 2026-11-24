@@ -157,14 +157,13 @@ fn the_player_reads_its_scene_and_title_from_its_arguments() {
     assert!(
         player
             .code
-            .contains("main_scene_game_(&player_argument_(PLAYER_SCENE_, \"scene\")?)?")
+            .contains("main_scene_game_(&::star_script_engine::player::argument(::star_script_engine::player::SCENE_ARGUMENT, \"scene\")?)?")
     );
     assert!(
         player
             .code
-            .contains(".with_title(player_argument_(PLAYER_TITLE_, \"title\")?)")
+            .contains(".with_title(::star_script_engine::player::argument(::star_script_engine::player::TITLE_ARGUMENT, \"title\")?)")
     );
-    assert!(player.code.contains("fn player_argument_("));
 }
 
 #[test]
@@ -231,8 +230,7 @@ fn input_calls_read_the_shared_action_state() {
     let code = game_with_jump_action().code;
 
     assert!(code.contains("::star_script_runtime::input::action_state(\"jump\").just_pressed"));
-    assert!(code.contains("share_actions_(&input);"));
-    assert!(code.contains("strength: input_.action_strength(name_),"));
+    assert!(code.contains("::star_script_engine::input::share_actions(&input, &ACTION_NAMES_);"));
     assert!(code.contains("world.input()"));
 }
 
@@ -321,7 +319,9 @@ fn games_share_the_pointer_seen_from_their_camera() {
          if Input.has_pointer() { Debug.print(Input.pointer_x().to_string()) }\n }\n}",
     );
 
-    assert!(code.contains("share_pointer_(&input, &self.view_(world), world.window_size());"));
+    assert!(code.contains(
+        "::star_script_engine::input::share_pointer(&input, &self.view_(world), world.window_size());"
+    ));
     assert!(code.contains("::star_script_runtime::input::pointer().is_present"));
     assert!(code.contains("::star_script_runtime::input::pointer().x"));
 }
@@ -335,7 +335,9 @@ fn games_read_scenes_through_the_engine() {
 
     assert!(code.contains("pub mod Scene {"));
     assert!(code.contains("crate::classes::Scene::load("));
-    assert!(code.contains("scenes::set_loader(move |path_| read_scene_(&folder_, path_));"));
+    assert!(
+        code.contains("let audio_ = ::star_script_engine::connect_runtime(app_.asset_folder());")
+    );
 }
 
 #[test]
@@ -349,9 +351,6 @@ fn games_move_bodies_with_the_engine() {
     assert!(code.contains("pub mod Body {"));
     assert!(code.contains("crate::classes::Body::circle("));
     assert!(code.contains("sync_bodies_(world, &mut self.mirror, &root_"));
-    assert!(
-        code.contains("body: match (node_.transform_3d.is_some(), node_.body_3d, node_.body) {")
-    );
 }
 
 #[test]
@@ -383,7 +382,7 @@ fn games_play_sounds_through_the_engine() {
     assert!(code.contains("pub mod Sound {"));
     assert!(code.contains("crate::classes::Sound::load("));
     assert!(code.contains("::star_script_runtime::audio::set_volume(0.5_f32)"));
-    assert!(code.contains("audio::set_backend(EngineAudio_ {"));
+    assert!(code.contains("::star_script_engine::connect_runtime("));
     assert!(code.contains("*self.audio.borrow_mut() = context.world().audio();"));
 }
 

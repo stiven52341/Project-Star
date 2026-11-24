@@ -9,6 +9,9 @@ use super::native_3d;
 use super::writer::Writer;
 use crate::InputAction;
 
+/// The crate that connects StarScript's runtime with the engine.
+const SCRIPT_ENGINE: &str = "::star_script_engine";
+
 /// Hidden field of `Game` that `quit()` sets. It ends in a single `_`, so no
 /// StarScript field can have the same Rust name.
 const QUIT_FIELD: &str = "quit_requested_";
@@ -1256,8 +1259,8 @@ impl ::star_engine::game::Game for EngineGame_ {{
     fn update(&mut self, world: &mut ::star_engine::star_ecs::World) {{
         use ::star_engine::EngineWorld as _;
         if let ::std::option::Option::Some(input) = world.input() {{
-            share_actions_(&input);
-            share_pointer_(&input, &self.view_(world), world.window_size());
+            {SCRIPT_ENGINE}::input::share_actions(&input, &ACTION_NAMES_);
+            {SCRIPT_ENGINE}::input::share_pointer(&input, &self.view_(world), world.window_size());
         }}
         let delta_ = world.time().delta_seconds();
         let root_ = ::std::rc::Rc::clone(&crate::classes::Game::HasFields::fields(&*self.game).root_);
@@ -1331,14 +1334,7 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
     let app_ = ::star_engine::app::App::new()
         .with_title({title})
         .with_actions(actions_);
-    let folder_ = ::std::clone::Clone::clone(app_.asset_folder());
-    let audio_ = ::std::rc::Rc::new(::std::cell::RefCell::new(::star_engine::star_audio::Audio::silent()));
-    {RUNTIME}::audio::set_backend(EngineAudio_ {{
-        folder: ::std::clone::Clone::clone(&folder_),
-        output: ::std::rc::Rc::clone(&audio_),
-        sounds: ::std::vec::Vec::new(),
-    }});
-    {RUNTIME}::scenes::set_loader(move |path_| read_scene_(&folder_, path_));
+    let audio_ = {SCRIPT_ENGINE}::connect_runtime(app_.asset_folder());
     // Created after the loaders are set, so its `init` can load scenes and
     // sounds too.
     let game_ = EngineGame_ {{
@@ -1354,12 +1350,12 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
 "
     );
     let engine_game = engine_game_loop();
-    let support = [SHARE_INPUT, MIRROR_NODES, READ_SCENE, ENGINE_AUDIO];
-    for line in main.lines().chain(engine_game.lines()).chain(
-        support
-            .iter()
-            .flat_map(|code| [""].into_iter().chain(code.lines())),
-    ) {
+    for line in main
+        .lines()
+        .chain(engine_game.lines())
+        .chain([""])
+        .chain(MIRROR_NODES.lines())
+    {
         out.line(line);
     }
 }
@@ -1381,52 +1377,6 @@ fn main_scene_game_(path_: &str) -> ::star_engine::star_core::EngineResult<crate
     })?;
     crate::classes::Game::Object::add_child(::std::rc::Rc::clone(&game_), scene_);
     ::std::result::Result::Ok(game_)
-}";
-
-/// Writes `player_argument_`, which reads the scene player's arguments.
-pub(super) fn player_arguments(out: &mut Writer) {
-    for line in std::iter::once("").chain(PLAYER_ARGUMENTS.lines()) {
-        out.line(line);
-    }
-}
-
-const PLAYER_ARGUMENTS: &str = "/// Where the scene to play is among the player's arguments.
-const PLAYER_SCENE_: usize = 1;
-/// Where the title of the window is among the player's arguments.
-const PLAYER_TITLE_: usize = 2;
-
-/// The player's argument at `index`, which tells `what_` it is.
-fn player_argument_(index_: usize, what_: &str) -> ::star_engine::star_core::EngineResult<::std::string::String> {
-    ::std::env::args().nth(index_).ok_or_else(|| ::star_engine::star_core::EngineError::Initialization {
-        subsystem: \"scene player\",
-        reason: ::std::format!(\"the {what_} is missing: play a scene with `player <scene> <title>`\"),
-    })
-}";
-
-const SHARE_INPUT: &str =
-    "/// Copies where the player points, in world units, where `Input` reads it.
-/// The camera is the one the last frame was drawn from: what the player saw.
-fn share_pointer_(
-    input_: &::star_engine::star_input::Input,
-    view_: &::star_engine::star_render::Camera,
-    window_: ::star_engine::star_platform::WindowSize,
-) {
-    let position_ = input_.pointer().and_then(|pixel_| view_.screen_to_world_2d(pixel_, window_));
-    ::star_script_runtime::input::set_pointer(position_.map(|point_| (point_.x, point_.y)));
-}
-
-/// Copies the state of each action where `Input` reads it.
-fn share_actions_(input_: &::star_engine::star_input::Input) {
-    let actions_ = input_.actions();
-    for (index_, name_) in ACTION_NAMES_.iter().enumerate() {
-        let state_ = ::star_script_runtime::input::ActionState {
-            is_down: actions_.is_down(name_),
-            just_pressed: actions_.just_pressed(name_),
-            just_released: actions_.just_released(name_),
-            strength: input_.action_strength(name_),
-        };
-        ::star_script_runtime::input::set_action_state(index_, state_);
-    }
 }";
 
 const MIRROR_NODES: &str = "/// Describes every node of the game's tree to the engine, parents first, so
@@ -1691,174 +1641,6 @@ fn script_camera_3d_(camera_: &dyn crate::classes::Camera3D::Object) -> ::star_e
         position: ::star_engine::star_math::Vec3::new(node_.x.get(), node_.y.get(), depth_.z.get()),
         angles: ::star_engine::star_math::Vec3::new(depth_.pitch.get(), depth_.yaw.get(), node_.rotation.get()),
         field_of_view: crate::classes::Camera3D::HasFields::fields(camera_).fov.get(),
-    }
-}";
-
-const READ_SCENE: &str = "/// Reads a scene of the game's asset folder for `Scene.load`. Parts of a
-/// scene that scripts have no field for yet (a sprite's region and anchor,
-/// the divisions of a sphere) are left out.
-fn read_scene_(
-    folder_: &::star_engine::star_assets::AssetFolder,
-    path_: &str,
-) -> ::std::result::Result<::std::vec::Vec<::star_script_runtime::scenes::SceneNode>, ::std::string::String> {
-    let outline_ = ::star_engine::star_assets::AssetPath::new(path_)
-        .and_then(|path_| folder_.read_text(&path_))
-        .and_then(|text_| ::star_engine::star_scene::SceneOutline::from_text(&text_))
-        .map_err(|error_| error_.to_string())?;
-    let nodes_ = outline_.into_nodes().into_iter().map(|node_| {
-        ::star_script_runtime::scenes::SceneNode {
-            name: node_.name,
-            class: node_.class,
-            tags: node_.tags,
-            parent: node_.parent,
-            transform: node_.transform.map(|place_| ::star_script_runtime::scenes::SceneTransform {
-                x: place_.position.x,
-                y: place_.position.y,
-                rotation: place_.rotation,
-                scale_x: place_.scale.x,
-                scale_y: place_.scale.y,
-            }),
-            sprite: node_.sprite.map(|image_| ::star_script_runtime::scenes::SceneSprite {
-                texture: image_.texture.as_str().to_owned(),
-                width: image_.size.x,
-                height: image_.size.y,
-                layer: image_.layer,
-                pixelated: image_.filter == ::star_engine::star_render::TextureFilter::Pixelated,
-                color: [image_.color.r, image_.color.g, image_.color.b, image_.color.a],
-            }),
-            body: match (node_.transform_3d.is_some(), node_.body_3d, node_.body) {
-                (true, ::std::option::Option::Some(settings_), _) => ::std::option::Option::Some(scene_body_(&::star_engine::script_nodes::ScriptBody::from_settings_3d(&settings_))),
-                (_, _, ::std::option::Option::Some(settings_)) => ::std::option::Option::Some(scene_body_(&::star_engine::script_nodes::ScriptBody::from_settings(&settings_))),
-                _ => ::std::option::Option::None,
-            },
-            transform_3d: node_.transform_3d.map(|place_| {
-                let angles_ = place_.rotation.to_euler();
-                ::star_script_runtime::scenes::SceneTransform3D {
-                    x: place_.position.x,
-                    y: place_.position.y,
-                    z: place_.position.z,
-                    pitch: angles_.x,
-                    yaw: angles_.y,
-                    roll: angles_.z,
-                    scale_x: place_.scale.x,
-                    scale_y: place_.scale.y,
-                    scale_z: place_.scale.z,
-                }
-            }),
-            mesh: node_.mesh.as_ref().map(|outline_| {
-                let mesh_ = ::star_engine::script_nodes::ScriptMesh::from_outline(outline_);
-                ::star_script_runtime::scenes::SceneMesh {
-                    shape: ::std::string::String::from(mesh_.shape),
-                    width: mesh_.width,
-                    height: mesh_.height,
-                    depth: mesh_.depth,
-                    radius: mesh_.radius,
-                    color: [mesh_.color.r, mesh_.color.g, mesh_.color.b, mesh_.color.a],
-                    metallic: mesh_.metallic,
-                    roughness: mesh_.roughness,
-                    texture: ::std::string::String::from(mesh_.texture),
-                    pixelated: mesh_.pixelated,
-                }
-            }),
-            fields: node_.fields.into_iter().map(|(name_, value_)| (name_, match value_ {
-                ::star_engine::star_scene::FieldValue::Bool(truth_) => ::star_script_runtime::scene_fields::SceneValue::Bool(truth_),
-                ::star_engine::star_scene::FieldValue::Int(number_) => ::star_script_runtime::scene_fields::SceneValue::Int(number_),
-                ::star_engine::star_scene::FieldValue::Float(number_) => ::star_script_runtime::scene_fields::SceneValue::Float(number_),
-                ::star_engine::star_scene::FieldValue::Text(text_) => ::star_script_runtime::scene_fields::SceneValue::Text(text_),
-                ::star_engine::star_scene::FieldValue::Color(color_) => ::star_script_runtime::scene_fields::SceneValue::Color(color_),
-            })).collect(),
-            camera: node_.camera.map(|view_| ::star_script_runtime::scenes::SceneCamera {
-                view_height: view_.view_height,
-                main: view_.main,
-            }),
-            camera_3d: node_.camera_3d.map(|view_| ::star_script_runtime::scenes::SceneCamera3D {
-                fov: view_.fov,
-                main: view_.main,
-            }),
-            light_2d: node_.light_2d.map(|shone_| {
-                let light_ = ::star_engine::script_nodes::ScriptLight::from_light_2d(&shone_);
-                ::star_script_runtime::scenes::SceneLight {
-                    kind: ::std::string::String::from(light_.kind),
-                    color: [light_.color.r, light_.color.g, light_.color.b, light_.color.a],
-                    intensity: light_.intensity,
-                    range: light_.range,
-                    angle: light_.angle,
-                    blend: light_.blend,
-                }
-            }),
-            light: node_.light.map(|shone_| {
-                let light_ = ::star_engine::script_nodes::ScriptLight::from_light(&shone_);
-                ::star_script_runtime::scenes::SceneLight {
-                    kind: ::std::string::String::from(light_.kind),
-                    color: [light_.color.r, light_.color.g, light_.color.b, light_.color.a],
-                    intensity: light_.intensity,
-                    range: light_.range,
-                    angle: light_.angle,
-                    blend: light_.blend,
-                }
-            }),
-        }
-    });
-    ::std::result::Result::Ok(nodes_.collect())
-}
-
-/// The body of a scene node, with the words of StarScript's `Body`.
-fn scene_body_(body_: &::star_engine::script_nodes::ScriptBody<'_>) -> ::star_script_runtime::scenes::SceneBody {
-    ::star_script_runtime::scenes::SceneBody {
-        kind: ::std::string::String::from(body_.kind),
-        shape: ::std::string::String::from(body_.shape),
-        radius: body_.radius,
-        width: body_.width,
-        height: body_.height,
-        depth: body_.depth,
-        gravity_scale: body_.gravity_scale,
-        fixed_rotation: body_.fixed_rotation,
-        friction: body_.friction,
-        bounciness: body_.bounciness,
-        density: body_.density,
-        sensor: body_.sensor,
-    }
-}";
-
-const ENGINE_AUDIO: &str = "/// Loads and plays the sounds of StarScript's `Sound` with the engine.
-struct EngineAudio_ {
-    folder: ::star_engine::star_assets::AssetFolder,
-    output: ::std::rc::Rc<::std::cell::RefCell<::star_engine::star_audio::Audio>>,
-    /// Every sound loaded, by its number.
-    sounds: ::std::vec::Vec<::std::sync::Arc<::star_engine::star_core::Sound>>,
-}
-
-impl ::star_script_runtime::audio::AudioBackend for EngineAudio_ {
-    fn load(&mut self, path_: &str) -> ::std::result::Result<::star_script_runtime::audio::SoundId, ::std::string::String> {
-        let sound_ = ::star_engine::star_assets::AssetPath::new(path_)
-            .and_then(|path_| self.folder.load_sound(&path_))
-            .map_err(|error_| error_.to_string())?;
-        self.sounds.push(::std::sync::Arc::new(sound_));
-        ::std::result::Result::Ok(::star_script_runtime::audio::SoundId(self.sounds.len() - 1))
-    }
-
-    fn play(&mut self, sound_: ::star_script_runtime::audio::SoundId, volume_: f32, looping_: bool) -> ::std::result::Result<::star_script_runtime::audio::VoiceId, ::std::string::String> {
-        let sound_ = self.sounds.get(sound_.0).ok_or_else(|| ::std::string::String::from(\"the sound was never loaded\"))?;
-        let settings_ = ::star_engine::star_audio::PlaySettings { volume: volume_, looping: looping_ };
-        self.output.borrow().play(::std::sync::Arc::clone(sound_), settings_)
-            .map(|voice_| ::star_script_runtime::audio::VoiceId(voice_.to_bits()))
-            .map_err(|error_| error_.to_string())
-    }
-
-    fn stop(&mut self, voice_: ::star_script_runtime::audio::VoiceId) {
-        self.output.borrow().stop(::star_engine::star_audio::VoiceId::from_bits(voice_.0));
-    }
-
-    fn is_playing(&self, voice_: ::star_script_runtime::audio::VoiceId) -> bool {
-        self.output.borrow().is_playing(::star_engine::star_audio::VoiceId::from_bits(voice_.0))
-    }
-
-    fn volume(&self) -> f32 {
-        self.output.borrow().volume()
-    }
-
-    fn set_volume(&mut self, volume_: f32) {
-        self.output.borrow().set_volume(volume_);
     }
 }";
 

@@ -361,6 +361,15 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           generated for each program (`crate::classes`, 175 times), so
           first what does not need them, and then a design for the rest
           that the interpreter can share.
+      - [x] f1a. The new crate `star_script_engine` (decision 65) holds
+            what did not need them, about 250 lines: reading scenes, the
+            audio backend, sharing input, the scene player's arguments.
+      - [ ] f1b. The engine classes (`Game`, `Node`, `Sprite`,
+            `Camera2D`, `Scene`, `Body`, `Sound`, `Color`, the 3D ones),
+            mirroring nodes and the game loop: their state and methods as
+            types of `star_script_engine` that generated classes and the
+            interpreter both use. Its design is agreed with the owner
+            first.
     - [ ] f2. Measure “Play” with scripts on a realistic, big project
           (measured on `pruebas`, 2428 lines of Rust: 2 s after a change
           to its code), before and after f1.

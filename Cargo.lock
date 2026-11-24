@@ -3289,6 +3289,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "star_script_engine"
+version = "0.1.0"
+dependencies = [
+ "star_engine",
+ "star_script_runtime",
+]
+
+[[package]]
 name = "star_script_runtime"
 version = "0.1.0"
 
