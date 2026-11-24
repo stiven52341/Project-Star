@@ -36,6 +36,14 @@ impl Texts {
         }
     }
 
+    /// The title of the section of the `export` fields of `class`.
+    pub(crate) fn exported_section(&self, class: &str) -> String {
+        match self.language {
+            Language::English => format!("{class} (export fields)"),
+            Language::Spanish => format!("{class} (campos export)"),
+        }
+    }
+
     pub(crate) fn scene_unreadable(&self, reason: &str) -> String {
         match self.language {
             Language::English => format!("Could not open the scene: {reason}"),

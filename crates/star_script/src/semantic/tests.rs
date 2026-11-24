@@ -1445,6 +1445,49 @@ fn nodes_export_fields_scenes_can_write() {
         .map(|field| field.name.as_str())
         .collect();
     assert_eq!(exported, ["speed", "lives", "tint"]);
+    let defaults: Vec<_> = rock
+        .fields
+        .iter()
+        .map(|field| field.default.clone())
+        .collect();
+    assert_eq!(
+        defaults,
+        [
+            Some(FieldDefault::Float(2.5)),
+            Some(FieldDefault::Int(3)),
+            Some(FieldDefault::Color([1.0, 0.0, 0.0, 1.0])),
+            Some(FieldDefault::Int(1)),
+        ]
+    );
+}
+
+#[test]
+fn computed_first_values_have_no_plain_default() {
+    let analysis = check_text(
+        "class Spot extends Node {\n\
+         export var a = 1 + 2\n\
+         export var b = -4.5\n\
+         export var c = Color(1, 0.5, 0, 1)\n\
+         init() { super.init(\"Spot\") }\n\
+         }",
+    )
+    .expect("valid program");
+
+    let classes = analysis.classes();
+    let spot = classes.class(classes.find("Spot").unwrap());
+    let defaults: Vec<_> = spot
+        .fields
+        .iter()
+        .map(|field| field.default.clone())
+        .collect();
+    assert_eq!(
+        defaults,
+        [
+            None,
+            Some(FieldDefault::Float(-4.5)),
+            Some(FieldDefault::Color([1.0, 0.5, 0.0, 1.0])),
+        ]
+    );
 }
 
 #[test]

@@ -3,6 +3,7 @@
 //! and finally method bodies.
 
 use super::checker::{BodyContext, Checker, ContextKind, Initialization};
+use super::field_defaults::plain_value;
 use super::natives::{BASIC_TYPE_NAMES, NODE_CLASS, basic_type};
 use super::{
     ClassId, ClassInfo, ClassOrigin, ConstantInfo, ConstructorInfo, Execution, FieldInfo,
@@ -161,6 +162,7 @@ impl Checker<'_> {
             ty,
             is_private,
             is_exported,
+            default: field.initializer.as_ref().and_then(plain_value),
             has_initializer: field.initializer.is_some(),
             span: field.name.span,
         });

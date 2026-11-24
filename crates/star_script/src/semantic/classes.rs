@@ -1,7 +1,7 @@
 //! Every class a program can use, with its members.
 
-use super::Type;
 use super::natives::COLOR_CLASS;
+use super::{FieldDefault, Type};
 use crate::Span;
 
 /// Identifies a class in a [`ClassTable`].
@@ -92,6 +92,8 @@ pub struct FieldInfo {
     pub is_private: bool,
     /// `export`: scenes, and so the editor's inspector, can set it.
     pub is_exported: bool,
+    /// Its first value, if the class writes it as a plain value.
+    pub default: Option<FieldDefault>,
     /// Whether it has `= value`.
     pub has_initializer: bool,
     /// Where its name is written.
@@ -393,6 +395,7 @@ mod tests {
             ty: Type::Float,
             is_private: false,
             is_exported: false,
+            default: None,
             has_initializer: true,
             span: Span::new(0, 0),
         });

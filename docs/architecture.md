@@ -626,7 +626,14 @@ edits its parts in sections (node, transform, sprite, mesh, light, 2D and
 among those of `assets/`, shapes rebuilt through the physics' own
 constructors so sizes it refuses are never kept. Each section can be
 removed, and “Add component” adds the parts the node lacks (those of the
-project's kind). Changes mark the tab (`•`) until “Save” (`Ctrl+S`),
+project's kind). A node with a class also shows the **`export` fields** of
+the class and its bases (`exported_fields.rs`), with the classes of the
+last check of the scripts (the live check, asked for when the project
+opens): each shows the value the scene gives it, in bold, or the class's
+own (`FieldInfo::default`, when the class writes a plain value), and
+changing it writes it in `[node.fields]`; “Reset” takes it out again.
+Values for fields the class does not export are shown in red, to remove.
+Changes mark the tab (`•`) until “Save” (`Ctrl+S`),
 “Compile” or “Play” writes the file with `SceneOutline::to_text`; opening
 another scene, closing the project or quitting ask first, as blueprints
 do. A file that cannot be read or saved shows why in the panel.

@@ -12,6 +12,7 @@ mod classes;
 mod declarations;
 mod error;
 mod expressions;
+mod field_defaults;
 mod flow;
 mod narrowing;
 mod natives;
@@ -25,6 +26,7 @@ pub use classes::{
     FieldInfo, FoundMember, MemberRef, MethodInfo, ParameterInfo,
 };
 pub use error::{SemanticError, SemanticErrorKind};
+pub use field_defaults::FieldDefault;
 pub use natives::{
     AUDIO_CLASS, BASIC_TYPE_NAMES, BODY_CLASS, BuiltinMethod, BuiltinSignature, CAMERA_3D_CLASS,
     CAMERA_CLASS, COLOR_CLASS, GAME_CLASS, INPUT_CLASS, LIGHT_CLASS, MESH_CLASS, NODE_3D_CLASS,

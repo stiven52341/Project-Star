@@ -268,7 +268,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [ ] A keyword for variables set from the inspector: `export var`.
     - [x] 7a The language: `export`, on fields of nodes of simple types.
     - [x] 7b Scenes keep the values (`[node.fields]`) and games apply them.
-    - [ ] 7c The inspector edits them.
+    - [x] 7c The inspector edits them.
     - [ ] 7d Blueprint variables can be exported.
   - [ ] Decorators (`@`) in StarScript.
   - [ ] Ready-made nodes: cameras, 2D and 3D lights, collision shapes…

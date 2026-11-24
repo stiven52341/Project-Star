@@ -14,10 +14,13 @@ use star_engine::star_render::{
 use star_engine::star_scene::{MeshOutline, NodeOutline, SpriteOutline};
 
 use super::components::{DEFAULT_CAPSULE_HEIGHT, DEFAULT_RADIUS, add_component_menu, new_light};
+use super::exported_fields::{edit_exported, exported_fields};
 use super::fields::{
     MIN_SIZE, angle_row, angles_row, checkbox_row, choice_row, color_row, fraction_row,
     number_from_row, number_row, size2_row, size3_row, text_row, vec2_row, vec3_row, whole_row,
 };
+use star_script::semantic::ClassTable;
+
 use crate::project::ProjectDimension;
 use crate::style::PROPERTY_SPACING;
 use crate::texts;
@@ -27,6 +30,8 @@ use crate::texts;
 pub(super) struct NodeContext<'context> {
     pub(super) dimension: ProjectDimension,
     pub(super) images: &'context [String],
+    /// The classes of the scripts, once checked, for `export` fields.
+    pub(super) classes: Option<&'context ClassTable>,
 }
 
 /// Shows the parts of `node` to edit. Returns whether it changed.
@@ -37,6 +42,7 @@ pub(super) fn edit_node(
 ) -> bool {
     let texts = texts::current();
     let mut changed = section(ui, texts.node_section, None, |ui| edit_identity(ui, node));
+    changed |= exported_section(ui, node, context.classes);
     changed |= optional_section(
         ui,
         texts.transform_section,
@@ -60,6 +66,26 @@ pub(super) fn edit_node(
     changed |= optional_section(ui, texts.body_3d_section, &mut node.body_3d, edit_body_3d);
     ui.separator();
     changed | add_component_menu(ui, node, context.dimension, context.images)
+}
+
+/// The `export` fields of the node's class, if the scripts are checked and
+/// it has any, or values the scene gives fields.
+fn exported_section(
+    ui: &mut egui::Ui,
+    node: &mut NodeOutline,
+    classes: Option<&ClassTable>,
+) -> bool {
+    let (Some(class), Some(classes)) = (node.class.clone(), classes) else {
+        return false;
+    };
+    let fields = exported_fields(classes, &class).unwrap_or_default();
+    if fields.is_empty() && node.fields.is_empty() {
+        return false;
+    }
+    let title = texts::current().exported_section(&class);
+    section(ui, &title, None, |ui| {
+        edit_exported(ui, &mut node.fields, &fields)
+    })
 }
 
 /// A part the node may lack: its section has a button that removes it.

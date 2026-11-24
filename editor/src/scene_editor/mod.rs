@@ -9,6 +9,7 @@ mod class_drop;
 mod components;
 mod drawing;
 mod dropping;
+mod exported_fields;
 mod fields;
 mod gizmo;
 mod history;
@@ -24,6 +25,7 @@ use std::path::{Path, PathBuf};
 use eframe::egui;
 use star_engine::prelude::{Frame, SceneOutline, Vec3};
 use star_engine::star_scene::NodeOutline;
+use star_script::semantic::ClassTable;
 
 use self::class_choice::{ChoiceOutcome, ClassChoice};
 pub(crate) use self::class_drop::ClassDrop;
@@ -377,7 +379,12 @@ impl SceneDocument {
     /// The node selected, to edit, choosing images among `images`. Returns
     /// whether one is selected, so the inspector can show something else
     /// when none is.
-    pub(crate) fn edit_selected_node(&mut self, ui: &mut egui::Ui, images: &[String]) -> bool {
+    pub(crate) fn edit_selected_node(
+        &mut self,
+        ui: &mut egui::Ui,
+        images: &[String],
+        classes: Option<&ClassTable>,
+    ) -> bool {
         let node = self.content.as_mut().ok().and_then(|outline| {
             self.selected
                 .and_then(|selected| outline.node_mut(selected))
@@ -388,6 +395,7 @@ impl SceneDocument {
         let context = NodeContext {
             dimension: self.dimension,
             images,
+            classes,
         };
         if edit_node(ui, node, &context) {
             self.mark_changed();

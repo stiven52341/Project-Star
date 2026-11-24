@@ -463,6 +463,7 @@ fn native_field(name: &str, ty: Type) -> FieldInfo {
         ty,
         is_private: false,
         is_exported: false,
+        default: None,
         has_initializer: true,
         span: Span::new(0, 0),
     }

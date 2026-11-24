@@ -134,6 +134,10 @@ impl EditorWindow {
             log::error!("Scene viewport unavailable: {error}");
         }
         let last_scene = LastSceneStore::new(project.directory());
+        // The inspector needs the classes of the scripts from the start,
+        // for the `export` fields of the nodes.
+        let mut live_check = LiveCheck::new();
+        live_check.request();
         let mut documents = Documents::new();
         if let Some(scene) = last_scene.scene(assets.directory()) {
             documents.open_scene(assets.directory(), scene, dimension);
@@ -148,7 +152,7 @@ impl EditorWindow {
             bottom_tab: BottomTab::Assets,
             documents,
             last_scene,
-            live_check: LiveCheck::new(),
+            live_check,
             leaving: None,
             quit_confirmed: false,
             viewport,
@@ -192,6 +196,7 @@ impl EditorWindow {
                     &self.project,
                     self.documents.scene_mut(),
                     self.assets.images(),
+                    self.live_check.outline().map(|outline| &outline.classes),
                 ),
                 ActiveDocument::Blueprint(tab) => {
                     ui.strong(texts::current().inspector);

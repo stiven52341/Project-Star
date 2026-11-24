@@ -129,6 +129,11 @@ pub(crate) struct Texts {
     pub(crate) no_scene_open: &'static str,
     pub(crate) node_section: &'static str,
     pub(crate) no_class: &'static str,
+    /// The button that gives an `export` field the value of its class again.
+    pub(crate) reset: &'static str,
+    pub(crate) reset_field_hint: &'static str,
+    /// A value of the scene for a field its class does not export.
+    pub(crate) not_an_export_field: &'static str,
     pub(crate) no_image: &'static str,
     pub(crate) add_component: &'static str,
     pub(crate) no_images_hint: &'static str,
