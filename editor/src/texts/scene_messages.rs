@@ -3,7 +3,7 @@
 use star_engine::prelude::{BodyKind, TextureFilter};
 
 use super::{Language, Texts};
-use crate::scene_editor::Tool;
+use crate::scene_editor::{LightKind, Tool};
 
 impl Texts {
     pub(crate) const fn tool_name(&self, tool: Tool) -> &'static str {
@@ -75,11 +75,11 @@ impl Texts {
 
     /// The name of a kind of light: `directional` is true for the sun's
     /// kind, false for a lamp's.
-    pub(crate) const fn light_kind_name(&self, directional: bool) -> &'static str {
-        if directional {
-            self.pick("Directional", "Direccional")
-        } else {
-            self.pick("Point", "Puntual")
+    pub(crate) const fn light_kind_name(&self, kind: LightKind) -> &'static str {
+        match kind {
+            LightKind::Directional => self.pick("Directional", "Direccional"),
+            LightKind::Point => self.pick("Point", "Puntual"),
+            LightKind::Spot => self.pick("Spot", "Foco"),
         }
     }
 }

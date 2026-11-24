@@ -182,6 +182,10 @@ class Physics3dGame extends Game {
             if solid != null {
                 Debug.print(solid.shape + \" \" + solid.depth.to_string() + \" \" + (floor is Mesh).to_string())
             }
+            const spot = floor.find_child(\"Spot\")
+            if spot is Light {
+                Debug.print(spot.kind + \" \" + spot.angle.to_string() + \" \" + spot.blend.to_string())
+            }
         }
         const eye = Camera3D(\"Eye\")
         eye.y = 2.0
@@ -278,6 +282,19 @@ size = [10.0, 1.0, 10.0]
 kind = "static"
 shape = "box"
 size = [10.0, 1.0, 10.0]
+
+[[node]]
+name = "Spot"
+parent = 0
+
+[node.transform_3d]
+position = [0.0, 4.0, 0.0]
+rotation = [-1.5, 0.0, 0.0]
+
+[node.light]
+kind = "spot"
+range = 8.0
+angle = 0.5
 "#;
 
 /// The floor of the physics game.
@@ -428,7 +445,10 @@ fn games_run_in_the_engine_until_they_quit() {
 
     std::fs::write(levels.join("floor_3d.scene"), FLOOR_3D_SCENE).expect("scene written");
     let (stdout, _) = play(&directory, "physics_3d_game");
-    assert_eq!(stdout, "box 10.0 true\nlanded on Floor true\n");
+    assert_eq!(
+        stdout,
+        "box 10.0 true\nspot 0.5 0.2\nlanded on Floor true\n"
+    );
 
     let (stdout, _) = play(&directory, "coroutine_game");
     // The blinker's coroutine ends with frame 3, when it leaves the tree.

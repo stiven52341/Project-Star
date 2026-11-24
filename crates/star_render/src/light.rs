@@ -3,6 +3,8 @@
 //! A light of intensity 1 shining straight on a white matte surface makes
 //! it white. Colors are in sRGB, like every other color of the engine.
 
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_6};
+
 use star_math::Vec3;
 
 use crate::Color;
@@ -67,6 +69,38 @@ pub struct PointLight {
     pub range: f32,
 }
 
+/// How wide spot lights shine when nothing says otherwise: 30° from their
+/// axis to the edge of their cone.
+pub const DEFAULT_SPOT_ANGLE: f32 = FRAC_PI_6;
+/// How much of a spot light's cone fades into the dark when nothing says
+/// otherwise: its outer fifth.
+pub const DEFAULT_SPOT_BLEND: f32 = 0.2;
+/// The widest a spot light can shine, from its axis to its edge: less than
+/// a right angle, or it would no longer be a cone.
+pub const MAX_SPOT_ANGLE: f32 = FRAC_PI_2;
+
+/// Light from a point, in a cone, fading with distance: a flashlight, a
+/// stage light.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpotLight {
+    /// Where it is, in the world.
+    pub position: Vec3,
+    /// Where its cone points. A zero direction lights nothing.
+    pub direction: Vec3,
+    /// Its color.
+    pub color: Color,
+    /// How bright it is one world unit away.
+    pub intensity: f32,
+    /// Beyond this distance it lights nothing; it must be positive.
+    pub range: f32,
+    /// From the cone's axis to its edge, in radians: more than 0 and less
+    /// than [`MAX_SPOT_ANGLE`].
+    pub angle: f32,
+    /// How much of the cone, from its edge inwards, fades into the dark:
+    /// 0 is a sharp edge, 1 fades from the very axis.
+    pub blend: f32,
+}
+
 /// A light of a frame.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Light {
@@ -74,6 +108,14 @@ pub enum Light {
     Directional(DirectionalLight),
     /// See [`PointLight`].
     Point(PointLight),
+    /// See [`SpotLight`].
+    Spot(SpotLight),
+}
+
+impl From<SpotLight> for Light {
+    fn from(light: SpotLight) -> Self {
+        Self::Spot(light)
+    }
 }
 
 impl From<DirectionalLight> for Light {
@@ -89,13 +131,14 @@ impl From<PointLight> for Light {
 }
 
 /// Size of the `Lights` struct of `surface.wgsl`: the camera's position,
-/// the ambient light, the count and [`MAX_LIGHTS`] lights of two
+/// the ambient light, the count and [`MAX_LIGHTS`] lights of four
 /// `vec4<f32>` each.
 pub(crate) const LIGHTS_SIZE: usize = 16 * 3 + MAX_LIGHTS * GPU_LIGHT_SIZE;
-const GPU_LIGHT_SIZE: usize = 32;
-/// The `w` of a light's position: a direction or a point.
+const GPU_LIGHT_SIZE: usize = 64;
+/// The `w` of a light's position: a direction, a point or a spot.
 const DIRECTION: f32 = 0.0;
 const POINT: f32 = 1.0;
+const SPOT: f32 = 2.0;
 
 /// Writes the lights of a frame as `surface.wgsl` reads them, with their
 /// colors already in the target's space (`to_target_space`). Lights that
@@ -130,8 +173,10 @@ pub(crate) fn encode_lights(
     bytes.resize(bytes.len() + missing * GPU_LIGHT_SIZE, 0);
 }
 
-/// A light's position (or direction) and radiance (and range).
-fn gpu_light(light: &Light, radiance: impl Fn(Color, f32) -> [f32; 3]) -> Option<[f32; 8]> {
+/// A light's position (or direction) and radiance (and range); and for
+/// spots, where they point and the cosines of the edges of their cone.
+fn gpu_light(light: &Light, radiance: impl Fn(Color, f32) -> [f32; 3]) -> Option<[f32; 16]> {
+    let reaches = |range: f32| range.is_finite() && range > 0.0;
     let (place, kind, color, intensity, range) = match *light {
         Light::Directional(sun) => (
             sun.direction.normalized()?,
@@ -141,18 +186,41 @@ fn gpu_light(light: &Light, radiance: impl Fn(Color, f32) -> [f32; 3]) -> Option
             0.0,
         ),
         Light::Point(lamp) => {
-            if !(lamp.range.is_finite() && lamp.range > 0.0) {
+            if !reaches(lamp.range) {
                 return None;
             }
             (lamp.position, POINT, lamp.color, lamp.intensity, lamp.range)
         }
+        Light::Spot(spot) => {
+            if !reaches(spot.range) {
+                return None;
+            }
+            (spot.position, SPOT, spot.color, spot.intensity, spot.range)
+        }
+    };
+    let (axis, [outer, inner]) = match *light {
+        Light::Spot(spot) => (spot.direction.normalized()?, cone_cosines(spot)?),
+        _ => (Vec3::ZERO, [0.0, 0.0]),
     };
     let [r, g, b] = radiance(color, intensity.max(0.0));
-    let values = [place.x, place.y, place.z, kind, r, g, b, range];
+    let values = [
+        place.x, place.y, place.z, kind, r, g, b, range, axis.x, axis.y, axis.z, 0.0, outer, inner,
+        0.0, 0.0,
+    ];
     values
         .iter()
         .all(|value| value.is_finite())
         .then_some(values)
+}
+
+/// The cosines of the angles of the edge of a spot's cone and of where it
+/// starts to fade; `None` for a cone that is no cone.
+fn cone_cosines(spot: SpotLight) -> Option<[f32; 2]> {
+    if !(spot.angle > 0.0 && spot.angle < MAX_SPOT_ANGLE) {
+        return None;
+    }
+    let inner = spot.angle * (1.0 - spot.blend.clamp(0.0, 1.0));
+    Some([spot.angle.cos(), inner.cos()])
 }
 
 #[cfg(test)]
@@ -210,5 +278,44 @@ mod tests {
 
         assert_eq!(count(&bytes), 1);
         assert_eq!(bytes.len(), LIGHTS_SIZE);
+    }
+
+    fn spot(angle: f32, blend: f32) -> SpotLight {
+        SpotLight {
+            position: Vec3::ZERO,
+            direction: Vec3::new(0.0, 0.0, -2.0),
+            color: Color::WHITE,
+            intensity: 1.0,
+            range: 5.0,
+            angle,
+            blend,
+        }
+    }
+
+    #[test]
+    fn spots_give_the_cosines_of_their_cone() {
+        let [outer, inner] = cone_cosines(spot(FRAC_PI_6, 0.5)).unwrap();
+
+        assert!((outer - FRAC_PI_6.cos()).abs() < 1e-6);
+        assert!((inner - (FRAC_PI_6 / 2.0).cos()).abs() < 1e-6);
+        let [_, sharp] = cone_cosines(spot(FRAC_PI_6, -3.0)).unwrap();
+        assert!(
+            (sharp - outer).abs() < 1e-6,
+            "the blend is kept from 0 to 1"
+        );
+    }
+
+    #[test]
+    fn spots_that_are_no_cone_are_left_out() {
+        let lights: Vec<Light> = [0.0, MAX_SPOT_ANGLE, f32::NAN, DEFAULT_SPOT_ANGLE]
+            .map(|angle| spot(angle, DEFAULT_SPOT_BLEND).into())
+            .to_vec();
+
+        let bytes = encoded(&lights);
+
+        assert_eq!(count(&bytes), 1);
+        // The spot's axis is normalized, after its position and radiance.
+        let axis_z = 48 + 4 * 10;
+        assert_eq!(&bytes[axis_z..axis_z + 4], &(-1.0f32).to_le_bytes());
     }
 }

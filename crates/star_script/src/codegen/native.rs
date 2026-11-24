@@ -817,6 +817,8 @@ pub mod Scene {
             look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
             look_.intensity.set(shone_.intensity);
             look_.range.set(shone_.range);
+            look_.angle.set(shone_.angle);
+            look_.blend.set(shone_.blend);
         }
         if let ::std::option::Option::Some(view_) = &node_.camera {
             let camera_ = crate::AnyObject::Camera2D(::std::rc::Rc::clone(&object_))
@@ -1274,6 +1276,8 @@ fn with_light_(
             color: look_.color.read(|color_| engine_color_(&**color_)),
             intensity: look_.intensity.get(),
             range: look_.range.get(),
+            angle: look_.angle.get(),
+            blend: look_.blend.get(),
         }));
     });
 }
@@ -1446,6 +1450,8 @@ fn read_scene_(
                     color: [light_.color.r, light_.color.g, light_.color.b, light_.color.a],
                     intensity: light_.intensity,
                     range: light_.range,
+                    angle: light_.angle,
+                    blend: light_.blend,
                 }
             }),
         }

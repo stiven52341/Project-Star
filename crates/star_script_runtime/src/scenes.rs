@@ -119,14 +119,18 @@ pub struct SceneMesh {
 /// StarScript's `Light`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneLight {
-    /// `"directional"` or `"point"`.
+    /// `"directional"`, `"point"` or `"spot"`.
     pub kind: String,
     /// Red, green, blue and opacity, from `0.0` to `1.0`.
     pub color: [f32; 4],
     /// How bright it is.
     pub intensity: f32,
-    /// How far a point light reaches.
+    /// How far a point light or a spot reaches.
     pub range: f32,
+    /// From a spot's axis to the edge of its cone, in radians.
+    pub angle: f32,
+    /// How much of a spot's cone fades, from 0 to 1.
+    pub blend: f32,
 }
 
 /// Where a [`SceneNode`] is, relative to its parent.

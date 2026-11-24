@@ -7,7 +7,10 @@
 
 use star_core::{EngineError, EngineResult};
 use star_math::{Quat, Vec2, Vec3};
-use star_render::{Color, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MeshShape, TextureFilter};
+use star_render::{
+    Color, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, DEFAULT_SPOT_ANGLE, DEFAULT_SPOT_BLEND,
+    MAX_SPOT_ANGLE, MeshShape, TextureFilter,
+};
 use star_scene::{LightNode, MeshOutline};
 
 use crate::script_body::{DEFAULT_RADIUS, DEFAULT_SIZE, SPHERE};
@@ -20,6 +23,8 @@ pub const PLANE: &str = "plane";
 pub const DIRECTIONAL: &str = "directional";
 /// How StarScript names point lights.
 pub const POINT: &str = "point";
+/// How StarScript names spot lights.
+pub const SPOT: &str = "spot";
 
 /// How far a script light reaches when its kind gives no range.
 pub const DEFAULT_RANGE: f32 = 10.0;
@@ -125,8 +130,12 @@ pub struct ScriptLight<'a> {
     pub color: Color,
     /// How bright it is.
     pub intensity: f32,
-    /// How far a point light reaches.
+    /// How far a point light or a spot reaches.
     pub range: f32,
+    /// From a spot's axis to the edge of its cone, in radians.
+    pub angle: f32,
+    /// How much of a spot's cone fades, from 0 to 1.
+    pub blend: f32,
 }
 
 impl ScriptLight<'static> {
@@ -139,6 +148,8 @@ impl ScriptLight<'static> {
                 color,
                 intensity,
                 range: DEFAULT_RANGE,
+                angle: DEFAULT_SPOT_ANGLE,
+                blend: DEFAULT_SPOT_BLEND,
             },
             LightNode::Point {
                 color,
@@ -149,6 +160,22 @@ impl ScriptLight<'static> {
                 color,
                 intensity,
                 range,
+                angle: DEFAULT_SPOT_ANGLE,
+                blend: DEFAULT_SPOT_BLEND,
+            },
+            LightNode::Spot {
+                color,
+                intensity,
+                range,
+                angle,
+                blend,
+            } => Self {
+                kind: SPOT,
+                color,
+                intensity,
+                range,
+                angle,
+                blend,
             },
         }
     }
@@ -159,7 +186,9 @@ impl ScriptLight<'_> {
     ///
     /// # Errors
     ///
-    /// [`EngineError::Rendering`] if the kind is not a known word.
+    /// [`EngineError::Rendering`] if the kind is not a known word, or a
+    /// spot's angle is not more than 0 and less than a right angle. A
+    /// spot's blend is kept from 0 to 1.
     pub fn to_light(&self) -> EngineResult<LightNode> {
         match self.kind {
             DIRECTIONAL => Ok(LightNode::Directional {
@@ -171,8 +200,19 @@ impl ScriptLight<'_> {
                 intensity: self.intensity,
                 range: self.range,
             }),
+            SPOT if self.angle > 0.0 && self.angle < MAX_SPOT_ANGLE => Ok(LightNode::Spot {
+                color: self.color,
+                intensity: self.intensity,
+                range: self.range,
+                angle: self.angle,
+                blend: self.blend.clamp(0.0, 1.0),
+            }),
+            SPOT => Err(EngineError::Rendering(format!(
+                "a spot's angle is more than 0 and less than {MAX_SPOT_ANGLE} radians, not {}",
+                self.angle
+            ))),
             other => Err(EngineError::Rendering(format!(
-                "a light is \"{DIRECTIONAL}\" or \"{POINT}\", not \"{other}\""
+                "a light is \"{DIRECTIONAL}\", \"{POINT}\" or \"{SPOT}\", not \"{other}\""
             ))),
         }
     }
@@ -287,6 +327,8 @@ mod tests {
             color: Color::WHITE,
             intensity: 2.0,
             range: 5.0,
+            angle: 0.5,
+            blend: 3.0,
         };
 
         assert!(matches!(
@@ -310,6 +352,19 @@ mod tests {
             .to_light()
             .is_err()
         );
+        let spot = ScriptLight {
+            kind: SPOT,
+            ..light
+        };
+        assert!(matches!(
+            spot.to_light().unwrap(),
+            LightNode::Spot {
+                angle: 0.5,
+                blend: 1.0,
+                ..
+            }
+        ));
+        assert!(ScriptLight { angle: 2.0, ..spot }.to_light().is_err());
     }
 
     #[test]

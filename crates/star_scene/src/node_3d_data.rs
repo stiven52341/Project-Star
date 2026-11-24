@@ -6,8 +6,8 @@ use star_assets::AssetPath;
 use star_core::{EngineError, EngineResult};
 use star_math::{Quat, Vec2, Vec3};
 use star_render::{
-    Color, DEFAULT_ROUGHNESS, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MeshShape,
-    TextureFilter,
+    Color, DEFAULT_ROUGHNESS, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, DEFAULT_SPOT_ANGLE,
+    DEFAULT_SPOT_BLEND, MAX_SPOT_ANGLE, MeshShape, TextureFilter,
 };
 
 use crate::scene_file::FilterData;
@@ -225,9 +225,15 @@ pub(crate) struct LightData {
     pub(crate) color: Option<[f32; 3]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) intensity: Option<f32>,
-    /// Of point lights.
+    /// Of point lights and spots.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) range: Option<f32>,
+    /// Of spots: from the cone's axis to its edge, in radians.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) angle: Option<f32>,
+    /// Of spots: how much of the cone fades, from 0 to 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) blend: Option<f32>,
 }
 
 /// What a light is, as written in files.
@@ -236,6 +242,7 @@ pub(crate) struct LightData {
 pub(crate) enum LightKindData {
     Directional,
     Point,
+    Spot,
 }
 
 /// The intensity of a light that gives none.
@@ -247,34 +254,74 @@ impl LightData {
             .color
             .map_or(Color::WHITE, |[r, g, b]| Color::rgb(r, g, b));
         let intensity = self.intensity.unwrap_or(DEFAULT_INTENSITY);
-        match (self.kind, self.range) {
-            (LightKindData::Directional, None) => Ok(LightNode::Directional { color, intensity }),
-            (LightKindData::Point, Some(range)) if range.is_finite() && range > 0.0 => {
-                Ok(LightNode::Point {
-                    color,
-                    intensity,
-                    range,
-                })
-            }
-            (LightKindData::Directional, Some(_)) => Err(EngineError::Scene(
-                "a directional light reaches everything: it has no range".to_owned(),
-            )),
-            (LightKindData::Point, _) => Err(EngineError::Scene(
-                "a point light needs a positive range".to_owned(),
-            )),
+        let is_spot = self.kind == LightKindData::Spot;
+        if !is_spot && (self.angle.is_some() || self.blend.is_some()) {
+            return Err(scene_error("only spot lights have an angle and a blend"));
         }
+        if self.kind == LightKindData::Directional {
+            return match self.range {
+                None => Ok(LightNode::Directional { color, intensity }),
+                Some(_) => Err(scene_error(
+                    "a directional light reaches everything: it has no range",
+                )),
+            };
+        }
+        let range = self
+            .range
+            .filter(|range| range.is_finite() && *range > 0.0)
+            .ok_or_else(|| scene_error("a point or spot light needs a positive range"))?;
+        if !is_spot {
+            return Ok(LightNode::Point {
+                color,
+                intensity,
+                range,
+            });
+        }
+        let angle = self.angle.unwrap_or(DEFAULT_SPOT_ANGLE);
+        let blend = self.blend.unwrap_or(DEFAULT_SPOT_BLEND);
+        if !(angle > 0.0 && angle < MAX_SPOT_ANGLE) {
+            return Err(EngineError::Scene(format!(
+                "a spot light's angle is more than 0 and less than {MAX_SPOT_ANGLE} radians, \
+                 not {angle}"
+            )));
+        }
+        if !(0.0..=1.0).contains(&blend) {
+            return Err(EngineError::Scene(format!(
+                "a spot light's blend goes from 0 to 1, not {blend}"
+            )));
+        }
+        Ok(LightNode::Spot {
+            color,
+            intensity,
+            range,
+            angle,
+            blend,
+        })
     }
 
     pub(crate) fn from_light(light: &LightNode) -> Self {
-        let (kind, color, intensity, range) = match *light {
+        let (kind, color, intensity, range, cone) = match *light {
             LightNode::Directional { color, intensity } => {
-                (LightKindData::Directional, color, intensity, None)
+                (LightKindData::Directional, color, intensity, None, None)
             }
             LightNode::Point {
                 color,
                 intensity,
                 range,
-            } => (LightKindData::Point, color, intensity, Some(range)),
+            } => (LightKindData::Point, color, intensity, Some(range), None),
+            LightNode::Spot {
+                color,
+                intensity,
+                range,
+                angle,
+                blend,
+            } => (
+                LightKindData::Spot,
+                color,
+                intensity,
+                Some(range),
+                Some((angle, blend)),
+            ),
         };
         let intensity = (intensity != DEFAULT_INTENSITY).then_some(intensity);
         Self {
@@ -282,8 +329,14 @@ impl LightData {
             color: (color != Color::WHITE).then_some([color.r, color.g, color.b]),
             intensity,
             range,
+            angle: cone.map(|(angle, _)| angle),
+            blend: cone.map(|(_, blend)| blend),
         }
     }
+}
+
+fn scene_error(reason: &str) -> EngineError {
+    EngineError::Scene(reason.to_owned())
 }
 
 const fn vec3([x, y, z]: [f32; 3]) -> Vec3 {
@@ -395,6 +448,38 @@ mod tests {
         assert_eq!(read(&text).unwrap(), lamp);
         assert!(read("kind = \"point\"").is_err());
         assert!(read("kind = \"directional\"\nrange = 1.0").is_err());
+        assert!(read("kind = \"point\"\nrange = 1.0\nangle = 0.5").is_err());
+    }
+
+    #[test]
+    fn spot_tables_give_spots_with_their_cone() {
+        let read = |text: &str| -> EngineResult<LightNode> {
+            let data: LightData =
+                toml::from_str(text).map_err(|error| EngineError::Scene(error.to_string()))?;
+            data.to_light()
+        };
+
+        let spot = read("kind = \"spot\"\nrange = 8.0\nangle = 0.4").unwrap();
+
+        assert_eq!(
+            spot,
+            LightNode::Spot {
+                color: Color::WHITE,
+                intensity: DEFAULT_INTENSITY,
+                range: 8.0,
+                angle: 0.4,
+                blend: DEFAULT_SPOT_BLEND
+            }
+        );
+        let text = toml::to_string(&LightData::from_light(&spot)).unwrap();
+        assert_eq!(read(&text).unwrap(), spot);
+        for broken in [
+            "kind = \"spot\"",
+            "kind = \"spot\"\nrange = 1.0\nangle = 2.0",
+            "kind = \"spot\"\nrange = 1.0\nblend = 1.5",
+        ] {
+            assert!(read(broken).is_err(), "{broken}");
+        }
     }
 
     #[test]

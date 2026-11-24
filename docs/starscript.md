@@ -464,7 +464,7 @@ The engine provides them; their names cannot be used for other classes.
 | `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `current: bool` (`false`) |
 | `Node3D` (extends `Node`) | `init(name: string)`; fields `z`, `pitch`, `yaw: float` (0.0), `scale_z: float` (1.0); `look_at(x: float, y: float, z: float)` |
 | `Mesh` (extends `Node3D`) | `init(name: string, shape: string)`; fields `shape: string`, `width`, `height`, `depth` (1.0), `radius` (0.5), `color: Color` (white), `metallic` (0.0), `roughness: float` (0.5), `texture: string` (`""`: none), `pixelated: bool` (`false`) |
-| `Light` (extends `Node3D`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range: float` (10.0) |
+| `Light` (extends `Node3D`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (10.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
 | `Camera3D` (extends `Node3D`) | `init(name: string)`; fields `fov: float` (about 1.047 radians: 60°), `current: bool` (`false`) |
 | `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
 | `Scene` | `static load(path: string) -> Node?` |
@@ -750,8 +750,13 @@ class World3D extends Game {
   by the color. A mesh of an unknown shape or a size that is not positive
   is not shown, and the reason is written once to the error output.
 - A `Light` is `"directional"` (the sun: from far away, along the node's
-  -z, wherever the node is) or `"point"` (a lamp: from the node, in every
-  direction, reaching `range` world units). `intensity` 1 lights a white
+  -z, wherever the node is), `"point"` (a lamp: from the node, in every
+  direction, reaching `range` world units) or `"spot"` (a flashlight: from
+  the node, in a cone along its -z, reaching `range`). A spot's `angle` goes
+  from its axis to the edge of its cone, more than 0 and less than a right
+  angle (others are not shown, and the reason is written once); `blend` is
+  how much of the cone, from its edge inwards, fades into the dark, from 0
+  (a sharp edge) to 1. `intensity` 1 lights a white
   matte surface facing it fully. At most 16 lights shine in a frame.
   `ambient` lights everything a little, from no direction.
 - With a `camera_3d` the game is drawn in perspective from where that

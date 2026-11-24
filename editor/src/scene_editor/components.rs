@@ -7,7 +7,10 @@ use star_engine::prelude::{
     TextureRegion, Transform2D, Transform3D, Vec2, Vec3,
 };
 use star_engine::star_assets::AssetPath;
-use star_engine::star_render::{DEFAULT_ROUGHNESS, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS};
+use star_engine::star_render::{
+    DEFAULT_ROUGHNESS, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, DEFAULT_SPOT_ANGLE,
+    DEFAULT_SPOT_BLEND,
+};
 use star_engine::star_scene::{
     Camera2dNode, Camera3dNode, MeshOutline, NodeOutline, SpriteOutline,
 };
@@ -83,7 +86,7 @@ pub(super) fn add_component_menu(
                     node.mesh = Some(new_mesh());
                 });
                 offer(ui, node.light.is_none(), texts.light_section, &mut || {
-                    node.light = Some(new_light(false));
+                    node.light = Some(new_light(LightKind::Point));
                 });
                 offer(
                     ui,
@@ -113,6 +116,7 @@ pub(super) enum NodeTemplate {
     Plane,
     DirectionalLight,
     PointLight,
+    SpotLight,
     Camera2D,
     Camera3D,
     Body(BodyTemplate),
@@ -173,6 +177,7 @@ impl NodeTemplate {
                 Self::Plane,
                 Self::DirectionalLight,
                 Self::PointLight,
+                Self::SpotLight,
                 Self::Camera3D,
             ],
         }
@@ -189,6 +194,7 @@ impl NodeTemplate {
             Self::Plane => texts.plane,
             Self::DirectionalLight => texts.directional_light,
             Self::PointLight => texts.point_light,
+            Self::SpotLight => texts.spot_light,
             Self::Camera2D => texts.camera_2d,
             Self::Camera3D => texts.camera_3d,
             Self::Body(body) => body.label(),
@@ -234,8 +240,9 @@ impl NodeTemplate {
         });
         match self {
             Self::Sprite => node.sprite = new_sprite(images),
-            Self::DirectionalLight => node.light = Some(new_light(true)),
-            Self::PointLight => node.light = Some(new_light(false)),
+            Self::DirectionalLight => node.light = Some(new_light(LightKind::Directional)),
+            Self::PointLight => node.light = Some(new_light(LightKind::Point)),
+            Self::SpotLight => node.light = Some(new_light(LightKind::Spot)),
             Self::Camera2D => {
                 node.camera = Some(Camera2dNode {
                     current: true,
@@ -330,19 +337,48 @@ pub(super) fn new_mesh() -> MeshOutline {
     }
 }
 
-/// A white light: a sun if `directional`, a lamp if not.
-pub(super) const fn new_light(directional: bool) -> LightNode {
-    if directional {
-        LightNode::Directional {
+/// The kinds of light a node can shine, to choose one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LightKind {
+    Directional,
+    Point,
+    Spot,
+}
+
+impl LightKind {
+    /// Every one, in the menu's order.
+    pub(super) const ALL: [Self; 3] = [Self::Directional, Self::Point, Self::Spot];
+
+    /// The kind of `light`.
+    pub(super) const fn of(light: &LightNode) -> Self {
+        match light {
+            LightNode::Directional { .. } => Self::Directional,
+            LightNode::Point { .. } => Self::Point,
+            LightNode::Spot { .. } => Self::Spot,
+        }
+    }
+}
+
+/// A white light of `kind`: a sun, a lamp or a spot that reaches as far as
+/// a lamp.
+pub(super) const fn new_light(kind: LightKind) -> LightNode {
+    match kind {
+        LightKind::Directional => LightNode::Directional {
             color: Color::WHITE,
             intensity: DEFAULT_SUN_INTENSITY,
-        }
-    } else {
-        LightNode::Point {
+        },
+        LightKind::Point => LightNode::Point {
             color: Color::WHITE,
             intensity: DEFAULT_LAMP_INTENSITY,
             range: DEFAULT_LAMP_RANGE,
-        }
+        },
+        LightKind::Spot => LightNode::Spot {
+            color: Color::WHITE,
+            intensity: DEFAULT_LAMP_INTENSITY,
+            range: DEFAULT_LAMP_RANGE,
+            angle: DEFAULT_SPOT_ANGLE,
+            blend: DEFAULT_SPOT_BLEND,
+        },
     }
 }
 

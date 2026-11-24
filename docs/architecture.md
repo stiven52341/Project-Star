@@ -194,8 +194,9 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   optional `[node.mesh]` (`shape` `cube` with a `size` of three numbers,
   `plane` with two, or `sphere` with a `radius` and optional `segments` and
   `rings`; and its material: `color`, `metallic`, `roughness`, `texture`,
-  `filter`) and an optional `[node.light]` (`kind` `directional` or `point`,
-  `color` of three numbers, `intensity`, and the `range` of point lights)
+  `filter`) and an optional `[node.light]` (`kind` `directional`, `point`
+  or `spot`, `color` of three numbers, `intensity`, the `range` of point
+  lights and spots, and the `angle` in radians and `blend` of spots)
   and an optional `[node.body_3d]` (see Physics). Cameras are an optional
   `[node.camera]` (`view_height`, `current`) on 2D nodes and
   `[node.camera_3d]` (`fov` in radians, `current`) on 3D ones; what they
@@ -465,10 +466,14 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
 - **Lights** belong to the `Frame`: `set_ambient_light(AmbientLight)` (none
   at first, kept between frames like the camera) and up to `MAX_LIGHTS`
   (16) `add_light`s per frame, either `DirectionalLight`s (a direction, like
-  the sun) or `PointLight`s (a position and a range, fading with the square
-  of the distance and smoothly reaching zero at the range). More lights are
+  the sun), `PointLight`s (a position and a range, fading with the square
+  of the distance and smoothly reaching zero at the range) or `SpotLight`s
+  (a point light shining only in a cone: `angle` from its axis to its edge,
+  and `blend`, the part of the cone that fades out towards the edge). Each
+  light takes four `vec4`s on the GPU. More lights are
   `EngineError::CapacityExceeded` when rendering; lights that cannot shine
-  (a zero direction, no range, numbers that are not finite) are skipped. A
+  (a zero direction, no range, a spot's cone that is no cone, numbers that
+  are not finite) are skipped. A
   light of intensity 1 straight on a white matte surface gives white.
   Normals use the inverse transpose of the model matrix (`Mat4::inverse`,
   `transposed`), so non-uniform scales keep them right. Lighting happens in

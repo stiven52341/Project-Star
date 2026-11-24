@@ -414,6 +414,8 @@ fn add_light_class(classes: &mut ClassTable, node_3d: ClassId, color: ClassId) -
         native_field("color", Type::Class(color)),
         native_field("intensity", Type::Float),
         native_field("range", Type::Float),
+        native_field("angle", Type::Float),
+        native_field("blend", Type::Float),
     ];
     light.constructor = Some(native_constructor(&[
         ("name", Type::String),

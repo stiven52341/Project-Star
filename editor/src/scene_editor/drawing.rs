@@ -9,7 +9,7 @@ use star_engine::prelude::{
 };
 use star_engine::star_assets::AssetPath;
 use star_engine::star_platform::WindowConfig;
-use star_engine::star_scene::{Camera2dNode, Camera3dNode, NodeOutline, SpriteOutline};
+use star_engine::star_scene::{Camera2dNode, Camera3dNode, LightNode, NodeOutline, SpriteOutline};
 
 use super::body_drawing::{BodyMarks, draw_body_2d, draw_body_3d};
 
@@ -53,13 +53,16 @@ pub(crate) struct Marks {
     /// A pyramid from `(0, 0, 0)` to a base from `(-1, -1, -1)` to
     /// `(1, 1, -1)`, in the color of cameras: what a 3D camera sees.
     pub(crate) pyramid: MeshId,
+    /// A cone from `(0, 0, 0)` to a circle of radius 1 at `z = -1`, in the
+    /// color of lights: what a spot lights.
+    pub(crate) cone: MeshId,
     /// The meshes of the shapes of bodies.
     pub(crate) bodies: BodyMarks,
 }
 
 /// Adds to `frame` what the nodes of `outline` show, where the game would
-/// show them, what their cameras see, the shapes of their bodies, and the
-/// mark of the node `selected`.
+/// show them, what their cameras see and their spots light, the shapes of
+/// their bodies, and the mark of the node `selected`.
 pub(crate) fn draw_scene(
     outline: &SceneOutline,
     selected: Option<usize>,
@@ -88,6 +91,9 @@ pub(crate) fn draw_scene(
         }
         if let Some(global) = place.solid {
             draw_mesh(node, global, gpu, frame);
+            if let Some(LightNode::Spot { range, angle, .. }) = node.light {
+                draw_spot_cone(range, angle, global, marks, frame);
+            }
             if let Some(light) = node.light
                 && frame.lights().len() < MAX_LIGHTS
             {
@@ -231,6 +237,16 @@ fn draw_camera_3d(camera: Camera3dNode, global: Mat4, marks: Marks, frame: &mut 
     );
 }
 
+/// The cone a spot of `range` and `angle` placed at `global` lights, along
+/// its -z: turned as it is, but not scaled, as the game lights it.
+fn draw_spot_cone(range: f32, angle: f32, global: Mat4, marks: Marks, frame: &mut Frame) {
+    let radius = angle.tan() * range;
+    frame.draw(
+        marks.cone,
+        without_scale(global) * Mat4::from_scale(Vec3::new(radius, radius, range)),
+    );
+}
+
 /// `matrix` with its axes made one unit long: placed and turned as it is,
 /// but not scaled.
 pub(super) fn without_scale(matrix: Mat4) -> Mat4 {
@@ -367,6 +383,29 @@ pub(crate) fn pyramid_lines() -> Vec<Vertex> {
     lines
 }
 
+/// The color of what spots light, like the light icon of the scene's tree.
+const LIGHT_COLOR: Color = Color::rgb(0.94, 0.78, 0.31);
+/// How many segments make the circle at the end of a spot's cone.
+const CONE_SEGMENTS: usize = 32;
+
+/// The segments of [`Marks::cone`].
+pub(crate) fn cone_lines() -> Vec<Vertex> {
+    #[allow(clippy::cast_precision_loss)]
+    let rim = |step: usize| {
+        let turn = std::f32::consts::TAU * step as f32 / CONE_SEGMENTS as f32;
+        Vec3::new(turn.cos(), turn.sin(), -1.0)
+    };
+    let corners: Vec<Vec3> = (0..CONE_SEGMENTS).map(rim).collect();
+    let mut lines = colored_loop(&corners, LIGHT_COLOR);
+    for side in [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)] {
+        lines.extend([
+            Vertex::new(Vec3::ZERO, LIGHT_COLOR),
+            Vertex::new(Vec3::new(side.0, side.1, -1.0), LIGHT_COLOR),
+        ]);
+    }
+    lines
+}
+
 /// The segments of [`Marks::cross`].
 pub(crate) fn cross_lines() -> Vec<Vertex> {
     let half = 0.5;
@@ -433,6 +472,7 @@ mod tests {
         cross: MeshId::from_index(2),
         view: MeshId::from_index(3),
         pyramid: MeshId::from_index(4),
+        cone: MeshId::from_index(5),
         bodies: super::super::body_drawing::TEST_MARKS,
     };
 
@@ -521,6 +561,7 @@ mod tests {
             cross_lines(),
             view_lines(),
             pyramid_lines(),
+            cone_lines(),
         ] {
             assert!(!lines.is_empty() && lines.len() % 2 == 0);
         }
@@ -558,6 +599,20 @@ mod tests {
             1 + 3,
             "a rectangle, and a capsule's three pieces"
         );
+    }
+
+    #[test]
+    fn spots_show_the_cone_they_light() {
+        let spot = "[[node]]\nname = \"Lamp\"\n[node.transform_3d]\n\
+                    [node.light]\nkind = \"spot\"\nrange = 5.0\n";
+
+        let (frame, _) = draw(&outline(spot), None);
+
+        assert_eq!(frame.draw_count(), 1);
+        assert!(matches!(
+            frame.lights()[0],
+            star_engine::prelude::Light::Spot(_)
+        ));
     }
 
     #[test]

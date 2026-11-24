@@ -4,7 +4,7 @@ use star_core::EngineResult;
 use star_ecs::World;
 use star_math::Vec3;
 use star_render::{
-    Color, DirectionalLight, Frame, Light, MAX_LIGHTS, Material, Mesh3dId, PointLight,
+    Color, DirectionalLight, Frame, Light, MAX_LIGHTS, Material, Mesh3dId, PointLight, SpotLight,
 };
 
 use crate::GlobalTransform3D;
@@ -47,23 +47,34 @@ pub enum LightNode {
         /// Beyond this distance it lights nothing.
         range: f32,
     },
+    /// Light from the node's position, in a cone along its -z axis.
+    Spot {
+        /// Its color.
+        color: Color,
+        /// How bright it is one world unit away.
+        intensity: f32,
+        /// Beyond this distance it lights nothing.
+        range: f32,
+        /// From the cone's axis to its edge, in radians.
+        angle: f32,
+        /// How much of the cone, from its edge inwards, fades: 0 to 1.
+        blend: f32,
+    },
 }
 
 impl LightNode {
     /// The light shining from a node placed at `global`.
     #[must_use]
     pub fn to_light(self, global: GlobalTransform3D) -> Light {
+        let [_, _, backward, _] = global.matrix().to_columns();
+        let forward = Vec3::new(-backward[0], -backward[1], -backward[2]);
         match self {
-            Self::Directional { color, intensity } => {
-                let [_, _, backward, _] = global.matrix().to_columns();
-                let direction = Vec3::new(-backward[0], -backward[1], -backward[2]);
-                DirectionalLight {
-                    direction,
-                    color,
-                    intensity,
-                }
-                .into()
+            Self::Directional { color, intensity } => DirectionalLight {
+                direction: forward,
+                color,
+                intensity,
             }
+            .into(),
             Self::Point {
                 color,
                 intensity,
@@ -73,6 +84,22 @@ impl LightNode {
                 color,
                 intensity,
                 range,
+            }
+            .into(),
+            Self::Spot {
+                color,
+                intensity,
+                range,
+                angle,
+                blend,
+            } => SpotLight {
+                position: global.position(),
+                direction: forward,
+                color,
+                intensity,
+                range,
+                angle,
+                blend,
             }
             .into(),
         }
@@ -183,9 +210,39 @@ mod tests {
                     assert_eq!(lamp.position, Vec3::new(1.0, 2.0, 3.0));
                     found.1 = true;
                 }
+                Light::Spot(_) => panic!("there are no spots"),
             }
         }
         assert_eq!(found, (true, true));
+    }
+
+    #[test]
+    fn spots_shine_from_their_nodes_along_their_minus_z() {
+        let mut world = World::new();
+        let node = node_3d(
+            &mut world,
+            Transform3D::from_position(Vec3::new(0.0, 4.0, 0.0))
+                .with_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+        );
+        let lamp = LightNode::Spot {
+            color: Color::WHITE,
+            intensity: 1.0,
+            range: 5.0,
+            angle: 0.5,
+            blend: 0.2,
+        };
+        world.insert(node, lamp).unwrap();
+        TransformPropagation::new().run(&mut world).unwrap();
+        let mut frame = Frame::new();
+
+        draw_3d_nodes(&world, &mut frame).unwrap();
+
+        let [Light::Spot(spot)] = frame.lights() else {
+            panic!("one spot shines");
+        };
+        assert!((spot.position - Vec3::new(0.0, 4.0, 0.0)).length() < EPSILON);
+        assert!((spot.direction - Vec3::new(0.0, -1.0, 0.0)).length() < EPSILON);
+        assert!((spot.angle - 0.5).abs() < EPSILON);
     }
 
     #[test]

@@ -32,7 +32,7 @@ use star_scene::{
 };
 
 pub use crate::script_3d::{
-    CUBE, DEFAULT_RANGE, DIRECTIONAL, PLANE, POINT, ScriptCamera3D, ScriptLight, ScriptMesh,
+    CUBE, DEFAULT_RANGE, DIRECTIONAL, PLANE, POINT, SPOT, ScriptCamera3D, ScriptLight, ScriptMesh,
 };
 pub use crate::script_body::{
     BOX, CAPSULE, CIRCLE, DEFAULT_RADIUS, DEFAULT_SIZE, DYNAMIC, KINEMATIC, RECTANGLE, SPHERE,
@@ -657,6 +657,7 @@ fn replace<T: 'static>(world: &mut World, entity: Entity, value: T) -> EngineRes
 mod tests {
     use star_math::Quat;
     use star_physics::{BodyKind, BodySettings, Physics2d, Physics3d, Shape2d, Shape3d};
+    use star_render::{DEFAULT_SPOT_ANGLE, DEFAULT_SPOT_BLEND};
     use star_scene::{TransformPropagation, step_node_physics, step_node_physics_3d};
 
     use super::*;
@@ -982,6 +983,8 @@ mod tests {
             color: Color::WHITE,
             intensity: 3.0,
             range: 6.0,
+            angle: DEFAULT_SPOT_ANGLE,
+            blend: DEFAULT_SPOT_BLEND,
         });
 
         frame(&mut mirror, &mut world, &[crate_node, lamp]);

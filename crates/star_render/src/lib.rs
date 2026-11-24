@@ -38,7 +38,10 @@ pub use camera::{Camera, DEFAULT_2D_VIEW_HEIGHT, DEFAULT_VERTICAL_FOV, Projectio
 pub use color::Color;
 pub use frame::Frame;
 pub use gpu_info::GpuInfo;
-pub use light::{AmbientLight, DirectionalLight, Light, MAX_LIGHTS, PointLight};
+pub use light::{
+    AmbientLight, DEFAULT_SPOT_ANGLE, DEFAULT_SPOT_BLEND, DirectionalLight, Light, MAX_LIGHTS,
+    MAX_SPOT_ANGLE, PointLight, SpotLight,
+};
 pub use material::{DEFAULT_ROUGHNESS, Material};
 pub use mesh::{Mesh3dId, MeshId};
 pub use mesh_data::{

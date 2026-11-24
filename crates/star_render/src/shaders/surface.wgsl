@@ -11,8 +11,9 @@ const DIELECTRIC_REFLECTANCE: f32 = 0.04;
 const MIN_ROUGHNESS: f32 = 0.04;
 // Keeps divisions away from zero at grazing angles.
 const EPSILON: f32 = 0.0001;
-// `w` of a light's position for point lights; 0 is a direction.
+// `w` of a light's position for point lights and spots; 0 is a direction.
 const POINT: f32 = 1.0;
+const SPOT: f32 = 2.0;
 
 struct Draw {
     model_view_projection: mat4x4<f32>,
@@ -26,8 +27,12 @@ struct Draw {
 struct Light {
     // xyz: direction (w = 0) or position (w = 1).
     position: vec4<f32>,
-    // rgb: color times intensity; a: range of point lights.
+    // rgb: color times intensity; a: range of point lights and spots.
     radiance: vec4<f32>,
+    // xyz: where a spot points.
+    axis: vec4<f32>,
+    // x: cosine of the edge of a spot's cone; y: of where it starts to fade.
+    cone: vec4<f32>,
 }
 
 struct Lights {
@@ -123,6 +128,14 @@ fn attenuation(distance: f32, range: f32) -> f32 {
     return window * window / max(distance * distance, EPSILON);
 }
 
+// How much of a spot reaches a point seen at `cosine` from its axis: all
+// inside where it starts to fade (`edges.y`), nothing beyond its edge
+// (`edges.x`), smoothly between them.
+fn in_cone(cosine: f32, edges: vec2<f32>) -> f32 {
+    let fading = clamp((cosine - edges.x) / max(edges.y - edges.x, EPSILON), 0.0, 1.0);
+    return fading * fading;
+}
+
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     // Materials without a texture get a white one.
@@ -136,11 +149,14 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         let light = lights.lights[index];
         var to_light = -light.position.xyz;
         var radiance = light.radiance.rgb;
-        if light.position.w == POINT {
+        if light.position.w >= POINT {
             let offset = light.position.xyz - input.world_position;
             let distance = length(offset);
             to_light = offset / max(distance, EPSILON);
             radiance = radiance * attenuation(distance, light.radiance.a);
+        }
+        if light.position.w == SPOT {
+            radiance = radiance * in_cone(dot(-to_light, light.axis.xyz), light.cone.xy);
         }
         lit += reflected(normal, view, to_light, radiance, color.rgb, metallic, roughness);
     }

@@ -15,7 +15,9 @@ use star_engine::star_scene::{
     Camera2dNode, Camera3dNode, MeshOutline, NodeOutline, SpriteOutline,
 };
 
-use super::components::{DEFAULT_CAPSULE_HEIGHT, DEFAULT_RADIUS, add_component_menu, new_light};
+use super::components::{
+    DEFAULT_CAPSULE_HEIGHT, DEFAULT_RADIUS, LightKind, add_component_menu, new_light,
+};
 use super::exported_fields::{edit_exported, exported_fields};
 use super::fields::{
     MIN_SIZE, angle_row, angle_slider_row, angles_row, checkbox_hint_row, checkbox_row, choice_row,
@@ -298,22 +300,33 @@ fn edit_mesh_shape(ui: &mut egui::Ui, shape: &mut MeshShape) -> bool {
     chosen | resized
 }
 
+/// The narrowest and widest a spot can shine, from its axis to its edge,
+/// in degrees: scene files take anything between 0 and 90.
+const SPOT_ANGLE_DEGREES: std::ops::RangeInclusive<f32> = 1.0..=89.0;
+
 fn edit_light(ui: &mut egui::Ui, light: &mut LightNode) -> bool {
     let texts = texts::current();
-    let mut directional = matches!(light, LightNode::Directional { .. });
-    let choices = [true, false].map(|choice| (choice, texts.light_kind_name(choice)));
-    let mut changed = choice_row(ui, texts.body_kind, &mut directional, &choices);
+    let mut kind = LightKind::of(light);
+    let choices = LightKind::ALL.map(|choice| (choice, texts.light_kind_name(choice)));
+    let mut changed = choice_row(ui, texts.body_kind, &mut kind, &choices);
     if changed {
-        *light = new_light(directional);
+        *light = new_light(kind);
     }
     let (LightNode::Directional { color, intensity }
     | LightNode::Point {
         color, intensity, ..
+    }
+    | LightNode::Spot {
+        color, intensity, ..
     }) = light;
     changed |= color_row(ui, texts.color, color);
     changed |= number_from_row(ui, texts.intensity, intensity, 0.0);
-    if let LightNode::Point { range, .. } = light {
+    if let LightNode::Point { range, .. } | LightNode::Spot { range, .. } = light {
         changed |= number_from_row(ui, texts.range, range, MIN_SIZE);
+    }
+    if let LightNode::Spot { angle, blend, .. } = light {
+        changed |= angle_slider_row(ui, texts.cone_angle, angle, SPOT_ANGLE_DEGREES);
+        changed |= fraction_row(ui, texts.blend, blend);
     }
     changed
 }

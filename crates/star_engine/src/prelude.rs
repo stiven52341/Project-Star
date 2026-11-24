@@ -20,7 +20,7 @@ pub use star_platform::TargetPlatform;
 pub use star_render::{
     AmbientLight, Camera, Color, DirectionalLight, Frame, GraphicsBackend, Image, Light,
     MAX_LIGHTS, Material, Mesh3dId, MeshData, MeshId, MeshShape, MeshVertex, PointLight,
-    Projection, Sprite, TextureFilter, TextureId, TextureRegion, Vertex,
+    Projection, SpotLight, Sprite, TextureFilter, TextureId, TextureRegion, Vertex,
 };
 pub use star_scene::{
     Body2D, Body3D, Children, GlobalTransform2D, GlobalTransform3D, Hierarchy, LightNode, MeshNode,

@@ -337,6 +337,28 @@ fn point_lights_fade_with_distance_and_end_at_their_range() {
 
 #[test]
 #[ignore = "needs a GPU"]
+fn spots_light_inside_their_cone_only() {
+    // Two units in front of the plane's center, pointing at it or away
+    // to the side.
+    let spot = |direction| crate::SpotLight {
+        position: Vec3::new(0.0, 0.0, 2.0),
+        direction,
+        color: Color::WHITE,
+        intensity: 4.0,
+        range: 10.0,
+        angle: crate::DEFAULT_SPOT_ANGLE,
+        blend: crate::DEFAULT_SPOT_BLEND,
+    };
+
+    let at_it = lit_center(spot(Vec3::new(0.0, 0.0, -1.0)));
+    let aside = lit_center(spot(Vec3::new(1.0, 0.0, -1.0)));
+
+    assert!(at_it > 0, "{at_it}");
+    assert_eq!(aside, 0);
+}
+
+#[test]
+#[ignore = "needs a GPU"]
 fn textures_tint_3d_surfaces() {
     let mut gpu = Gpu::new();
     let plane = plane(&mut gpu);

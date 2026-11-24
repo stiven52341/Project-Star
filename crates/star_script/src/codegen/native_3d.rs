@@ -147,13 +147,15 @@ const MESH: NodeClass = NodeClass {
 
 const LIGHT: NodeClass = NodeClass {
     name: "Light",
-    about: "the kind of light it shines, its color, how bright it is and how far it reaches",
+    about: "the kind of light it shines, its color, how bright it is, how far it reaches and the cone of spots",
     ancestors: &["Node", "Node3D"],
     fields: &[
         ("kind", STRING, "kind"),
         ("color", COLOR, WHITE),
         ("intensity", "f32", "1.0"),
         ("range", "f32", "10.0"),
+        ("angle", "f32", "::std::f32::consts::FRAC_PI_6"),
+        ("blend", "f32", "0.2"),
     ],
     parameters: &[("kind", STRING)],
     methods: &[],
