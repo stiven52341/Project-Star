@@ -50,9 +50,11 @@ impl OpenedAsset {
 pub(crate) enum AssetEvent {
     /// Opened a file.
     Opened(OpenedAsset),
-    /// Renamed or deleted the file or folder at this path: what was open
-    /// from it is gone.
+    /// Deleted the file or folder at this path: what was open from it is
+    /// gone.
     Gone(String),
+    /// Renamed the file or folder at `from`, which is now at `to`.
+    Renamed { from: String, to: String },
     /// Chose the size of the icons, in percent, to remember it.
     IconSizeChosen(u16),
 }
@@ -292,8 +294,8 @@ impl AssetsPanel {
                 None
             }
             Outcome::Renamed { from, to } => {
-                self.selected = Some(to);
-                Some(AssetEvent::Gone(from))
+                self.selected = Some(to.clone());
+                Some(AssetEvent::Renamed { from, to })
             }
             Outcome::Deleted(path) => {
                 self.selected = None;

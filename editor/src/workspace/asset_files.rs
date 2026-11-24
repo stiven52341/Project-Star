@@ -332,7 +332,10 @@ mod tests {
         let text = fs::read_to_string(assets.join(&path)).unwrap();
         assert!(text.contains("class = \"Player\""), "{text}");
         let manifest = fs::read_to_string(project.path().join("project.toml")).unwrap();
-        assert!(manifest.contains("left = [\"A\", \"ArrowLeft\""), "{manifest}");
+        assert!(
+            manifest.contains("left = [\"A\", \"ArrowLeft\""),
+            "{manifest}"
+        );
     }
 
     #[test]

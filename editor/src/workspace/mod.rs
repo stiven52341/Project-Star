@@ -4,6 +4,7 @@ mod asset_actions;
 mod asset_files;
 mod asset_icons;
 mod assets_panel;
+mod class_rename;
 mod console_panel;
 mod documents;
 mod editor_camera;
@@ -26,6 +27,7 @@ use star_script::Span;
 pub(crate) use self::asset_files::{AssetFileError, NewAsset};
 use self::assets_panel::{AssetEvent, AssetsPanel, OpenedAsset};
 pub(crate) use self::assets_panel::{DEFAULT_ICON_SIZE, ICON_SIZES};
+use self::class_rename::ClassRename;
 use self::console_panel::ConsolePanel;
 use self::documents::{ActiveDocument, Documents};
 use self::inspector_panel::show_inspector;
@@ -483,11 +485,10 @@ impl EditorWindow {
                     self.documents.open_script(self.assets.directory(), path);
                     self.live_check.request();
                 }
-                Some(AssetEvent::Gone(path)) => {
-                    self.documents.forget(&path);
-                    if self.documents.scene_mut().is_none() {
-                        self.last_scene.forget();
-                    }
+                Some(AssetEvent::Gone(path)) => self.forget(&path),
+                Some(AssetEvent::Renamed { from, to }) => {
+                    self.forget(&from);
+                    self.rename_class(&from, &to);
                 }
                 Some(AssetEvent::IconSizeChosen(size)) => self.icon_size_chosen = Some(size),
                 None => {}
@@ -500,6 +501,48 @@ impl EditorWindow {
             BottomTab::Output => self.output.show(ui),
             BottomTab::Console => self.console.show(ui),
         }
+    }
+
+    /// Closes what was open from the file or folder at `path`, which is
+    /// gone.
+    fn forget(&mut self, path: &str) {
+        self.documents.forget(path);
+        if self.documents.scene_mut().is_none() {
+            self.last_scene.forget();
+        }
+    }
+
+    /// Renames, in the whole project, the class of the script or blueprint
+    /// moved from `from` to `to` if it was called as the file. Files with
+    /// unsaved changes are left as they are, and named in the console.
+    fn rename_class(&mut self, from: &str, to: &str) {
+        let assets = self.assets.directory().to_path_buf();
+        let Some(rename) = ClassRename::after_moving(&assets, from, to) else {
+            return;
+        };
+        let skipped = self.documents.unsaved_paths();
+        let (changed, failed) = rename.apply(&assets, &skipped);
+        self.documents
+            .reload(&assets, &changed, self.project.settings().dimension());
+        log::info!(
+            "Renamed the class {} to {} in {}",
+            rename.old,
+            rename.new,
+            changed.join(", ")
+        );
+        let left: Vec<String> = skipped
+            .into_iter()
+            .filter(|path| rename.uses(&assets, path))
+            .chain(failed)
+            .collect();
+        if !left.is_empty() {
+            log::warn!(
+                "The class {} is still called so in {}: rename it there by hand",
+                rename.old,
+                left.join(", ")
+            );
+        }
+        self.live_check.request();
     }
 
     /// Opens the blueprint or script of `problem` where the problem is.

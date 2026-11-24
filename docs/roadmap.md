@@ -263,7 +263,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] Ready-made functions in blueprints (for example, of the transform),
         and variable nodes that read or set fields of another object.
   - [x] A pack of ready-made blueprints (2D movement, 3D movement…).
-  - [ ] Renaming a `.star` does not rename its class (bug).
+  - [x] Renaming a `.star` does not rename its class (bug): it now renames
+        the class, and its uses, in the whole project (blueprints too).
   - [ ] A keyword for variables set from the inspector.
   - [ ] Decorators (`@`) in StarScript.
   - [ ] Ready-made nodes: cameras, 2D and 3D lights, collision shapes…

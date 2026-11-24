@@ -553,7 +553,14 @@ of the StarScript compiler and of the project check stay in English:
    them. Every template is checked by a test that validates it, translates
    it and compiles it. Names are given in a
    row over the grid; `asset_files.rs` checks them and never overwrites.
-   What is renamed or deleted closes the tabs open from it), **Problems** (what the last
+   What is renamed or deleted closes the tabs open from it. A script or
+   blueprint renamed whose class is called as the file was (and whose new
+   name can be a class) renames its class in the whole project
+   (`class_rename.rs`): in scripts token by token (never in texts or
+   comments), in blueprints (class, base, class calls and types) and in
+   the classes of scenes' nodes. Files open with unsaved changes are left
+   alone and named in the console; open files without changes are read
+   again), **Problems** (what the last
    “Compile” found, as `file:line:column` and a message; it opens by itself
    when there are problems), **Output** (what Cargo and the game write
    while playing) and **Console** (the editor's own log), and a status bar (with the result of the last

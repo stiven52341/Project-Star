@@ -158,6 +158,44 @@ impl Documents {
         }
     }
 
+    /// The paths of the scene and tabs with unsaved changes.
+    pub(crate) fn unsaved_paths(&self) -> Vec<String> {
+        let scene = self
+            .scene
+            .as_ref()
+            .filter(|scene| scene.is_unsaved())
+            .map(|scene| scene.path().to_owned());
+        let tabs = self
+            .tabs
+            .iter()
+            .filter(|tab| tab.is_unsaved())
+            .map(|tab| tab.path().to_owned());
+        scene.into_iter().chain(tabs).collect()
+    }
+
+    /// Reads again from the `assets` folder of a project of `dimension`
+    /// the scene and tabs at `paths`, whose files changed on disk, unless
+    /// they have changes of their own.
+    pub(crate) fn reload(&mut self, assets: &Path, paths: &[String], dimension: ProjectDimension) {
+        let changed = |path: &str| paths.iter().any(|changed| changed == path);
+        if let Some(scene) = &mut self.scene
+            && changed(scene.path())
+            && !scene.is_unsaved()
+        {
+            *scene = SceneDocument::open(assets, scene.path().to_owned(), dimension);
+        }
+        for tab in &mut self.tabs {
+            if !changed(tab.path()) || tab.is_unsaved() {
+                continue;
+            }
+            let path = tab.path().to_owned();
+            *tab = match tab {
+                Tab::Blueprint(_) => Tab::Blueprint(BlueprintTab::open(assets, path)),
+                Tab::Script(_) => Tab::Script(ScriptTab::open(assets, path)),
+            };
+        }
+    }
+
     fn position_of(&self, path: &str) -> Option<usize> {
         self.tabs.iter().position(|tab| tab.path() == path)
     }
