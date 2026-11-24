@@ -589,7 +589,12 @@ given at once; several open a small menu where the file was dropped
 file with none says so next to the pointer, and no row is outlined. The
 same file can be dropped on the view, where it goes to the node under
 the pointer (the view is outlined only while one is there), or on the
-inspector, where it goes to the node selected. The tree (`tree_view.rs`) draws one row
+inspector, where it goes to the node selected. Every place that takes
+drops asks for them through `drag_drop::released`, which only takes what
+is carried if it is of the kind asked for: egui's own
+`dnd_release_payload` takes whatever is carried and throws it away when
+the kind differs, so a row that asked first for a dragged node lost the
+script dropped on it. The tree (`tree_view.rs`) draws one row
 per node across the panel, striped, with guides down to the children, an
 arrow to close and open them (closed nodes are kept by path, so they stay
 closed while others come and go), an icon for what the node shows most
@@ -899,7 +904,7 @@ in `<config>/ProjectStar/last_scenes.toml`, read again on every change so
 two editors open at once do not undo each other; a scene that no longer
 exists is not opened, and one renamed or deleted is forgotten; it lives
 outside the project because it is the editor's state, not the game's),
-`folder_dialog.rs` (rfd),
+`folder_dialog.rs` (rfd), `drag_drop.rs` (taking drops by kind),
 `game_run/` (see above), `texts/` (every visible text, in English and Spanish) and `style.rs`
 (shared visual constants).
 

@@ -19,6 +19,7 @@ use super::class_drop::ClassDrop;
 use super::components::NodeTemplate;
 use super::dropping::ImageDrop;
 use super::tree::{can_move, children_of};
+use crate::drag_drop::released;
 use crate::project::ProjectDimension;
 use crate::texts;
 
@@ -283,19 +284,13 @@ impl<'scene> TreeView<'scene> {
                 egui::StrokeKind::Inside,
             );
         }
-        if let Some(drag) = response
-            .dnd_release_payload::<NodeDrag>()
-            .filter(|drag| fits(drag))
-        {
+        if let Some(drag) = released::<NodeDrag>(response).filter(|drag| fits(drag)) {
             self.outcome.action = Some(TreeAction::Move {
                 node: drag.0,
                 parent: target,
             });
         }
-        if let Some(script) = response
-            .dnd_release_payload::<ClassDrop>()
-            .filter(|_| is_row)
-        {
+        if let Some(script) = released::<ClassDrop>(response).filter(|_| is_row) {
             let at = response
                 .ctx
                 .pointer_latest_pos()
@@ -446,7 +441,7 @@ impl<'scene> TreeView<'scene> {
             response.dnd_set_drag_payload(NodeDrag(index));
         }
         self.drop_target(ui, &response, index, true);
-        if let Some(image) = response.dnd_release_payload::<ImageDrop>() {
+        if let Some(image) = released::<ImageDrop>(&response) {
             self.outcome.dropped = Some((index, image));
         }
         if selected && self.state.reveal {

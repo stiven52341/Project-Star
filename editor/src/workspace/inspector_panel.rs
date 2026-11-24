@@ -5,6 +5,7 @@
 use eframe::egui;
 use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
 
+use crate::drag_drop::released;
 use crate::project::Project;
 use crate::scene_editor::{ClassDrop, SceneDocument};
 use crate::style::{PROPERTY_SPACING, property_row};
@@ -61,7 +62,7 @@ fn take_dropped_class(ui: &egui::Ui, area: egui::Rect, scene: &mut SceneDocument
             egui::StrokeKind::Inside,
         );
     }
-    if let Some(script) = response.dnd_release_payload::<ClassDrop>() {
+    if let Some(script) = released::<ClassDrop>(&response) {
         let at = response.hover_pos().unwrap_or_else(|| area.center());
         scene.drop_class_on_selected(&script, at);
     }

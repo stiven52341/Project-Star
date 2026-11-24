@@ -3,6 +3,7 @@
 mod app;
 mod blueprint_editor;
 mod config_file;
+mod drag_drop;
 mod editor_log;
 mod file_tree;
 mod folder_dialog;

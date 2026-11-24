@@ -259,7 +259,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
 - [ ] **Owner's list (2026-11-23)**, done one by one:
   - [x] Opening a project opens again the scene it had open.
   - [x] Dragging scripts from “Assets” to the view and to the inspector.
-  - [ ] Dropping a blueprint on a node does not give it its class (bug).
+  - [x] Dropping a blueprint on a node does not give it its class (bug).
   - [ ] Ready-made functions in blueprints (for example, of the transform).
   - [ ] A pack of ready-made blueprints (2D movement, 3D movement…).
   - [ ] Renaming a `.star` does not rename its class (bug).

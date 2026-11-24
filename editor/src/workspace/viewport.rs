@@ -17,6 +17,7 @@ use super::editor_camera::EditorCamera;
 use super::grid::grid_lines;
 use super::viewport_assets::ViewportAssets;
 use super::viewport_tools::{paint_handles, show_toolbar, tool_from_keys};
+use crate::drag_drop::released;
 use crate::project::ProjectDimension;
 use crate::scene_editor::{
     ClassDrop, Drag, HandleShape, ImageDrop, Lens, Marks, Ray, SceneDocument, Tool, cross_lines,
@@ -241,7 +242,7 @@ impl SceneViewport {
     /// Adds to `scene` a node showing the image dropped on the view, if
     /// one was, where it was dropped.
     fn drop_image(&self, response: &egui::Response, rect: egui::Rect, scene: &mut SceneDocument) {
-        let Some(image) = response.dnd_release_payload::<ImageDrop>() else {
+        let Some(image) = released::<ImageDrop>(response) else {
             return;
         };
         if let Some(ray) = self.pointer_ray(response, rect) {
@@ -252,7 +253,7 @@ impl SceneViewport {
     /// Gives the node under the pointer the class of the script or
     /// blueprint dropped on the view, if one was.
     fn drop_class(&self, response: &egui::Response, rect: egui::Rect, scene: &mut SceneDocument) {
-        let Some(script) = response.dnd_release_payload::<ClassDrop>() else {
+        let Some(script) = released::<ClassDrop>(response) else {
             return;
         };
         if let Some((ray, at)) = self.pointer_ray(response, rect).zip(response.hover_pos()) {
