@@ -348,8 +348,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         and b already make that cost a one-time one, and sharing the
         folder would make every “Play” wait for the developer's own Cargo
         commands (and the other way round).
-  - [ ] e. Projects without scripts: a ready-made player built with the
-        editor that opens the main scene, so they play without Cargo.
+  - [x] e. Projects without scripts: a ready-made player built with the
+        editor that opens the main scene, so they play without Cargo
+        (decision 63): the warm-up builds the scene player, and “Play”
+        only lets Cargo check it (0.26 s) before running it.
   - [ ] f. To discuss, much bigger: running StarScript without Rust while
         editing (an interpreter), for instant “Play” and hot reload.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

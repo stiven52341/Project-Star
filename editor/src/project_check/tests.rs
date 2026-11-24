@@ -336,6 +336,30 @@ fn projects_without_scripts_play_their_main_scene() {
     assert!(check.problems.is_empty(), "{:?}", messages(&check));
     let program = check.program.expect("the game's Rust");
     assert_eq!(program.entry_point, EntryPoint::MainScene);
+    let scene = check.scene_only.expect("played by the scene player");
+    assert_eq!(scene.path, "scenes/main.scene");
+    assert_eq!(scene.title, "Demo");
+}
+
+#[test]
+fn main_scenes_with_scripts_are_built_as_games() {
+    let directory = project(
+        "check_main_scene_scripts",
+        &[
+            (MANIFEST_FILE_NAME, MAIN_SCENE_MANIFEST),
+            ("assets/enemies/rock.star", ROCK),
+            ("assets/scenes/main.scene", SEEN_SCENE),
+        ],
+    );
+
+    let check = check_project(directory.path());
+
+    assert!(check.problems.is_empty(), "{:?}", messages(&check));
+    assert_eq!(
+        check.program.map(|program| program.entry_point),
+        Some(EntryPoint::MainScene)
+    );
+    assert!(check.scene_only.is_none());
 }
 
 #[test]
@@ -356,6 +380,7 @@ fn main_scenes_need_a_main_camera_and_to_exist() {
     let missing = check_project(missing.path());
 
     assert!(unseen.program.is_none());
+    assert!(unseen.scene_only.is_none());
     assert_eq!(unseen.problems.len(), 2, "{:?}", messages(&unseen));
     assert!(
         unseen.problems[0]
@@ -391,5 +416,6 @@ fn games_ignore_the_main_camera_of_the_main_scene() {
     let check = check_project(directory.path());
 
     assert!(check.problems.is_empty(), "{:?}", messages(&check));
+    assert!(check.scene_only.is_none());
     assert_eq!(check.program.unwrap().entry_point, EntryPoint::Game);
 }

@@ -23,7 +23,7 @@ pub(crate) enum CheckStatus {
     /// Still checking.
     Running,
     /// Done, with what it found.
-    Finished(ProjectCheck),
+    Finished(Box<ProjectCheck>),
     /// The thread stopped without an answer.
     Lost,
 }
@@ -56,7 +56,7 @@ impl CheckJob {
     /// Where the job is, without waiting for it.
     pub(crate) fn status(&self) -> CheckStatus {
         match self.receiver.try_recv() {
-            Ok(check) => CheckStatus::Finished(check),
+            Ok(check) => CheckStatus::Finished(Box::new(check)),
             Err(TryRecvError::Empty) => CheckStatus::Running,
             Err(TryRecvError::Disconnected) => CheckStatus::Lost,
         }

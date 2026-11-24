@@ -19,7 +19,8 @@ use std::path::Path;
 use star_script::codegen::{self, EntryPoint, GeneratedProgram};
 use star_script::semantic::{Analysis, ClassTable, LocalInfo};
 use star_script::{
-    CompileError, GameSettings, Position, SourceSet, Span, analyze_program_with, check_program_with,
+    CompileError, GameSettings, MainScene, Position, SourceSet, Span, analyze_program_with,
+    check_program_with,
 };
 
 pub(crate) use self::job::{CheckJob, CheckStatus};
@@ -42,6 +43,10 @@ pub(crate) struct ProjectCheck {
     pub(crate) problems: Vec<Problem>,
     /// The Rust code of the game, if there are scripts and no problems.
     pub(crate) program: Option<GeneratedProgram>,
+    /// The main scene, if the project plays nothing else: no scripts, no
+    /// blueprints and no problems. The scene player plays it, so “Play”
+    /// does not build `program`.
+    pub(crate) scene_only: Option<MainScene>,
     /// What the program declares, if its files could be read, even with
     /// mistakes in their meaning.
     pub(crate) outline: Option<ProgramOutline>,
@@ -184,10 +189,16 @@ pub(crate) fn check_project_with(
         None => None,
     };
     let program = generated.filter(|_| problems.is_empty());
+    let scene_only = settings.main_scene.filter(|_| scripts == 0).filter(|_| {
+        program
+            .as_ref()
+            .is_some_and(|program| program.entry_point == EntryPoint::MainScene)
+    });
     ProjectCheck {
         scripts,
         problems,
         program,
+        scene_only,
         outline,
     }
 }

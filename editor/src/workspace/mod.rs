@@ -342,12 +342,12 @@ impl EditorWindow {
 
     /// Plays the game the last check translated.
     fn play(&mut self, context: &egui::Context) {
-        match self.problems.program() {
-            Some(program) => self.output.play(
+        match self.problems.played_game() {
+            Some(game) => self.output.play(
                 PlayRequest {
                     name: self.project.settings().name().to_owned(),
                     directory: self.project.directory().to_path_buf(),
-                    program: program.clone(),
+                    game,
                 },
                 context,
             ),

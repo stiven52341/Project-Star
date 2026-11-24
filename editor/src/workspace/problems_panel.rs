@@ -3,8 +3,8 @@
 use std::path::Path;
 
 use eframe::egui;
-use star_script::codegen::GeneratedProgram;
 
+use crate::game_run::PlayedGame;
 use crate::project_check::{CheckJob, CheckStatus, Problem, ProjectCheck};
 use crate::style::{ERROR_COLOR, SUCCESS_COLOR};
 use crate::texts;
@@ -29,7 +29,7 @@ pub(crate) enum CheckEnd {
 enum CompileState {
     NotCompiled,
     Running(CheckJob),
-    Finished(ProjectCheck),
+    Finished(Box<ProjectCheck>),
     /// The check could not start or stopped without an answer.
     Failed(String),
 }
@@ -83,11 +83,16 @@ impl ProblemsPanel {
         }
     }
 
-    /// The game's Rust code, if the last check found no problems.
-    pub(crate) fn program(&self) -> Option<&GeneratedProgram> {
-        match &self.state {
-            CompileState::Finished(check) => check.program.as_ref(),
-            _ => None,
+    /// What “Play” plays, if the last check found no problems: the main
+    /// scene alone through the scene player, or else the game's Rust code.
+    pub(crate) fn played_game(&self) -> Option<PlayedGame> {
+        let CompileState::Finished(check) = &self.state else {
+            return None;
+        };
+        match (&check.scene_only, &check.program) {
+            (Some(scene), _) => Some(PlayedGame::Scene(scene.clone())),
+            (None, Some(program)) => Some(PlayedGame::Program(program.clone())),
+            (None, None) => None,
         }
     }
 

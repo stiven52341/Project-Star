@@ -5,6 +5,7 @@
 //! was built from, so “Play” works while the editor runs from its sources;
 //! shipping the engine with the editor will come with its packaging.
 
+mod player;
 mod process;
 mod warm_up;
 
@@ -19,6 +20,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 
+use star_script::MainScene;
 use star_script::codegen::{EntryPoint, GeneratedProgram};
 use star_script::package::Package;
 
@@ -102,8 +104,24 @@ pub(crate) struct PlayRequest {
     pub(crate) name: String,
     /// The project's folder: the game runs in it, so it finds `assets/`.
     pub(crate) directory: PathBuf,
-    /// The game's Rust code.
-    pub(crate) program: GeneratedProgram,
+    /// What is played.
+    pub(crate) game: PlayedGame,
+}
+
+/// What “Play” builds and runs.
+pub(crate) enum PlayedGame {
+    /// The game's Rust code, built as a package of its own.
+    Program(GeneratedProgram),
+    /// The main scene of a project without scripts, played by the scene
+    /// player that every such project shares.
+    Scene(MainScene),
+}
+
+/// A program ready to build: its package and how to run it once built.
+struct Build {
+    package: PathBuf,
+    binary: String,
+    arguments: Vec<String>,
 }
 
 /// A game being built or played.
@@ -170,20 +188,13 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
     if !engine_is_available() {
         return RunEnd::Failed(texts::current().engine_not_found(engine));
     }
-    // Without a game or a `main` the crate has no `fn main`, and Cargo's
-    // error would not say what is missing.
-    if request.program.entry_point == EntryPoint::None {
-        return RunEnd::Failed(texts::current().no_game_to_play.to_owned());
-    }
-    events.send(RunEvent::Phase(RunPhase::Building));
-    let name = package_name(&request.name);
+    let build = match prepare_build(request, events) {
+        Ok(build) => build,
+        Err(end) => return end,
+    };
     let output = Path::new(BUILD_DIRECTORY);
-    let package = output.join(&name);
-    if let Err(error) = write_package(&name, &request.program, engine, &package) {
-        return RunEnd::Failed(texts::current().game_not_written(&error));
-    }
     match process::run(
-        build_command(&package, output),
+        build_command(&build.package, output),
         OutputKind::Build,
         events,
         stop,
@@ -194,8 +205,8 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
         Err(error) => return RunEnd::Failed(texts::current().cargo_not_started(&error)),
     }
     events.send(RunEvent::Phase(RunPhase::Running));
-    let mut game = Command::new(binary(output, &name));
-    game.current_dir(&request.directory);
+    let mut game = Command::new(binary(output, &build.binary));
+    game.args(&build.arguments).current_dir(&request.directory);
     match process::run(game, OutputKind::Game, events, stop) {
         Ok(Ended::Exited(status)) => RunEnd::Closed {
             success: status.success(),
@@ -203,6 +214,42 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
         },
         Ok(Ended::Stopped) => RunEnd::Stopped,
         Err(error) => RunEnd::Failed(texts::current().game_not_started(&error)),
+    }
+}
+
+/// Writes the package that plays `request`, telling the editor it is being
+/// built. A scene is played by the shared player: Cargo builds it once
+/// and, from then on, only checks that it is up to date (well under a
+/// second), so a changed engine never plays with an old player.
+fn prepare_build(request: &PlayRequest, events: &Events) -> Result<Build, RunEnd> {
+    match &request.game {
+        PlayedGame::Program(program) => {
+            // Without a game or a `main` the crate has no `fn main`, and
+            // Cargo's error would not say what is missing.
+            if program.entry_point == EntryPoint::None {
+                return Err(RunEnd::Failed(texts::current().no_game_to_play.to_owned()));
+            }
+            events.send(RunEvent::Phase(RunPhase::Building));
+            let name = package_name(&request.name);
+            let package = Path::new(BUILD_DIRECTORY).join(&name);
+            write_package(&name, program, Path::new(ENGINE_CRATES), &package)
+                .map_err(|error| RunEnd::Failed(texts::current().game_not_written(&error)))?;
+            Ok(Build {
+                package,
+                binary: name,
+                arguments: Vec::new(),
+            })
+        }
+        PlayedGame::Scene(scene) => {
+            events.send(RunEvent::Phase(RunPhase::Building));
+            let package = player::write_player()
+                .map_err(|error| RunEnd::Failed(texts::current().game_not_written(&error)))?;
+            Ok(Build {
+                package,
+                binary: player::PLAYER_PACKAGE.to_owned(),
+                arguments: vec![scene.path.clone(), scene.title.clone()],
+            })
+        }
     }
 }
 
@@ -269,8 +316,8 @@ mod tests {
 
     /// Long enough for Cargo to answer on a slow machine.
     const TIMEOUT: Duration = Duration::from_secs(60);
-    /// Long enough for Cargo to build the runtime the first time.
-    const BUILD_TIMEOUT: Duration = Duration::from_secs(600);
+    /// Long enough for Cargo to build the engine the first time.
+    const BUILD_TIMEOUT: Duration = Duration::from_mins(30);
     /// Set for the copy of the tests that [`never_ends`] keeps running.
     const NEVER_END_VARIABLE: &str = "STAR_EDITOR_TEST_NEVER_END";
 
@@ -345,7 +392,7 @@ mod tests {
         let request = PlayRequest {
             name: "Editor test console".to_owned(),
             directory: project.path().to_path_buf(),
-            program,
+            game: PlayedGame::Program(program),
         };
 
         let run = GameRun::start(request, || {}).expect("thread started");
@@ -373,6 +420,43 @@ mod tests {
     }
 
     #[test]
+    fn scenes_are_played_by_the_scene_player() {
+        let project = crate::project::TestDirectory::new("play_scene");
+        std::fs::create_dir_all(project.path()).expect("project folder");
+        let request = PlayRequest {
+            name: "Editor test scene".to_owned(),
+            directory: project.path().to_path_buf(),
+            // Missing, so the player stops at once instead of playing it.
+            game: PlayedGame::Scene(MainScene {
+                path: "scenes/missing.scene".to_owned(),
+                title: "Scene".to_owned(),
+            }),
+        };
+
+        let run = GameRun::start(request, || {}).expect("thread started");
+
+        let mut errors = String::new();
+        let mut end = None;
+        while let Ok(event) = run.receiver.recv_timeout(BUILD_TIMEOUT) {
+            match event {
+                RunEvent::Output(line) if line.kind == OutputKind::Game => {
+                    errors.push_str(&line.text);
+                }
+                RunEvent::Phase(RunPhase::Finished(finished)) => {
+                    end = Some(finished);
+                    break;
+                }
+                _ => {}
+            }
+        }
+        assert!(
+            errors.contains("\"scenes/missing.scene\", could not be loaded"),
+            "{errors}"
+        );
+        assert!(matches!(end, Some(RunEnd::Closed { success: false, .. })));
+    }
+
+    #[test]
     fn programs_without_a_game_are_not_built() {
         let program = star_script::compile_source(
             "class Rock extends Node {\n init() { super.init(\"Rock\") }\n}\n",
@@ -381,7 +465,7 @@ mod tests {
         let request = PlayRequest {
             name: "Editor test no game".to_owned(),
             directory: std::env::temp_dir(),
-            program,
+            game: PlayedGame::Program(program),
         };
 
         let run = GameRun::start(request, || {}).expect("thread started");

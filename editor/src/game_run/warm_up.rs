@@ -1,6 +1,7 @@
-//! Preparing the engine when a project opens: a tiny game with the same
-//! dependencies as every game is built in the background, so the first
-//! “Play” finds the engine already built and only builds the game's code.
+//! Preparing the engine when a project opens: the scene player, which has
+//! the same dependencies as every game, is built in the background, so the
+//! first “Play” finds the engine (and the player) already built and only
+//! builds the game's code.
 //!
 //! A “Play” started meanwhile is not lost: Cargo makes its build wait for
 //! this one and then reuses what it built.
@@ -11,14 +12,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 
+use super::player::write_player;
 use super::process::{self, Ended, Events};
-use super::{BUILD_DIRECTORY, ENGINE_CRATES, OutputKind, build_command, engine_is_available};
-
-/// The package built to prepare the engine. Its name cannot come from a
-/// project: [`super::package_name`] gives none that starts with `_`.
-const WARM_UP_PACKAGE: &str = "_star_engine_warm_up";
-/// The smallest game: enough for Cargo to build all of the engine.
-const WARM_UP_SOURCE: &str = "class Main extends Game {}\n";
+use super::{BUILD_DIRECTORY, OutputKind, build_command, engine_is_available};
 /// Name of the thread that prepares the engine.
 const THREAD_NAME: &str = "engine warm-up";
 
@@ -82,30 +78,18 @@ impl Drop for EngineWarmUp {
     }
 }
 
-/// Builds the warm-up game, telling the log how it went.
+/// Builds the scene player, telling the log how it went.
 fn prepare(stop: &AtomicBool) {
-    let program = match star_script::compile_source(WARM_UP_SOURCE) {
-        Ok(program) => program,
-        Err(errors) => {
-            log::warn!("The engine could not be prepared: {errors:?}");
+    let package = match write_player() {
+        Ok(package) => package,
+        Err(error) => {
+            log::warn!("The engine could not be prepared: {error}");
             return;
         }
     };
-    let output = Path::new(BUILD_DIRECTORY);
-    let package = output.join(WARM_UP_PACKAGE);
-    let written = super::write_package(
-        WARM_UP_PACKAGE,
-        &program,
-        Path::new(ENGINE_CRATES),
-        &package,
-    );
-    if let Err(error) = written {
-        log::warn!("The engine could not be prepared: {error}");
-        return;
-    }
     log::info!("Preparing the engine for Play");
     match process::run(
-        build_command(&package, output),
+        build_command(&package, Path::new(BUILD_DIRECTORY)),
         OutputKind::Build,
         &silent_events(),
         stop,
@@ -133,8 +117,7 @@ fn silent_events() -> Events {
 mod tests {
     use std::time::{Duration, Instant};
 
-    use star_script::codegen::EntryPoint;
-
+    use super::super::player::PLAYER_PACKAGE;
     use super::*;
 
     /// Long enough for Cargo to build the engine the first time.
@@ -143,19 +126,7 @@ mod tests {
     const POLL_INTERVAL: Duration = Duration::from_millis(100);
 
     #[test]
-    fn the_warm_up_game_uses_the_engine() {
-        let program = star_script::compile_source(WARM_UP_SOURCE).expect("valid game");
-
-        assert_eq!(program.entry_point, EntryPoint::Game);
-    }
-
-    #[test]
-    fn no_project_gets_the_warm_up_package_name() {
-        assert_ne!(super::super::package_name(WARM_UP_PACKAGE), WARM_UP_PACKAGE);
-    }
-
-    #[test]
-    fn the_engine_gets_ready() {
+    fn the_engine_and_the_player_get_ready() {
         let mut warm_up = EngineWarmUp::start(|| {}).expect("engine found");
         let started = Instant::now();
 
@@ -164,7 +135,7 @@ mod tests {
             thread::sleep(POLL_INTERVAL);
         }
 
-        let binary = super::super::binary(Path::new(BUILD_DIRECTORY), WARM_UP_PACKAGE);
+        let binary = super::super::binary(Path::new(BUILD_DIRECTORY), PLAYER_PACKAGE);
         assert!(binary.exists(), "{}", binary.display());
     }
 }
