@@ -18,9 +18,12 @@ pub struct ClassDecl {
     pub span: Span,
 }
 
-/// One member of a class, with its modifiers.
+/// One member of a class, with its decorators and modifiers.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Member {
+    /// `@name` or `@name(arguments)` on the lines before it, in source
+    /// order.
+    pub decorators: Vec<Decorator>,
     /// `private`, `static`, `override`, `async`, `parallel` and `export`,
     /// in source order.
     pub modifiers: Vec<Modifier>,
@@ -36,6 +39,18 @@ impl Member {
     pub fn has_modifier(&self, kind: ModifierKind) -> bool {
         self.modifiers.iter().any(|modifier| modifier.kind == kind)
     }
+}
+
+/// `@name(arguments)` before a member: something the engine (or a
+/// decorator class) does with it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Decorator {
+    /// Its name: `range`, `tooltip`… or a class that extends `Decorator`.
+    pub name: Name,
+    /// The values in parentheses; none without them.
+    pub arguments: Vec<Expr>,
+    /// From `@` to the end.
+    pub span: Span,
 }
 
 /// Every kind of class member.

@@ -92,11 +92,11 @@ mod tests {
 
     #[test]
     fn report_shows_file_line_and_column() {
-        let source = "class A {\n  var x = @\n}";
+        let source = "class A {\n  var x = $\n}";
         let error = CompileError::from(tokenize(source).expect_err("has errors").remove(0));
 
         let report = error.report("a.star", &LineIndex::new(source));
 
-        assert_eq!(report, "a.star:2:11: error: unexpected character `@`");
+        assert_eq!(report, "a.star:2:11: error: unexpected character `$`");
     }
 }

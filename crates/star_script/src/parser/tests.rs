@@ -470,7 +470,7 @@ fn empty_token_list_is_an_empty_file() {
 
 #[test]
 fn lexical_errors_are_reported_without_parse_errors() {
-    let errors = parse_source("class A { var x = @ }").expect_err("has errors");
+    let errors = parse_source("class A { var x = $ }").expect_err("has errors");
 
     assert!(matches!(errors[..], [CompileError::Lex(_)]));
 }
@@ -548,4 +548,25 @@ class Enemy extends Character
         file_outline(include_str!("../../examples/scripts/player.star")),
         expected
     );
+}
+
+#[test]
+fn decorators_go_before_members_on_their_lines_or_the_same() {
+    let file = parse_source(
+        "class A {\n  @range(0, 10)\n  @tooltip(\"How fast\")\n  export var speed = 2.0\n  \
+         @Once func open() {}\n}",
+    )
+    .expect("valid");
+    let members = &file.classes[0].members;
+
+    let names = |index: usize| -> Vec<(&str, usize)> {
+        members[index]
+            .decorators
+            .iter()
+            .map(|decorator| (decorator.name.text.as_str(), decorator.arguments.len()))
+            .collect()
+    };
+    assert_eq!(names(0), [("range", 2), ("tooltip", 1)]);
+    assert_eq!(names(1), [("Once", 0)]);
+    assert!(members[0].has_modifier(ModifierKind::Export));
 }

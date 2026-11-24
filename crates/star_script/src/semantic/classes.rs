@@ -1,7 +1,7 @@
 //! Every class a program can use, with its members.
 
 use super::natives::COLOR_CLASS;
-use super::{FieldDefault, Type};
+use super::{FieldDefault, InspectorHints, Type};
 use crate::Span;
 
 /// Identifies a class in a [`ClassTable`].
@@ -94,6 +94,8 @@ pub struct FieldInfo {
     pub is_exported: bool,
     /// Its first value, if the class writes it as a plain value.
     pub default: Option<FieldDefault>,
+    /// How the inspector shows it, if it is `export`: its decorators.
+    pub hints: InspectorHints,
     /// Whether it has `= value`.
     pub has_initializer: bool,
     /// Where its name is written.
@@ -396,6 +398,7 @@ mod tests {
             is_private: false,
             is_exported: false,
             default: None,
+            hints: InspectorHints::default(),
             has_initializer: true,
             span: Span::new(0, 0),
         });

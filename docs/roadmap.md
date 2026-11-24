@@ -271,6 +271,13 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 7c The inspector edits them.
     - [x] 7d Blueprint variables can be exported.
   - [ ] Decorators (`@`) in StarScript.
+    - [x] 8a The syntax and the engine's decorators (`@range`, `@tooltip`,
+          `@header`, `@multiline`) for `export` fields.
+    - [ ] 8b The inspector follows them.
+    - [ ] 8c Blueprint variables have them.
+    - [ ] 8d Decorators of the user: classes that extend `Decorator`, with
+          `before` and `after`, on methods that return nothing; and
+          `Time.now()`.
   - [ ] Ready-made nodes: cameras, 2D and 3D lights, collision shapes…
   - [ ] Finding nodes of the scene by name and by tag, in StarScript and
         blueprints.

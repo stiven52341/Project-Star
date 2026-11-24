@@ -2,6 +2,7 @@
 //! classes, bases, member signatures, inheritance rules, constants, fields
 //! and finally method bodies.
 
+use super::InspectorHints;
 use super::checker::{BodyContext, Checker, ContextKind, Initialization};
 use super::field_defaults::plain_value;
 use super::natives::{BASIC_TYPE_NAMES, NODE_CLASS, basic_type};
@@ -32,6 +33,7 @@ impl Checker<'_> {
         }
         for (declaration, id) in &classes {
             self.resolve_fields(declaration, *id);
+            self.check_decorators(declaration, *id);
         }
         for (declaration, id) in &classes {
             self.check_bodies(declaration, *id);
@@ -163,6 +165,7 @@ impl Checker<'_> {
             is_private,
             is_exported,
             default: field.initializer.as_ref().and_then(plain_value),
+            hints: InspectorHints::default(),
             has_initializer: field.initializer.is_some(),
             span: field.name.span,
         });

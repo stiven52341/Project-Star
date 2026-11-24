@@ -295,9 +295,9 @@ fn unterminated_block_comment_is_reported() {
 #[test]
 fn unknown_characters_are_reported() {
     assert_eq!(
-        error_kinds("a @ b & c | d"),
+        error_kinds("a $ b & c | d"),
         [
-            LexErrorKind::UnexpectedCharacter('@'),
+            LexErrorKind::UnexpectedCharacter('$'),
             LexErrorKind::UnexpectedCharacter('&'),
             LexErrorKind::UnexpectedCharacter('|'),
         ]
@@ -314,7 +314,7 @@ fn non_ascii_names_get_a_specific_error() {
 
 #[test]
 fn all_errors_are_reported_together() {
-    let errors = tokenize("var a = @\nvar b = \"x\nvar c = 0x").expect_err("has errors");
+    let errors = tokenize("var a = $\nvar b = \"x\nvar c = 0x").expect_err("has errors");
 
     assert_eq!(errors.len(), 3);
 }
@@ -384,7 +384,7 @@ fn scans_note_where_comments_are() {
 
 #[test]
 fn scans_keep_going_after_mistakes() {
-    let source = "\"open\n@ 0x";
+    let source = "\"open\n$ 0x";
 
     let found = scan(source);
 

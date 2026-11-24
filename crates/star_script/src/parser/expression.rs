@@ -262,7 +262,7 @@ impl Parser<'_> {
 
     /// Comma-separated expressions up to `close`, a trailing comma allowed.
     /// The opening bracket must already be consumed.
-    fn expression_list(&mut self, close: TokenKind) -> ParseResult<Vec<Expr>> {
+    pub(super) fn expression_list(&mut self, close: TokenKind) -> ParseResult<Vec<Expr>> {
         let mut expressions = Vec::new();
         while !self.at(&close) {
             expressions.push(self.expression()?);

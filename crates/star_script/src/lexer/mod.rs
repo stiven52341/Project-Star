@@ -203,6 +203,7 @@ impl<'source> Lexer<'source> {
             ',' => TokenKind::Comma,
             ':' => TokenKind::Colon,
             ';' => TokenKind::Semicolon,
+            '@' => TokenKind::At,
             '.' => self.either('.', TokenKind::DotDot, TokenKind::Dot),
             '?' if self.cursor.eat('.') => TokenKind::QuestionDot,
             '?' => self.either('?', TokenKind::QuestionQuestion, TokenKind::Question),

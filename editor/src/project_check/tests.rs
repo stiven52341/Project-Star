@@ -64,7 +64,7 @@ fn script_mistakes_name_their_file_line_and_column() {
             ("assets/demo.star", GAME),
             (
                 "assets/enemies/rock.star",
-                "class Rock extends Node {\n  var x = @\n}\n",
+                "class Rock extends Node {\n  var x = $\n}\n",
             ),
         ],
     );
@@ -73,7 +73,7 @@ fn script_mistakes_name_their_file_line_and_column() {
 
     assert_eq!(
         messages(&check),
-        ["assets/enemies/rock.star:2:11: unexpected character `@`"]
+        ["assets/enemies/rock.star:2:11: unexpected character `$`"]
     );
 }
 
@@ -139,7 +139,7 @@ fn a_broken_manifest_is_a_problem_but_scripts_are_still_checked() {
         "check_broken_manifest",
         &[
             (MANIFEST_FILE_NAME, "[input.actions]\njump = 3\n"),
-            ("assets/rock.star", "class Rock {\n  var x = @\n}\n"),
+            ("assets/rock.star", "class Rock {\n  var x = $\n}\n"),
         ],
     );
 
@@ -282,14 +282,14 @@ fn open_texts_are_checked_instead_of_their_files() {
     );
     let open = OpenTexts::from([(
         "rock.star".to_owned(),
-        "class Rock {\n  var x = @\n}\n".to_owned(),
+        "class Rock {\n  var x = $\n}\n".to_owned(),
     )]);
 
     let check = check_project_with(directory.path(), &open, CheckGoal::Writing);
 
     assert_eq!(
         messages(&check),
-        ["assets/rock.star:2:11: unexpected character `@`"]
+        ["assets/rock.star:2:11: unexpected character `$`"]
     );
 }
 

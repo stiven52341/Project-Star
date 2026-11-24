@@ -59,6 +59,8 @@ pub enum TokenKind {
     Semicolon,
     /// `->`
     Arrow,
+    /// `@`: starts a decorator.
+    At,
     /// `?`
     Question,
     /// `?.`
@@ -132,6 +134,7 @@ impl TokenKind {
             Self::Colon => ":",
             Self::Semicolon => ";",
             Self::Arrow => "->",
+            Self::At => "@",
             Self::Question => "?",
             Self::QuestionDot => "?.",
             Self::QuestionQuestion => "??",

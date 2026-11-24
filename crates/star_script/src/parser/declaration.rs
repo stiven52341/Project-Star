@@ -2,8 +2,8 @@
 
 use super::{Expected, ParseError, ParseErrorKind, ParseResult, Parser};
 use crate::ast::{
-    ClassDecl, ConstructorDecl, Member, MemberKind, MethodDecl, Modifier, ModifierKind, Parameter,
-    VariableDecl, VariableKind,
+    ClassDecl, ConstructorDecl, Decorator, Member, MemberKind, MethodDecl, Modifier, ModifierKind,
+    Parameter, VariableDecl, VariableKind,
 };
 use crate::{Keyword, TokenKind};
 
@@ -46,6 +46,7 @@ impl Parser<'_> {
 
     fn member(&mut self) -> ParseResult<Member> {
         let start = self.start();
+        let decorators = self.decorators()?;
         let modifiers = self.modifiers();
         let kind = match self.peek() {
             TokenKind::Keyword(Keyword::Var | Keyword::Const) => {
@@ -60,10 +61,34 @@ impl Parser<'_> {
             self.end_statement();
         }
         Ok(Member {
+            decorators,
             modifiers,
             kind,
             span,
         })
+    }
+
+    /// Reads `@name` and `@name(arguments)`, each followed by line breaks
+    /// or not. Which decorators fit which members is checked later.
+    fn decorators(&mut self) -> ParseResult<Vec<Decorator>> {
+        let mut decorators = Vec::new();
+        while self.at(&TokenKind::At) {
+            let start = self.start();
+            self.expect(TokenKind::At)?;
+            let name = self.expect_name()?;
+            let arguments = if self.eat(&TokenKind::LeftParen) {
+                self.expression_list(TokenKind::RightParen)?
+            } else {
+                Vec::new()
+            };
+            decorators.push(Decorator {
+                name,
+                arguments,
+                span: self.span_from(start),
+            });
+            self.skip_newlines();
+        }
+        Ok(decorators)
     }
 
     /// Reads `private`, `static`, `override`, `async`, `parallel` and

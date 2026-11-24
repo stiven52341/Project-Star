@@ -114,7 +114,7 @@ letters (`10px`) is an error.
 | Logical | `&&` `\|\|` `!` |
 | Assignment | `=` `+=` `-=` `*=` `/=` `%=` |
 | Null safety | `?` (nullable type) `?.` (safe access) `??` (default value) |
-| Others | `.` `..` `,` `:` `;` `->` `( )` `{ }` `[ ]` |
+| Others | `.` `..` `,` `:` `;` `->` `( )` `{ }` `[ ]` `@` (decorator) |
 
 ## 2. Syntax (final)
 
@@ -156,6 +156,8 @@ class Player extends Sprite {
   - `init` (constructor).
   - Modifiers: `private`, `static` and `override` (required when redefining
     a method of the base).
+  - Decorators: `@name` or `@name(arguments)` before a member, on its own
+    line or the same one (see “Decorators”).
 - **Statements**:
   - Local `var`/`const`.
   - Assignment (`=`, `+=`, …).
@@ -329,6 +331,32 @@ compiler prevents it.
   extend `Node` have them; the field holds a number, a `bool`, a `string`
   or a `Color`, and cannot be `private`. The value written in the class is
   the one used when the scene gives none.
+
+### Decorators
+
+`@name(arguments)` before a member. The engine's own say how the editor's
+inspector shows an `export` field, and only go on those; their arguments
+are plain values (numbers, texts):
+
+```
+@header("Motion")
+@range(0, 10, 0.5)
+@tooltip("Units a second")
+export var speed = 2.5
+
+@multiline
+export var notes = ""
+```
+
+| Decorator | On | Does |
+|-----------|----|------|
+| `@range(min, max)`, `@range(min, max, step)` | numbers | a slider between `min` and `max` (`min` below `max`), in steps of `step` (positive) if given |
+| `@tooltip("text")` | any | the help shown over the field |
+| `@header("title")` | any | a title over the field and those after it |
+| `@multiline` | `string` | a box of several lines |
+
+A name that is not one of these is an error, as is the same decorator
+twice on one member, or one on a field of a type it does not fit.
 - **`static func`**: belongs to the class and is called as `Class.method()`;
   it has no `self`. `static var` fields do not exist yet.
 - **`is` and `as`**: `x is Player` checks the class. `x as Player` towards a

@@ -127,8 +127,11 @@ fn marked_spans(source: &str) -> Vec<(Span, Highlight)> {
         .iter()
         .enumerate()
         .filter_map(|(index, token)| {
+            let previous = index
+                .checked_sub(1)
+                .and_then(|index| scan.tokens.get(index));
             let next = scan.tokens.get(index + 1);
-            highlight_of(token, next).map(|highlight| (token.span, highlight))
+            highlight_of(token, previous, next).map(|highlight| (token.span, highlight))
         })
         .collect();
     marked.extend(scan.comments.iter().map(|span| (*span, Highlight::Comment)));
@@ -149,9 +152,18 @@ const fn is_covered_mistake(kind: LexErrorKind) -> bool {
     )
 }
 
-/// How `token`, followed by `next`, is colored, if not plainly.
-fn highlight_of(token: &Token, next: Option<&Token>) -> Option<Highlight> {
+/// How `token`, after `previous` and followed by `next`, is colored, if
+/// not plainly. A decorator, `@` and its name, is colored as keywords are.
+fn highlight_of(
+    token: &Token,
+    previous: Option<&Token>,
+    next: Option<&Token>,
+) -> Option<Highlight> {
+    let after_at = previous.is_some_and(|previous| previous.kind == TokenKind::At);
     let highlight = match &token.kind {
+        TokenKind::At | TokenKind::Identifier(_) if token.kind == TokenKind::At || after_at => {
+            Highlight::Keyword
+        }
         TokenKind::Keyword(Keyword::True | Keyword::False | Keyword::Null) => Highlight::Literal,
         TokenKind::Keyword(_) => Highlight::Keyword,
         TokenKind::Integer(_) | TokenKind::Float(_) => Highlight::Number,
@@ -182,6 +194,16 @@ mod tests {
             .map(|(range, highlight)| (source[range].trim(), highlight))
             .filter(|(text, _)| !text.is_empty())
             .collect()
+    }
+
+    #[test]
+    fn decorators_are_colored_as_keywords() {
+        let words = colored_words("@range(0, 1)");
+
+        assert_eq!(
+            words[..2],
+            [("@", Highlight::Keyword), ("range", Highlight::Keyword)]
+        );
     }
 
     #[test]
@@ -223,13 +245,13 @@ mod tests {
 
     #[test]
     fn code_being_written_is_still_colored() {
-        let words = colored_words("Player @ \"not closed");
+        let words = colored_words("Player $ \"not closed");
 
         assert_eq!(
             words,
             [
                 ("Player", Highlight::Type),
-                ("@", Highlight::Mistake),
+                ("$", Highlight::Mistake),
                 ("\"not closed", Highlight::String),
             ]
         );

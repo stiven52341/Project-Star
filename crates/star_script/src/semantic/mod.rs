@@ -10,6 +10,7 @@ mod calls;
 mod checker;
 mod classes;
 mod declarations;
+mod decorators;
 mod error;
 mod expressions;
 mod field_defaults;
@@ -24,6 +25,10 @@ pub use analysis::{Analysis, ExprInfo, LocalId, LocalInfo, Resolution};
 pub use classes::{
     ClassId, ClassInfo, ClassOrigin, ClassTable, ConstantInfo, ConstructorInfo, Execution,
     FieldInfo, FoundMember, MemberRef, MethodInfo, ParameterInfo,
+};
+pub use decorators::{
+    ENGINE_DECORATORS, HEADER_DECORATOR, InspectorHints, MULTILINE_DECORATOR, NumberRange,
+    RANGE_DECORATOR, TOOLTIP_DECORATOR,
 };
 pub use error::{SemanticError, SemanticErrorKind};
 pub use field_defaults::FieldDefault;

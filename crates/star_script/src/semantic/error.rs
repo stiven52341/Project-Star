@@ -158,6 +158,27 @@ pub enum SemanticErrorKind {
     CannotInferNull,
     /// A field without type and without value.
     MissingTypeOrValue(String),
+    /// A decorator that is neither the engine's nor a class.
+    UnknownDecorator(String),
+    /// The same decorator twice on one member.
+    DuplicateDecorator(String),
+    /// One of the engine's decorators on something other than an `export`
+    /// field.
+    DecoratorNeedsExport(String),
+    /// One of the engine's decorators on a field of a type it does not fit.
+    DecoratorField {
+        /// The decorator.
+        decorator: String,
+        /// What the field must hold: "a number", "a `string`".
+        needs: &'static str,
+    },
+    /// A decorator given the wrong values.
+    DecoratorArguments {
+        /// The decorator.
+        decorator: String,
+        /// What it takes.
+        expected: &'static str,
+    },
     /// A field both `private` and `export`: scenes set it from outside.
     PrivateExport(String),
     /// An `export` field of a class that does not extend `Node`.
@@ -361,6 +382,23 @@ impl fmt::Display for SemanticErrorKind {
             Self::MissingTypeOrValue(name) => {
                 write!(formatter, "`{name}` needs a type or a value")
             }
+            Self::UnknownDecorator(name) => write!(
+                formatter,
+                "there is no decorator `@{name}`: the engine's are `@range`, `@tooltip`, `@header` and `@multiline`"
+            ),
+            Self::DuplicateDecorator(name) => {
+                write!(formatter, "`@{name}` is written twice on the same member")
+            }
+            Self::DecoratorNeedsExport(name) => {
+                write!(formatter, "`@{name}` only goes on `export` fields")
+            }
+            Self::DecoratorField { decorator, needs } => {
+                write!(formatter, "`@{decorator}` only goes on fields that hold {needs}")
+            }
+            Self::DecoratorArguments {
+                decorator,
+                expected,
+            } => write!(formatter, "`@{decorator}` takes {expected}"),
             Self::PrivateExport(name) => write!(
                 formatter,
                 "`{name}` cannot be both `private` and `export`: scenes set it from outside"

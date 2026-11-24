@@ -2,8 +2,8 @@
 //! methods of basic types and lists.
 
 use super::{
-    ClassId, ClassInfo, ClassOrigin, ClassTable, ConstructorInfo, Execution, FieldInfo, MethodInfo,
-    ParameterInfo, Type,
+    ClassId, ClassInfo, ClassOrigin, ClassTable, ConstructorInfo, Execution, FieldInfo,
+    InspectorHints, MethodInfo, ParameterInfo, Type,
 };
 use crate::Span;
 
@@ -464,6 +464,7 @@ fn native_field(name: &str, ty: Type) -> FieldInfo {
         is_private: false,
         is_exported: false,
         default: None,
+        hints: InspectorHints::default(),
         has_initializer: true,
         span: Span::new(0, 0),
     }

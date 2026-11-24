@@ -11,8 +11,8 @@ mod statement;
 use std::fmt;
 
 pub use declaration::{
-    ClassDecl, ConstructorDecl, Member, MemberKind, MethodDecl, Modifier, ModifierKind, Parameter,
-    VariableDecl, VariableKind,
+    ClassDecl, ConstructorDecl, Decorator, Member, MemberKind, MethodDecl, Modifier, ModifierKind,
+    Parameter, VariableDecl, VariableKind,
 };
 pub use expression::{BinaryOperator, Expr, ExprId, ExprKind, Literal, UnaryOperator};
 pub use outline::outline;

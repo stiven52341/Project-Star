@@ -1516,3 +1516,75 @@ fn exports_need_a_node_a_simple_type_and_no_privacy() {
         ]
     );
 }
+
+#[test]
+fn engine_decorators_tell_the_inspector_how_to_show_export_fields() {
+    let analysis = check_text(
+        "class Rock extends Node {\n\
+         @header(\"Motion\")\n\
+         @range(0, 10, 0.5)\n\
+         @tooltip(\"Units a second\")\n\
+         export var speed = 2.5\n\
+         @multiline\n\
+         export var notes = \"\"\n\
+         init() { super.init(\"Rock\") }\n\
+         }",
+    )
+    .expect("valid program");
+
+    let classes = analysis.classes();
+    let rock = classes.class(classes.find("Rock").unwrap());
+    assert_eq!(
+        rock.fields[0].hints,
+        InspectorHints {
+            range: Some(NumberRange {
+                min: 0.0,
+                max: 10.0,
+                step: Some(0.5)
+            }),
+            tooltip: Some("Units a second".to_owned()),
+            header: Some("Motion".to_owned()),
+            multiline: false,
+        }
+    );
+    assert!(rock.fields[1].hints.multiline);
+}
+
+#[test]
+fn decorators_must_fit_what_they_decorate() {
+    assert_eq!(
+        errors(
+            "class Spot extends Node {\n\
+             @range(0, 1)\n\
+             var hidden = 0.5\n\
+             @range(5, 1)\n\
+             export var backwards = 2.0\n\
+             @multiline\n\
+             export var count = 1\n\
+             @tooltip(3)\n\
+             @tooltip(\"again\")\n\
+             export var label = \"\"\n\
+             @shiny\n\
+             func glow() {}\n\
+             init() { super.init(\"Spot\") }\n\
+             }"
+        ),
+        [
+            Kind::DecoratorNeedsExport("range".to_owned()),
+            Kind::DecoratorArguments {
+                decorator: "range".to_owned(),
+                expected: "two or three numbers: the smallest value, the largest and, if wanted, a positive step"
+            },
+            Kind::DecoratorField {
+                decorator: "multiline".to_owned(),
+                needs: "a `string`"
+            },
+            Kind::DecoratorArguments {
+                decorator: "tooltip".to_owned(),
+                expected: "one text"
+            },
+            Kind::DuplicateDecorator("tooltip".to_owned()),
+            Kind::UnknownDecorator("shiny".to_owned()),
+        ]
+    );
+}
