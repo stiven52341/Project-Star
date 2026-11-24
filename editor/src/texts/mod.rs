@@ -135,6 +135,16 @@ pub(crate) struct Texts {
     /// The box that makes a blueprint variable an `export` field.
     pub(crate) export: &'static str,
     pub(crate) export_hint: &'static str,
+    /// The rows of an `export` blueprint variable, one per decorator.
+    pub(crate) header: &'static str,
+    pub(crate) header_hint: &'static str,
+    pub(crate) value_range: &'static str,
+    pub(crate) range_hint: &'static str,
+    pub(crate) range_step: &'static str,
+    pub(crate) tooltip: &'static str,
+    pub(crate) tooltip_hint: &'static str,
+    pub(crate) multiline: &'static str,
+    pub(crate) multiline_hint: &'static str,
     /// A value of the scene for a field its class does not export.
     pub(crate) not_an_export_field: &'static str,
     pub(crate) no_image: &'static str,

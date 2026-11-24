@@ -1,5 +1,5 @@
 use super::*;
-use crate::model::{Call, Literal, Node, Operator, Parameter, PinRef, Variable};
+use crate::model::{Call, InspectorOptions, Literal, Node, Operator, Parameter, PinRef, Variable};
 use crate::pins::{
     BRANCH_FALSE, BRANCH_TRUE, CONDITION, EXECUTION_OUTPUT, LEFT, RESULT, RIGHT, VALUE,
 };
@@ -60,6 +60,7 @@ fn blueprint(graphs: Vec<Graph>) -> Blueprint {
             default: Some(Literal::Float(2.0)),
             private: false,
             export: false,
+            inspector: InspectorOptions::default(),
         }],
         graphs,
     }
@@ -345,6 +346,7 @@ fn class_rules_are_checked() {
         default: None,
         private: false,
         export: false,
+        inspector: InspectorOptions::default(),
     });
 
     assert_eq!(

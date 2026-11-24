@@ -274,7 +274,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 8a The syntax and the engine's decorators (`@range`, `@tooltip`,
           `@header`, `@multiline`) for `export` fields.
     - [x] 8b The inspector follows them.
-    - [ ] 8c Blueprint variables have them.
+    - [x] 8c Blueprint variables have them.
     - [ ] 8d Decorators of the user: classes that extend `Decorator`, with
           `before` and `after`, on methods that return nothing; and
           `Time.now()`.

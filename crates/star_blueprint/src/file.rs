@@ -82,7 +82,8 @@ impl Blueprint {
 mod tests {
     use super::*;
     use crate::model::{
-        Call, CallTarget, Graph, Link, Literal, Node, NodeId, NodeKind, Parameter, PinRef, Variable,
+        Call, CallTarget, Graph, InspectorOptions, Link, Literal, Node, NodeId, NodeKind,
+        Parameter, PinRef, Variable,
     };
     use crate::pins::{EXECUTION_INPUT, EXECUTION_OUTPUT, VALUE};
 
@@ -101,6 +102,7 @@ mod tests {
                     default: Some(Literal::Float(2.5)),
                     private: false,
                     export: false,
+                    inspector: InspectorOptions::default(),
                 },
                 Variable {
                     name: "lives".to_owned(),
@@ -108,6 +110,7 @@ mod tests {
                     default: Some(Literal::Int(3)),
                     private: true,
                     export: false,
+                    inspector: InspectorOptions::default(),
                 },
             ],
             graphs: vec![Graph {

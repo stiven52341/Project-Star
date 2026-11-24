@@ -86,7 +86,7 @@ impl LiteralKind {
 
 #[cfg(test)]
 mod tests {
-    use star_blueprint::{Graph, Parameter, Variable};
+    use star_blueprint::{Graph, InspectorOptions, Parameter, Variable};
 
     use super::*;
 
@@ -102,6 +102,7 @@ mod tests {
                 default: Some(Literal::Float(1.0)),
                 private: false,
                 export: false,
+                inspector: InspectorOptions::default(),
             }],
             graphs: vec![Graph {
                 name: "boost".to_owned(),

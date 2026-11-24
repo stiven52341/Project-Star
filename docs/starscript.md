@@ -878,7 +878,9 @@ constant values its `init` needs, `base_arguments`: a node gives its name,
 a sprite also its image; the blueprint itself is created without
 arguments), variables
 (fields: a name, a type and/or a starting value, `private` or not, and
-`export` or not) and
+`export` or not, with the options of the inspector in `[variable.inspector]`:
+`range = [0.0, 10.0]`, `tooltip`, `header` and `multiline`, written as
+decorators) and
 graphs. Each **graph** is a method: an event of the base class
 (`override = true`, such as `update`) or one of its own, with its
 parameters, the type it returns and its nodes and links.

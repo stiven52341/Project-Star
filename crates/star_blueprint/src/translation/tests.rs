@@ -1,7 +1,9 @@
 use star_script::{GameSettings, InputAction, check_source, check_source_with};
 
 use super::*;
-use crate::model::{Call, CallTarget, Graph, Link, Node, NodeKind, Operator, Parameter, PinRef};
+use crate::model::{
+    Call, CallTarget, Graph, InspectorOptions, Link, Node, NodeKind, Operator, Parameter, PinRef,
+};
 use crate::pins::{
     BRANCH_FALSE, BRANCH_TRUE, CONDITION, EXECUTION_INPUT, EXECUTION_OUTPUT, LEFT, RESULT, RIGHT,
     TARGET, VALUE,
@@ -21,6 +23,7 @@ fn ship(graph: Graph) -> Blueprint {
             default: Some(Literal::Float(2.0)),
             private: false,
             export: false,
+            inspector: InspectorOptions::default(),
         }],
         graphs: vec![graph],
     }
@@ -426,4 +429,27 @@ fn exported_variables_are_written_with_export() {
     let code = checked_code(&blueprint);
 
     assert!(code.contains("    export var speed = 2.0\n"), "{code}");
+}
+
+#[test]
+fn inspector_options_are_written_as_decorators() {
+    let mut blueprint = ship(GraphBuilder::new("start", &[], None).overriding().build());
+    let speed = &mut blueprint.variables[0];
+    speed.export = true;
+    speed.inspector = InspectorOptions {
+        range: vec![0.0, 10.0, 0.5],
+        tooltip: Some("Units \"a\" second".to_owned()),
+        header: Some("Motion".to_owned()),
+        multiline: false,
+    };
+
+    let code = checked_code(&blueprint);
+
+    assert!(
+        code.contains(
+            "    @header(\"Motion\")\n    @range(0.0, 10.0, 0.5)\n    \
+             @tooltip(\"Units \\\"a\\\" second\")\n    export var speed = 2.0\n"
+        ),
+        "{code}"
+    );
 }

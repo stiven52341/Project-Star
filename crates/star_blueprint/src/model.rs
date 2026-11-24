@@ -48,6 +48,38 @@ pub struct Variable {
     /// (`export var`).
     #[serde(default, skip_serializing_if = "is_false")]
     pub export: bool,
+    /// How the inspector shows it, if it is `export`: StarScript's
+    /// decorators for it.
+    #[serde(default, skip_serializing_if = "InspectorOptions::is_empty")]
+    pub inspector: InspectorOptions,
+}
+
+/// How the inspector shows an `export` variable: `[variable.inspector]`,
+/// written as decorators in StarScript.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InspectorOptions {
+    /// `@range(min, max)` or `@range(min, max, step)`: `[min, max]` or
+    /// `[min, max, step]`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub range: Vec<f64>,
+    /// `@tooltip("…")`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tooltip: Option<String>,
+    /// `@header("…")`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header: Option<String>,
+    /// `@multiline`.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub multiline: bool,
+}
+
+impl InspectorOptions {
+    /// Whether it asks for nothing, so files leave it out.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 /// A method of a blueprint, as a graph that starts at its [`NodeKind::Entry`].

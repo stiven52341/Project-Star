@@ -23,8 +23,8 @@ mod validation;
 
 pub use file::{BlueprintFileError, FORMAT_VERSION};
 pub use model::{
-    Blueprint, Call, CallTarget, Graph, Link, Literal, Node, NodeId, NodeKind, Operator, Parameter,
-    PinRef, Variable,
+    Blueprint, Call, CallTarget, Graph, InspectorOptions, Link, Literal, Node, NodeId, NodeKind,
+    Operator, Parameter, PinRef, Variable,
 };
 pub use pins::{
     BRANCH_FALSE, BRANCH_TRUE, CONDITION, Direction, EXECUTION_INPUT, EXECUTION_OUTPUT, LEFT, Pin,

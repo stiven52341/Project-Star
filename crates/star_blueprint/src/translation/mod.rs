@@ -12,7 +12,7 @@ mod writer;
 
 use std::fmt;
 
-use crate::model::{Blueprint, Literal, NodeId, Variable};
+use crate::model::{Blueprint, InspectorOptions, Literal, NodeId, Variable};
 use crate::validation::{BlueprintError, BlueprintErrorKind, validate};
 
 use self::graph::GraphTranslator;
@@ -164,13 +164,52 @@ fn class_error(kind: BlueprintErrorKind) -> BlueprintError {
     }
 }
 
-/// `[private ][export ]var name[: type][ = value]`
+/// Its decorators, one a line, then
+/// The decorators `options` ask for, as StarScript writes them: `@header`,
+/// `@range`, `@tooltip` and `@multiline`. `None` for a range with a number
+/// StarScript cannot write.
+fn decorators(options: &InspectorOptions) -> Vec<Option<String>> {
+    let text = |name: &str, text: &str| {
+        literal_code(&Literal::String(text.to_owned())).map(|code| format!("@{name}({code})"))
+    };
+    let mut decorators = Vec::new();
+    if let Some(header) = &options.header {
+        decorators.push(text("header", header));
+    }
+    if !options.range.is_empty() {
+        let numbers: Option<Vec<String>> = options
+            .range
+            .iter()
+            .map(|number| literal_code(&Literal::Float(*number)))
+            .collect();
+        decorators.push(numbers.map(|numbers| format!("@range({})", numbers.join(", "))));
+    }
+    if let Some(tooltip) = &options.tooltip {
+        decorators.push(text("tooltip", tooltip));
+    }
+    if options.multiline {
+        decorators.push(Some("@multiline".to_owned()));
+    }
+    decorators
+}
+
+/// `[private ][export ]var name[: type][ = value]`.
 fn write_variable(
     writer: &mut SourceWriter,
     variable: &Variable,
     errors: &mut Vec<BlueprintError>,
 ) {
     let start = writer.position();
+    for decorator in decorators(&variable.inspector) {
+        match decorator {
+            Some(code) => {
+                writer.indent();
+                writer.write(&code);
+                writer.newline();
+            }
+            None => errors.push(class_error(BlueprintErrorKind::UnwritableNumber)),
+        }
+    }
     writer.indent();
     if variable.private {
         writer.write("private ");

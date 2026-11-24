@@ -3,7 +3,7 @@
 //! variable, a method or a parameter renames it where nodes use it too.
 
 use eframe::egui;
-use star_blueprint::{Blueprint, Graph, Literal, Parameter, Variable};
+use star_blueprint::{Blueprint, Graph, InspectorOptions, Literal, Parameter, Variable};
 
 use super::edit;
 use super::literal_field::literal_field;
@@ -59,6 +59,13 @@ fn class_fields(ui: &mut egui::Ui, blueprint: &mut Blueprint) -> bool {
 }
 
 /// A field for text that may be missing: empty means none.
+/// The range a variable gets when `@range` is turned on.
+const NEW_RANGE: [f64; 2] = [0.0, 1.0];
+/// The step it gets when its step is turned on.
+const NEW_STEP: f64 = 0.1;
+/// How much the numbers of a range change per pixel dragged.
+const RANGE_DRAG_SPEED: f64 = 0.1;
+
 fn optional_text(ui: &mut egui::Ui, value: &mut Option<String>) -> bool {
     let mut text = value.clone().unwrap_or_default();
     let changed = ui.text_edit_singleline(&mut text).changed();
@@ -124,6 +131,7 @@ fn variables_fields(ui: &mut egui::Ui, blueprint: &mut Blueprint) -> bool {
             default: Some(Literal::Float(0.0)),
             private: false,
             export: false,
+            inspector: InspectorOptions::default(),
         });
         changed = true;
     }
@@ -179,7 +187,62 @@ fn variable_fields(
                 .on_hover_text(texts::current().export_hint);
             changed |= ui.checkbox(&mut variable.export, "").changed();
             ui.end_row();
+            if variable.export {
+                changed |= inspector_rows(ui, &mut variable.inspector);
+            }
         });
+    changed
+}
+
+/// How the inspector shows an `export` variable: its header, range, help
+/// and text box, as StarScript's decorators.
+fn inspector_rows(ui: &mut egui::Ui, options: &mut InspectorOptions) -> bool {
+    let texts = texts::current();
+    let mut changed = false;
+    ui.weak(texts.header).on_hover_text(texts.header_hint);
+    changed |= optional_text(ui, &mut options.header);
+    ui.end_row();
+    ui.weak(texts.value_range).on_hover_text(texts.range_hint);
+    changed |= range_field(ui, &mut options.range);
+    ui.end_row();
+    ui.weak(texts.tooltip).on_hover_text(texts.tooltip_hint);
+    changed |= optional_text(ui, &mut options.tooltip);
+    ui.end_row();
+    ui.weak(texts.multiline).on_hover_text(texts.multiline_hint);
+    changed |= ui.checkbox(&mut options.multiline, "").changed();
+    ui.end_row();
+    changed
+}
+
+/// `@range`: a box that turns it on, then its smallest and largest values
+/// and, if a second box is on, its step.
+fn range_field(ui: &mut egui::Ui, range: &mut Vec<f64>) -> bool {
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        let mut on = !range.is_empty();
+        if ui.checkbox(&mut on, "").changed() {
+            *range = if on { NEW_RANGE.to_vec() } else { Vec::new() };
+            changed = true;
+        }
+        for number in range.iter_mut() {
+            changed |= ui
+                .add(egui::DragValue::new(number).speed(RANGE_DRAG_SPEED))
+                .changed();
+        }
+        if on {
+            let mut stepped = range.len() > 2;
+            if ui
+                .checkbox(&mut stepped, texts::current().range_step)
+                .changed()
+            {
+                range.truncate(2);
+                if stepped {
+                    range.push(NEW_STEP);
+                }
+                changed = true;
+            }
+        }
+    });
     changed
 }
 
