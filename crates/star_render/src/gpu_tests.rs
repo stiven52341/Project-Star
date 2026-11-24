@@ -144,6 +144,63 @@ fn sprites_are_tinted_by_their_color() {
     assert!(pixels.iter().all(|&pixel| pixel == RED));
 }
 
+/// A white full-screen sprite in the dark, lit by `light`: the red of its
+/// left edge, center and right edge (the screen is two units wide).
+fn lit_sprite(light: impl Into<crate::Light2d>) -> [u8; 3] {
+    let mut gpu = Gpu::new();
+    let white = gpu.texture(1, 1, &[[255; 4]]);
+    let mut frame = Frame::new();
+    frame.set_camera(Camera::new_2d(VIEW_HEIGHT));
+    frame.set_ambient_light_2d(AmbientLight::NONE);
+    frame.add_light_2d(light);
+    frame.draw_sprite(full_screen(white));
+    let pixels = gpu.render(&frame);
+    let middle = SIZE / 2;
+    [0, middle, SIZE - 1].map(|column| pixel(&pixels, column, middle)[0])
+}
+
+#[test]
+#[ignore = "needs a GPU"]
+fn sprites_show_their_own_colors_without_2d_lights() {
+    let mut gpu = Gpu::new();
+    let white = gpu.texture(1, 1, &[[255; 4]]);
+
+    let pixels = gpu.draw(&[full_screen(white)]);
+
+    assert!(pixels.iter().all(|&pixel| pixel == [255; 4]));
+}
+
+#[test]
+#[ignore = "needs a GPU"]
+fn point_lights_2d_fade_towards_their_range() {
+    let [left, center, right] = lit_sprite(crate::PointLight2d {
+        position: Vec2::ZERO,
+        color: Color::WHITE,
+        intensity: 1.0,
+        range: 0.9,
+    });
+
+    assert!(center > 200, "{center}");
+    assert_eq!((left, right), (0, 0));
+}
+
+#[test]
+#[ignore = "needs a GPU"]
+fn spots_2d_light_inside_their_cone_only() {
+    let [left, _, right] = lit_sprite(crate::SpotLight2d {
+        position: Vec2::ZERO,
+        direction: Vec2::new(1.0, 0.0),
+        color: Color::WHITE,
+        intensity: 4.0,
+        range: 10.0,
+        angle: crate::DEFAULT_SPOT_ANGLE,
+        blend: 0.0,
+    });
+
+    assert!(right > 0, "{right}");
+    assert_eq!(left, 0);
+}
+
 #[test]
 #[ignore = "needs a GPU"]
 fn sprites_show_their_texture_the_right_way_up() {
