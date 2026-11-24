@@ -4,6 +4,7 @@
 //! parent, and the inspector edits the node selected in
 //! it. Changes are kept until the scene is saved, and can be undone.
 
+mod body_drawing;
 mod class_choice;
 mod class_drop;
 mod components;
@@ -27,6 +28,7 @@ use star_engine::prelude::{Frame, SceneOutline, Vec3};
 use star_engine::star_scene::NodeOutline;
 use star_script::semantic::ClassTable;
 
+pub(crate) use self::body_drawing::BodyMarks;
 use self::class_choice::{ChoiceOutcome, ClassChoice};
 pub(crate) use self::class_drop::ClassDrop;
 use self::components::NodeTemplate;

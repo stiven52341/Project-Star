@@ -200,6 +200,10 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   `[node.camera]` (`view_height`, `current`) on 2D nodes and
   `[node.camera_3d]` (`fov` in radians, `current`) on 3D ones; what they
   leave out takes its default, and the editor draws what each one sees.
+  The editor also draws the shape of every body (`[node.body]`,
+  `[node.body_3d]`), placed and turned as its node but not scaled, as the
+  physics has it; its “Physics” menu creates static, rigid and kinematic
+  bodies and areas (static sensors, which detect every kind of body).
   Unknown fields are errors, so typos are not silently ignored. Scenes keep
   names, classes, transforms, sprites, bodies, meshes and lights; other
   components will join them later.

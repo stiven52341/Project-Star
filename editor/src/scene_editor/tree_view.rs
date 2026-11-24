@@ -16,7 +16,7 @@ use star_engine::star_scene::NodeOutline;
 
 use super::ROOT;
 use super::class_drop::ClassDrop;
-use super::components::NodeTemplate;
+use super::components::{BodyTemplate, NodeTemplate};
 use super::dropping::ImageDrop;
 use super::tree::{can_move, children_of};
 use crate::drag_drop::released;
@@ -510,6 +510,14 @@ fn create_menu(
                 *action = Some(TreeAction::Create { parent, template });
             }
         }
+        ui.menu_button(texts.physics, |ui| {
+            for body in BodyTemplate::ALL {
+                let template = NodeTemplate::Body(body);
+                if ui.button(template.label()).clicked() {
+                    *action = Some(TreeAction::Create { parent, template });
+                }
+            }
+        });
     });
 }
 

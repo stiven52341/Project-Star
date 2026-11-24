@@ -20,8 +20,8 @@ use super::viewport_tools::{paint_handles, show_toolbar, tool_from_keys};
 use crate::drag_drop::released;
 use crate::project::ProjectDimension;
 use crate::scene_editor::{
-    ClassDrop, Drag, HandleShape, ImageDrop, Lens, Marks, Ray, SceneDocument, Tool, cross_lines,
-    cube_lines, handle_at, pyramid_lines, shapes, square_lines, view_lines,
+    BodyMarks, ClassDrop, Drag, HandleShape, ImageDrop, Lens, Marks, Ray, SceneDocument, Tool,
+    cross_lines, cube_lines, handle_at, pyramid_lines, shapes, square_lines, view_lines,
 };
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -71,6 +71,7 @@ impl SceneViewport {
             cross: renderer.create_lines(&cross_lines())?,
             view: renderer.create_lines(&view_lines())?,
             pyramid: renderer.create_lines(&pyramid_lines())?,
+            bodies: BodyMarks::create(|lines| renderer.create_lines(lines))?,
         };
         let texture_id = render_state.renderer.write().register_native_texture(
             &render_state.device,

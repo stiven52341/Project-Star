@@ -11,6 +11,8 @@ use star_engine::star_assets::AssetPath;
 use star_engine::star_platform::WindowConfig;
 use star_engine::star_scene::{Camera2dNode, Camera3dNode, NodeOutline, SpriteOutline};
 
+use super::body_drawing::{BodyMarks, draw_body_2d, draw_body_3d};
+
 /// Lights scenes that have none of their own, so their meshes can be
 /// seen: a sun from above and in front, and a soft ambient light.
 const PREVIEW_SUN_DIRECTION: Vec3 = Vec3::new(-0.4, -1.0, -0.6);
@@ -51,11 +53,13 @@ pub(crate) struct Marks {
     /// A pyramid from `(0, 0, 0)` to a base from `(-1, -1, -1)` to
     /// `(1, 1, -1)`, in the color of cameras: what a 3D camera sees.
     pub(crate) pyramid: MeshId,
+    /// The meshes of the shapes of bodies.
+    pub(crate) bodies: BodyMarks,
 }
 
 /// Adds to `frame` what the nodes of `outline` show, where the game would
-/// show them, what their cameras see, and the mark of the node
-/// `selected`.
+/// show them, what their cameras see, the shapes of their bodies, and the
+/// mark of the node `selected`.
 pub(crate) fn draw_scene(
     outline: &SceneOutline,
     selected: Option<usize>,
@@ -69,6 +73,12 @@ pub(crate) fn draw_scene(
     for (node, place) in nodes.iter().zip(&places) {
         if let (Some(sprite), Some(global)) = (&node.sprite, place.flat) {
             draw_sprite(sprite, global, gpu, frame);
+        }
+        if let (Some(body), Some(global)) = (&node.body, place.flat) {
+            draw_body_2d(body, global, &marks.bodies, frame);
+        }
+        if let (Some(body), Some(global)) = (&node.body_3d, place.solid) {
+            draw_body_3d(body, global, &marks.bodies, frame);
         }
         if let (Some(camera), Some(global)) = (node.camera, place.flat) {
             draw_camera_2d(camera, global, marks, frame);
@@ -223,7 +233,7 @@ fn draw_camera_3d(camera: Camera3dNode, global: Mat4, marks: Marks, frame: &mut 
 
 /// `matrix` with its axes made one unit long: placed and turned as it is,
 /// but not scaled.
-fn without_scale(matrix: Mat4) -> Mat4 {
+pub(super) fn without_scale(matrix: Mat4) -> Mat4 {
     let mut columns = matrix.to_columns();
     for column in columns.iter_mut().take(3) {
         let [x, y, z, _] = *column;
@@ -423,6 +433,7 @@ mod tests {
         cross: MeshId::from_index(2),
         view: MeshId::from_index(3),
         pyramid: MeshId::from_index(4),
+        bodies: super::super::body_drawing::TEST_MARKS,
     };
 
     fn outline(text: &str) -> SceneOutline {
@@ -530,6 +541,22 @@ mod tests {
             frame.draw_count(),
             2,
             "a camera without its transform shows nothing"
+        );
+    }
+
+    #[test]
+    fn bodies_show_their_shapes_whether_selected_or_not() {
+        let bodies = "[[node]]\nname = \"Floor\"\nposition = [0.0, 0.0]\n\
+                      [node.body]\nkind = \"static\"\nshape = \"rectangle\"\nsize = [4.0, 1.0]\n\
+                      [[node]]\nname = \"Pill\"\nparent = 0\n[node.transform_3d]\n\
+                      [node.body_3d]\nshape = \"capsule\"\nheight = 2.0\nradius = 0.5\n";
+
+        let (frame, _) = draw(&outline(bodies), None);
+
+        assert_eq!(
+            frame.draw_count(),
+            1 + 3,
+            "a rectangle, and a capsule's three pieces"
         );
     }
 

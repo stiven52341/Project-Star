@@ -282,6 +282,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 9a Cameras in scenes: `[node.camera]`/`[node.camera_3d]` with
           `current`, “2D camera”/“3D camera” in Create and the inspector,
           drawn in the view; `Camera` renamed `Camera2D`.
+    - [x] 9b Physics nodes: Create → Physics offers static, rigid,
+          kinematic bodies and areas (static sensors), 2D or 3D by the
+          project, and the view draws the shape of every body.
   - [ ] Finding nodes of the scene by name and by tag, in StarScript and
         blueprints.
   - [ ] Global and local position, as separate properties.

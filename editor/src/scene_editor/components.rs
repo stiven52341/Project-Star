@@ -115,6 +115,50 @@ pub(super) enum NodeTemplate {
     PointLight,
     Camera2D,
     Camera3D,
+    Body(BodyTemplate),
+}
+
+/// The bodies “Create” offers under “Physics”: each one a node with a body
+/// of one unit, in the project's space.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum BodyTemplate {
+    /// Never moves: floors, walls.
+    Static,
+    /// Moved by the simulation: falls, bounces, is pushed.
+    Rigid,
+    /// Moved only by the game: platforms, doors, characters.
+    Kinematic,
+    /// Detects what enters it, without stopping anything: a sensor.
+    Area,
+}
+
+impl BodyTemplate {
+    /// Every one, in the menu's order.
+    pub(super) const ALL: [Self; 4] = [Self::Static, Self::Rigid, Self::Kinematic, Self::Area];
+
+    fn label(self) -> &'static str {
+        let texts = texts::current();
+        match self {
+            Self::Static => texts.static_body,
+            Self::Rigid => texts.rigid_body,
+            Self::Kinematic => texts.kinematic_body,
+            Self::Area => texts.area,
+        }
+    }
+
+    /// The settings of its body, around `shape`. Areas do not move: a
+    /// static body detects all the others, and follows its node when the
+    /// game moves it.
+    fn settings<Shape>(self, shape: Shape) -> BodySettings<Shape> {
+        let kind = match self {
+            Self::Static | Self::Area => BodyKind::Static,
+            Self::Rigid => BodyKind::Dynamic,
+            Self::Kinematic => BodyKind::Kinematic,
+        };
+        let mut settings = BodySettings::new(kind, shape);
+        settings.is_sensor = self == Self::Area;
+        settings
+    }
 }
 
 impl NodeTemplate {
@@ -147,6 +191,7 @@ impl NodeTemplate {
             Self::PointLight => texts.point_light,
             Self::Camera2D => texts.camera_2d,
             Self::Camera3D => texts.camera_3d,
+            Self::Body(body) => body.label(),
         }
     }
 
@@ -203,6 +248,18 @@ impl NodeTemplate {
                     ..Camera3dNode::default()
                 });
             }
+            Self::Body(body) => match dimension {
+                ProjectDimension::TwoD => {
+                    node.body = Shape2d::rectangle(Vec2::ONE)
+                        .ok()
+                        .map(|shape| body.settings(shape));
+                }
+                ProjectDimension::ThreeD => {
+                    node.body_3d = Shape3d::cuboid(Vec3::ONE)
+                        .ok()
+                        .map(|shape| body.settings(shape));
+                }
+            },
             _ => {}
         }
         node
@@ -292,6 +349,31 @@ pub(super) const fn new_light(directional: bool) -> LightNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn physics_templates_give_bodies_of_the_projects_space() {
+        let build =
+            |body, dimension| NodeTemplate::Body(body).build("Body".to_owned(), dimension, &[]);
+
+        let floor = build(BodyTemplate::Static, ProjectDimension::TwoD);
+        let crate_box = build(BodyTemplate::Rigid, ProjectDimension::ThreeD);
+        let coin = build(BodyTemplate::Area, ProjectDimension::TwoD);
+        let door = build(BodyTemplate::Kinematic, ProjectDimension::ThreeD);
+
+        assert_eq!(floor.body.map(|body| body.kind), Some(BodyKind::Static));
+        assert!(floor.body_3d.is_none());
+        assert_eq!(
+            crate_box.body_3d.map(|body| body.kind),
+            Some(BodyKind::Dynamic)
+        );
+        assert!(crate_box.body.is_none());
+        assert!(coin.body.is_some_and(|body| body.is_sensor));
+        assert_eq!(
+            door.body_3d.map(|body| body.kind),
+            Some(BodyKind::Kinematic)
+        );
+        assert!(!door.body_3d.is_some_and(|body| body.is_sensor));
+    }
 
     #[test]
     fn new_nodes_are_placed_in_the_projects_space() {
