@@ -234,7 +234,7 @@ fn first_line(line: f32, start: f32, spacing: f32) -> f32 {
 const fn header_color(kind: &NodeKind) -> Color32 {
     match kind {
         NodeKind::Entry => ENTRY_COLOR,
-        NodeKind::Branch | NodeKind::Return => FLOW_COLOR,
+        NodeKind::Branch | NodeKind::ForEach | NodeKind::Return => FLOW_COLOR,
         NodeKind::GetVariable { .. } | NodeKind::SetVariable { .. } => VARIABLE_COLOR,
         NodeKind::Call(_) => CALL_COLOR,
         NodeKind::Literal { .. } | NodeKind::Operator { .. } => VALUE_COLOR,

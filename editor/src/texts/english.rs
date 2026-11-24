@@ -192,6 +192,7 @@ pub(super) static ENGLISH: Texts = Texts {
     math: "Math",
     menu_operator: "Operator",
     node_branch: "If",
+    node_for_each: "For each",
     node_return: "Return",
     other_name: "Other…",
     call_own_method: "Method of this object…",

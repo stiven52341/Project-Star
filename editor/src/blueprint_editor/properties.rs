@@ -40,7 +40,7 @@ pub(super) fn show_node_properties(
             }
             NodeKind::Call(call) => call_fields(ui, call, &mut renamed_pins),
             NodeKind::Operator { operator } => operator_field(ui, operator),
-            NodeKind::Entry | NodeKind::Branch | NodeKind::Return => false,
+            NodeKind::Entry | NodeKind::Branch | NodeKind::ForEach | NodeKind::Return => false,
         })
         .inner;
     if let NodeKind::Entry = node.kind {

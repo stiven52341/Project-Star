@@ -12,6 +12,16 @@ pub const BRANCH_TRUE: &str = "true";
 pub const BRANCH_FALSE: &str = "false";
 /// The condition of a [`NodeKind::Branch`].
 pub const CONDITION: &str = "condition";
+/// The list a [`NodeKind::ForEach`] goes through.
+pub const LIST: &str = "list";
+/// The execution output a [`NodeKind::ForEach`] follows for each element.
+pub const LOOP_BODY: &str = "body";
+/// The element of the list a [`NodeKind::ForEach`] is at, while its body
+/// runs.
+pub const ELEMENT: &str = "element";
+/// The execution output a [`NodeKind::ForEach`] follows once it went
+/// through the whole list.
+pub const LOOP_DONE: &str = "done";
 /// The value of literals and variables, the value a variable is given, the
 /// value returned and the single operand of unary operators.
 pub const VALUE: &str = "value";
@@ -144,6 +154,13 @@ impl Node {
                 Pin::execution_output(BRANCH_TRUE),
                 Pin::execution_output(BRANCH_FALSE),
             ],
+            NodeKind::ForEach => vec![
+                Pin::execution_input(),
+                Pin::data_input(LIST),
+                Pin::execution_output(LOOP_BODY),
+                Pin::data_output(ELEMENT),
+                Pin::execution_output(LOOP_DONE),
+            ],
             NodeKind::Return if graph.returns.is_some() => {
                 vec![Pin::execution_input(), Pin::data_input(VALUE)]
             }
@@ -165,6 +182,7 @@ impl Node {
             NodeKind::Entry
             | NodeKind::SetVariable { .. }
             | NodeKind::Branch
+            | NodeKind::ForEach
             | NodeKind::Return => true,
             NodeKind::Call(call) => !call.pure,
             NodeKind::Literal { .. } | NodeKind::GetVariable { .. } | NodeKind::Operator { .. } => {

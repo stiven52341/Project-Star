@@ -27,8 +27,8 @@ pub use model::{
     Operator, Parameter, PinRef, Variable,
 };
 pub use pins::{
-    BRANCH_FALSE, BRANCH_TRUE, CONDITION, Direction, EXECUTION_INPUT, EXECUTION_OUTPUT, LEFT, Pin,
-    PinKind, RESULT, RIGHT, TARGET, VALUE,
+    BRANCH_FALSE, BRANCH_TRUE, CONDITION, Direction, ELEMENT, EXECUTION_INPUT, EXECUTION_OUTPUT,
+    LEFT, LIST, LOOP_BODY, LOOP_DONE, Pin, PinKind, RESULT, RIGHT, TARGET, VALUE,
 };
 pub use translation::{Origin, Translation, translate};
 pub use validation::{BlueprintError, BlueprintErrorKind, is_valid_name, validate};

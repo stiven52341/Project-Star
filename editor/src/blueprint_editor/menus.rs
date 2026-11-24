@@ -138,6 +138,9 @@ fn new_node_menu(ui: &mut egui::Ui, names: &BlueprintNames) -> Option<NodeKind> 
     if ui.button(texts::current().node_branch).clicked() {
         chosen = Some(NodeKind::Branch);
     }
+    if ui.button(texts::current().node_for_each).clicked() {
+        chosen = Some(NodeKind::ForEach);
+    }
     if ui.button(texts::current().node_return).clicked() {
         chosen = Some(NodeKind::Return);
     }

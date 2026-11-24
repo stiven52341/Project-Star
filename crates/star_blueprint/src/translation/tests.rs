@@ -5,8 +5,8 @@ use crate::model::{
     Call, CallTarget, Graph, InspectorOptions, Link, Node, NodeKind, Operator, Parameter, PinRef,
 };
 use crate::pins::{
-    BRANCH_FALSE, BRANCH_TRUE, CONDITION, EXECUTION_INPUT, EXECUTION_OUTPUT, LEFT, RESULT, RIGHT,
-    TARGET, VALUE,
+    BRANCH_FALSE, BRANCH_TRUE, CONDITION, ELEMENT, EXECUTION_INPUT, EXECUTION_OUTPUT, LEFT, LIST,
+    LOOP_BODY, LOOP_DONE, RESULT, RIGHT, TARGET, VALUE,
 };
 
 const PLAYER: &str = include_str!("../../examples/player.blueprint");
@@ -301,6 +301,77 @@ fn results_used_outside_the_path_where_they_run_are_rejected() {
         [BlueprintError {
             graph: Some("pick".to_owned()),
             node: Some(NodeId(3)),
+            kind: BlueprintErrorKind::ValueNotReady,
+        }]
+    );
+}
+
+/// `for` each enemy of the game, `element.remove()`, then `speed = 0.0`;
+/// with `then_uses_element`, the speed is set to the element's `x` instead,
+/// after the loop.
+fn clearing_enemies(then_uses_element: bool) -> Graph {
+    let builder = GraphBuilder::new("clear", &[], None)
+        .node(2, NodeKind::ForEach)
+        .node(
+            3,
+            call(
+                CallTarget::Class("Scene".to_owned()),
+                "find_by_tag",
+                &["tag"],
+                true,
+            ),
+        )
+        .node(4, literal(Literal::String("enemy".to_owned())))
+        .node(5, call(CallTarget::Value, "remove", &[], false))
+        .node(6, variable("speed", true))
+        .node(7, literal(Literal::Float(0.0)))
+        .link((1, EXECUTION_OUTPUT), (2, EXECUTION_INPUT))
+        .link((4, VALUE), (3, "tag"))
+        .link((3, RESULT), (2, LIST))
+        .link((2, LOOP_BODY), (5, EXECUTION_INPUT))
+        .link((2, ELEMENT), (5, TARGET))
+        .link((2, LOOP_DONE), (6, EXECUTION_INPUT));
+    if then_uses_element {
+        builder
+            .node(
+                8,
+                NodeKind::GetVariable {
+                    variable: "x".to_owned(),
+                    of_value: true,
+                },
+            )
+            .link((2, ELEMENT), (8, TARGET))
+            .link((8, VALUE), (6, VALUE))
+            .build()
+    } else {
+        builder.link((7, VALUE), (6, VALUE)).build()
+    }
+}
+
+#[test]
+fn for_each_nodes_become_for_loops() {
+    let code = checked_code(&ship(clearing_enemies(false)));
+
+    assert_eq!(
+        method_lines(&code),
+        [
+            "for element_2 in Scene.find_by_tag(\"enemy\") {",
+            "element_2.remove()",
+            "}",
+            "speed = 0.0",
+        ]
+    );
+}
+
+#[test]
+fn elements_used_after_their_loop_are_rejected() {
+    let errors = translate(&ship(clearing_enemies(true))).expect_err("the loop is over");
+
+    assert_eq!(
+        errors,
+        [BlueprintError {
+            graph: Some("clear".to_owned()),
+            node: Some(NodeId(2)),
             kind: BlueprintErrorKind::ValueNotReady,
         }]
     );

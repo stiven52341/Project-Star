@@ -257,6 +257,7 @@ impl<'check> GraphCheck<'check> {
                 NodeKind::Literal { .. }
                 | NodeKind::Operator { .. }
                 | NodeKind::Branch
+                | NodeKind::ForEach
                 | NodeKind::Return => {}
             }
         }

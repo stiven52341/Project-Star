@@ -1,8 +1,8 @@
 //! Texts built from values (names, numbers, errors), in each language.
 
 use star_blueprint::{
-    BRANCH_FALSE, BRANCH_TRUE, CONDITION, CallTarget, EXECUTION_INPUT, EXECUTION_OUTPUT, LEFT,
-    Literal, NodeKind, Operator, RESULT, RIGHT, TARGET, VALUE,
+    BRANCH_FALSE, BRANCH_TRUE, CONDITION, CallTarget, ELEMENT, EXECUTION_INPUT, EXECUTION_OUTPUT,
+    LEFT, LIST, LOOP_BODY, LOOP_DONE, Literal, NodeKind, Operator, RESULT, RIGHT, TARGET, VALUE,
 };
 
 use super::{Language, Texts};
@@ -83,6 +83,7 @@ impl Texts {
             },
             NodeKind::Operator { operator } => operator.symbol().to_owned(),
             NodeKind::Branch => self.node_branch.to_owned(),
+            NodeKind::ForEach => self.node_for_each.to_owned(),
             NodeKind::Return => self.node_return.to_owned(),
         }
     }
@@ -97,6 +98,7 @@ impl Texts {
             NodeKind::Call(_) => self.pick("Call", "Llamada"),
             NodeKind::Operator { .. } => self.menu_operator,
             NodeKind::Branch => self.node_branch,
+            NodeKind::ForEach => self.node_for_each,
             NodeKind::Return => self.node_return,
         }
     }
@@ -160,6 +162,10 @@ impl Texts {
             BRANCH_TRUE => self.pick("true", "sí"),
             BRANCH_FALSE => self.pick("false", "no"),
             CONDITION => self.pick("condition", "condición"),
+            LIST => self.pick("list", "lista"),
+            LOOP_BODY => self.pick("each", "cada uno"),
+            ELEMENT => self.pick("element", "elemento"),
+            LOOP_DONE => self.pick("done", "al terminar"),
             VALUE => self.pick("value", "valor"),
             RESULT => self.pick("result", "resultado"),
             TARGET => self.pick("object", "objeto"),

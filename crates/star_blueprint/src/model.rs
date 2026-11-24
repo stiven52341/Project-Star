@@ -179,6 +179,9 @@ pub enum NodeKind {
     },
     /// Goes one way or the other depending on a condition: an `if`.
     Branch,
+    /// Runs its `body` once for each element of a list, which its
+    /// `element` pin gives meanwhile, and then goes on: a `for` loop.
+    ForEach,
     /// Ends the method, giving back a value if the method returns one.
     Return,
 }

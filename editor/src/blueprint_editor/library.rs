@@ -301,6 +301,25 @@ mod tests {
     }
 
     #[test]
+    fn nodes_can_be_found_by_name_and_by_tag() {
+        let library = Library::new(Some("Node"));
+
+        let scene = labels(&group(&library, "Scene").own);
+        let node = labels(&group(&library, "Node").own);
+
+        assert!(
+            scene.contains(&"Scene.find_by_name(name) -> Node?"),
+            "{scene:?}"
+        );
+        assert!(
+            scene.contains(&"Scene.find_by_tag(tag) -> [Node]"),
+            "{scene:?}"
+        );
+        assert!(node.contains(&"find_by_tag(tag) -> [Node]"), "{node:?}");
+        assert!(node.contains(&"has_tag(tag) -> bool"), "{node:?}");
+    }
+
+    #[test]
     fn three_d_nodes_also_get_the_third_dimension() {
         let library = Library::new(Some("Mesh"));
         let own = labels(&group(&library, texts::current().transform).own);

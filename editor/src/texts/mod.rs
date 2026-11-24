@@ -276,6 +276,7 @@ pub(crate) struct Texts {
     pub(crate) math: &'static str,
     pub(crate) menu_operator: &'static str,
     pub(crate) node_branch: &'static str,
+    pub(crate) node_for_each: &'static str,
     pub(crate) node_return: &'static str,
     pub(crate) other_name: &'static str,
     pub(crate) call_own_method: &'static str,

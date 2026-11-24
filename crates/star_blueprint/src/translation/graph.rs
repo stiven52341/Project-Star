@@ -7,8 +7,8 @@ use super::writer::SourceWriter;
 use super::{Origin, literal_code};
 use crate::model::{Call, CallTarget, Graph, NodeId, NodeKind, PinRef};
 use crate::pins::{
-    BRANCH_FALSE, BRANCH_TRUE, CONDITION, EXECUTION_INPUT, EXECUTION_OUTPUT, LEFT, RESULT, RIGHT,
-    TARGET, VALUE,
+    BRANCH_FALSE, BRANCH_TRUE, CONDITION, ELEMENT, EXECUTION_INPUT, EXECUTION_OUTPUT, LEFT, LIST,
+    LOOP_BODY, LOOP_DONE, RESULT, RIGHT, TARGET, VALUE,
 };
 use crate::validation::{BlueprintError, BlueprintErrorKind};
 
@@ -23,8 +23,9 @@ pub(super) struct GraphTranslator<'graph, 'out> {
     next: HashMap<(NodeId, &'graph str), NodeId>,
     /// Calls that run in order and whose result some node uses.
     used_results: HashSet<NodeId>,
-    /// Calls whose result already has a name, by nesting level: a name
-    /// given inside an `if` is not known after it.
+    /// Calls whose result already has a name, and loops whose element is
+    /// known, by nesting level: a name given inside an `if` or a `for` is
+    /// not known after it.
     named_results: Vec<HashSet<NodeId>>,
     /// Names of the method's parameters, which hide members of the class.
     parameters: HashSet<&'graph str>,
@@ -144,6 +145,10 @@ impl<'graph, 'out> GraphTranslator<'graph, 'out> {
                 self.branch(id);
                 None
             }
+            NodeKind::ForEach => {
+                self.for_each(id);
+                self.next.get(&(id, LOOP_DONE)).copied()
+            }
             NodeKind::Return => {
                 self.writer.indent();
                 self.writer.write("return");
@@ -184,6 +189,22 @@ impl<'graph, 'out> GraphTranslator<'graph, 'out> {
             self.writer.newline();
             self.block(id, BRANCH_FALSE);
         }
+        self.writer.line("}");
+    }
+
+    /// `for element_N in list { … }`: its body, where its element is
+    /// known.
+    fn for_each(&mut self, id: NodeId) {
+        self.writer.indent();
+        self.writer.write(&format!("for {} in ", element_name(id)));
+        self.input(id, LIST, false);
+        self.writer.write(" {");
+        self.writer.newline();
+        self.writer.open();
+        self.named_results.push(HashSet::from([id]));
+        self.statements(id, LOOP_BODY);
+        self.named_results.pop();
+        self.writer.close();
         self.writer.line("}");
     }
 
@@ -275,15 +296,29 @@ impl<'graph, 'out> GraphTranslator<'graph, 'out> {
             }
             NodeKind::Call(call) if call.pure => self.call(id, call),
             NodeKind::Call(call) => {
-                let named = self.named_results.iter().any(|names| names.contains(&id));
-                if !named {
+                if !self.is_named(id) {
                     self.error(id, BlueprintErrorKind::ValueNotReady);
                 }
                 self.writer.write(&result_name(call, id));
             }
-            NodeKind::SetVariable { .. } | NodeKind::Branch | NodeKind::Return => {}
+            NodeKind::ForEach if source.pin == ELEMENT => {
+                if !self.is_named(id) {
+                    self.error(id, BlueprintErrorKind::ValueNotReady);
+                }
+                self.writer.write(&element_name(id));
+            }
+            NodeKind::SetVariable { .. }
+            | NodeKind::Branch
+            | NodeKind::ForEach
+            | NodeKind::Return => {}
         }
         self.record_node(start, id);
+    }
+
+    /// Whether the value of node `id` has a name here: a call already run,
+    /// or a loop this code is inside of.
+    fn is_named(&self, id: NodeId) -> bool {
+        self.named_results.iter().any(|names| names.contains(&id))
     }
 
     fn record_node(&mut self, start: usize, node: NodeId) {
@@ -301,6 +336,11 @@ impl<'graph, 'out> GraphTranslator<'graph, 'out> {
             kind,
         });
     }
+}
+
+/// The name of the element of a loop: `element_4`.
+fn element_name(id: NodeId) -> String {
+    format!("{ELEMENT}_{}", id.0)
 }
 
 /// The name of the constant that keeps the result of a call that runs in
