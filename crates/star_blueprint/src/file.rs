@@ -100,12 +100,14 @@ mod tests {
                     ty: Some("float".to_owned()),
                     default: Some(Literal::Float(2.5)),
                     private: false,
+                    export: false,
                 },
                 Variable {
                     name: "lives".to_owned(),
                     ty: None,
                     default: Some(Literal::Int(3)),
                     private: true,
+                    export: false,
                 },
             ],
             graphs: vec![Graph {

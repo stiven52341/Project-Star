@@ -132,6 +132,9 @@ pub(crate) struct Texts {
     /// The button that gives an `export` field the value of its class again.
     pub(crate) reset: &'static str,
     pub(crate) reset_field_hint: &'static str,
+    /// The box that makes a blueprint variable an `export` field.
+    pub(crate) export: &'static str,
+    pub(crate) export_hint: &'static str,
     /// A value of the scene for a field its class does not export.
     pub(crate) not_an_export_field: &'static str,
     pub(crate) no_image: &'static str,

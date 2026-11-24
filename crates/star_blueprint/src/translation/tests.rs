@@ -20,6 +20,7 @@ fn ship(graph: Graph) -> Blueprint {
             ty: None,
             default: Some(Literal::Float(2.0)),
             private: false,
+            export: false,
         }],
         graphs: vec![graph],
     }
@@ -415,4 +416,14 @@ fn variables_of_a_value_read_and_set_its_fields() {
     let code = checked_code(&ship(graph));
 
     assert_eq!(method_lines(&code), ["other.x = other.y"]);
+}
+
+#[test]
+fn exported_variables_are_written_with_export() {
+    let mut blueprint = ship(GraphBuilder::new("start", &[], None).overriding().build());
+    blueprint.variables[0].export = true;
+
+    let code = checked_code(&blueprint);
+
+    assert!(code.contains("    export var speed = 2.0\n"), "{code}");
 }

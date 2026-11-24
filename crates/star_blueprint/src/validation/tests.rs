@@ -59,6 +59,7 @@ fn blueprint(graphs: Vec<Graph>) -> Blueprint {
             ty: None,
             default: Some(Literal::Float(2.0)),
             private: false,
+            export: false,
         }],
         graphs,
     }
@@ -343,6 +344,7 @@ fn class_rules_are_checked() {
         ty: None,
         default: None,
         private: false,
+        export: false,
     });
 
     assert_eq!(

@@ -265,11 +265,11 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] A pack of ready-made blueprints (2D movement, 3D movement…).
   - [x] Renaming a `.star` does not rename its class (bug): it now renames
         the class, and its uses, in the whole project (blueprints too).
-  - [ ] A keyword for variables set from the inspector: `export var`.
+  - [x] A keyword for variables set from the inspector: `export var`.
     - [x] 7a The language: `export`, on fields of nodes of simple types.
     - [x] 7b Scenes keep the values (`[node.fields]`) and games apply them.
     - [x] 7c The inspector edits them.
-    - [ ] 7d Blueprint variables can be exported.
+    - [x] 7d Blueprint variables can be exported.
   - [ ] Decorators (`@`) in StarScript.
   - [ ] Ready-made nodes: cameras, 2D and 3D lights, collision shapes…
   - [ ] Finding nodes of the scene by name and by tag, in StarScript and

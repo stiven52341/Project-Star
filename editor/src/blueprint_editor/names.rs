@@ -101,6 +101,7 @@ mod tests {
                 ty: None,
                 default: Some(Literal::Float(1.0)),
                 private: false,
+                export: false,
             }],
             graphs: vec![Graph {
                 name: "boost".to_owned(),

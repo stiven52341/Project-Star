@@ -53,6 +53,8 @@ pub(super) static SPANISH: Texts = Texts {
     no_class: "Sin clase",
     reset: "Restablecer",
     reset_field_hint: "Usar el valor que le da la clase",
+    export: "Inspector",
+    export_hint: "Las escenas y el inspector pueden darle un valor (export var); solo en blueprints que heredan de Node, con valores que sean números, bool, string o Color",
     not_an_export_field: "La clase no tiene un campo export con este nombre: la escena no cargará",
     no_image: "Sin imagen",
     add_component: "Añadir componente",

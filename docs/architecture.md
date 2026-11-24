@@ -747,7 +747,8 @@ whether it is pure, and an operator. A change that takes pins away also
 takes their wires.
 
 With no node selected, the Inspector edits the **class** (name, base,
-`base_arguments`, variables with their type, starting value and privacy)
+`base_arguments`, variables with their type, starting value, privacy and
+“Inspector”, which makes them `export`)
 and the **signature** of the graph shown (name, parameters, return type,
 `override`, privacy) (`class_properties.rs`). Renaming a variable, a method
 or a parameter renames it in the nodes that use it (`edit.rs`), and a

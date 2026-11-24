@@ -53,6 +53,8 @@ pub(super) static ENGLISH: Texts = Texts {
     no_class: "No class",
     reset: "Reset",
     reset_field_hint: "Use the value the class gives it",
+    export: "Inspector",
+    export_hint: "Scenes and the inspector can give it a value (export var); only for blueprints that extend Node, and values that are numbers, bool, string or Color",
     not_an_export_field: "The class has no export field with this name: the scene will not load",
     no_image: "No image",
     add_component: "Add component",

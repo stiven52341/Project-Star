@@ -44,6 +44,10 @@ pub struct Variable {
     /// Whether only the blueprint itself can use it.
     #[serde(default, skip_serializing_if = "is_false")]
     pub private: bool,
+    /// Whether scenes, and so the editor's inspector, can give it a value
+    /// (`export var`).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub export: bool,
 }
 
 /// A method of a blueprint, as a graph that starts at its [`NodeKind::Entry`].

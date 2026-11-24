@@ -164,7 +164,7 @@ fn class_error(kind: BlueprintErrorKind) -> BlueprintError {
     }
 }
 
-/// `[private ]var name[: type][ = value]`
+/// `[private ][export ]var name[: type][ = value]`
 fn write_variable(
     writer: &mut SourceWriter,
     variable: &Variable,
@@ -174,6 +174,9 @@ fn write_variable(
     writer.indent();
     if variable.private {
         writer.write("private ");
+    }
+    if variable.export {
+        writer.write("export ");
     }
     writer.write(&format!("var {}", variable.name));
     if let Some(ty) = &variable.ty {

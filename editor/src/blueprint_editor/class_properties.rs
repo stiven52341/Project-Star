@@ -123,6 +123,7 @@ fn variables_fields(ui: &mut egui::Ui, blueprint: &mut Blueprint) -> bool {
             ty: None,
             default: Some(Literal::Float(0.0)),
             private: false,
+            export: false,
         });
         changed = true;
     }
@@ -173,6 +174,10 @@ fn variable_fields(
             ui.end_row();
             ui.weak(texts::current().private);
             changed |= ui.checkbox(&mut variable.private, "").changed();
+            ui.end_row();
+            ui.weak(texts::current().export)
+                .on_hover_text(texts::current().export_hint);
+            changed |= ui.checkbox(&mut variable.export, "").changed();
             ui.end_row();
         });
     changed
