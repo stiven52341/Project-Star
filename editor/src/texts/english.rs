@@ -202,6 +202,7 @@ pub(super) static ENGLISH: Texts = Texts {
     rename: "Rename",
     delete: "Delete",
     copy_path: "Copy path",
+    show_in_file_explorer: "Show in file explorer",
     rename_to: "Rename to:",
     create: "Create",
     show_in_blueprint: "Show in the blueprint",

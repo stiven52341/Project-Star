@@ -252,7 +252,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] Moving nodes to another parent by dragging them in the tree.
   - [x] Dropping a `.star` (or a `.blueprint`) on a node to give it its
         class.
-  - [ ] “Show in the file explorer” in “Assets” (needs platform code or a
-        dependency: ask first).
+  - [x] “Show in file explorer” in “Assets” (decision 56: the system's own
+        program, no dependency).
   - [ ] A slider for the size of the icons of “Assets”.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

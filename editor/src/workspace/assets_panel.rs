@@ -59,6 +59,9 @@ enum MenuChoice {
     Open(Entry),
     Act(Choice),
     Refresh,
+    /// Show the file or folder at this path, inside the assets folder, in
+    /// the system's file manager.
+    ShowInFileExplorer(String),
 }
 
 /// A tile's size, and the size of the icon at its top.
@@ -172,6 +175,9 @@ impl AssetsPanel {
                     if ui.button(texts::current().refresh).clicked() {
                         choice = Some(MenuChoice::Refresh);
                     }
+                    if ui.button(texts::current().show_in_file_explorer).clicked() {
+                        choice = Some(MenuChoice::ShowInFileExplorer(self.open_folder.join("/")));
+                    }
                 });
                 if entries.is_empty() {
                     ui.weak(texts::current().empty_assets);
@@ -228,6 +234,10 @@ impl AssetsPanel {
             }
             MenuChoice::Refresh => {
                 self.refresh();
+                None
+            }
+            MenuChoice::ShowInFileExplorer(path) => {
+                show_in_file_explorer(self.directory.join(path));
                 None
             }
         }
@@ -459,8 +469,8 @@ fn entries_of(nodes: &[FileNode], open_folder: &[String]) -> Option<Vec<Entry>> 
     )
 }
 
-/// The menu of a tile: open it, rename it, delete it, copy its path, or
-/// create something next to it.
+/// The menu of a tile: open it, rename it, delete it, copy its path, show
+/// it in the file manager, or create something next to it.
 fn tile_menu(ui: &mut egui::Ui, entry: &Entry, choice: &mut Option<MenuChoice>) {
     let texts = texts::current();
     let opens = entry.kind == AssetKind::Folder || OpenedAsset::of(entry.path.clone()).is_some();
@@ -476,8 +486,21 @@ fn tile_menu(ui: &mut egui::Ui, entry: &Entry, choice: &mut Option<MenuChoice>) 
     if ui.button(texts.copy_path).clicked() {
         ui.ctx().copy_text(entry.path.clone());
     }
+    if ui.button(texts.show_in_file_explorer).clicked() {
+        *choice = Some(MenuChoice::ShowInFileExplorer(entry.path.clone()));
+    }
     ui.separator();
     create_menu(ui, choice);
+}
+
+/// Opens the system's file manager at `path` on a thread of its own, so
+/// the editor never waits for it; a failure is only logged.
+fn show_in_file_explorer(path: PathBuf) {
+    std::thread::spawn(move || {
+        if let Err(error) = star_engine::star_platform::show_in_file_explorer(&path) {
+            log::warn!("{error}");
+        }
+    });
 }
 
 /// “Create”, with a kind of file or folder to create in the folder shown.

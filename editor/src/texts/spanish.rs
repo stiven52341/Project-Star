@@ -202,6 +202,7 @@ pub(super) static SPANISH: Texts = Texts {
     rename: "Renombrar",
     delete: "Eliminar",
     copy_path: "Copiar ruta",
+    show_in_file_explorer: "Mostrar en el explorador de archivos",
     rename_to: "Renombrar a:",
     create: "Crear",
     show_in_blueprint: "Mostrar en el blueprint",
