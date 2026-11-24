@@ -291,6 +291,7 @@ pub(super) fn new_node(name: String, dimension: ProjectDimension) -> NodeOutline
         light: None,
         body_3d: None,
         camera: None,
+        light_2d: None,
         camera_3d: None,
         fields: std::collections::BTreeMap::new(),
     }

@@ -11,9 +11,12 @@ use star_physics::{BodySettings, Shape3d};
 
 use crate::body_data::{Body3dData, BodyData};
 use crate::camera_node::{Camera2dData, Camera3dData};
+use crate::light_2d_node::Light2dData;
 use crate::node_3d_data::{LightData, MeshOutline, MeshTable, Transform3dData};
 use crate::scene_file::{FORMAT_VERSION, NodeData, SceneFile, SpriteData};
-use crate::{Camera2dNode, Camera3dNode, FieldValue, LightNode, Transform2D, Transform3D};
+use crate::{
+    Camera2dNode, Camera3dNode, FieldValue, Light2dNode, LightNode, Transform2D, Transform3D,
+};
 
 /// The nodes of a `.scene` file, checked to form one tree, with their images
 /// named by asset path instead of loaded. A [`Scene`](crate::Scene) is built
@@ -52,6 +55,8 @@ pub struct NodeOutline {
     pub body_3d: Option<BodySettings<Shape3d>>,
     /// The 2D camera the game can be seen from, if it is one.
     pub camera: Option<Camera2dNode>,
+    /// The light it shines on the sprites, if any.
+    pub light_2d: Option<Light2dNode>,
     /// The 3D camera the game can be seen from, if it is one.
     pub camera_3d: Option<Camera3dNode>,
     /// The values of the `export` fields of its class, by name.
@@ -357,6 +362,12 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         .map(Camera3dData::to_camera)
         .transpose()
         .map_err(named)?;
+    let light_2d = node
+        .light_2d
+        .as_ref()
+        .map(Light2dData::to_light)
+        .transpose()
+        .map_err(named)?;
     if node
         .class
         .as_deref()
@@ -382,6 +393,7 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         light,
         body_3d,
         camera,
+        light_2d,
         camera_3d,
         fields: node.fields,
     })
@@ -424,6 +436,7 @@ fn write_node(node: &NodeOutline) -> NodeData {
         light: node.light.as_ref().map(LightData::from_light),
         body_3d: node.body_3d.as_ref().map(Body3dData::from_settings),
         camera: node.camera.map(Camera2dData::from_camera),
+        light_2d: node.light_2d.map(Light2dData::from_light),
         camera_3d: node.camera_3d.map(Camera3dData::from_camera),
         fields: node.fields.clone(),
     }
@@ -478,6 +491,21 @@ mod tests {
             })
         );
         assert_eq!(outline.nodes()[2].camera_3d, Some(Camera3dNode::default()));
+        assert_eq!(written, outline);
+    }
+
+    #[test]
+    fn lights_2d_are_read_and_written() {
+        let text = "format = 1\n[[node]]\nname = \"Torch\"\nposition = [1.0, 0.0]\n\
+                    [node.light_2d]\nkind = \"point\"\nrange = 3.0\n";
+
+        let outline = SceneOutline::from_text(text).unwrap();
+        let written = SceneOutline::from_text(&outline.to_text().unwrap()).unwrap();
+
+        assert!(matches!(
+            outline.nodes()[0].light_2d,
+            Some(Light2dNode::Point { range: 3.0, .. })
+        ));
         assert_eq!(written, outline);
     }
 

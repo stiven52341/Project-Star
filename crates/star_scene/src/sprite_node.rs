@@ -3,9 +3,9 @@
 use star_core::EngineResult;
 use star_ecs::World;
 use star_math::Vec2;
-use star_render::{Color, Frame, Sprite, TextureId, TextureRegion};
+use star_render::{Color, Frame, MAX_LIGHTS, Sprite, TextureId, TextureRegion};
 
-use crate::GlobalTransform2D;
+use crate::{GlobalTransform2D, Light2dNode};
 
 /// Shows a texture at a 2D node: the engine draws it every frame where the
 /// node's [`GlobalTransform2D`] places it, rotated and scaled with it.
@@ -84,7 +84,9 @@ impl SpriteNode {
 }
 
 /// Adds to `frame` the sprite of every node with a [`SpriteNode`] and a
-/// [`GlobalTransform2D`].
+/// [`GlobalTransform2D`], and the light of every one with a
+/// [`Light2dNode`]. A frame takes at most [`MAX_LIGHTS`] 2D lights: light
+/// nodes beyond them are left out.
 ///
 /// # Errors
 ///
@@ -93,6 +95,11 @@ impl SpriteNode {
 pub fn draw_sprite_nodes(world: &World, frame: &mut Frame) -> EngineResult<()> {
     world.each::<(&GlobalTransform2D, &SpriteNode)>(|_, (global, sprite)| {
         frame.draw_sprite(sprite.to_sprite(*global));
+    })?;
+    world.each::<(&GlobalTransform2D, &Light2dNode)>(|_, (global, light)| {
+        if frame.lights_2d().len() < MAX_LIGHTS {
+            frame.add_light_2d(light.to_light(*global));
+        }
     })
 }
 
@@ -157,5 +164,33 @@ mod tests {
         draw_sprite_nodes(&world, &mut frame).unwrap();
 
         assert_eq!(frame.sprite_count(), 0);
+    }
+
+    #[test]
+    fn light_nodes_light_the_sprites_from_where_they_are() {
+        let mut world = World::new();
+        let torch = world.spawn_node("Torch", None).unwrap();
+        world
+            .insert(torch, Transform2D::from_position(Vec2::new(2.0, 1.0)))
+            .unwrap();
+        world
+            .insert(
+                torch,
+                Light2dNode::Point {
+                    color: Color::WHITE,
+                    intensity: 1.0,
+                    range: 3.0,
+                },
+            )
+            .unwrap();
+        TransformPropagation::new().run(&mut world).unwrap();
+        let mut frame = Frame::new();
+
+        draw_sprite_nodes(&world, &mut frame).unwrap();
+
+        let [star_render::Light2d::Point(light)] = frame.lights_2d() else {
+            panic!("one point light");
+        };
+        assert!((light.position - Vec2::new(2.0, 1.0)).length() < EPSILON);
     }
 }
