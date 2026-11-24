@@ -10,6 +10,7 @@ use std::cell::{Cell, Ref, RefCell};
 use std::io::Write as _;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::bodies::BodyFields;
 use crate::placement::{Place2d, Place3d};
 use crate::{Field, List};
 
@@ -38,6 +39,8 @@ pub trait Host: Sized + 'static {
     fn as_node_3d(node: &Self::Node) -> Option<Self::Node3D>;
     /// The fields of `Node3D` in `node`.
     fn node_3d(node: &Self::Node3D) -> &Node3dFields;
+    /// The fields of the body `body`.
+    fn body(body: &Self::Body) -> &BodyFields<Self>;
     /// A new color with the channels `r`, `g`, `b` and `a`.
     fn color(r: f32, g: f32, b: f32, a: f32) -> Self::Color;
 }

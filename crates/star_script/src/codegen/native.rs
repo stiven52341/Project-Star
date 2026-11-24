@@ -194,32 +194,9 @@ pub mod Body {
     /// A reference to an object of this class.
     pub type Ref = ::std::rc::Rc<dyn Object>;
 
-    /// The nodes a body touches, without keeping them alive.
-    pub type Contacts_ = ::std::cell::RefCell<::std::vec::Vec<::std::rc::Weak<dyn crate::classes::Node::Object>>>;
-
     /// The fields of a body: the public ones, the impulses given during the
     /// frame, and what it touched in the last one.
-    pub struct Fields {
-        pub kind: ::star_script_runtime::Field<::std::string::String>,
-        pub shape: ::star_script_runtime::Field<::std::string::String>,
-        pub radius: ::star_script_runtime::Field<f32>,
-        pub width: ::star_script_runtime::Field<f32>,
-        pub height: ::star_script_runtime::Field<f32>,
-        pub depth: ::star_script_runtime::Field<f32>,
-        pub gravity_scale: ::star_script_runtime::Field<f32>,
-        pub friction: ::star_script_runtime::Field<f32>,
-        pub bounciness: ::star_script_runtime::Field<f32>,
-        pub density: ::star_script_runtime::Field<f32>,
-        pub velocity_x: ::star_script_runtime::Field<f32>,
-        pub velocity_y: ::star_script_runtime::Field<f32>,
-        pub velocity_z: ::star_script_runtime::Field<f32>,
-        pub fixed_rotation: ::star_script_runtime::Field<bool>,
-        pub sensor: ::star_script_runtime::Field<bool>,
-        pub impulse_: ::std::cell::Cell<(f32, f32, f32)>,
-        pub touching_: Contacts_,
-        pub just_touched_: Contacts_,
-        pub just_separated_: Contacts_,
-    }
+    pub type Fields = ::star_script_runtime::bodies::BodyFields<crate::classes::Host_>;
 
     /// Gives access to the fields of this class.
     pub trait HasFields {
@@ -235,41 +212,35 @@ pub mod Body {
         fn just_separated(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref>;
     }
 
-    /// The methods of a body.
+    /// The methods of a body: what `star_script_runtime::bodies` does with
+    /// its fields.
     pub struct Methods;
 
     impl Methods {
-        /// `func apply_impulse`: pushes the body once the frame ends.
+        /// `func apply_impulse`
         pub fn apply_impulse(this_: &Ref, x: f32, y: f32) {
-            Self::apply_impulse_3d(this_, x, y, 0.0);
+            HasFields::fields(&**this_).apply_impulse(x, y, 0.0);
         }
 
-        /// `func apply_impulse_3d`: pushes the body once the frame ends.
+        /// `func apply_impulse_3d`
         pub fn apply_impulse_3d(this_: &Ref, x: f32, y: f32, z: f32) {
-            let impulse_ = &HasFields::fields(&**this_).impulse_;
-            let (old_x_, old_y_, old_z_) = impulse_.get();
-            impulse_.set((old_x_ + x, old_y_ + y, old_z_ + z));
+            HasFields::fields(&**this_).apply_impulse(x, y, z);
         }
 
         /// `func touching`
         pub fn touching(this_: &Ref) -> ::star_script_runtime::List<crate::classes::Node::Ref> {
-            nodes_(&HasFields::fields(&**this_).touching_)
+            HasFields::fields(&**this_).contacts(::star_script_runtime::bodies::Contact::Touching)
         }
 
         /// `func just_touched`
         pub fn just_touched(this_: &Ref) -> ::star_script_runtime::List<crate::classes::Node::Ref> {
-            nodes_(&HasFields::fields(&**this_).just_touched_)
+            HasFields::fields(&**this_).contacts(::star_script_runtime::bodies::Contact::JustTouched)
         }
 
         /// `func just_separated`
         pub fn just_separated(this_: &Ref) -> ::star_script_runtime::List<crate::classes::Node::Ref> {
-            nodes_(&HasFields::fields(&**this_).just_separated_)
+            HasFields::fields(&**this_).contacts(::star_script_runtime::bodies::Contact::JustSeparated)
         }
-    }
-
-    /// A new list with the nodes of `contacts_` that still exist.
-    fn nodes_(contacts_: &Contacts_) -> ::star_script_runtime::List<crate::classes::Node::Ref> {
-        ::star_script_runtime::List::from_vec(contacts_.borrow().iter().filter_map(::std::rc::Weak::upgrade).collect())
     }
 
     /// An object created as this class.
@@ -293,57 +264,34 @@ pub mod Body {
         fn just_separated(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { Methods::just_separated(&(self as Ref)) }
     }
 
-    /// A body of `kind` and `shape` at rest, with the engine's surface.
-    pub fn new_(kind: ::std::string::String, shape: &str, radius: f32, width: f32, height: f32, depth: f32) -> Ref {
-        let contacts_ = || ::std::cell::RefCell::new(::std::vec::Vec::new());
-        ::std::rc::Rc::new(Instance {
-            Body: Fields {
-                kind: ::star_script_runtime::Field::new(kind),
-                shape: ::star_script_runtime::Field::new(::std::string::String::from(shape)),
-                radius: ::star_script_runtime::Field::new(radius),
-                width: ::star_script_runtime::Field::new(width),
-                height: ::star_script_runtime::Field::new(height),
-                depth: ::star_script_runtime::Field::new(depth),
-                gravity_scale: ::star_script_runtime::Field::new(1.0),
-                friction: ::star_script_runtime::Field::new(0.5),
-                bounciness: ::star_script_runtime::Field::new(0.0),
-                density: ::star_script_runtime::Field::new(1.0),
-                velocity_x: ::star_script_runtime::Field::new(0.0),
-                velocity_y: ::star_script_runtime::Field::new(0.0),
-                velocity_z: ::star_script_runtime::Field::new(0.0),
-                fixed_rotation: ::star_script_runtime::Field::new(false),
-                sensor: ::star_script_runtime::Field::new(false),
-                impulse_: ::std::cell::Cell::new((0.0, 0.0, 0.0)),
-                touching_: contacts_(),
-                just_touched_: contacts_(),
-                just_separated_: contacts_(),
-            },
-        })
+    /// A body with the fields `fields`.
+    pub fn of_(fields: Fields) -> Ref {
+        ::std::rc::Rc::new(Instance { Body: fields })
     }
 
     /// `static func circle`
     pub fn circle(kind: ::std::string::String, radius: f32) -> Ref {
-        new_(kind, \"circle\", radius, 1.0, 1.0, 1.0)
+        of_(Fields::circle(kind, radius))
     }
 
     /// `static func rectangle`
     pub fn rectangle(kind: ::std::string::String, width: f32, height: f32) -> Ref {
-        new_(kind, \"rectangle\", 0.5, width, height, 1.0)
+        of_(Fields::rectangle(kind, width, height))
     }
 
     /// `static func capsule`
     pub fn capsule(kind: ::std::string::String, height: f32, radius: f32) -> Ref {
-        new_(kind, \"capsule\", radius, 1.0, height, 1.0)
+        of_(Fields::capsule(kind, height, radius))
     }
 
     /// `static func sphere`
     pub fn sphere(kind: ::std::string::String, radius: f32) -> Ref {
-        new_(kind, \"sphere\", radius, 1.0, 1.0, 1.0)
+        of_(Fields::sphere(kind, radius))
     }
 
     /// `static func box`
     pub fn box_(kind: ::std::string::String, width: f32, height: f32, depth: f32) -> Ref {
-        new_(kind, \"box\", 0.5, width, height, depth)
+        of_(Fields::cuboid(kind, width, height, depth))
     }
 }";
 
@@ -604,6 +552,10 @@ impl ::star_script_runtime::nodes::Host for Host_ {
         crate::classes::Node3D::HasFields::fields(&**node)
     }
 
+    fn body(body: &Self::Body) -> &::star_script_runtime::bodies::BodyFields<Self> {
+        crate::classes::Body::HasFields::fields(&**body)
+    }
+
     fn color(r: f32, g: f32, b: f32, a: f32) -> Self::Color {
         crate::classes::Color::new(r, g, b, a)
     }
@@ -778,7 +730,7 @@ pub mod Scene {
             look_.main.set(view_.main);
         }
         if let ::std::option::Option::Some(solid_) = &node_.body {
-            let body_ = crate::classes::Body::new_(solid_.kind.clone(), &solid_.shape, solid_.radius, solid_.width, solid_.height, solid_.depth);
+            let body_ = crate::classes::Body::of_(crate::classes::Body::Fields::new(solid_.kind.clone(), &solid_.shape, solid_.radius, [solid_.width, solid_.height, solid_.depth]));
             let surface_ = crate::classes::Body::HasFields::fields(&*body_);
             surface_.gravity_scale.set(solid_.gravity_scale);
             surface_.fixed_rotation.set(solid_.fixed_rotation);
@@ -1147,7 +1099,7 @@ fn with_body_(
         return then_(::std::option::Option::None);
     };
     let body_ = crate::classes::Body::HasFields::fields(&*body_);
-    let (impulse_x_, impulse_y_, impulse_z_) = body_.impulse_.replace((0.0, 0.0, 0.0));
+    let [impulse_x_, impulse_y_, impulse_z_] = body_.take_impulse();
     body_.kind.read(|kind_| {
         body_.shape.read(|shape_| {
             then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptBody {
@@ -1278,18 +1230,14 @@ fn sync_bodies_(
             depth_.yaw.set(state_.angles.y);
         }
         let body_ = crate::classes::Body::HasFields::fields(&*body_);
-        body_.velocity_x.set(state_.velocity.x);
-        body_.velocity_y.set(state_.velocity.y);
-        body_.velocity_z.set(state_.velocity.z);
+        body_.set_velocity([state_.velocity.x, state_.velocity.y, state_.velocity.z]);
         let contacts_ = [
-            (&body_.touching_, state_.touching),
-            (&body_.just_touched_, state_.just_touched),
-            (&body_.just_separated_, state_.just_separated),
+            (::star_script_runtime::bodies::Contact::Touching, state_.touching),
+            (::star_script_runtime::bodies::Contact::JustTouched, state_.just_touched),
+            (::star_script_runtime::bodies::Contact::JustSeparated, state_.just_separated),
         ];
-        for (list_, ids_) in contacts_ {
-            let mut list_ = list_.borrow_mut();
-            list_.clear();
-            list_.extend(ids_.iter().filter_map(|other_| known_.get(other_)).map(::std::rc::Rc::downgrade));
+        for (which_, ids_) in contacts_ {
+            body_.set_contacts(which_, ids_.iter().filter_map(|other_| known_.get(other_)));
         }
     }
     known_.clear();

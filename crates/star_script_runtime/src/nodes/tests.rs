@@ -2,6 +2,7 @@ use std::f32::consts::FRAC_PI_2;
 use std::rc::{Rc, Weak};
 
 use super::*;
+use crate::bodies::BodyFields;
 
 /// Nodes made of plain `Rc`s, as a way of running StarScript could have.
 pub(crate) struct TestHost;
@@ -17,7 +18,7 @@ impl Host for TestHost {
     type Node = Rc<TestNode>;
     type WeakNode = Weak<TestNode>;
     type Node3D = Rc<TestNode>;
-    type Body = ();
+    type Body = Rc<BodyFields<Self>>;
     type Color = [f32; 4];
 
     fn node(node: &Self::Node) -> &NodeFields<Self> {
@@ -44,12 +45,27 @@ impl Host for TestHost {
         &node.node_3d
     }
 
+    fn body(body: &Self::Body) -> &BodyFields<Self> {
+        body
+    }
+
     fn color(r: f32, g: f32, b: f32, a: f32) -> Self::Color {
         [r, g, b, a]
     }
 }
 
 type Node = Rc<TestNode>;
+
+impl TestNode {
+    /// A node placed in 2D with the fields `node`.
+    pub(crate) fn flat(node: NodeFields<TestHost>) -> Self {
+        Self {
+            node,
+            node_3d: Node3dFields::new(),
+            is_3d: false,
+        }
+    }
+}
 
 fn node(name: &str) -> Node {
     Rc::new(TestNode {

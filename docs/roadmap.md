@@ -378,7 +378,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
               their fields in `star_script_runtime::node_classes`, the
               methods of `Node3D` in `nodes`, and all of them generated
               from one description each (`codegen/native_nodes.rs`).
-        - [ ] f1b3. `Body`: impulses, contacts, syncing with physics.
+        - [x] f1b3. `Body`: its fields, impulses and contacts in
+              `star_script_runtime::bodies`; the generated game only
+              passes them to the engine and back.
         - [ ] f1b4. `Game`, mirroring nodes and the game loop.
         - [ ] f1b5. `Scene` and `Sound` (`Host` creates classes by name).
     - [ ] f2. Measure “Play” with scripts on a realistic, big project

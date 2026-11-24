@@ -11,6 +11,7 @@
 //! Rust toolchain and the engine.
 
 pub mod audio;
+pub mod bodies;
 pub mod color;
 mod equality;
 mod fault;
