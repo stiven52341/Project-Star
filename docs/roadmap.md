@@ -256,7 +256,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         program, no dependency).
   - [x] A slider for the size of the icons of “Assets”, remembered by the
         editor's preferences.
-- [ ] **Owner's list (2026-11-23)**, done one by one:
+- [x] **Owner's list (2026-11-23)**, done one by one:
   - [x] Opening a project opens again the scene it had open.
   - [x] Dragging scripts from “Assets” to the view and to the inspector.
   - [x] Dropping a blueprint on a node does not give it its class (bug).
@@ -298,5 +298,8 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         blueprints: `tags` of nodes (scenes, inspector), `find_by_name` and
         `find_by_tag` of `Node` (descendants) and `Scene` (the whole
         game), and the blueprints' “For each” node to go through lists.
-  - [ ] Global and local position, as separate properties.
+  - [x] Global and local position: `x`, `y`… stay local, and nodes get
+        `global_x`/`global_y`/`global_rotation` (`global_z` in 3D), their
+        setters, `translate`, `translate_global` and `rotate` (and their
+        3D versions), also under “Transform” in blueprints.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

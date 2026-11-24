@@ -459,11 +459,11 @@ The engine provides them; their names cannot be used for other classes.
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. |
 | `Game` | fields `background: Color` (black), `camera: Camera2D?` (`null`), `camera_3d: Camera3D?` (`null`), `ambient: Color` (black: no ambient light), `ambient_2d: Color` (white: sprites show their own colors); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
-| `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `body: Body?` (`null`), `tags: [string]` (`[]`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?`, `has_tag(tag: string) -> bool`, `find_by_name(name: string) -> Node?`, `find_by_tag(tag: string) -> [Node]` |
+| `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `body: Body?` (`null`), `tags: [string]` (`[]`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?`, `has_tag(tag: string) -> bool`, `find_by_name(name: string) -> Node?`, `find_by_tag(tag: string) -> [Node]`, `global_x() -> float`, `global_y() -> float`, `global_rotation() -> float`, `set_global_position(x: float, y: float)`, `set_global_rotation(angle: float)`, `translate(x: float, y: float)`, `translate_global(x: float, y: float)`, `rotate(angle: float)` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors) |
 | `Light2D` (extends `Node`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (3.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
 | `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `current: bool` (`false`) |
-| `Node3D` (extends `Node`) | `init(name: string)`; fields `z`, `pitch`, `yaw: float` (0.0), `scale_z: float` (1.0); `look_at(x: float, y: float, z: float)` |
+| `Node3D` (extends `Node`) | `init(name: string)`; fields `z`, `pitch`, `yaw: float` (0.0), `scale_z: float` (1.0); `look_at(x: float, y: float, z: float)`, `global_z() -> float`, `set_global_position_3d(x: float, y: float, z: float)`, `translate_3d(x: float, y: float, z: float)`, `translate_global_3d(x: float, y: float, z: float)` |
 | `Mesh` (extends `Node3D`) | `init(name: string, shape: string)`; fields `shape: string`, `width`, `height`, `depth` (1.0), `radius` (0.5), `color: Color` (white), `metallic` (0.0), `roughness: float` (0.5), `texture: string` (`""`: none), `pixelated: bool` (`false`) |
 | `Light` (extends `Node3D`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (10.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
 | `Camera3D` (extends `Node3D`) | `init(name: string)`; fields `fov: float` (about 1.047 radians: 60°), `current: bool` (`false`) |
@@ -536,6 +536,21 @@ class Space extends Game {
   running and are no longer shown. The object can be added again later.
 - `x`, `y`, `width` and `height` are in world units; `rotation` in radians,
   counterclockwise.
+- A node's `x`, `y`, `rotation` and scales are **local**: relative to its
+  parent, which places it scaled, then turned, then moved, as the engine
+  draws it. Its **global** place, in the world, comes from methods:
+  `global_x()`, `global_y()` and `global_rotation()` read it;
+  `set_global_position(x, y)` and `set_global_rotation(angle)` change the
+  local values so the node ends up there. `translate(x, y)` moves it in its
+  parent's space (adds to `x` and `y`), `translate_global(x, y)` in the
+  world, and `rotate(angle)` turns it more. A `Node3D` adds `global_z()`,
+  `set_global_position_3d`, `translate_3d` and `translate_global_3d`, and
+  its 2D ones keep its depth in the world. 2D nodes are placed by their 2D
+  ancestors and 3D nodes by their 3D ancestors, as the engine does; a
+  parent scaled to nothing leaves its children where they are when they
+  are placed globally. `global_rotation` adds the rotations of the node
+  and its ancestors (for a `Node3D`, their rolls), which is exact unless a
+  parent is scaled differently across and up.
 - The game is seen from its `camera`: the window is centered on where that
   `Camera2D` is in the world (so a camera that is the child of a node
   follows it) and shows `view_height` world units from bottom to top; the

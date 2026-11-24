@@ -18,17 +18,29 @@ use crate::texts;
 /// rather than calls.
 const EVENTS: [&str; 2] = ["start", "update"];
 /// The members of nodes that place them, gathered under “Transform”.
-const TRANSFORM_MEMBERS: [(&str, &str); 10] = [
+const TRANSFORM_MEMBERS: [(&str, &str); 22] = [
     (NODE_CLASS, "x"),
     (NODE_CLASS, "y"),
     (NODE_CLASS, "rotation"),
     (NODE_CLASS, "scale_x"),
     (NODE_CLASS, "scale_y"),
+    (NODE_CLASS, "global_x"),
+    (NODE_CLASS, "global_y"),
+    (NODE_CLASS, "global_rotation"),
+    (NODE_CLASS, "set_global_position"),
+    (NODE_CLASS, "set_global_rotation"),
+    (NODE_CLASS, "translate"),
+    (NODE_CLASS, "translate_global"),
+    (NODE_CLASS, "rotate"),
     (NODE_3D_CLASS, "z"),
     (NODE_3D_CLASS, "pitch"),
     (NODE_3D_CLASS, "yaw"),
     (NODE_3D_CLASS, "scale_z"),
     (NODE_3D_CLASS, "look_at"),
+    (NODE_3D_CLASS, "global_z"),
+    (NODE_3D_CLASS, "set_global_position_3d"),
+    (NODE_3D_CLASS, "translate_3d"),
+    (NODE_3D_CLASS, "translate_global_3d"),
 ];
 /// The name of the argument of the methods of numbers (`min`, `max`).
 const NUMBER_ARGUMENT: &str = "other";
@@ -298,6 +310,9 @@ mod tests {
         assert!(!labels(&transform.own).contains(&"z: float"));
         assert!(labels(&transform.of_other).contains(&".z: float"));
         assert!(labels(&transform.of_other).contains(&".look_at(x, y, z)"));
+        assert!(labels(&transform.own).contains(&"translate(x, y)"));
+        assert!(labels(&transform.own).contains(&"global_x() -> float"));
+        assert!(!labels(&transform.own).contains(&"translate_3d(x, y, z)"));
     }
 
     #[test]
