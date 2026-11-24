@@ -11,7 +11,7 @@ use star_render::{
     Color, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, DEFAULT_SPOT_ANGLE, DEFAULT_SPOT_BLEND,
     MAX_SPOT_ANGLE, MeshShape, TextureFilter,
 };
-use star_scene::{LightNode, MeshOutline};
+use star_scene::{Light2dNode, LightNode, MeshOutline};
 
 use crate::script_body::{DEFAULT_RADIUS, DEFAULT_SIZE, SPHERE};
 
@@ -218,6 +218,80 @@ impl ScriptLight<'_> {
     }
 }
 
+impl ScriptLight<'static> {
+    /// The script light that a scene's `light_2d` describes.
+    #[must_use]
+    pub const fn from_light_2d(light: &Light2dNode) -> Self {
+        match *light {
+            Light2dNode::Point {
+                color,
+                intensity,
+                range,
+            } => Self {
+                kind: POINT,
+                color,
+                intensity,
+                range,
+                angle: DEFAULT_SPOT_ANGLE,
+                blend: DEFAULT_SPOT_BLEND,
+            },
+            Light2dNode::Spot {
+                color,
+                intensity,
+                range,
+                angle,
+                blend,
+            } => Self {
+                kind: SPOT,
+                color,
+                intensity,
+                range,
+                angle,
+                blend,
+            },
+        }
+    }
+}
+
+impl ScriptLight<'_> {
+    /// The light of a `Light2D` node: a point light or a spot, as a
+    /// `Light` is.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Rendering`] if it is not a point light or a spot,
+    /// or as [`ScriptLight::to_light`] says.
+    pub fn to_light_2d(&self) -> EngineResult<Light2dNode> {
+        match self.to_light()? {
+            LightNode::Point {
+                color,
+                intensity,
+                range,
+            } => Ok(Light2dNode::Point {
+                color,
+                intensity,
+                range,
+            }),
+            LightNode::Spot {
+                color,
+                intensity,
+                range,
+                angle,
+                blend,
+            } => Ok(Light2dNode::Spot {
+                color,
+                intensity,
+                range,
+                angle,
+                blend,
+            }),
+            LightNode::Directional { .. } => Err(EngineError::Rendering(format!(
+                "a 2D light is \"{POINT}\" or \"{SPOT}\", not \"{DIRECTIONAL}\""
+            ))),
+        }
+    }
+}
+
 /// A StarScript `Camera3D`, as the generated game describes it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScriptCamera3D {
@@ -365,6 +439,26 @@ mod tests {
             }
         ));
         assert!(ScriptLight { angle: 2.0, ..spot }.to_light().is_err());
+    }
+
+    #[test]
+    fn lights_2d_are_points_or_spots() {
+        let lamp = Light2dNode::Point {
+            color: Color::WHITE,
+            intensity: 1.0,
+            range: 3.0,
+        };
+        let light = ScriptLight::from_light_2d(&lamp);
+
+        assert_eq!(light.to_light_2d().unwrap(), lamp);
+        assert!(
+            ScriptLight {
+                kind: DIRECTIONAL,
+                ..light
+            }
+            .to_light_2d()
+            .is_err()
+        );
     }
 
     #[test]

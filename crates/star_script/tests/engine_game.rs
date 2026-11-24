@@ -84,6 +84,8 @@ class NodeGame extends Game {
 
     override func start() {
         background = Color(0.0, 0.0, 0.1, 1.0)
+        ambient_2d = Color(0.2, 0.2, 0.3, 1.0)
+        add_child(Light2D(\"Lamp\", \"point\"))
         const fleet = Scene.load(\"levels/fleet.scene\")
         if fleet != null {
             add_child(fleet)
@@ -91,6 +93,10 @@ class NodeGame extends Game {
             const leader = fleet.find_child(\"Leader\")
             if leader is Sprite {
                 Debug.print(leader.texture + \" \" + leader.x.to_string() + \" \" + leader.color.g.to_string())
+            }
+            const torch = fleet.find_child(\"Torch\")
+            if torch is Light2D {
+                Debug.print(torch.kind + \" \" + torch.range.to_string() + \" \" + torch.angle.to_string())
             }
         }
         Debug.print((Scene.load(\"levels/missing.scene\") == null).to_string())
@@ -347,6 +353,16 @@ parent = 0
 [node.camera]
 view_height = 6.0
 current = true
+
+[[node]]
+name = "Torch"
+parent = 0
+rotation = 1.5
+
+[node.light_2d]
+kind = "spot"
+range = 4.0
+angle = 0.5
 "#;
 
 /// A scene whose node names a class the game does not have.
@@ -433,7 +449,7 @@ fn games_run_in_the_engine_until_they_quit() {
     );
     assert_eq!(
         stdout,
-        "Fleet 3\nsprites/leader.png 1.5 0.5\ntrue\ntrue\n\
+        "Fleet 4\nsprites/leader.png 1.5 0.5\nspot 4.0 0.5\ntrue\ntrue\n\
          game frame 1\nship start\nship x 1.0\ndrone start Wingman -2.0 4.0 wing 0.25\n\
          game frame 2\ncamera Lookout 6.0\nship x 2.0\n\
          game frame 3\ncamera Lookout 6.0\nship x 3.0\n"

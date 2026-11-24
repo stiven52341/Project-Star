@@ -27,8 +27,8 @@ use star_math::{Mat4, Vec2, Vec3};
 use star_physics::{BodySettings, ContactPhase};
 use star_render::{Camera, Color, Projection, TextureFilter};
 use star_scene::{
-    Body2D, Body3D, GlobalTransform2D, GlobalTransform3D, Hierarchy, LightNode, Name, NodeBody,
-    NodeContact, PhysicsNodes, PhysicsNodes3d, Transform2D, Transform3D,
+    Body2D, Body3D, GlobalTransform2D, GlobalTransform3D, Hierarchy, Light2dNode, LightNode, Name,
+    NodeBody, NodeContact, PhysicsNodes, PhysicsNodes3d, Transform2D, Transform3D,
 };
 
 pub use crate::script_3d::{
@@ -62,6 +62,8 @@ pub struct ScriptNode<'a> {
     pub mesh: Option<ScriptMesh<'a>>,
     /// The light it shines, for `Light` objects.
     pub light: Option<ScriptLight<'a>>,
+    /// The light it shines on the sprites, for `Light2D` objects.
+    pub light_2d: Option<ScriptLight<'a>>,
 }
 
 /// What a StarScript `Sprite` shows.
@@ -375,6 +377,7 @@ impl ScriptNodes {
         self.update_body(world, node, entity)?;
         self.update_mesh(world, node, entity)?;
         self.update_light(world, node, entity)?;
+        self.update_light_2d(world, node, entity)?;
         if let Some(sprite) = node.sprite {
             self.update_sprite(world, node.id, entity, sprite)
         } else {
@@ -515,6 +518,26 @@ impl ScriptNodes {
             Ok(light) => replace(world, entity, light),
             Err(error) => {
                 world.remove::<LightNode>(entity);
+                self.reject_look(node, &error.to_string());
+                Ok(())
+            }
+        }
+    }
+
+    fn update_light_2d(
+        &mut self,
+        world: &mut World,
+        node: &ScriptNode<'_>,
+        entity: Entity,
+    ) -> EngineResult<()> {
+        let Some(light) = node.light_2d.filter(|_| node.transform_3d.is_none()) else {
+            world.remove::<Light2dNode>(entity);
+            return Ok(());
+        };
+        match light.to_light_2d() {
+            Ok(light) => replace(world, entity, light),
+            Err(error) => {
+                world.remove::<Light2dNode>(entity);
                 self.reject_look(node, &error.to_string());
                 Ok(())
             }
@@ -677,6 +700,7 @@ mod tests {
             body: None,
             mesh: None,
             light: None,
+            light_2d: None,
         }
     }
 

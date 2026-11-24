@@ -51,6 +51,9 @@ pub const MESH_CLASS: &str = "Mesh";
 /// Name of the engine class of the 3D nodes that shine a light.
 pub const LIGHT_CLASS: &str = "Light";
 
+/// Name of the engine class of the 2D nodes that light the sprites.
+pub const LIGHT_2D_CLASS: &str = "Light2D";
+
 /// Name of the engine class of the 3D nodes the game is seen from.
 pub const CAMERA_3D_CLASS: &str = "Camera3D";
 
@@ -144,6 +147,7 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     add_body_methods(classes, body, node);
     add_sprite_class(classes, node, color);
     let camera = add_camera_class(classes, node);
+    add_light_2d_class(classes, node, color);
     let node_3d = add_node_3d_class(classes, node);
     add_mesh_class(classes, node_3d, color);
     add_light_class(classes, node_3d, color);
@@ -185,6 +189,7 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
         native_field("camera", Type::Class(camera).nullable()),
         native_field("camera_3d", Type::Class(camera_3d).nullable()),
         native_field("ambient", Type::Class(color)),
+        native_field("ambient_2d", Type::Class(color)),
     ];
     game.methods
         .push(native_method("start", &[], Type::Void, false));
@@ -409,6 +414,26 @@ fn add_mesh_class(classes: &mut ClassTable, node_3d: ClassId, color: ClassId) ->
 fn add_light_class(classes: &mut ClassTable, node_3d: ClassId, color: ClassId) -> ClassId {
     let mut light = ClassInfo::new(LIGHT_CLASS.to_owned(), ClassOrigin::Native);
     light.base = Some(node_3d);
+    light.fields = vec![
+        native_field("kind", Type::String),
+        native_field("color", Type::Class(color)),
+        native_field("intensity", Type::Float),
+        native_field("range", Type::Float),
+        native_field("angle", Type::Float),
+        native_field("blend", Type::Float),
+    ];
+    light.constructor = Some(native_constructor(&[
+        ("name", Type::String),
+        ("kind", Type::String),
+    ]));
+    classes.add(light)
+}
+
+/// `Light2D`: a 2D node that lights the sprites: a point light or a spot,
+/// with the same fields as `Light`.
+fn add_light_2d_class(classes: &mut ClassTable, node: ClassId, color: ClassId) -> ClassId {
+    let mut light = ClassInfo::new(LIGHT_2D_CLASS.to_owned(), ClassOrigin::Native);
+    light.base = Some(node);
     light.fields = vec![
         native_field("kind", Type::String),
         native_field("color", Type::Class(color)),

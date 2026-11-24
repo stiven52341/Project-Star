@@ -39,6 +39,9 @@ pub struct SceneNode {
     pub mesh: Option<SceneMesh>,
     /// The light it shines; only `Light` objects can shine one.
     pub light: Option<SceneLight>,
+    /// The light it shines on the sprites; only `Light2D` objects can
+    /// shine one.
+    pub light_2d: Option<SceneLight>,
     /// The 2D camera it is; only `Camera2D` objects can be one.
     pub camera: Option<SceneCamera>,
     /// The 3D camera it is; only `Camera3D` objects can be one.
@@ -286,6 +289,7 @@ mod tests {
             transform_3d: None,
             mesh: None,
             light: None,
+            light_2d: None,
             camera: None,
             camera_3d: None,
             fields: Vec::new(),

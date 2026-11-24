@@ -1,5 +1,6 @@
-//! Modules of the engine's 3D node classes: `Node3D`, which extends `Node`,
-//! and `Mesh`, `Light` and `Camera3D`, which extend `Node3D`.
+//! Modules of the engine's node classes written from a description:
+//! `Light2D`, which extends `Node`; `Node3D`, which extends `Node`; and
+//! `Mesh`, `Light` and `Camera3D`, which extend `Node3D`.
 //!
 //! They have the same shape as the modules of `Sprite` and `Camera2D`, so
 //! they are written from a description of each class: its fields, the
@@ -89,7 +90,7 @@ if length_ > 0.0 && length_.is_finite() {
 /// value, which may be an argument of `init`.
 type Field = (&'static str, &'static str, &'static str);
 
-/// An engine node class placed in 3D.
+/// An engine node class written from a description.
 struct NodeClass {
     name: &'static str,
     /// What the fields are, for the documentation of `Fields`.
@@ -162,6 +163,23 @@ const LIGHT: NodeClass = NodeClass {
     bodies: &[],
 };
 
+const LIGHT_2D: NodeClass = NodeClass {
+    name: "Light2D",
+    about: "the kind of light it shines on the sprites, its color, how bright it is, how far it reaches and the cone of spots",
+    ancestors: &["Node"],
+    fields: &[
+        ("kind", STRING, "kind"),
+        ("color", COLOR, WHITE),
+        ("intensity", "f32", "1.0"),
+        ("range", "f32", "3.0"),
+        ("angle", "f32", "::std::f32::consts::FRAC_PI_6"),
+        ("blend", "f32", "0.2"),
+    ],
+    parameters: &[("kind", STRING)],
+    methods: &[],
+    bodies: &[],
+};
+
 const CAMERA_3D: NodeClass = NodeClass {
     name: "Camera3D",
     about: "how wide it sees, in radians",
@@ -175,9 +193,9 @@ const CAMERA_3D: NodeClass = NodeClass {
     bodies: &[],
 };
 
-/// The modules of `Node3D`, `Mesh`, `Light` and `Camera3D`.
+/// The modules of `Light2D`, `Node3D`, `Mesh`, `Light` and `Camera3D`.
 pub(super) fn node_3d_modules(out: &mut Writer) {
-    for class in [NODE_3D, MESH, LIGHT, CAMERA_3D] {
+    for class in [LIGHT_2D, NODE_3D, MESH, LIGHT, CAMERA_3D] {
         out.line("");
         module(out, &class);
     }

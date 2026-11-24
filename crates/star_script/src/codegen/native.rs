@@ -32,6 +32,7 @@ pub mod Game {
         pub camera: ::star_script_runtime::Field<::std::option::Option<crate::classes::Camera2D::Ref>>,
         pub camera_3d: ::star_script_runtime::Field<::std::option::Option<crate::classes::Camera3D::Ref>>,
         pub ambient: ::star_script_runtime::Field<crate::classes::Color::Ref>,
+        pub ambient_2d: ::star_script_runtime::Field<crate::classes::Color::Ref>,
         pub quit_requested_: ::star_script_runtime::Field<bool>,
         pub root_: crate::classes::Node::Ref,
     }
@@ -113,6 +114,7 @@ pub mod Game {
             camera: ::star_script_runtime::Field::new(::std::option::Option::None),
             camera_3d: ::star_script_runtime::Field::new(::std::option::Option::None),
             ambient: ::star_script_runtime::Field::new(crate::classes::Color::new(0.0, 0.0, 0.0, 1.0)),
+            ambient_2d: ::star_script_runtime::Field::new(crate::classes::Color::new(1.0, 1.0, 1.0, 1.0)),
             quit_requested_: ::star_script_runtime::Field::new(false),
             root_: crate::classes::Node::new_root_(),
         })
@@ -741,6 +743,10 @@ pub mod Scene {
                 ::std::option::Option::None => return missing_(\"Sprite\"),
             },
             ::std::option::Option::Some(\"Camera2D\") => crate::classes::Camera2D::new(name_),
+            ::std::option::Option::Some(\"Light2D\") => match &node_.light_2d {
+                ::std::option::Option::Some(light_) => crate::classes::Light2D::new(name_, light_.kind.clone()),
+                ::std::option::Option::None => return ::std::result::Result::Err(::std::string::String::from(\"a `Light2D` needs a `[node.light_2d]`\")),
+            },
             ::std::option::Option::Some(\"Node3D\") => crate::classes::Node3D::new(name_),
             ::std::option::Option::Some(\"Mesh\") => match &node_.mesh {
                 ::std::option::Option::Some(mesh_) => crate::classes::Mesh::new(name_, mesh_.shape.clone()),
@@ -820,6 +826,18 @@ pub mod Scene {
             look_.angle.set(shone_.angle);
             look_.blend.set(shone_.blend);
         }
+        if let ::std::option::Option::Some(shone_) = &node_.light_2d {
+            let light_ = crate::AnyObject::Light2D(::std::rc::Rc::clone(&object_))
+                .ok_or_else(|| ::std::format!(\"it lights the sprites, but `{class_}` is not a `Light2D`\"))?;
+            let look_ = crate::classes::Light2D::HasFields::fields(&*light_);
+            look_.kind.set(shone_.kind.clone());
+            let [r_, g_, b_, a_] = shone_.color;
+            look_.color.set(crate::classes::Color::new(r_, g_, b_, a_));
+            look_.intensity.set(shone_.intensity);
+            look_.range.set(shone_.range);
+            look_.angle.set(shone_.angle);
+            look_.blend.set(shone_.blend);
+        }
         if let ::std::option::Option::Some(view_) = &node_.camera {
             let camera_ = crate::AnyObject::Camera2D(::std::rc::Rc::clone(&object_))
                 .ok_or_else(|| ::std::format!(\"it is a 2D camera, but `{class_}` is not a `Camera2D`\"))?;
@@ -857,6 +875,8 @@ pub mod Scene {
             crate::classes::Mesh::new(name_, mesh_.shape.clone())
         } else if let ::std::option::Option::Some(light_) = &node_.light {
             crate::classes::Light::new(name_, light_.kind.clone())
+        } else if let ::std::option::Option::Some(light_) = &node_.light_2d {
+            crate::classes::Light2D::new(name_, light_.kind.clone())
         } else if node_.camera_3d.is_some() {
             crate::classes::Camera3D::new(name_)
         } else if node_.camera.is_some() {
@@ -1011,6 +1031,8 @@ impl ::star_engine::game::Game for EngineGame_ {{
         frame.set_clear_color(fields_.background.read(|color_| engine_color_(&**color_)));
         let ambient_ = fields_.ambient.read(|color_| engine_color_(&**color_));
         frame.set_ambient_light(::star_engine::star_render::AmbientLight::new(ambient_, 1.0));
+        let ambient_2d_ = fields_.ambient_2d.read(|color_| engine_color_(&**color_));
+        frame.set_ambient_light_2d(::star_engine::star_render::AmbientLight::new(ambient_2d_, 1.0));
         frame.set_camera(self.view_(world));
     }}
 
@@ -1154,6 +1176,7 @@ fn mirror_nodes_(
                 with_body_(fields_, |body_| {
                     with_mesh_(&node_, |mesh_| {
                         with_light_(&node_, |light_| {
+                          with_light_2d_(&node_, |light_2d_| {
                             let described_ = ::star_engine::script_nodes::ScriptNode {
                                 id: fields_.id_,
                                 parent: parent_,
@@ -1164,8 +1187,10 @@ fn mirror_nodes_(
                                 body: body_,
                                 mesh: mesh_,
                                 light: light_,
+                                light_2d: light_2d_,
                             };
                             mirror_.mirror(world_, &described_);
+                          });
                         });
                     });
                 });
@@ -1270,6 +1295,28 @@ fn with_light_(
         return then_(::std::option::Option::None);
     };
     let look_ = crate::classes::Light::HasFields::fields(&*light_);
+    look_.kind.read(|kind_| {
+        then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptLight {
+            kind: kind_,
+            color: look_.color.read(|color_| engine_color_(&**color_)),
+            intensity: look_.intensity.get(),
+            range: look_.range.get(),
+            angle: look_.angle.get(),
+            blend: look_.blend.get(),
+        }));
+    });
+}
+
+/// Runs `then_` with what the engine needs to know about the light `node_`
+/// shines on the sprites, if it is a `Light2D`.
+fn with_light_2d_(
+    node_: &crate::classes::Node::Ref,
+    then_: impl FnOnce(::std::option::Option<::star_engine::script_nodes::ScriptLight<'_>>),
+) {
+    let ::std::option::Option::Some(light_) = crate::AnyObject::Light2D(::std::rc::Rc::clone(node_)) else {
+        return then_(::std::option::Option::None);
+    };
+    let look_ = crate::classes::Light2D::HasFields::fields(&*light_);
     look_.kind.read(|kind_| {
         then_(::std::option::Option::Some(::star_engine::script_nodes::ScriptLight {
             kind: kind_,
@@ -1442,6 +1489,17 @@ fn read_scene_(
             camera_3d: node_.camera_3d.map(|view_| ::star_script_runtime::scenes::SceneCamera3D {
                 fov: view_.fov,
                 current: view_.current,
+            }),
+            light_2d: node_.light_2d.map(|shone_| {
+                let light_ = ::star_engine::script_nodes::ScriptLight::from_light_2d(&shone_);
+                ::star_script_runtime::scenes::SceneLight {
+                    kind: ::std::string::String::from(light_.kind),
+                    color: [light_.color.r, light_.color.g, light_.color.b, light_.color.a],
+                    intensity: light_.intensity,
+                    range: light_.range,
+                    angle: light_.angle,
+                    blend: light_.blend,
+                }
             }),
             light: node_.light.map(|shone_| {
                 let light_ = ::star_engine::script_nodes::ScriptLight::from_light(&shone_);
