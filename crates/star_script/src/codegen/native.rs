@@ -5,7 +5,7 @@
 //! here, with the same shape as the modules of script classes.
 
 use super::conversions::RUNTIME;
-use super::native_3d;
+use super::native_nodes;
 use super::writer::Writer;
 use crate::InputAction;
 
@@ -129,16 +129,15 @@ pub mod Game {
     }
 }";
 
-/// The modules of the engine classes `Color`, `Body`, `Node`, `Sprite`,
-/// `Camera2D`, `Scene` and `Sound`, and of the 3D nodes.
+/// How the generated classes are nodes for `star_script_runtime`, the
+/// modules of the engine classes `Color`, `Body`, `Node`, `Scene` and
+/// `Sound`, and those of the other node classes.
 pub(super) fn node_modules(out: &mut Writer) {
     let modules = [
         HOST,
         COLOR_MODULE,
         BODY_MODULE,
         NODE_MODULE,
-        SPRITE_MODULE,
-        CAMERA_MODULE,
         SCENE_MODULE,
         SOUND_MODULE,
     ];
@@ -150,7 +149,7 @@ pub(super) fn node_modules(out: &mut Writer) {
             out.line(line);
         }
     }
-    native_3d::node_3d_modules(out);
+    native_nodes::node_class_modules(out);
 }
 
 const COLOR_MODULE: &str = "/// `class Color`, provided by the engine.
@@ -579,6 +578,7 @@ impl ::star_script_runtime::nodes::Host for Host_ {
     type WeakNode = ::std::rc::Weak<dyn crate::classes::Node::Object>;
     type Node3D = crate::classes::Node3D::Ref;
     type Body = crate::classes::Body::Ref;
+    type Color = crate::classes::Color::Ref;
 
     fn node(node: &Self::Node) -> &crate::classes::Node::Fields {
         crate::classes::Node::HasFields::fields(&**node)
@@ -603,181 +603,9 @@ impl ::star_script_runtime::nodes::Host for Host_ {
     fn node_3d(node: &Self::Node3D) -> &::star_script_runtime::nodes::Node3dFields {
         crate::classes::Node3D::HasFields::fields(&**node)
     }
-}";
 
-const SPRITE_MODULE: &str = "/// `class Sprite`, provided by the engine.
-pub mod Sprite {
-    /// A reference to an object of this class or of a subclass.
-    pub type Ref = ::std::rc::Rc<dyn Object>;
-
-    /// The fields of a sprite: the image it shows and how.
-    pub struct Fields {
-        pub texture: ::star_script_runtime::Field<::std::string::String>,
-        pub width: ::star_script_runtime::Field<f32>,
-        pub height: ::star_script_runtime::Field<f32>,
-        pub layer: ::star_script_runtime::Field<i32>,
-        pub pixelated: ::star_script_runtime::Field<bool>,
-        pub color: ::star_script_runtime::Field<crate::classes::Color::Ref>,
-    }
-
-    /// Gives access to the fields of this class, in objects of any subclass.
-    pub trait HasFields {
-        fn fields(&self) -> &Fields;
-    }
-
-    /// A sprite adds no methods to those of a node.
-    pub trait Object: crate::classes::Node::Object + HasFields {}
-
-    /// A sprite adds no methods to those of a node.
-    pub struct Methods;
-
-    /// An object created as this class (not as a subclass).
-    pub struct Instance {
-        pub Node: crate::classes::Node::Fields,
-        pub Sprite: Fields,
-    }
-
-    impl crate::classes::Node::HasFields for Instance {
-        fn fields(&self) -> &crate::classes::Node::Fields { &self.Node }
-    }
-
-    impl HasFields for Instance {
-        fn fields(&self) -> &Fields { &self.Sprite }
-    }
-
-    impl crate::AnyObject for Instance {
-        fn Node(self: ::std::rc::Rc<Self>) -> ::std::option::Option<crate::classes::Node::Ref> { ::std::option::Option::Some(self) }
-        fn Sprite(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref> { ::std::option::Option::Some(self) }
-    }
-
-    impl crate::classes::Node::Object for Instance {
-        fn start(self: ::std::rc::Rc<Self>) { crate::classes::Node::Methods::start(&(self as crate::classes::Node::Ref)) }
-        fn update(self: ::std::rc::Rc<Self>, delta: f32) { crate::classes::Node::Methods::update(&(self as crate::classes::Node::Ref), delta) }
-        fn add_child(self: ::std::rc::Rc<Self>, child: crate::classes::Node::Ref) { crate::classes::Node::Methods::add_child(&(self as crate::classes::Node::Ref), child) }
-        fn remove(self: ::std::rc::Rc<Self>) { crate::classes::Node::Methods::remove(&(self as crate::classes::Node::Ref)) }
-        fn parent(self: ::std::rc::Rc<Self>) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::parent(&(self as crate::classes::Node::Ref)) }
-        fn children(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::children(&(self as crate::classes::Node::Ref)) }
-        fn find_child(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_child(&(self as crate::classes::Node::Ref), name) }
-        fn has_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> bool { crate::classes::Node::Methods::has_tag(&(self as crate::classes::Node::Ref), tag) }
-        fn find_by_name(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_name(&(self as crate::classes::Node::Ref), name) }
-        fn find_by_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_tag(&(self as crate::classes::Node::Ref), tag) }
-        fn global_x(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_x(&(self as crate::classes::Node::Ref)) }
-        fn global_y(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_y(&(self as crate::classes::Node::Ref)) }
-        fn global_rotation(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_rotation(&(self as crate::classes::Node::Ref)) }
-        fn set_global_position(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::set_global_position(&(self as crate::classes::Node::Ref), x, y) }
-        fn set_global_rotation(self: ::std::rc::Rc<Self>, angle: f32) { crate::classes::Node::Methods::set_global_rotation(&(self as crate::classes::Node::Ref), angle) }
-        fn translate(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::translate(&(self as crate::classes::Node::Ref), x, y) }
-        fn translate_global(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::translate_global(&(self as crate::classes::Node::Ref), x, y) }
-        fn rotate(self: ::std::rc::Rc<Self>, angle: f32) { crate::classes::Node::Methods::rotate(&(self as crate::classes::Node::Ref), angle) }
-    }
-
-    impl Object for Instance {}
-
-    /// Prepares an object of this class: `make_` builds it from the fields
-    /// of a node and of a sprite.
-    pub fn init_<O: Object + 'static>(
-        name: ::std::string::String,
-        texture: ::std::string::String,
-        make_: impl FnOnce(crate::classes::Node::Fields, Fields) -> ::std::rc::Rc<O>,
-    ) -> ::std::rc::Rc<O> {
-        let fields_ = Fields {
-            texture: ::star_script_runtime::Field::new(texture),
-            width: ::star_script_runtime::Field::new(1.0),
-            height: ::star_script_runtime::Field::new(1.0),
-            layer: ::star_script_runtime::Field::new(0),
-            pixelated: ::star_script_runtime::Field::new(false),
-            color: ::star_script_runtime::Field::new(crate::classes::Color::new(1.0, 1.0, 1.0, 1.0)),
-        };
-        crate::classes::Node::init_(name, move |base0_| make_(base0_, fields_))
-    }
-
-    /// Creates an object of this class.
-    pub fn new(name: ::std::string::String, texture: ::std::string::String) -> Ref {
-        init_(name, texture, |fields0_, fields1_| ::std::rc::Rc::new(Instance { Node: fields0_, Sprite: fields1_ }))
-    }
-}";
-
-const CAMERA_MODULE: &str = "/// `class Camera2D`, provided by the engine.
-pub mod Camera2D {
-    /// A reference to an object of this class or of a subclass.
-    pub type Ref = ::std::rc::Rc<dyn Object>;
-
-    /// The fields of a camera: how much of the world it shows, and whether
-    /// it becomes the game's camera when it enters the game's tree.
-    pub struct Fields {
-        pub view_height: ::star_script_runtime::Field<f32>,
-        pub main: ::star_script_runtime::Field<bool>,
-    }
-
-    /// Gives access to the fields of this class, in objects of any subclass.
-    pub trait HasFields {
-        fn fields(&self) -> &Fields;
-    }
-
-    /// A camera adds no methods to those of a node.
-    pub trait Object: crate::classes::Node::Object + HasFields {}
-
-    /// A camera adds no methods to those of a node.
-    pub struct Methods;
-
-    /// An object created as this class (not as a subclass).
-    pub struct Instance {
-        pub Node: crate::classes::Node::Fields,
-        pub Camera2D: Fields,
-    }
-
-    impl crate::classes::Node::HasFields for Instance {
-        fn fields(&self) -> &crate::classes::Node::Fields { &self.Node }
-    }
-
-    impl HasFields for Instance {
-        fn fields(&self) -> &Fields { &self.Camera2D }
-    }
-
-    impl crate::AnyObject for Instance {
-        fn Node(self: ::std::rc::Rc<Self>) -> ::std::option::Option<crate::classes::Node::Ref> { ::std::option::Option::Some(self) }
-        fn Camera2D(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref> { ::std::option::Option::Some(self) }
-    }
-
-    impl crate::classes::Node::Object for Instance {
-        fn start(self: ::std::rc::Rc<Self>) { crate::classes::Node::Methods::start(&(self as crate::classes::Node::Ref)) }
-        fn update(self: ::std::rc::Rc<Self>, delta: f32) { crate::classes::Node::Methods::update(&(self as crate::classes::Node::Ref), delta) }
-        fn add_child(self: ::std::rc::Rc<Self>, child: crate::classes::Node::Ref) { crate::classes::Node::Methods::add_child(&(self as crate::classes::Node::Ref), child) }
-        fn remove(self: ::std::rc::Rc<Self>) { crate::classes::Node::Methods::remove(&(self as crate::classes::Node::Ref)) }
-        fn parent(self: ::std::rc::Rc<Self>) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::parent(&(self as crate::classes::Node::Ref)) }
-        fn children(self: ::std::rc::Rc<Self>) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::children(&(self as crate::classes::Node::Ref)) }
-        fn find_child(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_child(&(self as crate::classes::Node::Ref), name) }
-        fn has_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> bool { crate::classes::Node::Methods::has_tag(&(self as crate::classes::Node::Ref), tag) }
-        fn find_by_name(self: ::std::rc::Rc<Self>, name: ::std::string::String) -> ::std::option::Option<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_name(&(self as crate::classes::Node::Ref), name) }
-        fn find_by_tag(self: ::std::rc::Rc<Self>, tag: ::std::string::String) -> ::star_script_runtime::List<crate::classes::Node::Ref> { crate::classes::Node::Methods::find_by_tag(&(self as crate::classes::Node::Ref), tag) }
-        fn global_x(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_x(&(self as crate::classes::Node::Ref)) }
-        fn global_y(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_y(&(self as crate::classes::Node::Ref)) }
-        fn global_rotation(self: ::std::rc::Rc<Self>) -> f32 { crate::classes::Node::Methods::global_rotation(&(self as crate::classes::Node::Ref)) }
-        fn set_global_position(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::set_global_position(&(self as crate::classes::Node::Ref), x, y) }
-        fn set_global_rotation(self: ::std::rc::Rc<Self>, angle: f32) { crate::classes::Node::Methods::set_global_rotation(&(self as crate::classes::Node::Ref), angle) }
-        fn translate(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::translate(&(self as crate::classes::Node::Ref), x, y) }
-        fn translate_global(self: ::std::rc::Rc<Self>, x: f32, y: f32) { crate::classes::Node::Methods::translate_global(&(self as crate::classes::Node::Ref), x, y) }
-        fn rotate(self: ::std::rc::Rc<Self>, angle: f32) { crate::classes::Node::Methods::rotate(&(self as crate::classes::Node::Ref), angle) }
-    }
-
-    impl Object for Instance {}
-
-    /// Prepares an object of this class: `make_` builds it from the fields
-    /// of a node and of a camera.
-    pub fn init_<O: Object + 'static>(
-        name: ::std::string::String,
-        make_: impl FnOnce(crate::classes::Node::Fields, Fields) -> ::std::rc::Rc<O>,
-    ) -> ::std::rc::Rc<O> {
-        let fields_ = Fields {
-            view_height: ::star_script_runtime::Field::new(2.0),
-            main: ::star_script_runtime::Field::new(false),
-        };
-        crate::classes::Node::init_(name, move |base0_| make_(base0_, fields_))
-    }
-
-    /// Creates an object of this class.
-    pub fn new(name: ::std::string::String) -> Ref {
-        init_(name, |fields0_, fields1_| ::std::rc::Rc::new(Instance { Node: fields0_, Camera2D: fields1_ }))
+    fn color(r: f32, g: f32, b: f32, a: f32) -> Self::Color {
+        crate::classes::Color::new(r, g, b, a)
     }
 }";
 

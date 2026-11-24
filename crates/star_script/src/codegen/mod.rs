@@ -21,7 +21,7 @@ mod conversions;
 mod expressions;
 mod names;
 mod native;
-mod native_3d;
+mod native_nodes;
 mod program;
 mod scene_fields;
 mod statements;

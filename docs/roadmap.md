@@ -374,7 +374,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
               `Color`, and `Node`'s methods (tree, tags, searches,
               global and local places) in `star_script_runtime::nodes`
               and `color`, with tests on a host of plain `Rc`s.
-        - [ ] f1b2. `Sprite`, `Camera2D`, `Light2D` and the 3D nodes.
+        - [x] f1b2. `Sprite`, `Camera2D`, `Light2D` and the 3D nodes:
+              their fields in `star_script_runtime::node_classes`, the
+              methods of `Node3D` in `nodes`, and all of them generated
+              from one description each (`codegen/native_nodes.rs`).
         - [ ] f1b3. `Body`: impulses, contacts, syncing with physics.
         - [ ] f1b4. `Game`, mirroring nodes and the game loop.
         - [ ] f1b5. `Scene` and `Sound` (`Host` creates classes by name).

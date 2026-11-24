@@ -1,9 +1,9 @@
 //! Modules of the engine's node classes written from a description:
-//! `Light2D`, which extends `Node`; `Node3D`, which extends `Node`; and
+//! `Sprite`, `Camera2D`, `Light2D` and `Node3D`, which extend `Node`; and
 //! `Mesh`, `Light` and `Camera3D`, which extend `Node3D`.
 //!
-//! They have the same shape as the modules of `Sprite` and `Camera2D`, so
-//! they are written from a description of each class: its fields, the
+//! They all have the same shape, so they are written from a description of
+//! each class: the type of its fields (in `star_script_runtime`), the
 //! arguments of its `init`, and its own methods.
 
 use super::writer::Writer;
@@ -179,48 +179,40 @@ if let ::std::option::Option::Some(node_) = node_ {
 }";
 
 /// `func translate_3d`: moves the node in its parent's space.
-const TRANSLATE_3D_BODY: &str = "let place_ = crate::classes::Node::HasFields::fields(&**this_);
-let depth_ = HasFields::fields(&**this_);
-place_.x.set(place_.x.get() + x);
-place_.y.set(place_.y.get() + y);
-depth_.z.set(depth_.z.get() + z);";
+const TRANSLATE_3D_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+if let ::std::option::Option::Some(node_) = node_ {
+    ::star_script_runtime::nodes::translate_3d::<crate::classes::Host_>(&node_, x, y, z);
+}";
 
 /// `func translate_global_3d`: moves the node in the world.
-const TRANSLATE_GLOBAL_3D_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+const TRANSLATE_GLOBAL_3D_BODY: &str =
+    "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
 if let ::std::option::Option::Some(node_) = node_ {
-    let [global_x_, global_y_, global_z_] = ::star_script_runtime::nodes::global_position::<crate::classes::Host_>(&node_);
-    ::star_script_runtime::nodes::set_global_position_3d::<crate::classes::Host_>(&node_, [global_x_ + x, global_y_ + y, global_z_ + z]);
+    ::star_script_runtime::nodes::translate_global_3d::<crate::classes::Host_>(&node_, x, y, z);
 }";
 
-/// `func look_at`: turns the node so that its -z axis, where cameras and
-/// lights look, points at a point of its parent's space. Its roll is kept.
-const LOOK_AT_BODY: &str = "let place_ = crate::classes::Node::HasFields::fields(&**this_);
-let depth_ = HasFields::fields(&**this_);
-let (dx_, dy_, dz_) = (x - place_.x.get(), y - place_.y.get(), z - depth_.z.get());
-let length_ = (dx_ * dx_ + dy_ * dy_ + dz_ * dz_).sqrt();
-if length_ > 0.0 && length_.is_finite() {
-    depth_.pitch.set((dy_ / length_).clamp(-1.0, 1.0).asin());
-    depth_.yaw.set((-dx_).atan2(-dz_));
+/// `func look_at`: turns the node to look at a point of its parent's space.
+const LOOK_AT_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+if let ::std::option::Option::Some(node_) = node_ {
+    ::star_script_runtime::nodes::look_at::<crate::classes::Host_>(&node_, x, y, z);
 }";
 
-/// A field of an engine class: its name, its Rust type and its first
-/// value, which may be an argument of `init`.
-type Field = (&'static str, &'static str, &'static str);
-
-/// An engine node class written from a description.
+/// An engine node class written from a description. Its own fields are a
+/// type of `star_script_runtime`, shared with every way of running
+/// StarScript.
 struct NodeClass {
     name: &'static str,
     /// What the fields are, for the documentation of `Fields`.
     about: &'static str,
     /// The classes it extends, from `Node` down.
     ancestors: &'static [&'static str],
-    fields: &'static [Field],
-    /// The type of `star_script_runtime` that holds its own fields, if they
-    /// are shared with every way of running StarScript (then `fields` is
-    /// empty): it is built with `new()`.
-    shared: Option<&'static str>,
+    /// The type of its own fields.
+    fields: &'static str,
+    /// The Rust expression that builds its own fields, from the arguments
+    /// of its `init`.
+    new_fields: &'static str,
     /// The arguments of its `init` after the name, which give their own
-    /// field its first value.
+    /// fields their first values.
     parameters: &'static [(&'static str, &'static str)],
     methods: &'static [Method],
     /// The code of each of its methods, in the same order.
@@ -228,15 +220,46 @@ struct NodeClass {
 }
 
 const STRING: &str = "::std::string::String";
-const COLOR: &str = "crate::classes::Color::Ref";
-const WHITE: &str = "crate::classes::Color::new(1.0, 1.0, 1.0, 1.0)";
+
+const SPRITE: NodeClass = NodeClass {
+    name: "Sprite",
+    about: "the image it shows and how",
+    ancestors: &["Node"],
+    fields: "::star_script_runtime::node_classes::SpriteFields<crate::classes::Host_>",
+    new_fields: "Fields::new(texture)",
+    parameters: &[("texture", STRING)],
+    methods: &[],
+    bodies: &[],
+};
+
+const CAMERA_2D: NodeClass = NodeClass {
+    name: "Camera2D",
+    about: "how much of the world it shows, and whether it becomes the game's camera when it enters the game's tree",
+    ancestors: &["Node"],
+    fields: "::star_script_runtime::node_classes::Camera2dFields",
+    new_fields: "Fields::new()",
+    parameters: &[],
+    methods: &[],
+    bodies: &[],
+};
+
+const LIGHT_2D: NodeClass = NodeClass {
+    name: "Light2D",
+    about: "the kind of light it shines on the sprites, its color, how bright it is, how far it reaches and the cone of spots",
+    ancestors: &["Node"],
+    fields: "::star_script_runtime::node_classes::LightFields<crate::classes::Host_>",
+    new_fields: "Fields::new_2d(kind)",
+    parameters: &[("kind", STRING)],
+    methods: &[],
+    bodies: &[],
+};
 
 const NODE_3D: NodeClass = NodeClass {
     name: "Node3D",
     about: "its depth, its pitch and yaw (its roll is `rotation`) and its depth scale",
     ancestors: &["Node"],
-    fields: &[],
-    shared: Some("::star_script_runtime::nodes::Node3dFields"),
+    fields: "::star_script_runtime::nodes::Node3dFields",
+    new_fields: "Fields::new()",
     parameters: &[],
     methods: &NODE_3D_METHODS,
     bodies: &[
@@ -252,19 +275,8 @@ const MESH: NodeClass = NodeClass {
     name: "Mesh",
     about: "the shape it shows, its sizes and its surface",
     ancestors: &["Node", "Node3D"],
-    fields: &[
-        ("shape", STRING, "shape"),
-        ("width", "f32", "1.0"),
-        ("height", "f32", "1.0"),
-        ("depth", "f32", "1.0"),
-        ("radius", "f32", "0.5"),
-        ("color", COLOR, WHITE),
-        ("metallic", "f32", "0.0"),
-        ("roughness", "f32", "0.5"),
-        ("texture", STRING, "::std::string::String::new()"),
-        ("pixelated", "bool", "false"),
-    ],
-    shared: None,
+    fields: "::star_script_runtime::node_classes::MeshFields<crate::classes::Host_>",
+    new_fields: "Fields::new(shape)",
     parameters: &[("shape", STRING)],
     methods: &[],
     bodies: &[],
@@ -274,33 +286,8 @@ const LIGHT: NodeClass = NodeClass {
     name: "Light",
     about: "the kind of light it shines, its color, how bright it is, how far it reaches and the cone of spots",
     ancestors: &["Node", "Node3D"],
-    fields: &[
-        ("kind", STRING, "kind"),
-        ("color", COLOR, WHITE),
-        ("intensity", "f32", "1.0"),
-        ("range", "f32", "10.0"),
-        ("angle", "f32", "::std::f32::consts::FRAC_PI_6"),
-        ("blend", "f32", "0.2"),
-    ],
-    shared: None,
-    parameters: &[("kind", STRING)],
-    methods: &[],
-    bodies: &[],
-};
-
-const LIGHT_2D: NodeClass = NodeClass {
-    name: "Light2D",
-    about: "the kind of light it shines on the sprites, its color, how bright it is, how far it reaches and the cone of spots",
-    ancestors: &["Node"],
-    fields: &[
-        ("kind", STRING, "kind"),
-        ("color", COLOR, WHITE),
-        ("intensity", "f32", "1.0"),
-        ("range", "f32", "3.0"),
-        ("angle", "f32", "::std::f32::consts::FRAC_PI_6"),
-        ("blend", "f32", "0.2"),
-    ],
-    shared: None,
+    fields: "::star_script_runtime::node_classes::LightFields<crate::classes::Host_>",
+    new_fields: "Fields::new_3d(kind)",
     parameters: &[("kind", STRING)],
     methods: &[],
     bodies: &[],
@@ -308,21 +295,19 @@ const LIGHT_2D: NodeClass = NodeClass {
 
 const CAMERA_3D: NodeClass = NodeClass {
     name: "Camera3D",
-    about: "how wide it sees, in radians",
+    about: "how wide it sees, in radians, and whether it becomes the game's 3D camera when it enters the game's tree",
     ancestors: &["Node", "Node3D"],
-    fields: &[
-        ("fov", "f32", "::std::f32::consts::FRAC_PI_3"),
-        ("main", "bool", "false"),
-    ],
-    shared: None,
+    fields: "::star_script_runtime::node_classes::Camera3dFields",
+    new_fields: "Fields::new()",
     parameters: &[],
     methods: &[],
     bodies: &[],
 };
 
-/// The modules of `Light2D`, `Node3D`, `Mesh`, `Light` and `Camera3D`.
-pub(super) fn node_3d_modules(out: &mut Writer) {
-    for class in [LIGHT_2D, NODE_3D, MESH, LIGHT, CAMERA_3D] {
+/// The modules of `Sprite`, `Camera2D`, `Light2D`, `Node3D`, `Mesh`,
+/// `Light` and `Camera3D`.
+pub(super) fn node_class_modules(out: &mut Writer) {
+    for class in [SPRITE, CAMERA_2D, LIGHT_2D, NODE_3D, MESH, LIGHT, CAMERA_3D] {
         out.line("");
         module(out, &class);
     }
@@ -346,15 +331,7 @@ fn module(out: &mut Writer, class: &NodeClass) {
     out.line("pub type Ref = ::std::rc::Rc<dyn Object>;");
     out.line("");
     out.line(&format!("/// The fields of a {name}: {}.", class.about));
-    if let Some(shared) = class.shared {
-        out.line(&format!("pub type Fields = {shared};"));
-    } else {
-        out.open("pub struct Fields {");
-        for (field, ty, _) in class.fields {
-            out.line(&format!("pub {field}: ::star_script_runtime::Field<{ty}>,"));
-        }
-        out.close("}");
-    }
+    out.line(&format!("pub type Fields = {};", class.fields));
     out.line("");
     out.line("/// Gives access to the fields of this class, in objects of any subclass.");
     out.open("pub trait HasFields {");
@@ -504,17 +481,7 @@ fn constructor(out: &mut Writer, class: &NodeClass) {
         "pub fn init_<O: Object + 'static>(name: ::std::string::String{parameters}, make_: impl FnOnce({}) -> ::std::rc::Rc<O>) -> ::std::rc::Rc<O> {{",
         field_types.join(", ")
     ));
-    if class.shared.is_some() {
-        out.line("let fields_ = Fields::new();");
-    } else {
-        out.open("let fields_ = Fields {");
-        for (field, _, value) in class.fields {
-            out.line(&format!(
-                "{field}: ::star_script_runtime::Field::new({value}),"
-            ));
-        }
-        out.close("};");
-    }
+    out.line(&format!("let fields_ = {};", class.new_fields));
     out.line(&format!(
         "{CLASSES}::{base}::init_(name, move |{}| make_({}, fields_))",
         bases.join(", "),

@@ -4,9 +4,9 @@ use std::rc::{Rc, Weak};
 use super::*;
 
 /// Nodes made of plain `Rc`s, as a way of running StarScript could have.
-struct TestHost;
+pub(crate) struct TestHost;
 
-struct TestNode {
+pub(crate) struct TestNode {
     node: NodeFields<TestHost>,
     /// Only used by nodes placed in 3D.
     node_3d: Node3dFields,
@@ -18,6 +18,7 @@ impl Host for TestHost {
     type WeakNode = Weak<TestNode>;
     type Node3D = Rc<TestNode>;
     type Body = ();
+    type Color = [f32; 4];
 
     fn node(node: &Self::Node) -> &NodeFields<Self> {
         &node.node
@@ -41,6 +42,10 @@ impl Host for TestHost {
 
     fn node_3d(node: &Self::Node3D) -> &Node3dFields {
         &node.node_3d
+    }
+
+    fn color(r: f32, g: f32, b: f32, a: f32) -> Self::Color {
+        [r, g, b, a]
     }
 }
 
@@ -206,4 +211,22 @@ fn nodes_start_once() {
 
     assert!(a.node.start_once());
     assert!(!a.node.start_once());
+}
+
+#[test]
+fn nodes_3d_move_and_look_in_3d() {
+    let (eye, flat) = (node_3d("eye"), node("flat"));
+
+    translate_3d::<TestHost>(&eye, 1.0, 0.0, 2.0);
+    translate_3d::<TestHost>(&flat, 1.0, 0.0, 2.0);
+    translate_global_3d::<TestHost>(&eye, 0.0, 1.0, 0.0);
+    look_at::<TestHost>(&eye, 1.0, 1.0, 0.0);
+
+    assert_eq!(global_position::<TestHost>(&eye), [1.0, 1.0, 2.0]);
+    assert!(near(flat.node.x.get(), 0.0), "only nodes 3D move in 3D");
+    assert!(near(eye.node_3d.pitch.get(), 0.0) && near(eye.node_3d.yaw.get(), 0.0));
+
+    look_at::<TestHost>(&eye, 2.0, 1.0, 2.0);
+
+    assert!(near(eye.node_3d.yaw.get(), -FRAC_PI_2));
 }

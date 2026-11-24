@@ -23,6 +23,8 @@ pub trait Host: Sized + 'static {
     type Node3D;
     /// A reference to a body, which a node may have.
     type Body: Clone;
+    /// A reference to a color.
+    type Color: Clone;
 
     /// The fields of `Node` in `node`.
     fn node(node: &Self::Node) -> &NodeFields<Self>;
@@ -36,6 +38,8 @@ pub trait Host: Sized + 'static {
     fn as_node_3d(node: &Self::Node) -> Option<Self::Node3D>;
     /// The fields of `Node3D` in `node`.
     fn node_3d(node: &Self::Node3D) -> &Node3dFields;
+    /// A new color with the channels `r`, `g`, `b` and `a`.
+    fn color(r: f32, g: f32, b: f32, a: f32) -> Self::Color;
 }
 
 /// Gives every node its own number, which the engine knows it by.
@@ -326,6 +330,39 @@ pub fn translate_global<H: Host>(this: &H::Node, x: f32, y: f32) {
     set_global_position::<H>(this, global_x + x, global_y + y);
 }
 
+/// `func translate_3d`: moves the `Node3D` `this` in its parent's space;
+/// other nodes do not move.
+pub fn translate_3d<H: Host>(this: &H::Node, x: f32, y: f32, z: f32) {
+    let Some(node_3d) = H::as_node_3d(this) else {
+        return;
+    };
+    translate::<H>(this, x, y);
+    let depth = &H::node_3d(&node_3d).z;
+    depth.set(depth.get() + z);
+}
+
+/// `func translate_global_3d`: moves the `Node3D` `this` in the world.
+pub fn translate_global_3d<H: Host>(this: &H::Node, x: f32, y: f32, z: f32) {
+    let [global_x, global_y, global_z] = global_position::<H>(this);
+    set_global_position_3d::<H>(this, [global_x + x, global_y + y, global_z + z]);
+}
+
+/// `func look_at`: turns the `Node3D` `this` so that its -z axis, where
+/// cameras and lights look, points at a point of its parent's space. Its
+/// roll is kept; looking at its own place does not turn it.
+pub fn look_at<H: Host>(this: &H::Node, x: f32, y: f32, z: f32) {
+    let Some(node_3d) = H::as_node_3d(this) else {
+        return;
+    };
+    let (place, depth) = (H::node(this), H::node_3d(&node_3d));
+    let (dx, dy, dz) = (x - place.x.get(), y - place.y.get(), z - depth.z.get());
+    let length = (dx * dx + dy * dy + dz * dz).sqrt();
+    if length > 0.0 && length.is_finite() {
+        depth.pitch.set((dy / length).clamp(-1.0, 1.0).asin());
+        depth.yaw.set((-dx).atan2(-dz));
+    }
+}
+
 /// The ancestors of `node`, from the root down to its parent.
 fn ancestors<H: Host>(node: &H::Node) -> Vec<H::Node> {
     let mut found = Vec::new();
@@ -395,4 +432,4 @@ fn warn(message: &str) {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

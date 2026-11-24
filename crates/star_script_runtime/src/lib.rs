@@ -17,6 +17,7 @@ mod fault;
 mod field;
 pub mod input;
 mod list;
+pub mod node_classes;
 pub mod nodes;
 mod operations;
 pub mod parallel;
