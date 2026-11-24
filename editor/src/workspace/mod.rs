@@ -4,6 +4,7 @@ mod asset_actions;
 mod asset_files;
 mod asset_icons;
 mod assets_panel;
+mod camera_preview;
 mod class_rename;
 mod console_panel;
 mod documents;

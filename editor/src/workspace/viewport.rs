@@ -13,6 +13,7 @@ use eframe::egui_wgpu;
 use star_engine::prelude::{Color, EngineResult, Frame, Mat4, MeshId, Vec2};
 use star_render::interop::{OffscreenRenderer, wgpu};
 
+use super::camera_preview::CameraPreview;
 use super::editor_camera::EditorCamera;
 use super::grid::grid_lines;
 use super::viewport_assets::ViewportAssets;
@@ -53,6 +54,8 @@ pub(crate) struct SceneViewport {
     tool: Tool,
     /// The handle being dragged, if one is.
     drag: Option<Drag>,
+    /// What a camera of the scene sees.
+    preview: CameraPreview,
 }
 
 impl SceneViewport {
@@ -82,7 +85,9 @@ impl SceneViewport {
             renderer.color_view(),
             wgpu::FilterMode::Linear,
         );
+        let preview = CameraPreview::new(render_state, &renderer);
         Ok(Self {
+            preview,
             renderer,
             device: render_state.device.clone(),
             ui_renderer: Arc::clone(&render_state.renderer),
@@ -132,6 +137,13 @@ impl SceneViewport {
             .render(scene.as_deref())
             .err()
             .map(|error| error.to_string());
+        self.preview.render(
+            &mut self.renderer,
+            &mut self.assets,
+            scene.as_deref(),
+            rect,
+            ui.ctx().pixels_per_point(),
+        );
 
         let painter = ui.painter_at(rect);
         painter.image(self.texture_id, rect, FULL_TEXTURE, egui::Color32::WHITE);
@@ -149,6 +161,7 @@ impl SceneViewport {
             );
         }
         self.paint_overlay(ui, &painter, rect);
+        self.preview.paint(ui, &painter, rect);
         show_toolbar(ui, rect, LABEL_MARGIN, &mut self.tool);
     }
 
@@ -370,7 +383,7 @@ fn to_screen(pointer: egui::Pos2, rect: egui::Rect) -> Vec2 {
 // Viewport sizes are small positive numbers, so the conversion cannot overflow
 // or lose a sign.
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn to_pixels(length: f32) -> u32 {
+pub(super) fn to_pixels(length: f32) -> u32 {
     length.max(0.0).round() as u32
 }
 

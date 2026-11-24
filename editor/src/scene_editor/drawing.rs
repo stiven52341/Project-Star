@@ -3,9 +3,9 @@
 
 use star_engine::MeshFile;
 use star_engine::prelude::{
-    Affine2, AmbientLight, Color, DirectionalLight, Frame, GlobalTransform2D, GlobalTransform3D,
-    MAX_LIGHTS, Mat4, Material, Mesh3dId, MeshId, MeshShape, SceneOutline, SpriteNode,
-    TextureFilter, TextureId, Vec2, Vec3, Vertex,
+    Affine2, AmbientLight, Camera, Color, DirectionalLight, Frame, GlobalTransform2D,
+    GlobalTransform3D, MAX_LIGHTS, Mat4, Material, Mesh3dId, MeshId, MeshShape, SceneOutline,
+    SpriteNode, TextureFilter, TextureId, Vec2, Vec3, Vertex,
 };
 use star_engine::star_assets::AssetPath;
 use star_engine::star_platform::WindowConfig;
@@ -80,11 +80,10 @@ pub(crate) fn draw_scene(
 ) {
     let nodes = outline.nodes();
     let places = places(nodes);
-    let mut lit = false;
+    if !draw_shown(nodes, &places, gpu, frame) {
+        light_for_preview(frame);
+    }
     for (node, place) in nodes.iter().zip(&places) {
-        if let (Some(sprite), Some(global)) = (&node.sprite, place.flat) {
-            draw_sprite(sprite, global, gpu, frame);
-        }
         if let (Some(body), Some(global)) = (&node.body, place.flat) {
             draw_body_2d(body, global, &marks.bodies, frame);
         }
@@ -102,11 +101,53 @@ pub(crate) fn draw_scene(
         if let (Some(camera), Some(global)) = (node.camera_3d, place.solid) {
             draw_camera_3d(camera, global, marks, frame);
         }
+        if let (Some(LightNode::Spot { range, angle, .. }), Some(global)) =
+            (node.light, place.solid)
+        {
+            draw_spot_cone(range, angle, global, marks, frame);
+        }
+    }
+    let selected = selected.and_then(|index| Some((nodes.get(index)?, places.get(index)?)));
+    if let Some((node, place)) = selected {
+        mark(node, place, marks, frame);
+    }
+}
+
+/// Adds to `frame` what the game shows of the nodes of `outline`, as it
+/// shows them before its code changes anything: its sprites, meshes and
+/// lights, on a black background, with no ambient light in 3D and a white
+/// one in 2D.
+pub(crate) fn draw_game_view(outline: &SceneOutline, gpu: &mut impl SceneGpu, frame: &mut Frame) {
+    let nodes = outline.nodes();
+    let places = places(nodes);
+    frame.set_clear_color(Color::BLACK);
+    frame.set_ambient_light(AmbientLight::new(Color::BLACK, 0.0));
+    frame.set_ambient_light_2d(AmbientLight::FULL);
+    draw_shown(nodes, &places, gpu, frame);
+    for (node, place) in nodes.iter().zip(&places) {
+        if let (Some(light), Some(global)) = (node.light_2d, place.flat)
+            && frame.lights_2d().len() < MAX_LIGHTS
+        {
+            frame.add_light_2d(light.to_light(GlobalTransform2D::from_affine(global)));
+        }
+    }
+}
+
+/// Adds to `frame` the sprites and meshes of `nodes`, placed at `places`,
+/// and the lights of their 3D nodes. Returns whether any light was added.
+fn draw_shown(
+    nodes: &[NodeOutline],
+    places: &[Place],
+    gpu: &mut impl SceneGpu,
+    frame: &mut Frame,
+) -> bool {
+    let mut lit = false;
+    for (node, place) in nodes.iter().zip(places) {
+        if let (Some(sprite), Some(global)) = (&node.sprite, place.flat) {
+            draw_sprite(sprite, global, gpu, frame);
+        }
         if let Some(global) = place.solid {
             draw_mesh(node, global, gpu, frame);
-            if let Some(LightNode::Spot { range, angle, .. }) = node.light {
-                draw_spot_cone(range, angle, global, marks, frame);
-            }
             if let Some(light) = node.light
                 && frame.lights().len() < MAX_LIGHTS
             {
@@ -115,13 +156,35 @@ pub(crate) fn draw_scene(
             }
         }
     }
-    if !lit {
-        light_for_preview(frame);
-    }
-    let selected = selected.and_then(|index| Some((nodes.get(index)?, places.get(index)?)));
-    if let Some((node, place)) = selected {
-        mark(node, place, marks, frame);
-    }
+    lit
+}
+
+/// The camera to preview in `outline`: the node `selected` if it is a
+/// camera, or else the scene's main camera. With the node's position.
+pub(crate) fn preview_camera(
+    outline: &SceneOutline,
+    selected: Option<usize>,
+) -> Option<(usize, Camera)> {
+    let nodes = outline.nodes();
+    let is_camera = |index: &usize| {
+        nodes
+            .get(*index)
+            .is_some_and(|node| node.camera.is_some() || node.camera_3d.is_some())
+    };
+    let index = selected
+        .filter(is_camera)
+        .or_else(|| outline.main_camera())?;
+    let node = nodes.get(index)?;
+    let place = places(nodes).get(index).copied()?;
+    let camera = match (node.camera, place.flat, node.camera_3d, place.solid) {
+        (Some(camera), Some(global), _, _) => Camera::centered_2d(
+            GlobalTransform2D::from_affine(global).position(),
+            camera.view_height,
+        ),
+        (_, _, Some(camera), Some(global)) => Camera::along_transform(global, camera.fov),
+        _ => return None,
+    };
+    Some((index, camera))
 }
 
 /// Where a node ends up in the world, in 2D and in 3D: only in the spaces
@@ -216,7 +279,7 @@ fn draw_mesh(node: &NodeOutline, global: Mat4, gpu: &mut impl SceneGpu, frame: &
 
 /// The shape of the game's window, width over height: the one it opens
 /// with, since the editor cannot know how players will size it.
-fn game_aspect_ratio() -> f32 {
+pub(crate) fn game_aspect_ratio() -> f32 {
     WindowConfig::default().size.aspect_ratio().unwrap_or(1.0)
 }
 
@@ -639,6 +702,43 @@ mod tests {
             2,
             "a camera without its transform shows nothing"
         );
+    }
+
+    #[test]
+    fn the_preview_sees_from_the_camera_selected_or_else_the_main_one() {
+        let cameras = "[[node]]\nname = \"Level\"\nposition = [0.0, 0.0]\n\
+                       [[node]]\nname = \"Eye\"\nparent = 0\nposition = [1.0, 2.0]\n\
+                       [node.camera]\nview_height = 4.0\n\
+                       [[node]]\nname = \"Main\"\nparent = 0\nposition = [5.0, 0.0]\n\
+                       [node.camera]\nmain = true\n";
+        let scene = outline(cameras);
+
+        let (selected, eye) = preview_camera(&scene, Some(1)).unwrap();
+        let (main, _) = preview_camera(&scene, Some(0)).unwrap();
+
+        assert_eq!((selected, main), (1, 2));
+        assert_eq!(eye.target, Vec3::new(1.0, 2.0, 0.0));
+        assert_eq!(preview_camera(&outline(SOLAR), Some(1)), None);
+    }
+
+    #[test]
+    fn the_game_view_shows_no_marks_and_lights_only_with_the_scene() {
+        let scene = outline(&format!(
+            "{SOLAR}[[node]]\nname = \"Torch\"\nparent = 0\nposition = [0.0, 0.0]\n\
+             [node.light_2d]\nkind = \"point\"\nrange = 2.0\n\
+             [[node]]\nname = \"Box\"\nparent = 0\n[node.transform_3d]\n\
+             [node.mesh]\nshape = \"cube\"\nsize = [1.0, 1.0, 1.0]\n"
+        ));
+        let mut frame = Frame::new();
+
+        draw_game_view(&scene, &mut FakeGpu::default(), &mut frame);
+
+        assert_eq!(frame.draw_count(), 0);
+        assert_eq!(frame.sprites().len(), 1);
+        assert_eq!(frame.mesh_3d_count(), 1);
+        assert_eq!(frame.lights_2d().len(), 1);
+        assert!(frame.lights().is_empty(), "no preview sun");
+        assert!(frame.ambient_light().intensity.abs() < EPSILON);
     }
 
     #[test]

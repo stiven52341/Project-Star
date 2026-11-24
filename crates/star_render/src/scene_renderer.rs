@@ -139,6 +139,20 @@ impl SceneRenderer {
         aspect_ratio: f32,
         frame: &Frame,
     ) -> EngineResult<()> {
+        self.render_with_depth(target, None, aspect_ratio, frame)
+    }
+
+    /// As [`SceneRenderer::render`], with `depth` (of `target`'s size and
+    /// [`DEPTH_FORMAT`](crate::depth::DEPTH_FORMAT)) as the depth buffer
+    /// instead of the renderer's own, if given: to draw into targets of
+    /// other sizes.
+    pub(crate) fn render_with_depth(
+        &mut self,
+        target: &wgpu::TextureView,
+        depth: Option<&wgpu::TextureView>,
+        aspect_ratio: f32,
+        frame: &Frame,
+    ) -> EngineResult<()> {
         let view_projection = frame.camera().view_projection(aspect_ratio).ok_or_else(|| {
             EngineError::Rendering(
                 "the camera needs distinct position and target, and must not look straight up or down"
@@ -183,7 +197,7 @@ impl SceneRenderer {
             },
             |color| color.in_target_space(target_format),
         )?;
-        let commands = self.encode(target, frame)?;
+        let commands = self.encode(target, depth.unwrap_or(self.depth_buffer.view()), frame)?;
         self.queue.submit([commands]);
         Ok(())
     }
@@ -196,6 +210,7 @@ impl SceneRenderer {
     fn encode(
         &self,
         target: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
         frame: &Frame,
     ) -> EngineResult<wgpu::CommandBuffer> {
         let mut encoder = self
@@ -204,7 +219,7 @@ impl SceneRenderer {
                 label: Some("frame encoder"),
             });
         {
-            let mut pass = self.begin_main_pass(&mut encoder, target, frame.clear_color());
+            let mut pass = self.begin_main_pass(&mut encoder, target, depth, frame.clear_color());
             for (slot, draw) in (0..).zip(frame.surfaces()) {
                 let mesh = self.mesh_3d(draw.mesh)?;
                 let texture = match draw.material.base_color_texture {
@@ -247,6 +262,7 @@ impl SceneRenderer {
         &self,
         encoder: &'encoder mut wgpu::CommandEncoder,
         target: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
         clear_color: Color,
     ) -> wgpu::RenderPass<'encoder> {
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -261,7 +277,7 @@ impl SceneRenderer {
                 },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: self.depth_buffer.view(),
+                view: depth,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Clear(FARTHEST_DEPTH),
                     store: wgpu::StoreOp::Discard,

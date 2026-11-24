@@ -308,5 +308,6 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] Playing without scripts: the project's main scene (`main_scene`
         in `project.toml`, “Set as main scene” in the assets), seen from
         its main camera, which it must have (decision 62).
-  - [ ] A small preview of what the main camera sees, in 2D and 3D.
+  - [x] A small preview of what a camera sees, in 2D and 3D: the camera
+        selected, or else the main one, in a corner of the view.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

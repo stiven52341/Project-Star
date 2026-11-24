@@ -144,6 +144,45 @@ fn sprites_are_tinted_by_their_color() {
     assert!(pixels.iter().all(|&pixel| pixel == RED));
 }
 
+#[test]
+#[ignore = "needs a GPU"]
+fn targets_of_other_sizes_are_drawn_with_their_own_depth() {
+    let mut gpu = Gpu::new();
+    let white = gpu.texture(1, 1, &[[255; 4]]);
+    let bigger = SIZE * 2;
+    let device = gpu.scene.device().clone();
+    let other = device
+        .create_texture(&wgpu::TextureDescriptor {
+            label: Some("other target"),
+            size: wgpu::Extent3d {
+                width: bigger,
+                height: bigger,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        })
+        .create_view(&wgpu::TextureViewDescriptor::default());
+    let depth = crate::depth::DepthBuffer::new(&device, bigger, bigger);
+    let mut frame = Frame::new();
+    frame.set_camera(Camera::new_2d(VIEW_HEIGHT));
+    frame.draw_sprite(full_screen(white).with_color(Color::rgb(0.0, 0.0, 1.0)));
+
+    gpu.scene
+        .render_with_depth(&other, Some(depth.view()), 1.0, &frame)
+        .unwrap();
+    let pixels = gpu.draw(&[full_screen(white).with_color(Color::rgb(1.0, 0.0, 0.0))]);
+
+    assert!(
+        pixels.iter().all(|&pixel| pixel == RED),
+        "each frame keeps its own sprites"
+    );
+}
+
 /// A white full-screen sprite in the dark, lit by `light`: the red of its
 /// left edge, center and right edge (the screen is two units wide).
 fn lit_sprite(light: impl Into<crate::Light2d>) -> [u8; 3] {

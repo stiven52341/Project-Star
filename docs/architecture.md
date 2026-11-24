@@ -450,6 +450,9 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
   `GameContext::create_mesh` and identified by a `MeshId`.
 - `SceneRenderer` (internal) draws a `Frame` into any target; `Renderer`
   (window) and `interop::OffscreenRenderer` (texture, for the editor) use it.
+  An `interop::OffscreenTarget` (texture and depth buffer of its own) is
+  drawn into by the same `OffscreenRenderer` (`render_into`), with the same
+  meshes and textures: the editor's camera preview.
 - Triangle meshes (`create_mesh`) and line meshes (`create_lines`).
 - **3D meshes** (`MeshData`) share their corners between triangles through
   `u32` indices, and each corner (`MeshVertex`) has a position, a normal
@@ -607,6 +610,15 @@ The view uses `OffscreenRenderer` on egui's wgpu device and registers its
 texture in `egui_wgpu` (it is registered again when its size changes). The
 texture is `Rgba8Unorm` with colors already encoded in sRGB, because egui
 samples textures as gamma values.
+
+In a corner of the view, `camera_preview.rs` shows what a camera of the
+open scene sees: the camera selected, or else the scene's main camera
+(none if neither exists). It is drawn into an `OffscreenTarget` with the
+shape of the game's window, from the camera the game would use
+(`Camera::centered_2d`, `Camera::along_transform`, shared with
+`star_engine::script_nodes`), and shows the scene as the game does before
+its code changes anything: no grid or marks, a black background, no 3D
+ambient light, the white 2D one and the scene's own lights.
 
 The **scene editor** (`scene_editor/`) opens one `.scene` file at a time
 in the “Scene” tab, read as a `SceneOutline` (the nodes as the file

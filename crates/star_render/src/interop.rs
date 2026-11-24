@@ -10,6 +10,7 @@ use star_core::EngineResult;
 
 pub use wgpu;
 
+use crate::depth::DepthBuffer;
 use crate::mesh::Topology;
 use crate::scene_renderer::SceneRenderer;
 use crate::{Frame, Image, Mesh3dId, MeshData, MeshId, TextureFilter, TextureId, Vertex};
@@ -21,24 +22,36 @@ const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 /// Size of the target until the first [`OffscreenRenderer::resize`].
 const INITIAL_SIZE: u32 = 1;
 
-/// Draws frames into a texture owned by the renderer, on a device owned by the caller.
+/// Draws frames into a texture owned by the renderer, on a device owned by
+/// the caller, and into other [`OffscreenTarget`]s with the same meshes and
+/// textures.
 pub struct OffscreenRenderer {
     scene: SceneRenderer,
+    target: OffscreenTarget,
+}
+
+/// A texture to draw frames into, with its depth buffer.
+pub struct OffscreenTarget {
     color_view: wgpu::TextureView,
+    depth: DepthBuffer,
     width: u32,
     height: u32,
 }
 
-impl OffscreenRenderer {
-    /// Creates a renderer that draws with the caller's `device` and `queue`.
+impl OffscreenTarget {
+    /// A target of one pixel on the device of `renderer`, until it is
+    /// resized.
     #[must_use]
-    pub fn new(device: wgpu::Device, queue: wgpu::Queue) -> Self {
-        let color_view = create_color_target(&device, INITIAL_SIZE, INITIAL_SIZE);
+    pub fn new(renderer: &OffscreenRenderer) -> Self {
+        Self::of_size(renderer.scene.device(), INITIAL_SIZE, INITIAL_SIZE)
+    }
+
+    fn of_size(device: &wgpu::Device, width: u32, height: u32) -> Self {
         Self {
-            scene: SceneRenderer::new(device, queue, COLOR_FORMAT, INITIAL_SIZE, INITIAL_SIZE),
-            color_view,
-            width: INITIAL_SIZE,
-            height: INITIAL_SIZE,
+            color_view: create_color_target(device, width, height),
+            depth: DepthBuffer::new(device, width, height),
+            width,
+            height,
         }
     }
 
@@ -48,18 +61,46 @@ impl OffscreenRenderer {
         &self.color_view
     }
 
+    /// Sets the size of the target in pixels (zero is treated as one), on
+    /// the device of `renderer`. Returns `true` if the texture was
+    /// replaced, so its users must refresh their references to
+    /// [`color_view`](Self::color_view).
+    pub fn resize(&mut self, renderer: &OffscreenRenderer, width: u32, height: u32) -> bool {
+        let (width, height) = (width.max(1), height.max(1));
+        if (width, height) == (self.width, self.height) {
+            return false;
+        }
+        *self = Self::of_size(renderer.scene.device(), width, height);
+        true
+    }
+}
+
+impl OffscreenRenderer {
+    /// Creates a renderer that draws with the caller's `device` and `queue`.
+    #[must_use]
+    pub fn new(device: wgpu::Device, queue: wgpu::Queue) -> Self {
+        let target = OffscreenTarget::of_size(&device, INITIAL_SIZE, INITIAL_SIZE);
+        Self {
+            scene: SceneRenderer::new(device, queue, COLOR_FORMAT, INITIAL_SIZE, INITIAL_SIZE),
+            target,
+        }
+    }
+
+    /// Texture the frames are drawn into. Replaced by [`resize`](Self::resize).
+    #[must_use]
+    pub fn color_view(&self) -> &wgpu::TextureView {
+        self.target.color_view()
+    }
+
     /// Sets the size of the target in pixels (zero is treated as one).
     /// Returns `true` if the texture was replaced, so its users must refresh
     /// their references to [`color_view`](Self::color_view).
     pub fn resize(&mut self, width: u32, height: u32) -> bool {
         let (width, height) = (width.max(1), height.max(1));
-        if (width, height) == (self.width, self.height) {
+        if (width, height) == (self.target.width, self.target.height) {
             return false;
         }
-        self.width = width;
-        self.height = height;
-        self.color_view = create_color_target(self.scene.device(), width, height);
-        self.scene.resize(width, height);
+        self.target = OffscreenTarget::of_size(self.scene.device(), width, height);
         true
     }
 
@@ -110,9 +151,33 @@ impl OffscreenRenderer {
     ///
     /// Same as [`Renderer::render`](crate::Renderer::render).
     pub fn render(&mut self, frame: &Frame) -> EngineResult<()> {
-        let aspect_ratio = aspect_ratio(self.width, self.height);
-        self.scene.render(&self.color_view, aspect_ratio, frame)
+        render_into(&mut self.scene, &self.target, frame)
     }
+
+    /// Draws `frame` into `target`, made for this renderer, and submits the
+    /// work to the queue. Frames drawn one after the other into different
+    /// targets each keep what they drew.
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Renderer::render`](crate::Renderer::render).
+    pub fn render_into(&mut self, target: &OffscreenTarget, frame: &Frame) -> EngineResult<()> {
+        render_into(&mut self.scene, target, frame)
+    }
+}
+
+fn render_into(
+    scene: &mut SceneRenderer,
+    target: &OffscreenTarget,
+    frame: &Frame,
+) -> EngineResult<()> {
+    let aspect_ratio = aspect_ratio(target.width, target.height);
+    scene.render_with_depth(
+        &target.color_view,
+        Some(target.depth.view()),
+        aspect_ratio,
+        frame,
+    )
 }
 
 fn create_color_target(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {

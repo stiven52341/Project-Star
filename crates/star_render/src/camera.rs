@@ -67,6 +67,33 @@ impl Camera {
         }
     }
 
+    /// 2D camera centered on `center` of the `z = 0` plane, showing
+    /// `view_height` world units vertically, as [`Camera::new_2d`].
+    #[must_use]
+    pub const fn centered_2d(center: Vec2, view_height: f32) -> Self {
+        let mut camera = Self::new_2d(view_height);
+        camera.position.x = center.x;
+        camera.position.y = center.y;
+        camera.target.x = center.x;
+        camera.target.y = center.y;
+        camera
+    }
+
+    /// 3D perspective camera placed and turned by `transform`, looking
+    /// along its -Z axis with `vertical_fov` radians. Its roll is ignored:
+    /// +Y stays up, so the view never tilts.
+    #[must_use]
+    pub fn along_transform(transform: Mat4, vertical_fov: f32) -> Self {
+        let position = transform.translation();
+        let [_, _, backward, _] = transform.to_columns();
+        let forward = Vec3::new(-backward[0], -backward[1], -backward[2]);
+        Self {
+            position,
+            target: position + forward,
+            projection: Projection::Perspective { vertical_fov },
+        }
+    }
+
     /// Matrix that takes world coordinates to the screen.
     ///
     /// Returns `None` if `position` equals `target` or the camera looks
@@ -131,6 +158,26 @@ impl Default for Camera {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cameras_follow_the_place_they_are_given() {
+        let flat = Camera::centered_2d(Vec2::new(3.0, -1.0), 5.0);
+        let turned = Mat4::from_translation(Vec3::new(1.0, 2.0, 3.0))
+            * Mat4::from_rotation_y(std::f32::consts::FRAC_PI_2);
+        let solid = Camera::along_transform(turned, 0.5);
+
+        assert_eq!(flat.target, Vec3::new(3.0, -1.0, 0.0));
+        assert_eq!(
+            flat.projection,
+            Projection::Orthographic { view_height: 5.0 }
+        );
+        // A quarter turn about +Y points -Z (forward) to -X.
+        assert!((solid.target - Vec3::new(0.0, 2.0, 3.0)).length() < 1e-5);
+        assert_eq!(
+            solid.projection,
+            Projection::Perspective { vertical_fov: 0.5 }
+        );
+    }
 
     const EPSILON: f32 = 1e-5;
 

@@ -24,7 +24,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use eframe::egui;
-use star_engine::prelude::{Frame, SceneOutline, Vec3};
+use star_engine::prelude::{Camera, Frame, SceneOutline, Vec3};
 use star_engine::star_scene::NodeOutline;
 use star_script::semantic::ClassTable;
 
@@ -34,8 +34,8 @@ pub(crate) use self::class_drop::ClassDrop;
 pub(crate) use self::components::LightKind;
 use self::components::NodeTemplate;
 pub(crate) use self::drawing::{
-    Marks, SceneGpu, cone_lines, cross_lines, cube_lines, pyramid_lines, ray_lines, reach_lines,
-    square_lines, view_lines,
+    Marks, SceneGpu, cone_lines, cross_lines, cube_lines, game_aspect_ratio, pyramid_lines,
+    ray_lines, reach_lines, square_lines, view_lines,
 };
 pub(crate) use self::dropping::ImageDrop;
 pub(crate) use self::gizmo::{
@@ -155,6 +155,22 @@ impl SceneDocument {
     pub(crate) fn draw(&self, gpu: &mut impl SceneGpu, marks: Marks, frame: &mut Frame) {
         if let Ok(outline) = &self.content {
             drawing::draw_scene(outline, self.selected, gpu, marks, frame);
+        }
+    }
+
+    /// The camera whose view is previewed, with its node's name: the node
+    /// selected if it is a camera, or else the scene's main camera.
+    pub(crate) fn preview_camera(&self) -> Option<(&str, Camera)> {
+        let outline = self.content.as_ref().ok()?;
+        let (index, camera) = drawing::preview_camera(outline, self.selected)?;
+        Some((outline.nodes().get(index)?.name.as_str(), camera))
+    }
+
+    /// Adds to `frame` what the game shows of the scene, before its code
+    /// changes anything.
+    pub(crate) fn draw_game_view(&self, gpu: &mut impl SceneGpu, frame: &mut Frame) {
+        if let Ok(outline) = &self.content {
+            drawing::draw_game_view(outline, gpu, frame);
         }
     }
 

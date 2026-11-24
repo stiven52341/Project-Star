@@ -25,7 +25,7 @@ use star_core::EngineResult;
 use star_ecs::{Entity, World};
 use star_math::{Mat4, Vec2, Vec3};
 use star_physics::{BodySettings, ContactPhase};
-use star_render::{Camera, Color, Projection, TextureFilter};
+use star_render::{Camera, Color, TextureFilter};
 use star_scene::{
     Body2D, Body3D, GlobalTransform2D, GlobalTransform3D, Hierarchy, Light2dNode, LightNode, Name,
     NodeBody, NodeContact, PhysicsNodes, PhysicsNodes3d, Transform2D, Transform3D,
@@ -309,12 +309,7 @@ impl ScriptNodes {
                     .map(|global| global.position())
             })
             .unwrap_or(camera.position);
-        let mut view = Camera::new_2d(camera.view_height.max(MIN_VIEW_HEIGHT));
-        view.position.x = center.x;
-        view.position.y = center.y;
-        view.target.x = center.x;
-        view.target.y = center.y;
-        view
+        Camera::centered_2d(center, camera.view_height.max(MIN_VIEW_HEIGHT))
     }
 
     /// The 3D camera that shows the world from `camera`: from where its
@@ -333,16 +328,7 @@ impl ScriptNodes {
             .unwrap_or_else(|| {
                 Mat4::from_translation(camera.position) * camera.rotation().to_mat4()
             });
-        let position = matrix.translation();
-        let [_, _, backward, _] = matrix.to_columns();
-        let forward = Vec3::new(-backward[0], -backward[1], -backward[2]);
-        Camera {
-            position,
-            target: position + forward,
-            projection: Projection::Perspective {
-                vertical_fov: camera.shown_field_of_view(),
-            },
-        }
+        Camera::along_transform(matrix, camera.shown_field_of_view())
     }
 
     fn try_mirror(&mut self, world: &mut World, node: &ScriptNode<'_>) -> EngineResult<()> {
@@ -680,7 +666,7 @@ fn replace<T: 'static>(world: &mut World, entity: Entity, value: T) -> EngineRes
 mod tests {
     use star_math::Quat;
     use star_physics::{BodyKind, BodySettings, Physics2d, Physics3d, Shape2d, Shape3d};
-    use star_render::{DEFAULT_SPOT_ANGLE, DEFAULT_SPOT_BLEND};
+    use star_render::{DEFAULT_SPOT_ANGLE, DEFAULT_SPOT_BLEND, Projection};
     use star_scene::{TransformPropagation, step_node_physics, step_node_physics_3d};
 
     use super::*;
