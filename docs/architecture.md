@@ -101,6 +101,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 54 | StarScript's concurrency is **coroutines on the game's thread** (`async`/`await`), and its parallelism **`parallel static func`s that only see copied values** | Objects, lists and nodes are `Rc` and `RefCell` (decision 19): sharing them between threads would need `Arc` and locks on every field read, slower for every game and with deadlocks that StarScript could not explain. Most game code that “waits” (blink, cooldowns, cutscenes) only needs to continue in a later frame, so coroutines are Rust `async` methods polled once per frame by an executor of `star_script_runtime` (no dependency), on the same thread, touching anything. Heavy work (paths, terrain) goes to `parallel` functions: the compiler allows them only values, copies the arguments into a thread of the runtime (`std::thread`) and the result back, and a coroutine awaits it. `async` is explicit, so a method's signature says whether it waits and overrides are checked. Coroutines of a node end when it leaves the tree. Rejected: threads over shared objects (above), coroutines without `async` inferred from `await` in the body (the signature would depend on the body), `parallel for` loops (for later, if games need them) and a crate such as rayon or tokio (std is enough) |
 | 55 | StarScript has **three integer types and two decimal types**: `short` (`i16`), `int` (`i32`, the usual one), `bigint` (`i64`), `float` (`f32`, the usual one) and `double` (`f64`); a number **widens by itself only where no value is lost** | Most integers of a game (lives, scores, indices, layers) fit in 32 bits, which halves their memory in lists and fields and matches the engine (a sprite's layer is an `i32`); `double` is there for the rare case that needs the precision. `int` and `float` stay the types literals get, so most code never names the others. Widening (`short` → `int` → `bigint`, `float` → `double`, `short` → `float`, `int` → `double`) happens on assignment, arguments, `return`, `T?` and between the two sides of an operator, whose result is the wider type; it is lossless, so it can never surprise. Conversions that may lose values (narrowing, `int` → `float`, `bigint` → `double`) need `as`, so they stay visible. Lists never convert: a `[short]` seen as a `[int]` would be the same shared list with two element types. An integer literal takes the number type its place needs and must fit in it, checked when compiling (`-32768` is a valid `short`). Integers wrap around on overflow. List indices and `length()` are `int`; a range's values have the common type of its ends. Rejected: `int` → `float` by itself (as in C# and Java: it silently rounds integers above 16777216), unsigned types (a negative result would wrap to a huge number, a common bug in games) and `byte` (rarely needed in game logic; it can come later) |
 | 56 | “Show in file explorer” **starts the system's own program**, in `star_platform::show_in_file_explorer` | Every desktop system already has one: `explorer /select,` on Windows and `open -R` on macOS select the file; on Linux the freedesktop `FileManager1.ShowItems` call (through `dbus-send`) selects it in Nautilus, Dolphin, Nemo and the like, and `xdg-open` on its folder is the fallback for the rest. Android and iOS have no file manager to show, so it is an error there. The editor calls it on a thread of its own, since the program may take a while to answer, and only logs a failure. Rejected: a crate such as `opener` or `open` (a dependency for a few lines, and it is platform code, which belongs in `star_platform` anyway) |
+| 57 | Blueprint ready-made functions come from StarScript's own table of the engine's classes | The blueprint editor lists `star_script::semantic::native_classes` instead of a list of its own: one place says what the engine offers, to scripts and blueprints alike, and nothing can fall out of step. Labels are how the code is written (`Input.is_down(action) -> bool`), in every language. Rejected: a hand-written catalog with translated names (a second list to keep, and names that differ from the code users read) |
 
 ## ECS
 
@@ -690,12 +691,25 @@ leaves it out); dragging a selected node moves all the selected ones.
 Dragging from a pin to another joins them, whichever is the output; the
 right button opens a menu to add a node where it was opened (values,
 variables of the blueprint, calls to its own methods or to any other,
-operators, “If”, “Return”), to delete the selected nodes or to remove a
+ready-made “Functions”, operators, “If”, “Return”), to delete the selected nodes or to remove a
 pin's wires; `Delete` deletes the selected nodes. The entry cannot be deleted. The editor keeps only wires it
 can draw: from an output to an input of the same kind, on two nodes, and a
 pin that takes one wire (every input, and execution outputs) keeps the
 newest one. Everything else (unreachable nodes, cycles, inputs without a
 wire) is allowed while building and reported by “Compile”.
+
+The **ready-made functions** (`library.rs`) are the fields and methods of
+the engine's classes and the methods of numbers (“Math”), as nodes
+already filled in: a field gives a node that reads it and one that sets
+it, a method a call with its arguments (pure if it gives a value). They
+are read from `star_script::semantic::native_classes`, so what the engine
+adds appears without a second list (decision 57). Each class is a group,
+and “Transform” gathers the members that place a node. The members of a
+class are the blueprint's own only if it extends that class (a base
+from the project is taken to be a node); those of another object, wired
+to `target`, are in a submenu of their own. A field at the top searches
+every group. Events (`start`, `update`) and `async` methods are left
+out.
 
 While a blueprint is shown and one node is selected, the **Inspector**
 gives its fields (`properties.rs`; with several selected it says how many): a value's type and value, a variable's name

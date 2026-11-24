@@ -8,6 +8,7 @@ mod class_properties;
 mod creation;
 mod edit;
 mod layout;
+mod library;
 mod literal_field;
 mod menus;
 mod names;

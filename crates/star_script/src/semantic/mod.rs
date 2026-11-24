@@ -64,6 +64,16 @@ pub fn check_with(
     }
 }
 
+/// The classes the engine provides, with their members, as every program
+/// sees them before its own: what tools list, such as the ready-made
+/// functions of the blueprint editor.
+#[must_use]
+pub fn native_classes() -> ClassTable {
+    let mut classes = ClassTable::default();
+    natives::add_native_classes(&mut classes);
+    classes
+}
+
 /// Checks the meaning of `file` as [`check_with`] does, but keeps what the
 /// analysis learned even when it finds mistakes (the classes and their
 /// members, and the types of the code without mistakes): what tools that

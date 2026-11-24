@@ -231,6 +231,12 @@ pub(crate) struct Texts {
     pub(crate) menu_get_variable: &'static str,
     pub(crate) menu_set_variable: &'static str,
     pub(crate) menu_call: &'static str,
+    /// The ready-made functions of the blueprint menu, and their groups.
+    pub(crate) menu_functions: &'static str,
+    pub(crate) search_functions: &'static str,
+    pub(crate) no_function_matches: &'static str,
+    pub(crate) transform: &'static str,
+    pub(crate) math: &'static str,
     pub(crate) menu_operator: &'static str,
     pub(crate) node_branch: &'static str,
     pub(crate) node_return: &'static str,

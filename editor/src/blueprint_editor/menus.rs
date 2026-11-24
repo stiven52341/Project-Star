@@ -5,9 +5,15 @@ use eframe::egui::{self, Pos2};
 use star_blueprint::{Call, CallTarget, Graph, NodeId, NodeKind, Operator, PinRef};
 
 use super::edit;
+use super::library::{Library, ReadyMade};
 use super::names::{BlueprintNames, LiteralKind};
 use super::selection::Selection;
 use crate::texts;
+
+/// How wide the search field of the functions is.
+const FUNCTION_MENU_WIDTH: f32 = 220.0;
+/// How tall a list of functions grows before it scrolls.
+const FUNCTION_LIST_HEIGHT: f32 = 360.0;
 
 /// What was under the pointer when the menu was opened.
 #[derive(Debug, Clone, PartialEq)]
@@ -114,6 +120,11 @@ fn new_node_menu(ui: &mut egui::Ui, names: &BlueprintNames) -> Option<NodeKind> 
             chosen = Some(NodeKind::Call(call));
         }
     });
+    ui.menu_button(texts::current().menu_functions, |ui| {
+        if let Some(kind) = functions_menu(ui, names) {
+            chosen = Some(kind);
+        }
+    });
     ui.menu_button(texts::current().menu_operator, |ui| {
         for operator in Operator::ALL {
             if ui
@@ -129,6 +140,97 @@ fn new_node_menu(ui: &mut egui::Ui, names: &BlueprintNames) -> Option<NodeKind> 
     }
     if ui.button(texts::current().node_return).clicked() {
         chosen = Some(NodeKind::Return);
+    }
+    chosen
+}
+
+/// The ready-made functions, by group, with a field that searches all of
+/// them; returns the node of the one chosen.
+fn functions_menu(ui: &mut egui::Ui, names: &BlueprintNames) -> Option<NodeKind> {
+    let search_id = egui::Id::unique("blueprint_function_search");
+    let mut search: String = ui.data_mut(|data| data.get_temp(search_id).unwrap_or_default());
+    ui.add(
+        egui::TextEdit::singleline(&mut search)
+            .hint_text(texts::current().search_functions)
+            .desired_width(FUNCTION_MENU_WIDTH),
+    );
+    let library = Library::new(names.base.as_deref());
+    let chosen = if search.trim().is_empty() {
+        function_groups(ui, &library)
+    } else {
+        found_functions(ui, &library, search.trim())
+    };
+    if chosen.is_some() {
+        search.clear();
+    }
+    ui.data_mut(|data| data.insert_temp(search_id, search));
+    chosen
+}
+
+/// A submenu for each group, with the members of another object in a
+/// submenu of their own when the blueprint has its own too.
+fn function_groups(ui: &mut egui::Ui, library: &Library) -> Option<NodeKind> {
+    let mut chosen = None;
+    for group in library.groups() {
+        ui.menu_button(&group.name, |ui| {
+            egui::ScrollArea::vertical()
+                .max_height(FUNCTION_LIST_HEIGHT)
+                .show(ui, |ui| {
+                    chosen = chosen.take().or_else(|| entry_buttons(ui, &group.own));
+                    if group.own.is_empty() {
+                        chosen = chosen.take().or_else(|| entry_buttons(ui, &group.of_other));
+                    } else if !group.of_other.is_empty() {
+                        ui.separator();
+                        ui.menu_button(texts::current().of_another_object, |ui| {
+                            egui::ScrollArea::vertical()
+                                .max_height(FUNCTION_LIST_HEIGHT)
+                                .show(ui, |ui| {
+                                    chosen = chosen
+                                        .take()
+                                        .or_else(|| entry_buttons(ui, &group.of_other));
+                                });
+                        });
+                    }
+                });
+        });
+    }
+    chosen
+}
+
+/// The entries whose label contains `search`, each with its group.
+fn found_functions(ui: &mut egui::Ui, library: &Library, search: &str) -> Option<NodeKind> {
+    let found = library.search(search);
+    if found.is_empty() {
+        ui.weak(texts::current().no_function_matches);
+        return None;
+    }
+    let mut chosen = None;
+    egui::ScrollArea::vertical()
+        .max_height(FUNCTION_LIST_HEIGHT)
+        .show(ui, |ui| {
+            for (group, entry) in found {
+                let clicked = ui
+                    .horizontal(|ui| {
+                        let clicked = ui.button(&entry.label).clicked();
+                        ui.weak(group);
+                        clicked
+                    })
+                    .inner;
+                if clicked {
+                    chosen = Some(entry.kind.clone());
+                }
+            }
+        });
+    chosen
+}
+
+/// A button for each entry; returns the node of the one clicked.
+fn entry_buttons(ui: &mut egui::Ui, entries: &[ReadyMade]) -> Option<NodeKind> {
+    let mut chosen = None;
+    for entry in entries {
+        if ui.button(&entry.label).clicked() {
+            chosen = Some(entry.kind.clone());
+        }
     }
     chosen
 }

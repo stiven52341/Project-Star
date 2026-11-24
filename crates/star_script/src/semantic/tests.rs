@@ -1407,3 +1407,18 @@ fn parallel_goes_only_with_static_and_never_with_async() {
         ]
     );
 }
+
+#[test]
+fn native_classes_are_listed_with_their_members_and_bases() {
+    let classes = native_classes();
+
+    let node = classes.find(NODE_CLASS).unwrap();
+    let sprite = classes.find(SPRITE_CLASS).unwrap();
+    assert!(classes.is_subclass(sprite, node));
+    assert!(classes.find_member(sprite, "x").is_some());
+    assert!(
+        classes
+            .iter()
+            .all(|(_, class)| class.origin == ClassOrigin::Native)
+    );
+}

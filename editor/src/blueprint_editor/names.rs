@@ -8,6 +8,8 @@ use crate::texts;
 
 /// The names of a blueprint that nodes use.
 pub(super) struct BlueprintNames {
+    /// The class it extends, if any.
+    pub(super) base: Option<String>,
     pub(super) variables: Vec<String>,
     pub(super) methods: Vec<Call>,
 }
@@ -15,6 +17,7 @@ pub(super) struct BlueprintNames {
 impl BlueprintNames {
     pub(super) fn of(blueprint: &Blueprint) -> Self {
         Self {
+            base: blueprint.extends.clone(),
             variables: blueprint
                 .variables
                 .iter()
