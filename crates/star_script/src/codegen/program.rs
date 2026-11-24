@@ -6,7 +6,7 @@ use super::native;
 use super::statements::{Body, BodyKind};
 use super::writer::Writer;
 use super::{
-    CodegenError, CodegenErrorKind, Context, EntryPoint, GeneratedProgram, Result, internal,
+    CodegenError, CodegenErrorKind, Context, Entry, EntryPoint, GeneratedProgram, Result, internal,
 };
 use crate::Span;
 use crate::ast::{ClassDecl, ConstructorDecl, Expr, MemberKind, MethodDecl, VariableKind};
@@ -92,7 +92,7 @@ impl<'a> ClassItem<'a> {
 }
 
 /// Generates the whole file.
-pub(super) fn generate(context: Context<'_>) -> Result<GeneratedProgram> {
+pub(super) fn generate(context: Context<'_>, entry: Entry) -> Result<GeneratedProgram> {
     let game = context
         .analysis
         .classes()
@@ -133,7 +133,10 @@ pub(super) fn generate(context: Context<'_>) -> Result<GeneratedProgram> {
     out.close("}");
     scene_classes(context, &mut out);
     super::scene_fields::scene_fields(context, &mut out);
-    let entry_point = entry_point(context, &mut out, &items, game)?;
+    let entry_point = match entry {
+        Entry::FromProgram => entry_point(context, &mut out, &items, game)?,
+        Entry::Player => player_entry_point(&mut out),
+    };
     Ok(GeneratedProgram {
         code: out.finish(),
         entry_point,
@@ -308,7 +311,7 @@ fn entry_point(
     native::game_entry_point(
         out,
         &format!("{path}::new()"),
-        &class.name,
+        &format!("{:?}", class.name),
         &context.analysis.settings().actions,
     );
     Ok(kind)
@@ -325,11 +328,27 @@ fn main_scene_entry_point(context: Context<'_>, out: &mut Writer) -> EntryPoint 
     native::game_entry_point(
         out,
         &format!("main_scene_game_({:?})?", scene.path),
-        &scene.title,
+        &format!("{:?}", scene.title),
         &settings.actions,
     );
     native::main_scene_game(out);
     EntryPoint::MainScene
+}
+
+/// Writes `fn main` for the scene player: the scene and the title come
+/// from its arguments. It has no input actions: without scripts, nothing
+/// would read them.
+fn player_entry_point(out: &mut Writer) -> EntryPoint {
+    out.line("");
+    native::game_entry_point(
+        out,
+        "main_scene_game_(&player_argument_(PLAYER_SCENE_, \"scene\")?)?",
+        "player_argument_(PLAYER_TITLE_, \"title\")?",
+        &[],
+    );
+    native::main_scene_game(out);
+    native::player_arguments(out);
+    EntryPoint::Player
 }
 
 /// Whether `class` is the game: it extends `Game` and no class extends it,

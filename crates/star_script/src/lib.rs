@@ -216,6 +216,19 @@ pub fn compile_program_with(
     generate(&check_program_with(sources, settings)?)
 }
 
+/// The scene player: one program that plays any project without scripts,
+/// given the scene and the window's title as arguments (see
+/// [`codegen::generate_player`]).
+///
+/// # Errors
+///
+/// As [`compile_source`]; only a mistake of the compiler itself.
+pub fn player_program() -> Result<codegen::GeneratedProgram, Vec<CompileError>> {
+    let checked = check_source_with("", &GameSettings::default())?;
+    codegen::generate_player(&checked.syntax, &checked.analysis)
+        .map_err(|error| vec![CompileError::Codegen(error)])
+}
+
 fn generate(checked: &CheckedSource) -> Result<codegen::GeneratedProgram, Vec<CompileError>> {
     codegen::generate(&checked.syntax, &checked.analysis)
         .map_err(|error| vec![CompileError::Codegen(error)])

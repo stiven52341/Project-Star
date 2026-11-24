@@ -1303,6 +1303,8 @@ impl EngineGame_ {{
 
 /// `fn main` that runs the game `class_path` in a window of the engine, with
 /// the input `actions` of the project.
+/// `new_game` and `title` are Rust expressions, run inside `run_`: the
+/// game and the title of its window.
 pub(super) fn game_entry_point(
     out: &mut Writer,
     new_game: &str,
@@ -1327,7 +1329,7 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
     let actions_ = action_map_()?;
     {RUNTIME}::input::declare_actions(&ACTION_NAMES_);
     let app_ = ::star_engine::app::App::new()
-        .with_title({title:?})
+        .with_title({title})
         .with_actions(actions_);
     let folder_ = ::std::clone::Clone::clone(app_.asset_folder());
     let audio_ = ::std::rc::Rc::new(::std::cell::RefCell::new(::star_engine::star_audio::Audio::silent()));
@@ -1379,6 +1381,26 @@ fn main_scene_game_(path_: &str) -> ::star_engine::star_core::EngineResult<crate
     })?;
     crate::classes::Game::Object::add_child(::std::rc::Rc::clone(&game_), scene_);
     ::std::result::Result::Ok(game_)
+}";
+
+/// Writes `player_argument_`, which reads the scene player's arguments.
+pub(super) fn player_arguments(out: &mut Writer) {
+    for line in std::iter::once("").chain(PLAYER_ARGUMENTS.lines()) {
+        out.line(line);
+    }
+}
+
+const PLAYER_ARGUMENTS: &str = "/// Where the scene to play is among the player's arguments.
+const PLAYER_SCENE_: usize = 1;
+/// Where the title of the window is among the player's arguments.
+const PLAYER_TITLE_: usize = 2;
+
+/// The player's argument at `index`, which tells `what_` it is.
+fn player_argument_(index_: usize, what_: &str) -> ::star_engine::star_core::EngineResult<::std::string::String> {
+    ::std::env::args().nth(index_).ok_or_else(|| ::star_engine::star_core::EngineError::Initialization {
+        subsystem: \"scene player\",
+        reason: ::std::format!(\"the {what_} is missing: play a scene with `player <scene> <title>`\"),
+    })
 }";
 
 const SHARE_INPUT: &str =

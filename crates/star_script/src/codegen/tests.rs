@@ -149,6 +149,25 @@ fn programs_without_a_game_play_the_main_scene() {
 }
 
 #[test]
+fn the_player_reads_its_scene_and_title_from_its_arguments() {
+    let player = crate::player_program().expect("valid program");
+
+    assert_eq!(player.entry_point, EntryPoint::Player);
+    assert!(player.uses_engine());
+    assert!(
+        player
+            .code
+            .contains("main_scene_game_(&player_argument_(PLAYER_SCENE_, \"scene\")?)?")
+    );
+    assert!(
+        player
+            .code
+            .contains(".with_title(player_argument_(PLAYER_TITLE_, \"title\")?)")
+    );
+    assert!(player.code.contains("fn player_argument_("));
+}
+
+#[test]
 fn console_programs_do_not_need_the_engine() {
     let program = compile_source("class A { static func main() {} }").expect("valid program");
 

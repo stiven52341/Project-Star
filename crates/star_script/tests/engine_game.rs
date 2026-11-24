@@ -447,6 +447,12 @@ fn games_run_in_the_engine_until_they_quit() {
     package
         .add_program("scene_game", compile_with("scene_game", "", &scene_only))
         .expect("valid name");
+    package
+        .add_program(
+            "scene_player",
+            star_script::player_program().expect("valid player"),
+        )
+        .expect("valid name");
     package.write(&directory).expect("package written");
 
     build(&directory);
@@ -488,8 +494,23 @@ fn games_run_in_the_engine_until_they_quit() {
         "frame 1\nblink\nframe 2\nlater\nblink\nframe 3\nframe 4\nframe 5\n"
     );
 
-    let output = Command::new(binary(&directory, "scene_game"))
-        .current_dir(&directory)
+    scene_only_games_need_their_scene(&directory);
+
+    let output = Command::new(binary(&directory, "misspelled_game"))
+        .output()
+        .expect("the game runs");
+    assert!(!output.status.success(), "a wrong binding stops the game");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("unknown input binding \"Spcae\""),
+        "the error names the binding"
+    );
+}
+
+/// The scene-only game and the scene player stop, saying which scene they
+/// could not load (a scene they load would play until closed).
+fn scene_only_games_need_their_scene(directory: &Path) {
+    let output = Command::new(binary(directory, "scene_game"))
+        .current_dir(directory)
         .output()
         .expect("the game runs");
     assert!(
@@ -502,12 +523,25 @@ fn games_run_in_the_engine_until_they_quit() {
         "the error names the scene"
     );
 
-    let output = Command::new(binary(&directory, "misspelled_game"))
+    let without_arguments = Command::new(binary(directory, "scene_player"))
+        .current_dir(directory)
         .output()
-        .expect("the game runs");
-    assert!(!output.status.success(), "a wrong binding stops the game");
+        .expect("the player runs");
+    assert!(!without_arguments.status.success());
     assert!(
-        String::from_utf8_lossy(&output.stderr).contains("unknown input binding \"Spcae\""),
-        "the error names the binding"
+        String::from_utf8_lossy(&without_arguments.stderr)
+            .contains("play a scene with `player <scene> <title>`"),
+        "the player says how to run it"
+    );
+    let missing_scene = Command::new(binary(directory, "scene_player"))
+        .args(["levels/elsewhere.scene", "Player"])
+        .current_dir(directory)
+        .output()
+        .expect("the player runs");
+    assert!(!missing_scene.status.success());
+    assert!(
+        String::from_utf8_lossy(&missing_scene.stderr)
+            .contains("the main scene, \"levels/elsewhere.scene\", could not be loaded"),
+        "the player names the scene it was given"
     );
 }
