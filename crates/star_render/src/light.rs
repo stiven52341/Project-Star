@@ -30,6 +30,13 @@ impl AmbientLight {
         intensity: 0.0,
     };
 
+    /// White light at full intensity: surfaces show their own colors. The
+    /// 2D ambient light of a frame, unless the game changes it.
+    pub const FULL: Self = Self {
+        color: Color::WHITE,
+        intensity: 1.0,
+    };
+
     /// An ambient light of `color` and `intensity`.
     #[must_use]
     pub const fn new(color: Color, intensity: f32) -> Self {

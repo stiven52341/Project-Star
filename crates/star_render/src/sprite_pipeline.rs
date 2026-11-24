@@ -2,13 +2,14 @@
 
 use std::num::NonZeroU64;
 
-use star_core::EngineResult;
+use star_core::{EngineError, EngineResult};
 use star_math::Mat4;
 use wgpu::util::DeviceExt as _;
 
 use crate::depth::DEPTH_FORMAT;
+use crate::light_2d::{LIGHTS_2D_SIZE, encode_lights_2d};
 use crate::sprite_batch::{MAX_SPRITES_PER_FRAME, SpriteBatcher, VERTEX_STRIDE, sprite_indices};
-use crate::{Color, Sprite, TextureId};
+use crate::{AmbientLight, Color, Light2d, MAX_LIGHTS, Sprite, TextureId};
 
 /// Size of the camera's `mat4x4<f32>` in `sprite.wgsl`.
 const CAMERA_SIZE: usize = 64;
@@ -20,10 +21,19 @@ const SPRITE_VERTEX_BYTES: u64 = 4 * VERTEX_STRIDE;
 const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
     wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Float32x4];
 
-/// Shader, camera and buffers needed to draw sprites.
+/// The lights of the sprites of a frame.
+pub(crate) struct SpriteLights<'frame> {
+    pub(crate) ambient: AmbientLight,
+    pub(crate) lights: &'frame [Light2d],
+}
+
+/// Shader, camera, lights and buffers needed to draw sprites.
 pub(crate) struct SpritePipeline {
     pipeline: wgpu::RenderPipeline,
     camera_buffer: wgpu::Buffer,
+    lights_buffer: wgpu::Buffer,
+    /// Reused bytes of the lights, written to `lights_buffer`.
+    lights_staging: Vec<u8>,
     camera_bind_group: wgpu::BindGroup,
     buffers: Option<SpriteBuffers>,
     batcher: SpriteBatcher,
@@ -49,13 +59,25 @@ impl SpritePipeline {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        let lights_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("sprite lights"),
+            size: LIGHTS_2D_SIZE as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("sprite camera"),
+            label: Some("sprite camera and lights"),
             layout: &camera_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: camera_buffer.as_entire_binding(),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: lights_buffer.as_entire_binding(),
+                },
+            ],
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("sprite pipeline layout"),
@@ -65,30 +87,48 @@ impl SpritePipeline {
         Self {
             pipeline: create_pipeline(device, &layout, target_format),
             camera_buffer,
+            lights_buffer,
+            lights_staging: Vec::with_capacity(LIGHTS_2D_SIZE),
             camera_bind_group,
             buffers: None,
             batcher: SpriteBatcher::default(),
         }
     }
 
-    /// Copies the sprites of a frame and its camera to the GPU.
+    /// Copies the sprites of a frame, its camera and its 2D lights to the
+    /// GPU.
     ///
     /// # Errors
     ///
-    /// Returns [`star_core::EngineError::CapacityExceeded`] if there are too many sprites.
+    /// Returns [`EngineError::CapacityExceeded`] if there are too many
+    /// sprites or 2D lights.
     pub(crate) fn prepare(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         view_projection: Mat4,
         sprites: &[Sprite],
-        to_target_space: impl Fn(Color) -> Color,
+        lights: &SpriteLights<'_>,
+        to_target_space: impl Fn(Color) -> Color + Copy,
     ) -> EngineResult<()> {
+        if lights.lights.len() > MAX_LIGHTS {
+            return Err(EngineError::CapacityExceeded {
+                resource: "2D lights per frame",
+            });
+        }
         self.batcher.prepare(sprites, to_target_space)?;
         if sprites.is_empty() {
             return Ok(());
         }
         queue.write_buffer(&self.camera_buffer, 0, &camera_bytes(view_projection));
+        self.lights_staging.clear();
+        encode_lights_2d(
+            &mut self.lights_staging,
+            lights.ambient,
+            lights.lights,
+            to_target_space,
+        );
+        queue.write_buffer(&self.lights_buffer, 0, &self.lights_staging);
         let buffers = buffers_for(&mut self.buffers, device, self.batcher.sprite_count());
         queue.write_buffer(&buffers.vertices, 0, self.batcher.vertices());
         Ok(())
@@ -176,18 +216,22 @@ fn camera_bytes(view_projection: Mat4) -> [u8; CAMERA_SIZE] {
 }
 
 fn create_camera_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    let uniform = |binding, visibility, size: usize| wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: false,
+            min_binding_size: NonZeroU64::new(size as u64),
+        },
+        count: None,
+    };
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("sprite camera"),
-        entries: &[wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStages::VERTEX,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: false,
-                min_binding_size: NonZeroU64::new(CAMERA_SIZE as u64),
-            },
-            count: None,
-        }],
+        label: Some("sprite camera and lights"),
+        entries: &[
+            uniform(0, wgpu::ShaderStages::VERTEX, CAMERA_SIZE),
+            uniform(1, wgpu::ShaderStages::FRAGMENT, LIGHTS_2D_SIZE),
+        ],
     })
 }
 

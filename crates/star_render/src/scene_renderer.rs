@@ -6,7 +6,7 @@ use wgpu::util::DeviceExt as _;
 use crate::depth::{DepthBuffer, FARTHEST_DEPTH};
 use crate::mesh::{GpuMesh, Topology, primitive_vertex_count};
 use crate::mesh_pipeline::MeshPipeline;
-use crate::sprite_pipeline::SpritePipeline;
+use crate::sprite_pipeline::{SpriteLights, SpritePipeline};
 use crate::store::Store;
 use crate::surface_pipeline::{FrameLights, GpuSurfaceMesh, SurfacePipeline, SurfaceUniforms};
 use crate::texture::{GpuTexture, TextureBindings};
@@ -177,6 +177,10 @@ impl SceneRenderer {
             &self.queue,
             view_projection,
             frame.sprites(),
+            &SpriteLights {
+                ambient: frame.ambient_light_2d(),
+                lights: frame.lights_2d(),
+            },
             |color| color.in_target_space(target_format),
         )?;
         let commands = self.encode(target, frame)?;

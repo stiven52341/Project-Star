@@ -2,7 +2,7 @@
 
 use star_math::Mat4;
 
-use crate::{AmbientLight, Camera, Color, Light, Material, Mesh3dId, MeshId, Sprite};
+use crate::{AmbientLight, Camera, Color, Light, Light2d, Material, Mesh3dId, MeshId, Sprite};
 
 /// One mesh to draw, placed in the world by `transform`.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -29,6 +29,9 @@ pub struct Frame {
     camera: Camera,
     ambient_light: AmbientLight,
     lights: Vec<Light>,
+    /// `None` until the game sets it: [`AmbientLight::FULL`].
+    ambient_light_2d: Option<AmbientLight>,
+    lights_2d: Vec<Light2d>,
     draws: Vec<DrawCommand>,
     surfaces: Vec<SurfaceDraw>,
     sprites: Vec<Sprite>,
@@ -42,11 +45,12 @@ impl Frame {
     }
 
     /// Starts a new frame filled with `clear_color`, discarding the previous
-    /// meshes, sprites and lights. The camera and the ambient light are
+    /// meshes, sprites and lights. The camera and the ambient lights are
     /// kept.
     pub fn begin(&mut self, clear_color: Color) {
         self.clear_color = clear_color;
         self.lights.clear();
+        self.lights_2d.clear();
         self.draws.clear();
         self.surfaces.clear();
         self.sprites.clear();
@@ -79,6 +83,32 @@ impl Frame {
     #[must_use]
     pub fn ambient_light(&self) -> AmbientLight {
         self.ambient_light
+    }
+
+    /// Sets the light that reaches every sprite ([`AmbientLight::FULL`] at
+    /// first, so sprites show their own colors). Darken it for 2D lights
+    /// to be seen.
+    pub fn set_ambient_light_2d(&mut self, light: AmbientLight) {
+        self.ambient_light_2d = Some(light);
+    }
+
+    /// The light that reaches every sprite.
+    #[must_use]
+    pub fn ambient_light_2d(&self) -> AmbientLight {
+        self.ambient_light_2d.unwrap_or(AmbientLight::FULL)
+    }
+
+    /// Lights the sprites of this frame with `light`, besides the others.
+    /// A frame can have up to [`MAX_LIGHTS`](crate::MAX_LIGHTS) 2D lights:
+    /// rendering a frame with more is an error.
+    pub fn add_light_2d(&mut self, light: impl Into<Light2d>) {
+        self.lights_2d.push(light.into());
+    }
+
+    /// The 2D lights of this frame, in the order they were added.
+    #[must_use]
+    pub fn lights_2d(&self) -> &[Light2d] {
+        &self.lights_2d
     }
 
     /// The lights of this frame, in the order they were added.
@@ -203,15 +233,30 @@ mod tests {
             intensity: 1.0,
         });
 
+        frame.set_ambient_light_2d(AmbientLight::new(Color::BLACK, 1.0));
+        frame.add_light_2d(crate::PointLight2d {
+            position: star_math::Vec2::ZERO,
+            color: Color::WHITE,
+            intensity: 1.0,
+            range: 2.0,
+        });
+
         frame.begin(Color::WHITE);
 
         assert_eq!(frame.lights().len(), 0);
+        assert_eq!(frame.lights_2d().len(), 0);
         assert_eq!(frame.ambient_light().intensity, 0.5);
+        assert_eq!(frame.ambient_light_2d().color, Color::BLACK);
 
         assert_eq!(frame.draw_count(), 0);
         assert_eq!(frame.mesh_3d_count(), 0);
         assert_eq!(frame.sprite_count(), 0);
         assert_eq!(frame.clear_color(), Color::WHITE);
+    }
+
+    #[test]
+    fn sprites_show_their_own_colors_until_the_2d_ambient_light_changes() {
+        assert_eq!(Frame::new().ambient_light_2d(), AmbientLight::FULL);
     }
 
     #[test]

@@ -19,6 +19,7 @@ mod gpu_tests;
 #[cfg(feature = "interop")]
 pub mod interop;
 mod light;
+mod light_2d;
 mod material;
 mod mesh;
 mod mesh_data;
@@ -42,6 +43,7 @@ pub use light::{
     AmbientLight, DEFAULT_SPOT_ANGLE, DEFAULT_SPOT_BLEND, DirectionalLight, Light, MAX_LIGHTS,
     MAX_SPOT_ANGLE, PointLight, SpotLight,
 };
+pub use light_2d::{Light2d, PointLight2d, SpotLight2d};
 pub use material::{DEFAULT_ROUGHNESS, Material};
 pub use mesh::{Mesh3dId, MeshId};
 pub use mesh_data::{
