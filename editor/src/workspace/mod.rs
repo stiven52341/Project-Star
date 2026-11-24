@@ -29,7 +29,10 @@ use self::console_panel::ConsolePanel;
 use self::documents::{ActiveDocument, Documents};
 use self::inspector_panel::show_inspector;
 use self::live_check::LiveCheck;
-use self::menu_bar::{MenuAction, MenuState, SAVE_SHORTCUT, show_menu_bar};
+use self::menu_bar::{
+    MenuAction, MenuState, REDO_OTHER_SHORTCUT, REDO_SHORTCUT, SAVE_SHORTCUT, UNDO_SHORTCUT,
+    UndoSteps, show_menu_bar,
+};
 use self::output_panel::OutputPanel;
 use self::problems_panel::{CheckEnd, ProblemsPanel};
 use self::unsaved_dialog::{UnsavedChoice, show_unsaved_dialog};
@@ -38,6 +41,7 @@ use crate::editor_log::LogHistory;
 use crate::game_run::PlayRequest;
 use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, Project, SCRIPT_EXTENSION};
 use crate::project_check::Problem;
+use crate::scene_editor::SceneDocument;
 use crate::style::ERROR_COLOR;
 use crate::texts::{self, Language};
 
@@ -152,14 +156,32 @@ impl EditorWindow {
         if ui.input_mut(|input| input.consume_shortcut(&SAVE_SHORTCUT)) {
             self.documents.save_active();
         }
+        self.undo_from_keys(ui.ctx());
+        let steps = self
+            .shown_scene()
+            .map_or_else(UndoSteps::default, |scene| UndoSteps {
+                can_undo: scene.can_undo(),
+                can_redo: scene.can_redo(),
+            });
         let state = MenuState {
             can_save: self.documents.active_is_unsaved(),
+            steps,
             compiling: self.problems.is_compiling(),
             playing: self.output.is_playing(),
         };
         egui::Panel::top("menu_bar").show(ui, |ui| {
             match show_menu_bar(ui, state) {
                 Some(MenuAction::Save) => self.documents.save_active(),
+                Some(MenuAction::Undo) => {
+                    if let Some(scene) = self.shown_scene() {
+                        scene.undo();
+                    }
+                }
+                Some(MenuAction::Redo) => {
+                    if let Some(scene) = self.shown_scene() {
+                        scene.redo();
+                    }
+                }
                 Some(MenuAction::CloseProject) => action = self.leave(Leaving::CloseProject),
                 Some(MenuAction::Compile) => {
                     // “Compile” checks the files, so it checks what is
@@ -216,11 +238,45 @@ impl EditorWindow {
             .min_size(BOTTOM_PANEL_MIN_HEIGHT)
             .show(ui, |ui| self.show_bottom_panel(ui));
         egui::CentralPanel::default().show(ui, |ui| self.show_central_area(ui));
+        if let Some(scene) = self.documents.scene_mut() {
+            scene.settle(ui.ctx());
+        }
         if action.is_none() {
             action = self.ask_about_unsaved_changes(ui.ctx());
         }
         self.show_about(ui.ctx());
         action
+    }
+
+    /// The scene, if its tab is the one shown.
+    fn shown_scene(&mut self) -> Option<&mut SceneDocument> {
+        match self.documents.active() {
+            ActiveDocument::Scene => self.documents.scene_mut(),
+            ActiveDocument::Blueprint(_) | ActiveDocument::Script(_) => None,
+        }
+    }
+
+    /// `Ctrl+Z` undoes the last change to the scene shown, and
+    /// `Ctrl+Shift+Z` or `Ctrl+Y` redo it, while no text is being typed:
+    /// text fields undo their own text.
+    fn undo_from_keys(&mut self, context: &egui::Context) {
+        if context.egui_wants_keyboard_input() {
+            return;
+        }
+        let Some(scene) = self.shown_scene() else {
+            return;
+        };
+        let (redo, undo) = context.input_mut(|input| {
+            // `Ctrl+Z` also matches `Ctrl+Shift+Z`, so redo goes first.
+            let redo = input.consume_shortcut(&REDO_SHORTCUT)
+                || input.consume_shortcut(&REDO_OTHER_SHORTCUT);
+            (redo, !redo && input.consume_shortcut(&UNDO_SHORTCUT))
+        });
+        if redo {
+            scene.redo();
+        } else if undo {
+            scene.undo();
+        }
     }
 
     /// Takes the result of a check that has just finished: its problems are

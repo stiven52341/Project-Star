@@ -112,6 +112,9 @@ pub(crate) struct Texts {
     // Editor window.
     pub(crate) menu_file: &'static str,
     pub(crate) close_project: &'static str,
+    pub(crate) menu_edit: &'static str,
+    pub(crate) undo: &'static str,
+    pub(crate) redo: &'static str,
     pub(crate) quit: &'static str,
     pub(crate) menu_help: &'static str,
     pub(crate) about: &'static str,

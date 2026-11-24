@@ -34,6 +34,9 @@ pub(super) static ENGLISH: Texts = Texts {
     // Editor window.
     menu_file: "File",
     close_project: "Close project",
+    menu_edit: "Edit",
+    undo: "Undo",
+    redo: "Redo",
     quit: "Quit",
     menu_help: "Help",
     about: "About",

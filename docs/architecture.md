@@ -516,7 +516,8 @@ of the StarScript compiler and of the project check stay in English:
    `<location>/<name>/` with `project.toml` and `assets/` (it never
    overwrites) and opens the editor.
 2. **Editor** (`workspace/`), maximized: menu (“File” → “Save” /
-   “Close project” / “Language” / “Quit”; “Project” → “Compile” / “Play” /
+   “Close project” / “Language” / “Quit”; “Edit” → “Undo” / “Redo” of the
+   scene; “Project” → “Compile” / “Play” /
    “Stop”; “Help” → “About”) and the same three buttons next to it, **Scene** panel (the
    tree of the open scene's nodes, see below), a central area with
    **tabs**: “Scene”, the **view** rendered by the engine (reference grid;
@@ -581,6 +582,15 @@ project's kind). Changes mark the tab (`•`) until “Save” (`Ctrl+S`),
 “Compile” or “Play” writes the file with `SceneOutline::to_text`; opening
 another scene, closing the project or quitting ask first, as blueprints
 do. A file that cannot be read or saved shows why in the panel.
+“Undo” (`Ctrl+Z`) and “Redo” (`Ctrl+Shift+Z` or `Ctrl+Y`) work while
+the “Scene” tab is shown and no text is being typed (text fields undo
+their own text). The history (`history.rs`) keeps whole copies of the
+scene and of the node selected, up to 100 steps: scenes are small, and a
+copy cannot miss a kind of change the way recorded operations could. A
+change is only marked while it happens; the step closes once the pointer
+is released and no field is being typed in, so one drag of a handle or
+one number typed is undone at once. Each copy has a revision number, so
+undoing back to the saved scene clears the tab's mark.
 
 The view draws the open scene over its grid as the game would: each
 node's place is computed from the outline in one pass (parents come

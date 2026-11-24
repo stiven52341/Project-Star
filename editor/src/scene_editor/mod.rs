@@ -1,13 +1,14 @@
 //! The scene editor: a `.scene` file of the assets folder, open in the
 //! “Scene” tab. The “Scene” panel shows its nodes as a tree, whose menus
 //! create, duplicate and delete nodes, and the inspector edits the node selected in
-//! it. Changes are kept until the scene is saved.
+//! it. Changes are kept until the scene is saved, and can be undone.
 
 mod components;
 mod drawing;
 mod dropping;
 mod fields;
 mod gizmo;
+mod history;
 mod picking;
 mod properties;
 mod tree;
@@ -26,6 +27,7 @@ pub(crate) use self::dropping::ImageDrop;
 pub(crate) use self::gizmo::{
     Drag, Handle, HandleShape, Lens, Target, Tip, Tool, handle_at, shapes,
 };
+use self::history::{Now, SceneHistory, Snapshot};
 pub(crate) use self::picking::Ray;
 use self::properties::{NodeContext, edit_node};
 use self::tree_view::{MenuContext, TreeAction, TreeState, TreeView};
@@ -45,8 +47,9 @@ pub(crate) struct SceneDocument {
     content: Result<SceneOutline, String>,
     /// The position of the node selected in the tree.
     selected: Option<usize>,
-    /// Whether it changed since it was opened or saved.
-    unsaved: bool,
+    /// What can be undone and redone, which also tells whether it changed
+    /// since it was saved; `None` if its file could not be read.
+    history: Option<SceneHistory>,
     /// Why the last save failed, until one works.
     save_error: Option<String>,
     /// The nodes closed in the tree and the text searched in it.
@@ -61,13 +64,19 @@ impl SceneDocument {
         let content = fs::read_to_string(&file)
             .map_err(|error| error.to_string())
             .and_then(|text| SceneOutline::from_text(&text).map_err(|error| error.to_string()));
+        let history = content.as_ref().ok().map(|outline| {
+            SceneHistory::new(Snapshot {
+                outline: outline.clone(),
+                selected: None,
+            })
+        });
         Self {
             path,
             file,
             dimension,
             content,
             selected: None,
-            unsaved: false,
+            history,
             save_error: None,
             tree: TreeState::default(),
         }
@@ -81,7 +90,7 @@ impl SceneDocument {
     /// The name of its file, for its tab, marked if it has unsaved changes.
     pub(crate) fn title(&self) -> String {
         let name = self.path.rsplit('/').next().unwrap_or(&self.path);
-        if self.unsaved {
+        if self.is_unsaved() {
             texts::unsaved_title(name)
         } else {
             name.to_owned()
@@ -89,26 +98,31 @@ impl SceneDocument {
     }
 
     /// Whether it changed since it was opened or saved.
-    pub(crate) const fn is_unsaved(&self) -> bool {
-        self.unsaved
+    pub(crate) fn is_unsaved(&self) -> bool {
+        self.history
+            .as_ref()
+            .is_some_and(|history| !history.is_saved())
     }
 
     /// Writes it to its file if it has unsaved changes. Returns whether it
     /// is saved now; if not, the “Scene” panel shows why.
     pub(crate) fn save(&mut self) -> bool {
-        let Ok(outline) = &self.content else {
-            return true;
-        };
-        if !self.unsaved {
+        if !self.is_unsaved() {
             return true;
         }
+        let (Ok(outline), Some(history)) = (&self.content, &mut self.history) else {
+            return true;
+        };
         let written = outline
             .to_text()
             .map_err(|error| error.to_string())
             .and_then(|text| fs::write(&self.file, text).map_err(|error| error.to_string()));
         match written {
             Ok(()) => {
-                self.unsaved = false;
+                history.mark_saved(Now {
+                    outline,
+                    selected: self.selected,
+                });
                 self.save_error = None;
                 true
             }
@@ -167,7 +181,7 @@ impl SceneDocument {
         match outline.add_node(parent, node) {
             Ok(index) => {
                 self.selected = Some(index);
-                self.unsaved = true;
+                self.mark_changed();
                 self.tree.reveal_selected();
             }
             Err(error) => log::warn!("{error}"),
@@ -209,7 +223,9 @@ impl SceneDocument {
             Target::Flat { local, .. } => node.transform.replace(local) != Some(local),
             Target::Solid { local, .. } => node.transform_3d.replace(local) != Some(local),
         };
-        self.unsaved |= changed;
+        if changed {
+            self.mark_changed();
+        }
     }
 
     /// The tree of its nodes, where the user selects one, with buttons to
@@ -274,7 +290,7 @@ impl SceneDocument {
             TreeAction::Delete(index) => editor.delete(index),
         };
         if changed {
-            self.unsaved = true;
+            self.mark_changed();
             self.tree.reveal_selected();
         }
     }
@@ -294,8 +310,74 @@ impl SceneDocument {
             dimension: self.dimension,
             images,
         };
-        self.unsaved |= edit_node(ui, node, &context);
+        if edit_node(ui, node, &context) {
+            self.mark_changed();
+        }
         true
+    }
+
+    /// The scene changed: the change can be undone.
+    fn mark_changed(&mut self) {
+        if let Some(history) = &mut self.history {
+            history.mark_changed();
+        }
+    }
+
+    /// Closes the change being made once the user lets go of the pointer
+    /// and of the text being typed, so a whole drag or a whole number is
+    /// undone at once. Called once per frame, after every change.
+    pub(crate) fn settle(&mut self, context: &egui::Context) {
+        let (Ok(outline), Some(history)) = (&self.content, &mut self.history) else {
+            return;
+        };
+        history.follow_selection(self.selected);
+        let busy =
+            context.input(|input| input.pointer.any_down()) || context.egui_wants_keyboard_input();
+        if !busy {
+            history.close_step(Now {
+                outline,
+                selected: self.selected,
+            });
+        }
+    }
+
+    /// Whether there is a change to undo.
+    pub(crate) fn can_undo(&self) -> bool {
+        self.history.as_ref().is_some_and(SceneHistory::can_undo)
+    }
+
+    /// Whether there is a change undone to redo.
+    pub(crate) fn can_redo(&self) -> bool {
+        self.history.as_ref().is_some_and(SceneHistory::can_redo)
+    }
+
+    /// Takes the scene back to how it was before the last change.
+    pub(crate) fn undo(&mut self) {
+        self.travel(SceneHistory::undo);
+    }
+
+    /// Makes again the last change undone.
+    pub(crate) fn redo(&mut self) {
+        self.travel(SceneHistory::redo);
+    }
+
+    /// Shows the scene `step` takes the history to, if it takes it anywhere.
+    fn travel(&mut self, step: fn(&mut SceneHistory, Now<'_>) -> Option<Snapshot>) {
+        let (Ok(outline), Some(history)) = (&mut self.content, &mut self.history) else {
+            return;
+        };
+        let now = Now {
+            outline,
+            selected: self.selected,
+        };
+        let Some(snapshot) = step(history, now) else {
+            return;
+        };
+        *outline = snapshot.outline;
+        self.selected = snapshot
+            .selected
+            .filter(|&selected| selected < outline.nodes().len());
+        self.tree.reveal_selected();
     }
 }
 
@@ -526,10 +608,29 @@ mod tests {
     }
 
     #[test]
+    fn changes_can_be_undone_and_redone() {
+        let (_assets, mut scene) = open_level("scene_document_undo");
+        tree_editor(&mut scene).add_child(ROOT, NodeTemplate::Empty, &[]);
+        scene.mark_changed();
+        scene.settle(&egui::Context::default());
+        assert!(scene.can_undo());
+
+        scene.undo();
+        assert_eq!(scene.content.as_ref().unwrap().nodes().len(), 1);
+        assert_eq!(scene.selected, None);
+        assert!(!scene.is_unsaved());
+
+        scene.redo();
+        assert_eq!(scene.content.as_ref().unwrap().nodes().len(), 2);
+        assert_eq!(scene.selected, Some(1));
+        assert!(scene.is_unsaved());
+    }
+
+    #[test]
     fn saving_writes_the_changes_and_clears_the_mark() {
         let (assets, mut scene) = open_level("scene_document_save");
         tree_editor(&mut scene).add_child(ROOT, NodeTemplate::Empty, &[]);
-        scene.unsaved = true;
+        scene.mark_changed();
 
         assert!(scene.save());
 

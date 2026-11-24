@@ -246,10 +246,12 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       `bigint` (`i64`), `float` (`f32`) and `double` (`f64`); literals take
       the type their place needs and must fit in it, and numbers widen by
       themselves where no value is lost.
-- [ ] **Editor ideas, not planned yet**: undo and redo in the scene
-      editor (`Ctrl+Z`); moving nodes to another parent by dragging them in
-      the tree; dropping a `.star` on a node to give it its class; “Show in
-      the file explorer” in “Assets” (needs platform code or a
-      dependency: ask first); a slider for the size of the icons of
-      “Assets”.
+- [ ] **Editor ideas, not planned yet**, done one by one:
+  - [x] Undo and redo in the scene editor (`Ctrl+Z`, `Ctrl+Shift+Z` or
+        `Ctrl+Y`, and the “Edit” menu).
+  - [ ] Moving nodes to another parent by dragging them in the tree.
+  - [ ] Dropping a `.star` on a node to give it its class.
+  - [ ] “Show in the file explorer” in “Assets” (needs platform code or a
+        dependency: ask first).
+  - [ ] A slider for the size of the icons of “Assets”.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

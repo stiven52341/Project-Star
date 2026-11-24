@@ -9,9 +9,25 @@ use crate::texts::{self, Language};
 pub(crate) const SAVE_SHORTCUT: egui::KeyboardShortcut =
     egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::S);
 
+/// Undoes the last change to the scene.
+pub(crate) const UNDO_SHORTCUT: egui::KeyboardShortcut =
+    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Z);
+
+/// Makes again the last change undone in the scene.
+pub(crate) const REDO_SHORTCUT: egui::KeyboardShortcut = egui::KeyboardShortcut::new(
+    egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
+    egui::Key::Z,
+);
+
+/// The other key for redo, usual on Windows and Linux.
+pub(crate) const REDO_OTHER_SHORTCUT: egui::KeyboardShortcut =
+    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Y);
+
 /// Menu entries that need the editor to react.
 pub(crate) enum MenuAction {
     Save,
+    Undo,
+    Redo,
     CloseProject,
     Compile,
     Play,
@@ -20,11 +36,20 @@ pub(crate) enum MenuAction {
     ChangeLanguage(Language),
 }
 
+/// Whether the scene shown has changes to undo and to redo.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct UndoSteps {
+    pub(crate) can_undo: bool,
+    pub(crate) can_redo: bool,
+}
+
 /// What the menu's entries can do now.
 #[derive(Clone, Copy)]
 pub(crate) struct MenuState {
     /// There is something to save.
     pub(crate) can_save: bool,
+    /// What “Undo” and “Redo” can do.
+    pub(crate) steps: UndoSteps,
     /// A check is running: “Compile” and “Play” wait for it.
     pub(crate) compiling: bool,
     /// The game is being built or played: “Stop” stops it.
@@ -37,6 +62,7 @@ pub(crate) fn show_menu_bar(ui: &mut egui::Ui, state: MenuState) -> Option<MenuA
         can_save,
         compiling,
         playing,
+        steps,
     } = state;
     let mut action = None;
     egui::MenuBar::new().ui(ui, |ui| {
@@ -58,6 +84,11 @@ pub(crate) fn show_menu_bar(ui: &mut egui::Ui, state: MenuState) -> Option<MenuA
                 ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
             }
         });
+        ui.menu_button(texts::current().menu_edit, |ui| {
+            if let Some(chosen) = edit_buttons(ui, steps) {
+                action = Some(chosen);
+            }
+        });
         ui.menu_button(texts::current().menu_project, |ui| {
             if let Some(chosen) = project_buttons(ui, compiling, playing) {
                 action = Some(chosen);
@@ -74,6 +105,22 @@ pub(crate) fn show_menu_bar(ui: &mut egui::Ui, state: MenuState) -> Option<MenuA
         }
     });
     action
+}
+
+/// “Undo” and “Redo”, enabled as `steps` allows. Returns the one clicked.
+fn edit_buttons(ui: &mut egui::Ui, steps: UndoSteps) -> Option<MenuAction> {
+    let texts = texts::current();
+    let undo =
+        egui::Button::new(texts.undo).shortcut_text(ui.ctx().format_shortcut(&UNDO_SHORTCUT));
+    let redo =
+        egui::Button::new(texts.redo).shortcut_text(ui.ctx().format_shortcut(&REDO_SHORTCUT));
+    if ui.add_enabled(steps.can_undo, undo).clicked() {
+        return Some(MenuAction::Undo);
+    }
+    if ui.add_enabled(steps.can_redo, redo).clicked() {
+        return Some(MenuAction::Redo);
+    }
+    None
 }
 
 /// “Compile”, “Play” and “Stop”, as menu entries or in the bar itself.
