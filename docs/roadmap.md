@@ -413,9 +413,15 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           code at `opt-level = 1`: a change to a class's fields rebuilds
           most of it with optimizations. With the game's code at
           `opt-level = 0` (the engine and the dependencies still at 3) a
-          new field took 4 s and a build from scratch 12 s; whether the
-          frame rate allows it is still to be checked. The interpreter
-          (Phase 14) removes this cost from “Play” altogether.
+          new field took 4 s and a build from scratch 12 s, but a stress
+          game (4000 sprites and 1000 balls with bodies, without vsync)
+          dropped from 45 to 26 FPS (46 at `opt-level = 3`). Its sprites
+          running no code of their own dropped the same (46 to 28): the
+          cost is the shared loop (running the tree, mirroring nodes,
+          syncing bodies), generic over the `Host` and so built with the
+          game's optimization level, not the user's code. So games stay
+          at `opt-level = 1` for now. The interpreter (Phase 14) removes
+          this cost from “Play” altogether.
 - [ ] **Phase 14 — StarScript interpreter** (decision 64, rule 3.7 of
       `CLAUDE.md`): “Play” in the editor interprets StarScript, and
       building the project compiles it. Done part by part; each part comes
