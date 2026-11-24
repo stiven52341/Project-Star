@@ -246,7 +246,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       `bigint` (`i64`), `float` (`f32`) and `double` (`f64`); literals take
       the type their place needs and must fit in it, and numbers widen by
       themselves where no value is lost.
-- [ ] **Editor ideas, not planned yet**, done one by one:
+- [x] **Editor ideas**, done one by one:
   - [x] Undo and redo in the scene editor (`Ctrl+Z`, `Ctrl+Shift+Z` or
         `Ctrl+Y`, and the “Edit” menu).
   - [x] Moving nodes to another parent by dragging them in the tree.
@@ -254,5 +254,6 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         class.
   - [x] “Show in file explorer” in “Assets” (decision 56: the system's own
         program, no dependency).
-  - [ ] A slider for the size of the icons of “Assets”.
+  - [x] A slider for the size of the icons of “Assets”, remembered by the
+        editor's preferences.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

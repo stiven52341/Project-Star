@@ -281,6 +281,7 @@ pub(crate) struct Texts {
     pub(crate) delete: &'static str,
     pub(crate) copy_path: &'static str,
     pub(crate) show_in_file_explorer: &'static str,
+    pub(crate) icon_size: &'static str,
     pub(crate) rename_to: &'static str,
     pub(crate) create: &'static str,
     pub(crate) show_in_blueprint: &'static str,

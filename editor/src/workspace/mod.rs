@@ -25,6 +25,7 @@ use star_script::Span;
 
 pub(crate) use self::asset_files::{AssetFileError, NewAsset};
 use self::assets_panel::{AssetEvent, AssetsPanel, OpenedAsset};
+pub(crate) use self::assets_panel::{DEFAULT_ICON_SIZE, ICON_SIZES};
 use self::console_panel::ConsolePanel;
 use self::documents::{ActiveDocument, Documents};
 use self::inspector_panel::show_inspector;
@@ -57,6 +58,8 @@ pub(crate) enum EditorAction {
     Quit,
     /// Show the editor in another language.
     ChangeLanguage(Language),
+    /// Remember this size of the icons of “Assets”, in percent.
+    ChangeIconSize(u16),
 }
 
 /// Something that closes blueprints, waiting for the user to say what to do
@@ -100,18 +103,22 @@ pub(crate) struct EditorWindow {
     /// The engine view, or why it could not be created.
     viewport: Result<SceneViewport, String>,
     about_open: bool,
+    /// A size of the icons chosen this frame, to hand to the preferences.
+    icon_size_chosen: Option<u16>,
 }
 
 impl EditorWindow {
-    /// Opens `project`, rendering its scene on the UI's GPU (`render_state`)
-    /// and showing the messages of `log_history` in its console.
+    /// Opens `project`, rendering its scene on the UI's GPU (`render_state`),
+    /// showing the messages of `log_history` in its console and the icons
+    /// of “Assets” at `icon_size` percent.
     pub(crate) fn new(
         project: Project,
         render_state: Option<&egui_wgpu::RenderState>,
         log_history: LogHistory,
+        icon_size: u16,
     ) -> Self {
         let dimension = project.settings().dimension();
-        let assets = AssetsPanel::new(project.directory(), dimension);
+        let assets = AssetsPanel::new(project.directory(), dimension, icon_size);
         let viewport = render_state
             .ok_or_else(|| texts::current().no_gpu_for_viewport.to_owned())
             .and_then(|state| {
@@ -135,6 +142,7 @@ impl EditorWindow {
             quit_confirmed: false,
             viewport,
             about_open: false,
+            icon_size_chosen: None,
         }
     }
 
@@ -144,7 +152,6 @@ impl EditorWindow {
     }
 
     pub(crate) fn show(&mut self, ui: &mut egui::Ui) -> Option<EditorAction> {
-        let mut action = None;
         self.follow_check(ui.ctx());
         let documents = &self.documents;
         self.live_check
@@ -157,53 +164,7 @@ impl EditorWindow {
             self.documents.save_active();
         }
         self.undo_from_keys(ui.ctx());
-        let steps = self
-            .shown_scene()
-            .map_or_else(UndoSteps::default, |scene| UndoSteps {
-                can_undo: scene.can_undo(),
-                can_redo: scene.can_redo(),
-            });
-        let state = MenuState {
-            can_save: self.documents.active_is_unsaved(),
-            steps,
-            compiling: self.problems.is_compiling(),
-            playing: self.output.is_playing(),
-        };
-        egui::Panel::top("menu_bar").show(ui, |ui| {
-            match show_menu_bar(ui, state) {
-                Some(MenuAction::Save) => self.documents.save_active(),
-                Some(MenuAction::Undo) => {
-                    if let Some(scene) = self.shown_scene() {
-                        scene.undo();
-                    }
-                }
-                Some(MenuAction::Redo) => {
-                    if let Some(scene) = self.shown_scene() {
-                        scene.redo();
-                    }
-                }
-                Some(MenuAction::CloseProject) => action = self.leave(Leaving::CloseProject),
-                Some(MenuAction::Compile) => {
-                    // “Compile” checks the files, so it checks what is
-                    // shown.
-                    self.documents.save_all();
-                    self.problems.compile(self.project.directory(), ui.ctx());
-                }
-                Some(MenuAction::Play) => {
-                    // The game is built from what is shown, once checked.
-                    self.documents.save_all();
-                    self.problems.compile(self.project.directory(), ui.ctx());
-                    self.play_after_check = true;
-                    self.bottom_tab = BottomTab::Output;
-                }
-                Some(MenuAction::Stop) => self.output.stop(),
-                Some(MenuAction::ShowAbout) => self.about_open = true,
-                Some(MenuAction::ChangeLanguage(language)) => {
-                    action = Some(EditorAction::ChangeLanguage(language));
-                }
-                None => {}
-            }
-        });
+        let mut action = self.show_menu(ui);
         egui::Panel::bottom("status_bar").show(ui, |ui| self.show_status_bar(ui));
         egui::Panel::left("hierarchy")
             .resizable(true)
@@ -244,7 +205,67 @@ impl EditorWindow {
         if action.is_none() {
             action = self.ask_about_unsaved_changes(ui.ctx());
         }
+        if action.is_none() {
+            action = self
+                .icon_size_chosen
+                .take()
+                .map(EditorAction::ChangeIconSize);
+        }
         self.show_about(ui.ctx());
+        action
+    }
+
+    /// The menu bar, and what its entries do. Returns what the editor
+    /// window must do because of it.
+    fn show_menu(&mut self, ui: &mut egui::Ui) -> Option<EditorAction> {
+        let steps = self
+            .shown_scene()
+            .map_or_else(UndoSteps::default, |scene| UndoSteps {
+                can_undo: scene.can_undo(),
+                can_redo: scene.can_redo(),
+            });
+        let state = MenuState {
+            can_save: self.documents.active_is_unsaved(),
+            steps,
+            compiling: self.problems.is_compiling(),
+            playing: self.output.is_playing(),
+        };
+        let mut action = None;
+        egui::Panel::top("menu_bar").show(ui, |ui| {
+            match show_menu_bar(ui, state) {
+                Some(MenuAction::Save) => self.documents.save_active(),
+                Some(MenuAction::Undo) => {
+                    if let Some(scene) = self.shown_scene() {
+                        scene.undo();
+                    }
+                }
+                Some(MenuAction::Redo) => {
+                    if let Some(scene) = self.shown_scene() {
+                        scene.redo();
+                    }
+                }
+                Some(MenuAction::CloseProject) => action = self.leave(Leaving::CloseProject),
+                Some(MenuAction::Compile) => {
+                    // “Compile” checks the files, so it checks what is
+                    // shown.
+                    self.documents.save_all();
+                    self.problems.compile(self.project.directory(), ui.ctx());
+                }
+                Some(MenuAction::Play) => {
+                    // The game is built from what is shown, once checked.
+                    self.documents.save_all();
+                    self.problems.compile(self.project.directory(), ui.ctx());
+                    self.play_after_check = true;
+                    self.bottom_tab = BottomTab::Output;
+                }
+                Some(MenuAction::Stop) => self.output.stop(),
+                Some(MenuAction::ShowAbout) => self.about_open = true,
+                Some(MenuAction::ChangeLanguage(language)) => {
+                    action = Some(EditorAction::ChangeLanguage(language));
+                }
+                None => {}
+            }
+        });
         action
     }
 
@@ -452,6 +473,7 @@ impl EditorWindow {
                     self.live_check.request();
                 }
                 Some(AssetEvent::Gone(path)) => self.documents.forget(&path),
+                Some(AssetEvent::IconSizeChosen(size)) => self.icon_size_chosen = Some(size),
                 None => {}
             },
             BottomTab::Problems => {

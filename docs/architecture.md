@@ -536,7 +536,9 @@ of the StarScript compiler and of the project check stay in English:
    Rust script), “Refresh” and “Show in file explorer” (the folder shown);
    on a tile, also “Open”, “Rename” (`F2`), “Delete” (`Delete`, asked
    first), “Copy path” and “Show in file explorer” (that file or folder,
-   selected; see decision 56). Names are given in a
+   selected; see decision 56). A slider next to “Refresh” sizes the icons
+   from 60 % to 200 %; the editor's preferences remember it, written once
+   the slider is let go. Names are given in a
    row over the grid; `asset_files.rs` checks them and never overwrites.
    What is renamed or deleted closes the tabs open from it), **Problems** (what the last
    “Compile” found, as `file:line:column` and a message; it opens by itself

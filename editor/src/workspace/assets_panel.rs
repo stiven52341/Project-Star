@@ -52,6 +52,8 @@ pub(crate) enum AssetEvent {
     /// Renamed or deleted the file or folder at this path: what was open
     /// from it is gone.
     Gone(String),
+    /// Chose the size of the icons, in percent, to remember it.
+    IconSizeChosen(u16),
 }
 
 /// What the user chose in a menu or with a key.
@@ -64,9 +66,15 @@ enum MenuChoice {
     ShowInFileExplorer(String),
 }
 
-/// A tile's size, and the size of the icon at its top.
-const TILE_SIZE: egui::Vec2 = egui::vec2(84.0, 100.0);
+/// The side of a tile's icon at 100 %.
 const ICON_SIDE: f32 = 56.0;
+/// How much wider a tile is than its icon, and how much taller, which
+/// leaves room for its padding and two rows of its name.
+const TILE_EXTRA: egui::Vec2 = egui::vec2(28.0, 44.0);
+/// The sizes of the icons the slider offers, in percent.
+pub(crate) const ICON_SIZES: std::ops::RangeInclusive<u16> = 60..=200;
+/// The size of the icons until the user chooses another, in percent.
+pub(crate) const DEFAULT_ICON_SIZE: u16 = 100;
 /// Space between a tile's edges and its icon and name.
 const TILE_PADDING: f32 = 6.0;
 const TILE_ROUNDING: f32 = 4.0;
@@ -79,6 +87,8 @@ const DRAGGED_SIDE: f32 = 40.0;
 const DRAGGED_OFFSET: f32 = 12.0;
 /// What separates folders in the way back to the top.
 const PATH_SEPARATOR: &str = "›";
+/// The width of the slider of the icons' size.
+const ICON_SLIDER_WIDTH: f32 = 80.0;
 
 /// Contents of the assets folder, refreshed on demand.
 pub(crate) struct AssetsPanel {
@@ -93,12 +103,18 @@ pub(crate) struct AssetsPanel {
     images: Vec<String>,
     /// Naming files and asking before deleting them.
     actions: AssetActions,
+    /// The size of the icons, in percent.
+    icon_size: u16,
 }
 
 impl AssetsPanel {
     /// Lists the assets folder of the project in `project_directory`, of
-    /// `dimension`.
-    pub(crate) fn new(project_directory: &Path, dimension: ProjectDimension) -> Self {
+    /// `dimension`, with icons of `icon_size` percent.
+    pub(crate) fn new(
+        project_directory: &Path,
+        dimension: ProjectDimension,
+        icon_size: u16,
+    ) -> Self {
         let directory = project_directory.join(ASSETS_DIRECTORY);
         let contents = scan_directory(&directory);
         Self {
@@ -109,7 +125,26 @@ impl AssetsPanel {
             open_folder: Vec::new(),
             selected: None,
             actions: AssetActions::new(dimension),
+            icon_size: icon_size.clamp(*ICON_SIZES.start(), *ICON_SIZES.end()),
         }
+    }
+
+    /// The side of the icons, at the size chosen.
+    fn icon_side(&self) -> f32 {
+        ICON_SIDE * f32::from(self.icon_size) / 100.0
+    }
+
+    /// The slider of the icons' size. Returns the size once the user lets
+    /// go of it, to remember it without writing at every step of a drag.
+    fn show_icon_size(&mut self, ui: &mut egui::Ui) -> Option<u16> {
+        let slider = egui::Slider::new(&mut self.icon_size, ICON_SIZES)
+            .show_value(false)
+            .suffix(" %");
+        let response = ui
+            .add_sized([ICON_SLIDER_WIDTH, ui.spacing().interact_size.y], slider)
+            .on_hover_text(texts::current().icon_size);
+        let done = response.drag_stopped() || (response.changed() && !response.dragged());
+        done.then_some(self.icon_size)
     }
 
     fn refresh(&mut self) {
@@ -132,19 +167,22 @@ impl AssetsPanel {
     /// Shows the folder open. Returns what the user opened (double click
     /// or menu), renamed or deleted.
     pub(crate) fn show(&mut self, ui: &mut egui::Ui) -> Option<AssetEvent> {
+        let mut size_chosen = None;
         ui.horizontal(|ui| {
             self.show_path(ui);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.small_button(texts::current().refresh).clicked() {
                     self.refresh();
                 }
+                size_chosen = self.show_icon_size(ui);
             });
         });
         let folder = self.open_folder.join("/");
         let mut event = self
             .actions
             .show(ui, &self.directory, &folder)
-            .and_then(|outcome| self.apply(outcome));
+            .and_then(|outcome| self.apply(outcome))
+            .or(size_chosen.map(AssetEvent::IconSizeChosen));
         ui.separator();
         let entries = match &self.contents {
             Ok(nodes) => entries_of(nodes, &self.open_folder),
@@ -311,7 +349,9 @@ impl AssetsPanel {
     /// One tile: the icon of `entry` and its name under it. A click
     /// selects it; returns what a double click or its menu chose.
     fn show_tile(&mut self, ui: &mut egui::Ui, entry: &Entry) -> Option<MenuChoice> {
-        let (rect, response) = ui.allocate_exact_size(TILE_SIZE, egui::Sense::click_and_drag());
+        let icon_side = self.icon_side();
+        let tile_size = egui::Vec2::splat(icon_side) + TILE_EXTRA;
+        let (rect, response) = ui.allocate_exact_size(tile_size, egui::Sense::click_and_drag());
         let hint =
             if OpenedAsset::of(entry.path.clone()).is_some() || entry.kind == AssetKind::Folder {
                 format!("{}\n{}", entry.name, texts::current().open_file_hint)
@@ -333,8 +373,8 @@ impl AssetsPanel {
             painter.rect_filled(rect, TILE_ROUNDING, visuals.widgets.hovered.weak_bg_fill);
         }
         let icon = egui::Rect::from_min_size(
-            egui::pos2(rect.center().x - ICON_SIDE / 2.0, rect.top() + TILE_PADDING),
-            egui::Vec2::splat(ICON_SIDE),
+            egui::pos2(rect.center().x - icon_side / 2.0, rect.top() + TILE_PADDING),
+            egui::Vec2::splat(icon_side),
         );
         let thumbnail = (entry.kind == AssetKind::Image)
             .then(|| self.thumbnails.get(ui.ctx(), &entry.path))
@@ -368,7 +408,7 @@ impl AssetsPanel {
             entry.name.clone(),
             egui::FontId::proportional(NAME_SIZE),
             text_color,
-            TILE_SIZE.x - 2.0 * TILE_PADDING,
+            tile_size.x - 2.0 * TILE_PADDING,
         );
         name.wrap.max_rows = NAME_ROWS;
         name.wrap.break_anywhere = true;
@@ -581,6 +621,16 @@ mod tests {
             },
             file("level.scene"),
         ]
+    }
+
+    #[test]
+    fn icon_sizes_out_of_range_are_brought_into_it() {
+        let directory = PathBuf::from("no_such_project");
+        let tiny = AssetsPanel::new(&directory, ProjectDimension::TwoD, 1);
+        let usual = AssetsPanel::new(&directory, ProjectDimension::TwoD, DEFAULT_ICON_SIZE);
+
+        assert_eq!(tiny.icon_size, *ICON_SIZES.start());
+        assert!((usual.icon_side() - ICON_SIDE).abs() < f32::EPSILON);
     }
 
     #[test]

@@ -50,8 +50,9 @@ impl EditorApp {
         render_state: Option<&egui_wgpu::RenderState>,
         project: Project,
         log_history: LogHistory,
+        icon_size: u16,
     ) -> Screen {
-        let editor = EditorWindow::new(project, render_state, log_history);
+        let editor = EditorWindow::new(project, render_state, log_history, icon_size);
         context.send_viewport_cmd(egui::ViewportCommand::Title(editor.title()));
         context.send_viewport_cmd(egui::ViewportCommand::Maximized(true));
         Screen::Editor(Box::new(editor))
@@ -80,6 +81,7 @@ impl eframe::App for EditorApp {
                     frame.wgpu_render_state(),
                     project,
                     self.log_history.clone(),
+                    self.preferences.asset_icon_size(),
                 )),
                 Some(LauncherAction::ChangeLanguage(language)) => {
                     self.change_language(&context, language);
@@ -95,6 +97,10 @@ impl eframe::App for EditorApp {
                 }
                 Some(EditorAction::ChangeLanguage(language)) => {
                     self.change_language(&context, language);
+                    None
+                }
+                Some(EditorAction::ChangeIconSize(size)) => {
+                    self.preferences.set_asset_icon_size(size);
                     None
                 }
                 None => None,
