@@ -66,6 +66,15 @@ pub struct NodeOutline {
     pub fields: BTreeMap<String, FieldValue>,
 }
 
+impl NodeOutline {
+    /// Whether it is a camera, 2D or 3D, marked as the scene's main one.
+    #[must_use]
+    pub fn is_main_camera(&self) -> bool {
+        self.camera.is_some_and(|camera| camera.main)
+            || self.camera_3d.is_some_and(|camera| camera.main)
+    }
+}
+
 /// The image a node of a [`SceneOutline`] shows.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpriteOutline {
@@ -93,16 +102,24 @@ impl SceneOutline {
     ///
     /// Returns [`EngineError::Scene`] if the text is not a valid scene: bad
     /// TOML, another format version, a missing root, a node before its
-    /// parent or an invalid texture path.
+    /// parent, an invalid texture path or more than one main camera.
     pub fn from_text(text: &str) -> EngineResult<Self> {
         let file = SceneFile::parse(text)?;
         validate_tree(&file.nodes)?;
-        let nodes = file
+        let nodes: Vec<NodeOutline> = file
             .nodes
             .into_iter()
             .map(read_node)
             .collect::<EngineResult<_>>()?;
+        validate_main_camera(&nodes)?;
         Ok(Self { nodes })
+    }
+
+    /// Position in [`SceneOutline::nodes`] of the scene's main camera: the
+    /// first one, if several are marked `main`.
+    #[must_use]
+    pub fn main_camera(&self) -> Option<usize> {
+        self.nodes.iter().position(NodeOutline::is_main_camera)
     }
 
     /// Reads the `.scene` file at `path` in `folder`.
@@ -256,8 +273,9 @@ impl SceneOutline {
     /// # Errors
     ///
     /// Returns [`EngineError::Scene`] if its nodes no longer form one tree
-    /// (see [`SceneOutline::node_mut`]).
+    /// (see [`SceneOutline::node_mut`]) or more than one is a main camera.
     pub fn to_text(&self) -> EngineResult<String> {
+        validate_main_camera(&self.nodes)?;
         let nodes: Vec<NodeData> = self.nodes.iter().map(write_node).collect();
         validate_tree(&nodes)?;
         SceneFile {
@@ -313,6 +331,19 @@ fn validate_tree(nodes: &[NodeData]) -> EngineResult<()> {
         }
     }
     Ok(())
+}
+
+/// Checks that at most one node is a main camera: a scene is seen from one
+/// point of view.
+fn validate_main_camera(nodes: &[NodeOutline]) -> EngineResult<()> {
+    let mut mains = nodes.iter().filter(|node| node.is_main_camera());
+    match (mains.next(), mains.next()) {
+        (Some(first), Some(second)) => Err(EngineError::Scene(format!(
+            "invalid scene: \"{}\" and \"{}\" are both its main camera, but a scene has only one",
+            first.name, second.name
+        ))),
+        _ => Ok(()),
+    }
 }
 
 fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
@@ -482,7 +513,7 @@ mod tests {
     fn cameras_are_read_and_written() {
         let text = "format = 1\n[[node]]\nname = \"Level\"\n\
                     [[node]]\nname = \"Eye\"\nparent = 0\n[node.camera]\n\
-                    view_height = 8.0\ncurrent = true\n\
+                    view_height = 8.0\nmain = true\n\
                     [[node]]\nname = \"Eye3D\"\nparent = 0\n[node.camera_3d]\n";
 
         let outline = SceneOutline::from_text(text).unwrap();
@@ -492,11 +523,23 @@ mod tests {
             outline.nodes()[1].camera,
             Some(Camera2dNode {
                 view_height: 8.0,
-                current: true
+                main: true
             })
         );
         assert_eq!(outline.nodes()[2].camera_3d, Some(Camera3dNode::default()));
+        assert_eq!(outline.main_camera(), Some(1));
         assert_eq!(written, outline);
+    }
+
+    #[test]
+    fn scenes_have_at_most_one_main_camera() {
+        let text = "format = 1\n[[node]]\nname = \"Level\"\n\
+                    [[node]]\nname = \"Eye\"\nparent = 0\n[node.camera]\nmain = true\n\
+                    [[node]]\nname = \"Eye3D\"\nparent = 0\n[node.camera_3d]\nmain = true\n";
+
+        let error = SceneOutline::from_text(text).unwrap_err().to_string();
+
+        assert!(error.contains("\"Eye\" and \"Eye3D\""), "{error}");
     }
 
     #[test]

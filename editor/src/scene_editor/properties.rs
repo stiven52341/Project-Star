@@ -346,9 +346,9 @@ fn edit_camera_2d(ui: &mut egui::Ui, camera: &mut Camera2dNode) -> bool {
     number_from_row(ui, texts.view_height, &mut camera.view_height, MIN_SIZE)
         | checkbox_hint_row(
             ui,
-            texts.current_camera,
-            &mut camera.current,
-            texts.current_camera_hint,
+            texts.main_camera,
+            &mut camera.main,
+            texts.main_camera_hint,
         )
 }
 
@@ -361,9 +361,9 @@ fn edit_camera_3d(ui: &mut egui::Ui, camera: &mut Camera3dNode) -> bool {
         FIELD_OF_VIEW_DEGREES,
     ) | checkbox_hint_row(
         ui,
-        texts.current_camera,
-        &mut camera.current,
-        texts.current_camera_hint,
+        texts.main_camera,
+        &mut camera.main,
+        texts.main_camera_hint,
     )
 }
 

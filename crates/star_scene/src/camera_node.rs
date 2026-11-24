@@ -14,14 +14,14 @@ pub struct Camera2dNode {
     /// width follows the window's shape. It must be positive.
     pub view_height: f32,
     /// Whether the game is seen from it as soon as it enters the game.
-    pub current: bool,
+    pub main: bool,
 }
 
 impl Default for Camera2dNode {
     fn default() -> Self {
         Self {
             view_height: DEFAULT_2D_VIEW_HEIGHT,
-            current: false,
+            main: false,
         }
     }
 }
@@ -34,14 +34,14 @@ pub struct Camera3dNode {
     /// 0 and less than a half turn.
     pub fov: f32,
     /// Whether the game is seen from it as soon as it enters the game.
-    pub current: bool,
+    pub main: bool,
 }
 
 impl Default for Camera3dNode {
     fn default() -> Self {
         Self {
             fov: DEFAULT_VERTICAL_FOV,
-            current: false,
+            main: false,
         }
     }
 }
@@ -53,7 +53,7 @@ pub(crate) struct Camera2dData {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     view_height: Option<f32>,
     #[serde(default, skip_serializing_if = "is_false")]
-    current: bool,
+    main: bool,
 }
 
 /// A `[node.camera_3d]` table; what it leaves out takes its default.
@@ -63,7 +63,7 @@ pub(crate) struct Camera3dData {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     fov: Option<f32>,
     #[serde(default, skip_serializing_if = "is_false")]
-    current: bool,
+    main: bool,
 }
 
 #[expect(
@@ -84,7 +84,7 @@ impl Camera2dData {
         }
         Ok(Camera2dNode {
             view_height,
-            current: self.current,
+            main: self.main,
         })
     }
 
@@ -92,7 +92,7 @@ impl Camera2dData {
         Self {
             view_height: (camera.view_height != DEFAULT_2D_VIEW_HEIGHT)
                 .then_some(camera.view_height),
-            current: camera.current,
+            main: camera.main,
         }
     }
 }
@@ -107,14 +107,14 @@ impl Camera3dData {
         }
         Ok(Camera3dNode {
             fov,
-            current: self.current,
+            main: self.main,
         })
     }
 
     pub(crate) fn from_camera(camera: Camera3dNode) -> Self {
         Self {
             fov: (camera.fov != DEFAULT_VERTICAL_FOV).then_some(camera.fov),
-            current: camera.current,
+            main: camera.main,
         }
     }
 }
@@ -138,12 +138,12 @@ mod tests {
     }
 
     #[test]
-    fn tables_give_their_sizes_and_whether_they_are_current() {
+    fn tables_give_their_sizes_and_whether_they_are_main() {
         assert_eq!(
-            camera_2d("view_height = 10.0\ncurrent = true").unwrap(),
+            camera_2d("view_height = 10.0\nmain = true").unwrap(),
             Camera2dNode {
                 view_height: 10.0,
-                current: true
+                main: true
             }
         );
         assert_eq!(camera_3d("fov = 1.2").unwrap().fov, 1.2);
@@ -173,7 +173,7 @@ mod tests {
     fn written_tables_leave_out_the_defaults_and_read_back_the_same() {
         let wide = Camera3dNode {
             fov: 1.5,
-            current: true,
+            main: true,
         };
 
         let default_text = toml::to_string(&Camera2dData::from_camera(Camera2dNode::default()));

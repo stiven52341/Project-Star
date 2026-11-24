@@ -355,7 +355,7 @@ parent = 0
 
 [node.camera]
 view_height = 6.0
-current = true
+main = true
 
 [[node]]
 name = "Torch"

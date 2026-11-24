@@ -403,10 +403,29 @@ impl SceneDocument {
             images,
             classes,
         };
+        let was_main = node.is_main_camera();
         if edit_node(ui, node, &context) {
+            if !was_main && node.is_main_camera() {
+                self.make_only_main_camera();
+            }
             self.mark_changed();
         }
         true
+    }
+
+    /// The selected node has just become the main camera: no other node
+    /// is it any more, as a scene is seen from one camera.
+    fn make_only_main_camera(&mut self) {
+        let (Ok(outline), Some(selected)) = (&mut self.content, self.selected) else {
+            return;
+        };
+        for index in 0..outline.nodes().len() {
+            if index != selected
+                && let Some(node) = outline.node_mut(index)
+            {
+                stop_being_main(node);
+            }
+        }
     }
 
     /// The scene changed: the change can be undone.
@@ -477,22 +496,13 @@ impl SceneDocument {
 /// Every scene has its root first.
 const ROOT: usize = 0;
 
-/// Whether a node of `outline` is a camera the game is seen from as soon
-/// as it enters the game.
-fn has_current_camera(outline: &SceneOutline) -> bool {
-    outline.nodes().iter().any(|node| {
-        node.camera.is_some_and(|camera| camera.current)
-            || node.camera_3d.is_some_and(|camera| camera.current)
-    })
-}
-
 /// Makes the camera of `node`, if it is one, wait to be chosen.
-const fn stop_being_current(node: &mut NodeOutline) {
+const fn stop_being_main(node: &mut NodeOutline) {
     if let Some(camera) = &mut node.camera {
-        camera.current = false;
+        camera.main = false;
     }
     if let Some(camera) = &mut node.camera_3d {
-        camera.current = false;
+        camera.main = false;
     }
 }
 
@@ -508,8 +518,8 @@ impl TreeEditor<'_> {
     fn add_child(&mut self, parent: usize, template: NodeTemplate, images: &[String]) -> bool {
         let name = unique_child_name(self.outline, parent, template.node_name());
         let mut node = template.build(name, self.dimension, images);
-        if has_current_camera(self.outline) {
-            stop_being_current(&mut node);
+        if self.outline.main_camera().is_some() {
+            stop_being_main(&mut node);
         }
         match self.outline.add_node(parent, node) {
             Ok(index) => {
@@ -538,6 +548,8 @@ impl TreeEditor<'_> {
         // Where each original's copy went, to place the copies' children.
         let mut placed: Vec<(usize, usize)> = Vec::with_capacity(copies.len());
         for (original, mut copy) in originals.into_iter().zip(copies) {
+            // A scene has one main camera: the original stays it.
+            stop_being_main(&mut copy);
             let copy_parent = if original == index {
                 copy.name = unique_child_name(self.outline, parent, &copy.name);
                 Some(parent)
@@ -739,18 +751,35 @@ mod tests {
     }
 
     #[test]
-    fn only_the_first_camera_created_is_current() {
+    fn only_the_first_camera_created_or_copied_is_main() {
         let (_assets, mut scene) = open_level("scene_document_cameras");
         let mut editor = tree_editor(&mut scene);
 
         editor.add_child(ROOT, NodeTemplate::Camera2D, &[]);
-        editor.add_child(ROOT, NodeTemplate::Camera2D, &[]);
+        editor.add_child(ROOT, NodeTemplate::Camera3D, &[]);
+        editor.duplicate(1);
 
-        let current: Vec<_> = editor.outline.nodes()[1..]
+        let mains: Vec<_> = editor.outline.nodes()[1..]
             .iter()
-            .map(|node| node.camera.map(|camera| camera.current))
+            .map(NodeOutline::is_main_camera)
             .collect();
-        assert_eq!(current, [Some(true), Some(false)]);
+        assert_eq!(mains, [true, false, false]);
+    }
+
+    #[test]
+    fn a_new_main_camera_takes_the_place_of_the_old_one() {
+        let (_assets, mut scene) = open_level("scene_document_new_main");
+        let mut editor = tree_editor(&mut scene);
+        editor.add_child(ROOT, NodeTemplate::Camera2D, &[]);
+        editor.add_child(ROOT, NodeTemplate::Camera3D, &[]);
+        let outline = scene.content.as_mut().unwrap();
+        if let Some(camera) = &mut outline.node_mut(2).unwrap().camera_3d {
+            camera.main = true;
+        }
+
+        scene.make_only_main_camera();
+
+        assert_eq!(scene.content.unwrap().main_camera(), Some(2));
     }
 
     #[test]

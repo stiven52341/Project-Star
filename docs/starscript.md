@@ -462,11 +462,11 @@ The engine provides them; their names cannot be used for other classes.
 | `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `body: Body?` (`null`), `tags: [string]` (`[]`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?`, `has_tag(tag: string) -> bool`, `find_by_name(name: string) -> Node?`, `find_by_tag(tag: string) -> [Node]`, `global_x() -> float`, `global_y() -> float`, `global_rotation() -> float`, `set_global_position(x: float, y: float)`, `set_global_rotation(angle: float)`, `translate(x: float, y: float)`, `translate_global(x: float, y: float)`, `rotate(angle: float)` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors) |
 | `Light2D` (extends `Node`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (3.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
-| `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `current: bool` (`false`) |
+| `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `main: bool` (`false`) |
 | `Node3D` (extends `Node`) | `init(name: string)`; fields `z`, `pitch`, `yaw: float` (0.0), `scale_z: float` (1.0); `look_at(x: float, y: float, z: float)`, `global_z() -> float`, `set_global_position_3d(x: float, y: float, z: float)`, `translate_3d(x: float, y: float, z: float)`, `translate_global_3d(x: float, y: float, z: float)` |
 | `Mesh` (extends `Node3D`) | `init(name: string, shape: string)`; fields `shape: string`, `width`, `height`, `depth` (1.0), `radius` (0.5), `color: Color` (white), `metallic` (0.0), `roughness: float` (0.5), `texture: string` (`""`: none), `pixelated: bool` (`false`) |
 | `Light` (extends `Node3D`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (10.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
-| `Camera3D` (extends `Node3D`) | `init(name: string)`; fields `fov: float` (about 1.047 radians: 60°), `current: bool` (`false`) |
+| `Camera3D` (extends `Node3D`) | `init(name: string)`; fields `fov: float` (about 1.047 radians: 60°), `main: bool` (`false`) |
 | `Color` | `init(r: float, g: float, b: float, a: float)`; fields `r`, `g`, `b`, `a: float` |
 | `Scene` | `static load(path: string) -> Node?`, `static find_by_name(name: string) -> Node?`, `static find_by_tag(tag: string) -> [Node]` |
 | `Sound` | no `init`: `static load(path: string) -> Sound?`; fields `volume: float` (1.0), `looping: bool` (`false`); `play()`, `stop()`, `is_playing() -> bool` |
@@ -556,11 +556,11 @@ class Space extends Game {
   follows it) and shows `view_height` world units from bottom to top; the
   width follows the window's shape. The camera's rotation and scale are
   ignored. Without a camera, the window shows 2 units centered on `(0, 0)`.
-- A camera whose `current` is `true` becomes the game's `camera` (or
+- A camera whose `main` is `true` becomes the game's `camera` (or
   `camera_3d`) when it enters the game's tree, just before its `start`:
-  a scene can bring the camera it is seen from. Cameras that enter later
-  win; `current` changed afterwards does nothing until the camera enters
-  the tree again. The game can still set `camera` itself at any time.
+  a scene can bring the camera it is seen from. A scene has at most one
+  main camera. Cameras that enter later win; `main` changed afterwards
+  does nothing until the camera enters the tree again. The game can still set `camera` itself at any time.
 - Sprites are lit by the game's `ambient_2d`, white at first, so they show
   their own colors, and by its `Light2D` nodes, which add their color to
   the sprites they reach. Darken `ambient_2d` (a night, a cave) for the
@@ -605,7 +605,7 @@ class Space extends Game {
   so it runs its own `start` and `update`, and then gets what the scene
   writes, which wins over what `init` set: its name always, its transform
   and image only if the file has them. A node with a
-  `[node.camera]` table (`view_height`, `current`) is a `Camera2D`, or
+  `[node.camera]` table (`view_height`, `main`) is a `Camera2D`, or
   the class it names, which must extend it; `class = "Camera2D"` alone
   gives a plain camera. If a class does not exist, needs arguments, or is not a `Sprite`
   but the node shows an image, the whole scene is not loaded (`null`) and
@@ -808,7 +808,7 @@ class World3D extends Game {
 - `Scene.load` builds 3D nodes too: a node with `[node.transform_3d]` is a
   `Node3D`, with `[node.mesh]` a `Mesh` and with `[node.light]` a `Light`
   (or the class it names, which must extend them); `[node.body_3d]` gives
-  its body. A node with `[node.camera_3d]` (`fov` in radians, `current`)
+  its body. A node with `[node.camera_3d]` (`fov` in radians, `main`)
   is a `Camera3D`, as `class = "Camera3D"` is. The divisions of a sphere
   are not kept.
 

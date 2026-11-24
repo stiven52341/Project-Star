@@ -309,7 +309,7 @@ const CAMERA_3D: NodeClass = NodeClass {
     ancestors: &["Node", "Node3D"],
     fields: &[
         ("fov", "f32", "::std::f32::consts::FRAC_PI_3"),
-        ("current", "bool", "false"),
+        ("main", "bool", "false"),
     ],
     parameters: &[],
     methods: &[],

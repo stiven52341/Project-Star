@@ -413,7 +413,7 @@ fn add_camera_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
     camera.base = Some(node);
     camera.fields = vec![
         native_field("view_height", Type::Float),
-        native_field("current", Type::Bool),
+        native_field("main", Type::Bool),
     ];
     camera.constructor = Some(native_constructor(&[("name", Type::String)]));
     classes.add(camera)
@@ -513,7 +513,7 @@ fn add_camera_3d_class(classes: &mut ClassTable, node_3d: ClassId) -> ClassId {
     camera.base = Some(node_3d);
     camera.fields = vec![
         native_field("fov", Type::Float),
-        native_field("current", Type::Bool),
+        native_field("main", Type::Bool),
     ];
     camera.constructor = Some(native_constructor(&[("name", Type::String)]));
     classes.add(camera)

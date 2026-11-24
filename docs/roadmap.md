@@ -280,7 +280,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           `Time.now()`.
   - [x] Ready-made nodes: cameras, 2D and 3D lights, collision shapes…
     - [x] 9a Cameras in scenes: `[node.camera]`/`[node.camera_3d]` with
-          `current`, “2D camera”/“3D camera” in Create and the inspector,
+          `main` (first called `current`), “2D camera”/“3D camera” in Create and the inspector,
           drawn in the view; `Camera` renamed `Camera2D`.
     - [x] 9b Physics nodes: Create → Physics offers static, rigid,
           kinematic bodies and areas (static sensors), 2D or 3D by the
@@ -302,4 +302,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `global_x`/`global_y`/`global_rotation` (`global_z` in 3D), their
         setters, `translate`, `translate_global` and `rotate` (and their
         3D versions), also under “Transform” in blueprints.
+- [ ] **Owner's requests (2026-11-24)**:
+  - [x] One main camera per scene: the cameras' flag is `main`, a scene
+        with two is an error, and the editor keeps only one marked.
+  - [ ] Playing without scripts: the project's main scene, seen from its
+        main camera, which it must have.
+  - [ ] A small preview of what the main camera sees, in 2D and 3D.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

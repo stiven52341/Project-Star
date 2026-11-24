@@ -268,13 +268,13 @@ impl NodeTemplate {
             Self::SpotLight2D => node.light_2d = Some(new_light_2d(LightKind::Spot)),
             Self::Camera2D => {
                 node.camera = Some(Camera2dNode {
-                    current: true,
+                    main: true,
                     ..Camera2dNode::default()
                 });
             }
             Self::Camera3D => {
                 node.camera_3d = Some(Camera3dNode {
-                    current: true,
+                    main: true,
                     ..Camera3dNode::default()
                 });
             }

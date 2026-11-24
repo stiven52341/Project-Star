@@ -58,7 +58,7 @@ pub struct SceneCamera {
     /// World units shown from the bottom to the top of the window.
     pub view_height: f32,
     /// Whether the game is seen from it once it enters the game's tree.
-    pub current: bool,
+    pub main: bool,
 }
 
 /// The 3D camera a [`SceneNode`] is.
@@ -67,7 +67,7 @@ pub struct SceneCamera3D {
     /// How wide it sees from the bottom to the top, in radians.
     pub fov: f32,
     /// Whether the game is seen from it once it enters the game's tree.
-    pub current: bool,
+    pub main: bool,
 }
 
 /// Where a [`SceneNode`] is in 3D, relative to its parent.

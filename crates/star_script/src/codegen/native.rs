@@ -92,16 +92,16 @@ pub mod Game {
     }
 
     /// Makes `node` the game's `camera` or `camera_3d` if it is a camera
-    /// marked `current`: called as it enters the game's tree, before its
+    /// marked `main`: called as it enters the game's tree, before its
     /// `start`.
-    pub fn see_from_if_current_(this_: &Ref, node: &crate::classes::Node::Ref) {
+    pub fn see_from_if_main_(this_: &Ref, node: &crate::classes::Node::Ref) {
         let fields_ = HasFields::fields(&**this_);
         if let ::std::option::Option::Some(camera_) = crate::AnyObject::Camera2D(::std::rc::Rc::clone(node)) {
-            if crate::classes::Camera2D::HasFields::fields(&*camera_).current.get() {
+            if crate::classes::Camera2D::HasFields::fields(&*camera_).main.get() {
                 fields_.camera.set(::std::option::Option::Some(camera_));
             }
         } else if let ::std::option::Option::Some(camera_) = crate::AnyObject::Camera3D(::std::rc::Rc::clone(node)) {
-            if crate::classes::Camera3D::HasFields::fields(&*camera_).current.get() {
+            if crate::classes::Camera3D::HasFields::fields(&*camera_).main.get() {
                 fields_.camera_3d.set(::std::option::Option::Some(camera_));
             }
         }
@@ -685,7 +685,7 @@ pub mod Node {
             let fields_ = HasFields::fields(&**node_);
             if !fields_.started_.get() {
                 fields_.started_.set(true);
-                crate::classes::Game::see_from_if_current_(game_, node_);
+                crate::classes::Game::see_from_if_main_(game_, node_);
                 Object::start(::std::rc::Rc::clone(node_));
             }
             Object::update(::std::rc::Rc::clone(node_), delta);
@@ -852,7 +852,7 @@ pub mod Camera2D {
     /// it becomes the game's camera when it enters the game's tree.
     pub struct Fields {
         pub view_height: ::star_script_runtime::Field<f32>,
-        pub current: ::star_script_runtime::Field<bool>,
+        pub main: ::star_script_runtime::Field<bool>,
     }
 
     /// Gives access to the fields of this class, in objects of any subclass.
@@ -916,7 +916,7 @@ pub mod Camera2D {
     ) -> ::std::rc::Rc<O> {
         let fields_ = Fields {
             view_height: ::star_script_runtime::Field::new(2.0),
-            current: ::star_script_runtime::Field::new(false),
+            main: ::star_script_runtime::Field::new(false),
         };
         crate::classes::Node::init_(name, move |base0_| make_(base0_, fields_))
     }
@@ -1086,14 +1086,14 @@ pub mod Scene {
                 .ok_or_else(|| ::std::format!(\"it is a 2D camera, but `{class_}` is not a `Camera2D`\"))?;
             let look_ = crate::classes::Camera2D::HasFields::fields(&*camera_);
             look_.view_height.set(view_.view_height);
-            look_.current.set(view_.current);
+            look_.main.set(view_.main);
         }
         if let ::std::option::Option::Some(view_) = &node_.camera_3d {
             let camera_ = crate::AnyObject::Camera3D(::std::rc::Rc::clone(&object_))
                 .ok_or_else(|| ::std::format!(\"it is a 3D camera, but `{class_}` is not a `Camera3D`\"))?;
             let look_ = crate::classes::Camera3D::HasFields::fields(&*camera_);
             look_.fov.set(view_.fov);
-            look_.current.set(view_.current);
+            look_.main.set(view_.main);
         }
         if let ::std::option::Option::Some(solid_) = &node_.body {
             let body_ = crate::classes::Body::new_(solid_.kind.clone(), &solid_.shape, solid_.radius, solid_.width, solid_.height, solid_.depth);
@@ -1728,11 +1728,11 @@ fn read_scene_(
             })).collect(),
             camera: node_.camera.map(|view_| ::star_script_runtime::scenes::SceneCamera {
                 view_height: view_.view_height,
-                current: view_.current,
+                main: view_.main,
             }),
             camera_3d: node_.camera_3d.map(|view_| ::star_script_runtime::scenes::SceneCamera3D {
                 fov: view_.fov,
-                current: view_.current,
+                main: view_.main,
             }),
             light_2d: node_.light_2d.map(|shone_| {
                 let light_ = ::star_engine::script_nodes::ScriptLight::from_light_2d(&shone_);
