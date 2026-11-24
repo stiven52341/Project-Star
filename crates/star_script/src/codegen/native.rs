@@ -133,6 +133,7 @@ pub mod Game {
 /// `Camera2D`, `Scene` and `Sound`, and of the 3D nodes.
 pub(super) fn node_modules(out: &mut Writer) {
     let modules = [
+        HOST,
         COLOR_MODULE,
         BODY_MODULE,
         NODE_MODULE,
@@ -158,12 +159,7 @@ pub mod Color {
     pub type Ref = ::std::rc::Rc<dyn Object>;
 
     /// The fields of a color: its channels, from `0.0` to `1.0`.
-    pub struct Fields {
-        pub r: ::star_script_runtime::Field<f32>,
-        pub g: ::star_script_runtime::Field<f32>,
-        pub b: ::star_script_runtime::Field<f32>,
-        pub a: ::star_script_runtime::Field<f32>,
-    }
+    pub type Fields = ::star_script_runtime::color::ColorFields;
 
     /// Gives access to the fields of this class.
     pub trait HasFields {
@@ -190,14 +186,7 @@ pub mod Color {
 
     /// Creates an object of this class.
     pub fn new(r: f32, g: f32, b: f32, a: f32) -> Ref {
-        ::std::rc::Rc::new(Instance {
-            Color: Fields {
-                r: ::star_script_runtime::Field::new(r),
-                g: ::star_script_runtime::Field::new(g),
-                b: ::star_script_runtime::Field::new(b),
-                a: ::star_script_runtime::Field::new(a),
-            },
-        })
+        ::std::rc::Rc::new(Instance { Color: Fields::new(r, g, b, a) })
     }
 }";
 
@@ -364,24 +353,8 @@ pub mod Node {
     /// A reference to an object of this class or of a subclass.
     pub type Ref = ::std::rc::Rc<dyn Object>;
 
-    /// Gives every node its own number, which the engine knows it by.
-    static NEXT_ID_: ::std::sync::atomic::AtomicU64 = ::std::sync::atomic::AtomicU64::new(1);
-
     /// The fields of a node: the public ones, and its place in the tree.
-    pub struct Fields {
-        pub name: ::star_script_runtime::Field<::std::string::String>,
-        pub x: ::star_script_runtime::Field<f32>,
-        pub y: ::star_script_runtime::Field<f32>,
-        pub rotation: ::star_script_runtime::Field<f32>,
-        pub scale_x: ::star_script_runtime::Field<f32>,
-        pub scale_y: ::star_script_runtime::Field<f32>,
-        pub body: ::star_script_runtime::Field<::std::option::Option<crate::classes::Body::Ref>>,
-        pub tags: ::star_script_runtime::Field<::star_script_runtime::List<::std::string::String>>,
-        pub id_: u64,
-        pub parent_: ::std::cell::RefCell<::std::option::Option<::std::rc::Weak<dyn Object>>>,
-        pub children_: ::std::cell::RefCell<::std::vec::Vec<Ref>>,
-        pub started_: ::std::cell::Cell<bool>,
-    }
+    pub type Fields = ::star_script_runtime::nodes::NodeFields<crate::classes::Host_>;
 
     /// Gives access to the fields of this class, in objects of any subclass.
     pub trait HasFields {
@@ -410,7 +383,8 @@ pub mod Node {
         fn rotate(self: ::std::rc::Rc<Self>, angle: f32);
     }
 
-    /// What nodes do unless a subclass overrides it.
+    /// What nodes do unless a subclass overrides it: what
+    /// `star_script_runtime::nodes` does with their fields.
     pub struct Methods;
 
     impl Methods {
@@ -420,215 +394,85 @@ pub mod Node {
         /// `func update`
         pub fn update(this_: &Ref, delta: f32) {}
 
-        /// `func add_child`: moves `child`, with its own children, under this node.
+        /// `func add_child`
         pub fn add_child(this_: &Ref, child: Ref) {
-            if is_same_or_ancestor_(&child, this_) {
-                ::std::eprintln!(\"StarScript warning: a node cannot be added under itself or one of its children\");
-                return;
-            }
-            Self::remove(&child);
-            *HasFields::fields(&*child).parent_.borrow_mut() = ::std::option::Option::Some(::std::rc::Rc::downgrade(this_));
-            HasFields::fields(&**this_).children_.borrow_mut().push(child);
+            ::star_script_runtime::nodes::add_child::<crate::classes::Host_>(this_, child);
         }
 
-        /// `func remove`: takes the node, with its children, out of the tree.
+        /// `func remove`
         pub fn remove(this_: &Ref) {
-            let parent_ = HasFields::fields(&**this_).parent_.borrow_mut().take();
-            if let ::std::option::Option::Some(parent_) = parent_.and_then(|parent_| parent_.upgrade()) {
-                HasFields::fields(&*parent_).children_.borrow_mut().retain(|child_| !::std::rc::Rc::ptr_eq(child_, this_));
-            }
+            ::star_script_runtime::nodes::remove::<crate::classes::Host_>(this_);
         }
 
         /// `func parent`
         pub fn parent(this_: &Ref) -> ::std::option::Option<Ref> {
-            HasFields::fields(&**this_).parent_.borrow().as_ref().and_then(::std::rc::Weak::upgrade)
+            ::star_script_runtime::nodes::parent::<crate::classes::Host_>(this_)
         }
 
-        /// `func children`: a new list, so changing it does not change the tree.
+        /// `func children`
         pub fn children(this_: &Ref) -> ::star_script_runtime::List<Ref> {
-            ::star_script_runtime::List::from_vec(HasFields::fields(&**this_).children_.borrow().clone())
+            ::star_script_runtime::nodes::children::<crate::classes::Host_>(this_)
         }
 
         /// `func find_child`
         pub fn find_child(this_: &Ref, name: ::std::string::String) -> ::std::option::Option<Ref> {
-            HasFields::fields(&**this_).children_.borrow().iter()
-                .find(|child_| HasFields::fields(&***child_).name.read(|child_name_| *child_name_ == name))
-                .cloned()
+            ::star_script_runtime::nodes::find_child::<crate::classes::Host_>(this_, &name)
         }
 
         /// `func has_tag`
         pub fn has_tag(this_: &Ref, tag: ::std::string::String) -> bool {
-            HasFields::fields(&**this_).tags.read(|tags_| tags_.contains(&tag))
+            ::star_script_runtime::nodes::has_tag::<crate::classes::Host_>(this_, &tag)
         }
 
-        /// `func find_by_name`: the first descendant named `name`, parents
-        /// before their children and children in order.
+        /// `func find_by_name`
         pub fn find_by_name(this_: &Ref, name: ::std::string::String) -> ::std::option::Option<Ref> {
-            descendants_(this_).into_iter()
-                .find(|node_| HasFields::fields(&**node_).name.read(|node_name_| *node_name_ == name))
+            ::star_script_runtime::nodes::find_by_name::<crate::classes::Host_>(this_, &name)
         }
 
-        /// `func find_by_tag`: every descendant with the tag `tag`, parents
-        /// before their children and children in order.
+        /// `func find_by_tag`
         pub fn find_by_tag(this_: &Ref, tag: ::std::string::String) -> ::star_script_runtime::List<Ref> {
-            let tagged_ = descendants_(this_).into_iter()
-                .filter(|node_| HasFields::fields(&**node_).tags.read(|tags_| tags_.contains(&tag)))
-                .collect();
-            ::star_script_runtime::List::from_vec(tagged_)
+            ::star_script_runtime::nodes::find_by_tag::<crate::classes::Host_>(this_, &tag)
         }
 
-        /// `func global_x`: where the node is across, in the world.
+        /// `func global_x`
         pub fn global_x(this_: &Ref) -> f32 {
-            global_position_(this_)[0]
+            ::star_script_runtime::nodes::global_position::<crate::classes::Host_>(this_)[0]
         }
 
-        /// `func global_y`: where the node is up, in the world.
+        /// `func global_y`
         pub fn global_y(this_: &Ref) -> f32 {
-            global_position_(this_)[1]
+            ::star_script_runtime::nodes::global_position::<crate::classes::Host_>(this_)[1]
         }
 
-        /// `func global_rotation`: how much the node is turned in the
-        /// world: its `rotation` and those of its ancestors placed as it
-        /// is (in 2D, or in 3D for a `Node3D`, where it is its roll).
+        /// `func global_rotation`
         pub fn global_rotation(this_: &Ref) -> f32 {
-            let in_3d_ = is_3d_(this_);
-            ancestors_(this_).iter()
-                .filter(|ancestor_| is_3d_(ancestor_) == in_3d_)
-                .chain(::std::iter::once(this_))
-                .map(|node_| HasFields::fields(&**node_).rotation.get())
-                .sum()
+            ::star_script_runtime::nodes::global_rotation::<crate::classes::Host_>(this_)
         }
 
-        /// `func set_global_position`: places the node at a point of the
-        /// world; a `Node3D` keeps its depth in the world.
+        /// `func set_global_position`
         pub fn set_global_position(this_: &Ref, x: f32, y: f32) {
-            if is_3d_(this_) {
-                let [_, _, depth_] = global_position_(this_);
-                set_global_position_3d_(this_, [x, y, depth_]);
-            } else if let ::std::option::Option::Some([local_x_, local_y_]) = parent_place_2d_(this_).local_point([x, y]) {
-                let fields_ = HasFields::fields(&**this_);
-                fields_.x.set(local_x_);
-                fields_.y.set(local_y_);
-            }
+            ::star_script_runtime::nodes::set_global_position::<crate::classes::Host_>(this_, x, y);
         }
 
-        /// `func set_global_rotation`: turns the node to `angle` in the world.
+        /// `func set_global_rotation`
         pub fn set_global_rotation(this_: &Ref, angle: f32) {
-            let fields_ = HasFields::fields(&**this_);
-            let inherited_ = Self::global_rotation(this_) - fields_.rotation.get();
-            fields_.rotation.set(angle - inherited_);
+            ::star_script_runtime::nodes::set_global_rotation::<crate::classes::Host_>(this_, angle);
         }
 
-        /// `func translate`: moves the node in its parent's space.
+        /// `func translate`
         pub fn translate(this_: &Ref, x: f32, y: f32) {
-            let fields_ = HasFields::fields(&**this_);
-            fields_.x.set(fields_.x.get() + x);
-            fields_.y.set(fields_.y.get() + y);
+            ::star_script_runtime::nodes::translate::<crate::classes::Host_>(this_, x, y);
         }
 
-        /// `func translate_global`: moves the node in the world.
+        /// `func translate_global`
         pub fn translate_global(this_: &Ref, x: f32, y: f32) {
-            let [global_x_, global_y_, _] = global_position_(this_);
-            Self::set_global_position(this_, global_x_ + x, global_y_ + y);
+            ::star_script_runtime::nodes::translate_global::<crate::classes::Host_>(this_, x, y);
         }
 
-        /// `func rotate`: turns the node a little more.
+        /// `func rotate`
         pub fn rotate(this_: &Ref, angle: f32) {
-            let fields_ = HasFields::fields(&**this_);
-            fields_.rotation.set(fields_.rotation.get() + angle);
+            ::star_script_runtime::nodes::rotate::<crate::classes::Host_>(this_, angle);
         }
-    }
-
-    /// The ancestors of `node`, from the root down to its parent.
-    fn ancestors_(node: &Ref) -> ::std::vec::Vec<Ref> {
-        let mut found_ = ::std::vec::Vec::new();
-        let mut current_ = Methods::parent(node);
-        while let ::std::option::Option::Some(ancestor_) = current_ {
-            current_ = Methods::parent(&ancestor_);
-            found_.push(ancestor_);
-        }
-        found_.reverse();
-        found_
-    }
-
-    /// Whether `node` is placed in 3D: a `Node3D`.
-    fn is_3d_(node: &Ref) -> bool {
-        crate::AnyObject::Node3D(::std::rc::Rc::clone(node)).is_some()
-    }
-
-    /// Where the 2D space a 2D node is placed in is in the world: its
-    /// parent's, through its ancestors placed in 2D, as the engine does.
-    fn parent_place_2d_(node: &Ref) -> ::star_script_runtime::placement::Place2d {
-        ancestors_(node).iter()
-            .filter(|ancestor_| !is_3d_(ancestor_))
-            .fold(::star_script_runtime::placement::Place2d::IDENTITY, |place_, ancestor_| place_.then(place_2d_(ancestor_)))
-    }
-
-    fn place_2d_(node: &Ref) -> ::star_script_runtime::placement::Place2d {
-        let fields_ = HasFields::fields(&**node);
-        ::star_script_runtime::placement::Place2d::of_node(fields_.x.get(), fields_.y.get(), fields_.rotation.get(), fields_.scale_x.get(), fields_.scale_y.get())
-    }
-
-    /// Where the 3D space a `Node3D` is placed in is in the world: its
-    /// parent's, through its ancestors placed in 3D.
-    fn parent_place_3d_(node: &Ref) -> ::star_script_runtime::placement::Place3d {
-        ancestors_(node).iter()
-            .filter_map(place_3d_)
-            .fold(::star_script_runtime::placement::Place3d::IDENTITY, |place_, inner_| place_.then(inner_))
-    }
-
-    /// The place of `node` in its parent's 3D space, if it is a `Node3D`.
-    fn place_3d_(node: &Ref) -> ::std::option::Option<::star_script_runtime::placement::Place3d> {
-        let node_3d_ = crate::AnyObject::Node3D(::std::rc::Rc::clone(node))?;
-        let fields_ = HasFields::fields(&**node);
-        let depth_ = crate::classes::Node3D::HasFields::fields(&*node_3d_);
-        ::std::option::Option::Some(::star_script_runtime::placement::Place3d::of_node(
-            [fields_.x.get(), fields_.y.get(), depth_.z.get()],
-            [depth_.pitch.get(), depth_.yaw.get(), fields_.rotation.get()],
-            [fields_.scale_x.get(), fields_.scale_y.get(), depth_.scale_z.get()],
-        ))
-    }
-
-    /// Where `node` is in the world: in 3D for a `Node3D`, else in 2D with
-    /// a depth of 0.
-    pub fn global_position_(node: &Ref) -> [f32; 3] {
-        let fields_ = HasFields::fields(&**node);
-        match crate::AnyObject::Node3D(::std::rc::Rc::clone(node)) {
-            ::std::option::Option::Some(node_3d_) => {
-                let depth_ = crate::classes::Node3D::HasFields::fields(&*node_3d_).z.get();
-                parent_place_3d_(node).point([fields_.x.get(), fields_.y.get(), depth_])
-            }
-            ::std::option::Option::None => {
-                let [x_, y_] = parent_place_2d_(node).point([fields_.x.get(), fields_.y.get()]);
-                [x_, y_, 0.0]
-            }
-        }
-    }
-
-    /// Places the `Node3D` `node` at `point` of the world; it stays where
-    /// it is if its parent is scaled to nothing.
-    pub fn set_global_position_3d_(node: &Ref, point: [f32; 3]) {
-        let ::std::option::Option::Some(node_3d_) = crate::AnyObject::Node3D(::std::rc::Rc::clone(node)) else {
-            return;
-        };
-        if let ::std::option::Option::Some([x_, y_, z_]) = parent_place_3d_(node).local_point(point) {
-            let fields_ = HasFields::fields(&**node);
-            fields_.x.set(x_);
-            fields_.y.set(y_);
-            crate::classes::Node3D::HasFields::fields(&*node_3d_).z.set(z_);
-        }
-    }
-
-    /// The descendants of `node`, not itself: each parent before its
-    /// children, and children in their order.
-    fn descendants_(node: &Ref) -> ::std::vec::Vec<Ref> {
-        let mut found_ = ::std::vec::Vec::new();
-        let mut pending_: ::std::vec::Vec<Ref> = HasFields::fields(&**node).children_.borrow().iter().rev().cloned().collect();
-        while let ::std::option::Option::Some(next_) = pending_.pop() {
-            pending_.extend(HasFields::fields(&*next_).children_.borrow().iter().rev().cloned());
-            found_.push(next_);
-        }
-        found_
     }
 
     /// The root of the game's tree; `None` without a game.
@@ -651,23 +495,10 @@ pub mod Node {
     /// Whether `node` is in the game's tree, so its coroutines go on.
     /// Without a game (a console program) there is no tree to leave.
     pub fn in_tree_(node: &Ref) -> bool {
-        let root_ = GAME_ROOT_.with(|game_root_| game_root_.borrow().as_ref().and_then(::std::rc::Weak::upgrade));
-        match root_ {
-            ::std::option::Option::Some(root_) => is_same_or_ancestor_(&root_, node),
+        match game_root_() {
+            ::std::option::Option::Some(root_) => ::star_script_runtime::nodes::is_same_or_ancestor::<crate::classes::Host_>(&root_, node),
             ::std::option::Option::None => true,
         }
-    }
-
-    /// Whether `node` is `other` or one of its ancestors.
-    fn is_same_or_ancestor_(node: &Ref, other: &Ref) -> bool {
-        let mut current_ = ::std::option::Option::Some(::std::rc::Rc::clone(other));
-        while let ::std::option::Option::Some(candidate_) = current_ {
-            if ::std::rc::Rc::ptr_eq(&candidate_, node) {
-                return true;
-            }
-            current_ = Methods::parent(&candidate_);
-        }
-        false
     }
 
     /// Runs `start` (the first time) and `update` of every node of the tree
@@ -678,16 +509,14 @@ pub mod Node {
         nodes_.push(::std::rc::Rc::clone(root));
         let mut next_ = 0;
         while let ::std::option::Option::Some(node_) = nodes_.get(next_).cloned() {
-            nodes_.extend(HasFields::fields(&*node_).children_.borrow().iter().cloned());
+            nodes_.extend(HasFields::fields(&*node_).children().iter().cloned());
             next_ += 1;
         }
         for node_ in nodes_.iter() {
-            if !is_same_or_ancestor_(root, node_) {
+            if !::star_script_runtime::nodes::is_same_or_ancestor::<crate::classes::Host_>(root, node_) {
                 continue;
             }
-            let fields_ = HasFields::fields(&**node_);
-            if !fields_.started_.get() {
-                fields_.started_.set(true);
+            if HasFields::fields(&**node_).start_once() {
                 crate::classes::Game::see_from_if_main_(game_, node_);
                 Object::start(::std::rc::Rc::clone(node_));
             }
@@ -732,25 +561,47 @@ pub mod Node {
 
     /// Prepares an object of this class: `make_` builds it from its fields.
     pub fn init_<O: Object + 'static>(name: ::std::string::String, make_: impl FnOnce(Fields) -> ::std::rc::Rc<O>) -> ::std::rc::Rc<O> {
-        make_(Fields {
-            name: ::star_script_runtime::Field::new(name),
-            x: ::star_script_runtime::Field::new(0.0),
-            y: ::star_script_runtime::Field::new(0.0),
-            rotation: ::star_script_runtime::Field::new(0.0),
-            scale_x: ::star_script_runtime::Field::new(1.0),
-            scale_y: ::star_script_runtime::Field::new(1.0),
-            body: ::star_script_runtime::Field::new(::std::option::Option::None),
-            tags: ::star_script_runtime::Field::new(::star_script_runtime::List::new()),
-            id_: NEXT_ID_.fetch_add(1, ::std::sync::atomic::Ordering::Relaxed),
-            parent_: ::std::cell::RefCell::new(::std::option::Option::None),
-            children_: ::std::cell::RefCell::new(::std::vec::Vec::new()),
-            started_: ::std::cell::Cell::new(false),
-        })
+        make_(Fields::new(name))
     }
 
     /// Creates an object of this class.
     pub fn new(name: ::std::string::String) -> Ref {
         init_(name, |fields0_| ::std::rc::Rc::new(Instance { Node: fields0_ }))
+    }
+}";
+
+/// How the generated classes are the nodes of `star_script_runtime::nodes`.
+const HOST: &str = "/// The generated classes, as the nodes `star_script_runtime::nodes` works on.
+pub struct Host_;
+
+impl ::star_script_runtime::nodes::Host for Host_ {
+    type Node = crate::classes::Node::Ref;
+    type WeakNode = ::std::rc::Weak<dyn crate::classes::Node::Object>;
+    type Node3D = crate::classes::Node3D::Ref;
+    type Body = crate::classes::Body::Ref;
+
+    fn node(node: &Self::Node) -> &crate::classes::Node::Fields {
+        crate::classes::Node::HasFields::fields(&**node)
+    }
+
+    fn downgrade(node: &Self::Node) -> Self::WeakNode {
+        ::std::rc::Rc::downgrade(node)
+    }
+
+    fn upgrade(weak: &Self::WeakNode) -> ::std::option::Option<Self::Node> {
+        weak.upgrade()
+    }
+
+    fn same(node: &Self::Node, other: &Self::Node) -> bool {
+        ::std::rc::Rc::ptr_eq(node, other)
+    }
+
+    fn as_node_3d(node: &Self::Node) -> ::std::option::Option<Self::Node3D> {
+        crate::AnyObject::Node3D(::std::rc::Rc::clone(node))
+    }
+
+    fn node_3d(node: &Self::Node3D) -> &::star_script_runtime::nodes::Node3dFields {
+        crate::classes::Node3D::HasFields::fields(&**node)
     }
 }";
 
@@ -1412,7 +1263,7 @@ fn mirror_nodes_(
                         with_light_(&node_, |light_| {
                           with_light_2d_(&node_, |light_2d_| {
                             let described_ = ::star_engine::script_nodes::ScriptNode {
-                                id: fields_.id_,
+                                id: fields_.id(),
                                 parent: parent_,
                                 name: name_,
                                 transform: transform_,
@@ -1430,8 +1281,8 @@ fn mirror_nodes_(
                 });
             });
         });
-        for child_ in fields_.children_.borrow().iter().rev() {
-            pending_.push((::std::rc::Rc::clone(child_), ::std::option::Option::Some(fields_.id_)));
+        for child_ in fields_.children().iter().rev() {
+            pending_.push((::std::rc::Rc::clone(child_), ::std::option::Option::Some(fields_.id())));
         }
     }
     mirror_.finish_frame(world_);
@@ -1577,8 +1428,8 @@ fn sync_bodies_(
     let mut next_ = ::std::option::Option::Some(::std::rc::Rc::clone(root_));
     while let ::std::option::Option::Some(node_) = next_ {
         let fields_ = crate::classes::Node::HasFields::fields(&*node_);
-        queue_.extend(fields_.children_.borrow().iter().cloned());
-        known_.insert(fields_.id_, ::std::rc::Rc::clone(&node_));
+        queue_.extend(fields_.children().iter().cloned());
+        known_.insert(fields_.id(), ::std::rc::Rc::clone(&node_));
         next_ = queue_.pop();
     }
     for (id_, node_) in known_.iter() {
@@ -1618,15 +1469,15 @@ fn sync_bodies_(
 
 /// The engine's value of a script `Color`.
 fn engine_color_(color_: &dyn crate::classes::Color::Object) -> ::star_engine::star_render::Color {
-    let channels_ = crate::classes::Color::HasFields::fields(color_);
-    ::star_engine::star_render::Color::rgba(channels_.r.get(), channels_.g.get(), channels_.b.get(), channels_.a.get())
+    let [r_, g_, b_, a_] = crate::classes::Color::HasFields::fields(color_).channels();
+    ::star_engine::star_render::Color::rgba(r_, g_, b_, a_)
 }
 
 /// What the engine needs to know about the game's camera.
 fn script_camera_(camera_: &dyn crate::classes::Camera2D::Object) -> ::star_engine::script_nodes::ScriptCamera {
     let node_ = crate::classes::Node::HasFields::fields(camera_);
     ::star_engine::script_nodes::ScriptCamera {
-        id: node_.id_,
+        id: node_.id(),
         position: ::star_engine::star_math::Vec2::new(node_.x.get(), node_.y.get()),
         view_height: crate::classes::Camera2D::HasFields::fields(camera_).view_height.get(),
     }
@@ -1637,7 +1488,7 @@ fn script_camera_3d_(camera_: &dyn crate::classes::Camera3D::Object) -> ::star_e
     let node_ = crate::classes::Node::HasFields::fields(camera_);
     let depth_ = crate::classes::Node3D::HasFields::fields(camera_);
     ::star_engine::script_nodes::ScriptCamera3D {
-        id: node_.id_,
+        id: node_.id(),
         position: ::star_engine::star_math::Vec3::new(node_.x.get(), node_.y.get(), depth_.z.get()),
         angles: ::star_engine::star_math::Vec3::new(depth_.pitch.get(), depth_.yaw.get(), node_.rotation.get()),
         field_of_view: crate::classes::Camera3D::HasFields::fields(camera_).fov.get(),

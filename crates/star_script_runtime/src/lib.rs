@@ -11,11 +11,13 @@
 //! Rust toolchain and the engine.
 
 pub mod audio;
+pub mod color;
 mod equality;
 mod fault;
 mod field;
 pub mod input;
 mod list;
+pub mod nodes;
 mod operations;
 pub mod parallel;
 pub mod placement;

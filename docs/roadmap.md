@@ -368,8 +368,16 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
             `Camera2D`, `Scene`, `Body`, `Sound`, `Color`, the 3D ones),
             mirroring nodes and the game loop: their state and methods as
             types of `star_script_engine` that generated classes and the
-            interpreter both use. Its design is agreed with the owner
-            first.
+            interpreter both use, generic over a `Host` (agreed with
+            the owner, decision 65).
+        - [x] f1b1. `Host`, the fields of `Node`, `Node3D` and
+              `Color`, and `Node`'s methods (tree, tags, searches,
+              global and local places) in `star_script_runtime::nodes`
+              and `color`, with tests on a host of plain `Rc`s.
+        - [ ] f1b2. `Sprite`, `Camera2D`, `Light2D` and the 3D nodes.
+        - [ ] f1b3. `Body`: impulses, contacts, syncing with physics.
+        - [ ] f1b4. `Game`, mirroring nodes and the game loop.
+        - [ ] f1b5. `Scene` and `Sound` (`Host` creates classes by name).
     - [ ] f2. Measure “Play” with scripts on a realistic, big project
           (measured on `pruebas`, 2428 lines of Rust: 2 s after a change
           to its code), before and after f1.

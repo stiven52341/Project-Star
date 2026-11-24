@@ -108,7 +108,7 @@ impl<T: Clone> List<T> {
         self.read(Vec::clone)
     }
 
-    fn read<R>(&self, action: impl FnOnce(&Vec<T>) -> R) -> R {
+    pub(crate) fn read<R>(&self, action: impl FnOnce(&Vec<T>) -> R) -> R {
         match self.elements.try_borrow() {
             Ok(elements) => action(&elements),
             Err(_) => fault(OVERLAPPING_ACCESS),
