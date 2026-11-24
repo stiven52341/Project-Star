@@ -337,8 +337,17 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         it. The engine at `opt-level = 1` only saved 12 s more and dropped
         to 58 FPS, so it stays at 3; a change to the engine's code rebuilds
         in about 4 s either way (incremental builds), not minutes.
-  - [ ] d. Try sharing the third-party builds with the editor's `target`
+  - [x] d. Try sharing the third-party builds with the editor's `target`
         (same lockfile and profile); keep it only if it really reuses them.
+        Tried and not kept: a game built in the editor's `target` reused
+        182 crates but rebuilt 61, among them the heaviest (wgpu, naga,
+        winit, rapier, parry, symphonia), in 316 s instead of 485 s. The
+        repository's workspace unifies features with the editor (egui
+        turns on more of wgpu and winit) and its engine crates are members
+        at `opt-level = 1`, so their builds differ from a game's. Steps a
+        and b already make that cost a one-time one, and sharing the
+        folder would make every “Play” wait for the developer's own Cargo
+        commands (and the other way round).
   - [ ] e. Projects without scripts: a ready-made player built with the
         editor that opens the main scene, so they play without Cargo.
   - [ ] f. To discuss, much bigger: running StarScript without Rust while
