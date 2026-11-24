@@ -1,5 +1,7 @@
 //! Scenes: trees of nodes saved in files and instanced into worlds.
 
+use std::collections::BTreeMap;
+
 use star_assets::AssetPath;
 use star_core::{EngineError, EngineResult};
 use star_ecs::{Entity, World};
@@ -9,8 +11,8 @@ use star_render::{Material, Mesh3dId, MeshShape, TextureFilter, TextureId};
 use crate::node_3d_data::MeshOutline;
 use crate::scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
 use crate::{
-    Body2D, Body3D, Children, Hierarchy, LightNode, MeshNode, Name, SpriteNode, Transform2D,
-    Transform3D,
+    Body2D, Body3D, Children, FieldValue, Hierarchy, LightNode, MeshNode, Name, SpriteNode,
+    Transform2D, Transform3D,
 };
 
 /// A tree of nodes that can be added to a world as many times as needed:
@@ -41,6 +43,8 @@ struct SceneNode {
     mesh: Option<MeshNode>,
     light: Option<LightNode>,
     body_3d: Option<BodySettings<Shape3d>>,
+    /// Kept, as `class` is, for the scene to be written again whole.
+    fields: BTreeMap<String, FieldValue>,
 }
 
 /// Loads what the nodes of a scene show, so a [`Scene`] can be read.
@@ -242,6 +246,7 @@ fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResul
         mesh,
         light: outline.light,
         body_3d: outline.body_3d,
+        fields: outline.fields,
     })
 }
 
@@ -284,6 +289,7 @@ fn outline_node(node: &SceneNode, sources: &impl SceneSources) -> EngineResult<N
         mesh,
         light: node.light,
         body_3d: node.body_3d,
+        fields: node.fields.clone(),
     })
 }
 
@@ -345,6 +351,7 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
         mesh: world.get::<MeshNode>(entity).map(|mesh| *mesh),
         light: world.get::<LightNode>(entity).map(|light| *light),
         body_3d: world.get::<Body3D>(entity).map(|body| *body.settings()),
+        fields: BTreeMap::new(),
     }
 }
 

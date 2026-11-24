@@ -1,9 +1,12 @@
 //! The layout of `.scene` files: TOML with a flat list of nodes.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use star_core::{EngineError, EngineResult};
 use star_render::TextureFilter;
 
+use crate::FieldValue;
 use crate::body_data::{Body3dData, BodyData};
 use crate::node_3d_data::{LightData, MeshTable, Transform3dData};
 
@@ -51,6 +54,9 @@ pub(crate) struct NodeData {
     pub(crate) light: Option<LightData>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) body_3d: Option<Body3dData>,
+    /// `[node.fields]`: the values of the `export` fields of its class.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) fields: BTreeMap<String, FieldValue>,
 }
 
 /// A `[node.sprite]` table.
@@ -189,6 +195,7 @@ mod tests {
                 mesh: None,
                 light: None,
                 body_3d: None,
+                fields: BTreeMap::new(),
             }],
         };
 

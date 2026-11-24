@@ -39,6 +39,8 @@ pub struct SceneNode {
     pub mesh: Option<SceneMesh>,
     /// The light it shines; only `Light` objects can shine one.
     pub light: Option<SceneLight>,
+    /// The values of the `export` fields of its class, by name.
+    pub fields: Vec<(String, crate::scene_fields::SceneValue)>,
 }
 
 /// Where a [`SceneNode`] is in 3D, relative to its parent.
@@ -258,6 +260,7 @@ mod tests {
             transform_3d: None,
             mesh: None,
             light: None,
+            fields: Vec::new(),
         }
     }
 

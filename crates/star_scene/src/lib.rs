@@ -17,6 +17,7 @@
 
 mod body_data;
 mod body_node;
+mod field_value;
 mod hierarchy;
 mod node_3d;
 mod node_3d_data;
@@ -29,6 +30,7 @@ mod sprite_node;
 mod transform;
 
 pub use body_node::{Body2D, Body3D, NodeBody};
+pub use field_value::FieldValue;
 pub use hierarchy::{Children, Hierarchy, Name, Parent};
 pub use node_3d::{LightNode, MeshNode, draw_3d_nodes};
 pub use node_3d_data::MeshOutline;

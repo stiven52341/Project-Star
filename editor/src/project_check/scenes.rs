@@ -1,9 +1,10 @@
-//! Checking `.scene` files: that they can be read, and that the StarScript
-//! classes their nodes name can build those nodes.
+//! Checking `.scene` files: that they can be read, that the StarScript
+//! classes their nodes name can build those nodes, and that the values
+//! they give fields go to `export` fields that take them.
 
 use star_engine::star_core::EngineError;
-use star_engine::star_scene::SceneOutline;
-use star_script::semantic::ClassTable;
+use star_engine::star_scene::{FieldValue, NodeOutline, SceneOutline};
+use star_script::semantic::{COLOR_CLASS, ClassTable, FieldInfo, NODE_CLASS, Type};
 
 use super::Problem;
 
@@ -22,15 +23,80 @@ pub(super) fn check_scene(name: &str, text: &str, classes: Option<&ClassTable>) 
     outline
         .nodes()
         .iter()
-        .filter_map(|node| {
-            let class = node.class.as_deref()?;
-            let error = classes.scene_class(class).err()?;
-            Some(Problem::in_file(
-                name,
-                format!("node \"{}\": {error}", node.name),
-            ))
+        .flat_map(|node| {
+            node_problems(node, classes)
+                .into_iter()
+                .map(|problem| Problem::in_file(name, format!("node \"{}\": {problem}", node.name)))
         })
         .collect()
+}
+
+/// What is wrong with the class of `node` and the values it gives fields.
+fn node_problems(node: &NodeOutline, classes: &ClassTable) -> Vec<String> {
+    let class = node.class.as_deref().unwrap_or(NODE_CLASS);
+    let id = match classes.scene_class(class) {
+        Ok(id) => id,
+        Err(error) if node.class.is_some() => return vec![error.to_string()],
+        // A node without a class is a plain node, with no fields to give.
+        Err(_) => return unknown_fields(class, node),
+    };
+    node.fields
+        .iter()
+        .filter_map(|(field, value)| {
+            match classes
+                .ancestors(id)
+                .find_map(|owner| exported_field(classes, owner, field))
+            {
+                None => Some(unknown_field(class, field)),
+                Some(info) if !fits(classes, value, &info.ty) => Some(format!(
+                    "the field `{field}` takes a value of type `{}`",
+                    classes.type_name(&info.ty)
+                )),
+                Some(_) => None,
+            }
+        })
+        .collect()
+}
+
+/// The `export` field `name` declared by the class `owner`.
+fn exported_field<'classes>(
+    classes: &'classes ClassTable,
+    owner: star_script::semantic::ClassId,
+    name: &str,
+) -> Option<&'classes FieldInfo> {
+    classes
+        .class(owner)
+        .fields
+        .iter()
+        .find(|field| field.is_exported && field.name == name)
+}
+
+/// One problem for each value `node` gives, as `class` has no fields.
+fn unknown_fields(class: &str, node: &NodeOutline) -> Vec<String> {
+    node.fields
+        .keys()
+        .map(|field| unknown_field(class, field))
+        .collect()
+}
+
+fn unknown_field(class: &str, field: &str) -> String {
+    format!("`{class}` has no `export` field `{field}`")
+}
+
+/// Whether a scene's `value` can be given to a field of type `ty`, as
+/// games take it: whole numbers that fit, decimals also from whole
+/// numbers, and each other kind only its own.
+fn fits(classes: &ClassTable, value: &FieldValue, ty: &Type) -> bool {
+    match (value, ty) {
+        (FieldValue::Int(number), Type::Short) => i16::try_from(*number).is_ok(),
+        (FieldValue::Int(number), Type::Int) => i32::try_from(*number).is_ok(),
+        (FieldValue::Int(_), Type::BigInt | Type::Float | Type::Double)
+        | (FieldValue::Float(_), Type::Float | Type::Double)
+        | (FieldValue::Bool(_), Type::Bool)
+        | (FieldValue::Text(_), Type::String) => true,
+        (FieldValue::Color(_), Type::Class(id)) => classes.class(*id).name == COLOR_CLASS,
+        _ => false,
+    }
 }
 
 /// What is wrong with a scene, without the "scene error" prefix: the problem
@@ -73,6 +139,34 @@ mod tests {
         assert_eq!(
             messages("class Rocks {}\n", SCENE_WITH_ROCK),
             ["assets/level.scene: node \"Big rock\": there is no class \"Rock\""]
+        );
+    }
+
+    #[test]
+    fn values_go_to_export_fields_that_take_them() {
+        let source = "class Rock extends Node {\n  export var speed = 1.0\n  export var lives = 3\n  \
+                      var hidden = 0\n  init() {\n    super.init(\"Rock\")\n  }\n}\n";
+        let scene = format!(
+            "{SCENE_WITH_ROCK}[node.fields]\nspeed = 2\nlives = 2.5\nhidden = 1\nghost = true\n"
+        );
+
+        assert_eq!(
+            messages(source, &scene),
+            [
+                "assets/level.scene: node \"Big rock\": `Rock` has no `export` field `ghost`",
+                "assets/level.scene: node \"Big rock\": `Rock` has no `export` field `hidden`",
+                "assets/level.scene: node \"Big rock\": the field `lives` takes a value of type `int`",
+            ]
+        );
+    }
+
+    #[test]
+    fn plain_nodes_have_no_fields() {
+        let scene = "format = 1\n[[node]]\nname = \"Level\"\n[node.fields]\nspeed = 2\n";
+
+        assert_eq!(
+            messages("class A {}\n", scene),
+            ["assets/level.scene: node \"Level\": `Node` has no `export` field `speed`"]
         );
     }
 

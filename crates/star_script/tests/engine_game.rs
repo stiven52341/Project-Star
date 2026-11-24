@@ -66,12 +66,16 @@ class Ship extends Sprite {
 }
 
 class Drone extends Node {
+    export var speed = 1.0
+    export var label = \"none\"
+    export var tint = Color(1.0, 1.0, 1.0, 1.0)
+
     init() {
         super.init(\"Drone\")
     }
 
     override func start() {
-        Debug.print(\"drone start \" + name + \" \" + x.to_string())
+        Debug.print(\"drone start \" + name + \" \" + x.to_string() + \" \" + speed.to_string() + \" \" + label + \" \" + tint.r.to_string())
     }
 }
 
@@ -309,6 +313,11 @@ name = "Wingman"
 class = "Drone"
 parent = 0
 position = [-2.0, 0.0]
+
+[node.fields]
+speed = 4
+label = "wing"
+tint = [0.25, 1.0, 1.0, 1.0]
 "#;
 
 /// A scene whose node names a class the game does not have.
@@ -396,7 +405,7 @@ fn games_run_in_the_engine_until_they_quit() {
     assert_eq!(
         stdout,
         "Fleet 2\nsprites/leader.png 1.5 0.5\ntrue\ntrue\n\
-         game frame 1\nship start\nship x 1.0\ndrone start Wingman -2.0\ngame frame 2\nship x 2.0\n\
+         game frame 1\nship start\nship x 1.0\ndrone start Wingman -2.0 4.0 wing 0.25\ngame frame 2\nship x 2.0\n\
          game frame 3\nship x 3.0\n"
     );
 

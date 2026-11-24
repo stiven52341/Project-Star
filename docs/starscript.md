@@ -499,6 +499,13 @@ class Space extends Game {
   camera. If a class does not exist, needs arguments, or is not a `Sprite`
   but the node shows an image, the whole scene is not loaded (`null`) and
   the reason, with the node's name, is written once.
+- A node with a class can give its `export` fields values, in a
+  `[node.fields]` table: `speed = 2.5`, `lives = 3`, `alive = true`,
+  `title = "Boss"`, `tint = [1.0, 0.0, 0.0, 1.0]` (a `Color`). They are
+  set after `init`, so they win over the values of the class; a field
+  of decimals also takes a whole number. A value for a field that is not
+  `export`, or that does not fit its type, stops the scene as an unknown
+  class does, and “Compile” in the editor reports it first.
 
 ```toml
 [[node]]

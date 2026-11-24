@@ -736,6 +736,9 @@ pub mod Scene {
         let class_ = node_.class.as_deref().unwrap_or(\"Node\");
         let fields_ = crate::classes::Node::HasFields::fields(&*object_);
         fields_.name.set(node_.name.clone());
+        if !node_.fields.is_empty() {
+            crate::set_scene_fields_(class_, &object_, &node_.fields)?;
+        }
         if let ::std::option::Option::Some(place_) = &node_.transform {
             fields_.x.set(place_.x);
             fields_.y.set(place_.y);
@@ -1383,6 +1386,13 @@ fn read_scene_(
                     pixelated: mesh_.pixelated,
                 }
             }),
+            fields: node_.fields.into_iter().map(|(name_, value_)| (name_, match value_ {
+                ::star_engine::star_scene::FieldValue::Bool(truth_) => ::star_script_runtime::scene_fields::SceneValue::Bool(truth_),
+                ::star_engine::star_scene::FieldValue::Int(number_) => ::star_script_runtime::scene_fields::SceneValue::Int(number_),
+                ::star_engine::star_scene::FieldValue::Float(number_) => ::star_script_runtime::scene_fields::SceneValue::Float(number_),
+                ::star_engine::star_scene::FieldValue::Text(text_) => ::star_script_runtime::scene_fields::SceneValue::Text(text_),
+                ::star_engine::star_scene::FieldValue::Color(color_) => ::star_script_runtime::scene_fields::SceneValue::Color(color_),
+            })).collect(),
             light: node_.light.map(|shone_| {
                 let light_ = ::star_engine::script_nodes::ScriptLight::from_light(&shone_);
                 ::star_script_runtime::scenes::SceneLight {

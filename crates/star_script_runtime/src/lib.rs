@@ -19,6 +19,7 @@ mod list;
 mod operations;
 pub mod parallel;
 mod plain;
+pub mod scene_fields;
 pub mod scenes;
 pub mod tasks;
 

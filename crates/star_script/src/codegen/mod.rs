@@ -23,6 +23,7 @@ mod names;
 mod native;
 mod native_3d;
 mod program;
+mod scene_fields;
 mod statements;
 mod writer;
 
