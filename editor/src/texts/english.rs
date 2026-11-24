@@ -164,6 +164,8 @@ pub(super) static ENGLISH: Texts = Texts {
     console_empty: "The editor's messages appear here: scenes or images that cannot be read, the GPU it draws with…",
     output_empty: "Press “Play” to build and run the game. What Cargo and the game write appears here.",
     building_game: "Building the game…",
+    preparing_engine: "Preparing the engine…",
+    preparing_engine_hint: "The engine is being built in the background so that Play only has to build the game.",
     game_running: "Game running",
     game_stopped: "Game stopped",
     game_build_failed: "The game did not build: Cargo's output above says why.",

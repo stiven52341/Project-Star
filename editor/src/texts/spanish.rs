@@ -164,6 +164,8 @@ pub(super) static SPANISH: Texts = Texts {
     console_empty: "Aquí aparecen los mensajes del editor: escenas o imágenes que no se pueden leer, la GPU con la que dibuja…",
     output_empty: "Pulsa «Jugar» para construir y ejecutar el juego. Aquí aparece lo que escriben Cargo y el juego.",
     building_game: "Construyendo el juego…",
+    preparing_engine: "Preparando el motor…",
+    preparing_engine_hint: "El motor se compila en segundo plano para que «Play» solo tenga que compilar el juego.",
     game_running: "Juego en marcha",
     game_stopped: "Juego detenido",
     game_build_failed: "El juego no se pudo construir: la salida de Cargo de arriba dice por qué.",

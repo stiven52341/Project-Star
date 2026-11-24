@@ -324,7 +324,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `Cargo.toml` and the code only when they changed. Measured: after
         one project caught up with the repository's versions, a second
         project built in 11.8 s instead of a full build.
-  - [ ] b. Prepare the engine in the background when a project opens (a
+  - [x] b. Prepare the engine in the background when a project opens (a
         build of a small package with the same dependencies), so the first
         “Play” finds it built; show that it is being prepared.
   - [ ] c. Measure lighter profiles: the engine's crates at

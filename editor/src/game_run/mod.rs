@@ -6,6 +6,7 @@
 //! shipping the engine with the editor will come with its packaging.
 
 mod process;
+mod warm_up;
 
 use std::env;
 use std::ffi::OsString;
@@ -22,6 +23,7 @@ use star_script::codegen::{EntryPoint, GeneratedProgram};
 use star_script::package::Package;
 
 use self::process::{Ended, Events};
+pub(crate) use self::warm_up::EngineWarmUp;
 use crate::texts;
 
 /// The `crates` folder of the repository, with the runtime and the engine.
@@ -165,7 +167,7 @@ impl Drop for GameRun {
 
 fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> RunEnd {
     let engine = Path::new(ENGINE_CRATES);
-    if !engine.join(ENGINE_CRATE).is_dir() {
+    if !engine_is_available() {
         return RunEnd::Failed(texts::current().engine_not_found(engine));
     }
     // Without a game or a `main` the crate has no `fn main`, and Cargo's
@@ -202,6 +204,11 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
         Ok(Ended::Stopped) => RunEnd::Stopped,
         Err(error) => RunEnd::Failed(texts::current().game_not_started(&error)),
     }
+}
+
+/// Whether the engine's crates are where games are built from.
+fn engine_is_available() -> bool {
+    Path::new(ENGINE_CRATES).join(ENGINE_CRATE).is_dir()
 }
 
 fn write_package(
@@ -276,7 +283,7 @@ mod tests {
 
     #[test]
     fn the_engine_is_found_in_the_repository() {
-        assert!(Path::new(ENGINE_CRATES).join(ENGINE_CRATE).is_dir());
+        assert!(engine_is_available());
     }
 
     #[test]

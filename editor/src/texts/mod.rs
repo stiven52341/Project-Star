@@ -246,6 +246,8 @@ pub(crate) struct Texts {
     pub(crate) console_empty: &'static str,
     pub(crate) output_empty: &'static str,
     pub(crate) building_game: &'static str,
+    pub(crate) preparing_engine: &'static str,
+    pub(crate) preparing_engine_hint: &'static str,
     pub(crate) game_running: &'static str,
     pub(crate) game_stopped: &'static str,
     pub(crate) game_build_failed: &'static str,

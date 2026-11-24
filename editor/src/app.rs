@@ -52,7 +52,7 @@ impl EditorApp {
         log_history: LogHistory,
         icon_size: u16,
     ) -> Screen {
-        let editor = EditorWindow::new(project, render_state, log_history, icon_size);
+        let editor = EditorWindow::new(project, context, render_state, log_history, icon_size);
         context.send_viewport_cmd(egui::ViewportCommand::Title(editor.title()));
         context.send_viewport_cmd(egui::ViewportCommand::Maximized(true));
         Screen::Editor(Box::new(editor))

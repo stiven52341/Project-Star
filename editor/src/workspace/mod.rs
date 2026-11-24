@@ -42,7 +42,7 @@ use self::problems_panel::{CheckEnd, ProblemsPanel};
 use self::unsaved_dialog::{UnsavedChoice, show_unsaved_dialog};
 use self::viewport::SceneViewport;
 use crate::editor_log::LogHistory;
-use crate::game_run::PlayRequest;
+use crate::game_run::{EngineWarmUp, PlayRequest};
 use crate::last_scenes::LastSceneStore;
 use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, Project, SCRIPT_EXTENSION};
 use crate::project_check::Problem;
@@ -93,6 +93,8 @@ pub(crate) struct EditorWindow {
     assets: AssetsPanel,
     problems: ProblemsPanel,
     output: OutputPanel,
+    /// The engine built in the background, so the first “Play” is quick.
+    warm_up: Option<EngineWarmUp>,
     console: ConsolePanel,
     /// “Play” waits for its check: the game is played if it finds nothing.
     play_after_check: bool,
@@ -119,6 +121,7 @@ impl EditorWindow {
     /// of “Assets” at `icon_size` percent.
     pub(crate) fn new(
         project: Project,
+        context: &egui::Context,
         render_state: Option<&egui_wgpu::RenderState>,
         log_history: LogHistory,
         icon_size: u16,
@@ -148,6 +151,7 @@ impl EditorWindow {
             assets,
             problems: ProblemsPanel::new(),
             output: OutputPanel::new(),
+            warm_up: start_warm_up(context),
             console: ConsolePanel::new(log_history),
             play_after_check: false,
             bottom_tab: BottomTab::Assets,
@@ -606,7 +610,8 @@ impl EditorWindow {
         }
     }
 
-    fn show_status_bar(&self, ui: &mut egui::Ui) {
+    fn show_status_bar(&mut self, ui: &mut egui::Ui) {
+        let preparing = self.is_preparing_engine();
         let settings = self.project.settings();
         ui.horizontal(|ui| {
             ui.label(settings.name());
@@ -617,6 +622,9 @@ impl EditorWindow {
                 ui.separator();
                 self.problems.show_summary(ui);
                 self.output.show_summary(ui);
+                if preparing {
+                    show_engine_preparing(ui);
+                }
             });
         });
     }
@@ -637,6 +645,34 @@ impl EditorWindow {
                 ui.hyperlink_to(texts::current().source_code, REPOSITORY_URL);
             });
     }
+}
+
+impl EditorWindow {
+    /// Whether the engine is still being prepared, while no game is: a
+    /// “Play” waiting for it already says it is building.
+    fn is_preparing_engine(&mut self) -> bool {
+        let preparing = self
+            .warm_up
+            .as_mut()
+            .is_some_and(EngineWarmUp::is_preparing);
+        if !preparing {
+            self.warm_up = None;
+        }
+        preparing && !self.output.is_playing()
+    }
+}
+
+/// Starts preparing the engine, redrawing the editor when it is ready.
+fn start_warm_up(context: &egui::Context) -> Option<EngineWarmUp> {
+    let context = context.clone();
+    EngineWarmUp::start(move || context.request_repaint())
+}
+
+fn show_engine_preparing(ui: &mut egui::Ui) {
+    let texts = texts::current();
+    ui.spinner();
+    ui.weak(texts.preparing_engine)
+        .on_hover_text(texts.preparing_engine_hint);
 }
 
 /// Where the source code is published, as the GPL asks programs to tell users.
