@@ -10,8 +10,8 @@ use super::Member;
 use super::body::Body;
 use crate::error::LowerError;
 use crate::tree::{
-    self, Arithmetic, ClassRef, Comparison, Coroutine, EngineCall, EngineMethod, Expression,
-    MethodTarget, NodeMethod, NumberType,
+    self, Arithmetic, BodyMethod, BodyShape, ClassRef, Comparison, Coroutine, EngineCall,
+    EngineMethod, Expression, MethodTarget, NodeMethod, NumberType, SoundMethod,
 };
 
 /// The engine class whose `print` writes a line.
@@ -26,6 +26,12 @@ const GAME_CLASS: &str = "Game";
 const NODE_CLASS: &str = "Node";
 /// The engine class that loads scenes and searches the game's tree.
 const SCENE_CLASS: &str = "Scene";
+/// The engine class of physics bodies.
+const BODY_CLASS: &str = "Body";
+/// The engine class of sounds.
+const SOUND_CLASS: &str = "Sound";
+/// The engine class with the volume of every sound.
+const AUDIO_CLASS: &str = "Audio";
 
 /// How a method is called on its object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -369,8 +375,8 @@ impl Body<'_> {
                     )))))
                 }
                 (TIME_CLASS, "next_frame") => Ok(Expression::Start(Box::new(Coroutine::NextFrame))),
-                (INPUT_CLASS | SCENE_CLASS, name) => {
-                    let method = static_method(&info.name, name).ok_or_else(|| {
+                (class, name) if method.is_static => {
+                    let method = static_method(class, name).ok_or_else(|| {
                         LowerError::unsupported("this method of the engine", callee.span)
                     })?;
                     Ok(Expression::Engine {
@@ -456,8 +462,9 @@ impl Body<'_> {
     }
 
     /// A method of an object of an engine class (`class`), with its
-    /// receiver as the first argument: those of `Node` and `Game`, and
-    /// the engine's own `start` and `update`, which do nothing.
+    /// receiver as the first argument: those of `Node`, `Game`, `Body`
+    /// and `Sound`, and the engine's own `start` and `update`, which do
+    /// nothing.
     fn engine_object_method(
         &self,
         callee: &Expr,
@@ -554,6 +561,14 @@ fn static_method(class: &str, name: &str) -> Option<EngineMethod> {
         (SCENE_CLASS, "load") => EngineMethod::LoadScene,
         (SCENE_CLASS, "find_by_name") => EngineMethod::FindInGame,
         (SCENE_CLASS, "find_by_tag") => EngineMethod::FindTaggedInGame,
+        (BODY_CLASS, "circle") => EngineMethod::NewBody(BodyShape::Circle),
+        (BODY_CLASS, "rectangle") => EngineMethod::NewBody(BodyShape::Rectangle),
+        (BODY_CLASS, "capsule") => EngineMethod::NewBody(BodyShape::Capsule),
+        (BODY_CLASS, "sphere") => EngineMethod::NewBody(BodyShape::Sphere),
+        (BODY_CLASS, "box") => EngineMethod::NewBody(BodyShape::Box),
+        (SOUND_CLASS, "load") => EngineMethod::LoadSound,
+        (AUDIO_CLASS, "volume") => EngineMethod::Volume,
+        (AUDIO_CLASS, "set_volume") => EngineMethod::SetVolume,
         _ => return None,
     })
 }
@@ -567,6 +582,14 @@ pub(super) fn object_method(class: &str, name: &str) -> Option<EngineMethod> {
         (GAME_CLASS | NODE_CLASS, "start") => EngineMethod::Start,
         (GAME_CLASS | NODE_CLASS, "update") => EngineMethod::Update,
         (NODE_CLASS, name) => EngineMethod::Node(NodeMethod::named(name)?),
+        (BODY_CLASS, "apply_impulse") => EngineMethod::Body(BodyMethod::ApplyImpulse),
+        (BODY_CLASS, "apply_impulse_3d") => EngineMethod::Body(BodyMethod::ApplyImpulse3D),
+        (BODY_CLASS, "touching") => EngineMethod::Body(BodyMethod::Touching),
+        (BODY_CLASS, "just_touched") => EngineMethod::Body(BodyMethod::JustTouched),
+        (BODY_CLASS, "just_separated") => EngineMethod::Body(BodyMethod::JustSeparated),
+        (SOUND_CLASS, "play") => EngineMethod::Sound(SoundMethod::Play),
+        (SOUND_CLASS, "stop") => EngineMethod::Sound(SoundMethod::Stop),
+        (SOUND_CLASS, "is_playing") => EngineMethod::Sound(SoundMethod::IsPlaying),
         _ => return None,
     })
 }

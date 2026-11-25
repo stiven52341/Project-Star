@@ -72,15 +72,14 @@ fn what_cannot_run_yet_is_refused_before_running() {
         lowering_error(mesh),
         LowerErrorKind::Unsupported("classes that extend this engine class")
     );
-    let method =
-        "class Main {\n static func main() {\n const body = Body.circle(\"dynamic\", 0.5)\n }\n}\n";
+    let method = "class Main {\n static func aim(rock: Node3D) {\n rock.look_at(0.0, 0.0, 0.0)\n }\n static func main() {\n }\n}\n";
     assert_eq!(
         lowering_error(method),
         LowerErrorKind::Unsupported("this method of the engine")
     );
-    let body = "class Main {\n static func main() {\n Debug.print((Node(\"a\").body == null).to_string())\n }\n}\n";
+    let field = "class Main {\n static func depth(rock: Node3D) -> float {\n return rock.z\n }\n static func main() {\n }\n}\n";
     assert_eq!(
-        lowering_error(body),
+        lowering_error(field),
         LowerErrorKind::Unsupported("this field of the engine")
     );
 }

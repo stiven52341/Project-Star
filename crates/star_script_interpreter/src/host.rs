@@ -8,13 +8,14 @@
 //! Its types are public only so the engine can name them; what they hold
 //! stays the interpreter's. The engine classes of later steps of Phase 14
 //! (`Node3D`, `Camera3D`, `Mesh` and `Light`) are [`NotYet`] or never
-//! found here: no value of them exists, so
-//! the runtime is never handed one.
+//! found here: no value of them exists, so the runtime is never handed
+//! one.
 
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
+use star_script_runtime::audio::SoundFields;
 use star_script_runtime::bodies::BodyFields;
 use star_script_runtime::color::ColorFields;
 use star_script_runtime::game::GameFields;
@@ -44,6 +45,12 @@ pub type NodeObject = Object<NodeParts>;
 
 /// The game: an object of the class that extends `Game`.
 pub type GameObject = Object<GameFields<Interpreted>>;
+
+/// A `Body`: an object with the runtime's fields of bodies (decision 72).
+pub type BodyObject = Object<BodyFields<Interpreted>>;
+
+/// A `Sound`: an object with the runtime's fields of sounds.
+pub type SoundObject = Object<SoundFields>;
 
 /// The runtime's fields of a node: those of `Node`, and those of its node
 /// class.
@@ -122,7 +129,7 @@ impl Host for Interpreted {
     type Node3D = NotYet;
     type Camera2D = CameraRef;
     type Camera3D = NotYet;
-    type Body = Rc<BodyFields<Self>>;
+    type Body = Rc<BodyObject>;
     type Color = Rc<Object<ColorFields>>;
     type Game = Rc<GameObject>;
     type Tags = Tags;
@@ -216,7 +223,7 @@ impl Host for Interpreted {
     }
 
     fn body(body: &Self::Body) -> &BodyFields<Self> {
-        body
+        &body.engine
     }
 
     fn color(r: f32, g: f32, b: f32, a: f32) -> Self::Color {
@@ -244,7 +251,7 @@ impl Host for Interpreted {
     }
 
     fn new_body(fields: BodyFields<Self>) -> Self::Body {
-        Rc::new(fields)
+        Rc::new(Object::new(EngineClass::Body.class(), Vec::new(), fields))
     }
 
     fn start(node: &Self::Node) {
@@ -301,6 +308,14 @@ mod tests {
         assert!(Interpreted::has_tag(&tags, "enemy"));
         assert!(Interpreted::has_tag(&tags, "loud"));
         assert!(!Interpreted::has_tag(&tags, "quiet"));
+    }
+
+    #[test]
+    fn bodies_made_by_the_runtime_are_engine_bodies() {
+        let body = Interpreted::new_body(BodyFields::circle("static".to_owned(), 2.0));
+
+        assert_eq!(body.class, EngineClass::Body.class());
+        assert!((Interpreted::body(&body).radius.get() - 2.0).abs() < f32::EPSILON);
     }
 
     #[test]

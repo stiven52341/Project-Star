@@ -791,7 +791,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           machine with the same output.
   - [ ] 14.8 Physics, sounds and 3D (`Body`, `Sound`, `Audio`,
         `Node3D`, `Mesh`, `Light`, `Camera3D`).
-        Design proposed to the owner (awaiting approval):
+        Design approved by the owner (decision 72, 2026-11-24):
         - Bodies and sounds become objects of the interpreter with the
           runtime's fields, as colors are: a value of kind `Body` holds
           `BodyFields` (the `Host`'s body becomes that object), and one of
@@ -829,8 +829,18 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           object (it would need a second path for `is`, `==` and fields,
           which objects already have), and simulating bodies outside the
           engine (the compiled console program does not either).
-    - [ ] 14.8a Bodies and sounds: `Body`, `Sound`, `Audio` and a node's
+    - [x] 14.8a Bodies and sounds: `Body`, `Sound`, `Audio` and a node's
           `body`; `bodies.star` and `sounds.star` conform.
+          Values of kind `Body` and `Sound` are objects with the runtime's
+          `BodyFields` and `SoundFields` (the interpreter's `Host::Body` is
+          that object, so bodies the runtime makes for scenes are ones
+          too); `Body`'s static constructors, impulses and contact lists
+          (new lists of the interpreter), `Sound.load`/`play`/`stop`/
+          `is_playing` and `Audio.volume`/`set_volume` call the runtime.
+          Static methods of the engine are now recognized by being
+          static, not by their class. Unit tests cover contacts set by the
+          physics, impulses that add up until the physics takes them, and
+          sounds that do not load without audio.
     - [ ] 14.8b 3D: `Node3D`, `Mesh`, `Light`, `Camera3D`, their methods,
           `Game.camera_3d` and 3D nodes in scenes; `nodes_3d.star` and
           `placement.star` conform, and the conformance test covers every

@@ -118,7 +118,12 @@ fn send(value: &Value) -> Result<Sent, RunError> {
         Value::List(elements) => {
             Sent::List(read(elements)?.iter().map(send).collect::<Result<_, _>>()?)
         }
-        Value::Object(_) | Value::Color(_) | Value::Node(_) | Value::Game(_) => {
+        Value::Object(_)
+        | Value::Color(_)
+        | Value::Node(_)
+        | Value::Game(_)
+        | Value::Body(_)
+        | Value::Sound(_) => {
             return Err(RunError::Internal(
                 "an object sent to a `parallel` function",
             ));

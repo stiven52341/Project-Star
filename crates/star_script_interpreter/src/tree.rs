@@ -92,18 +92,22 @@ pub(crate) enum EngineClass {
     Game,
     Sprite,
     Light2D,
+    Body,
+    Sound,
 }
 
 impl EngineClass {
     /// Every engine class the interpreter knows, in the order of their
     /// places.
-    pub(crate) const ALL: [Self; 6] = [
+    pub(crate) const ALL: [Self; 8] = [
         Self::Color,
         Self::Node,
         Self::Camera2D,
         Self::Game,
         Self::Sprite,
         Self::Light2D,
+        Self::Body,
+        Self::Sound,
     ];
 
     /// Its place among the classes.
@@ -120,6 +124,8 @@ impl EngineClass {
             Self::Game => "Game",
             Self::Sprite => "Sprite",
             Self::Light2D => "Light2D",
+            Self::Body => "Body",
+            Self::Sound => "Sound",
         }
     }
 }
@@ -218,23 +224,43 @@ pub(crate) enum EngineField {
     ScaleY,
     /// `tags` of `Node`: the interpreter's list, which the runtime reads.
     Tags,
+    /// `body` of `Node`.
+    Body,
     /// `view_height` and `main` of `Camera2D`.
     ViewHeight,
     Main,
     /// `texture`, `width`, `height`, `layer`, `pixelated` and `color` of
-    /// `Sprite` (`color` of `Light2D` too).
+    /// `Sprite` (`color` of `Light2D` too, `width` and `height` of
+    /// `Body`).
     Texture,
     Width,
     Height,
     Layer,
     Pixelated,
     Tint,
-    /// `kind`, `intensity`, `range`, `angle` and `blend` of `Light2D`.
+    /// `kind`, `intensity`, `range`, `angle` and `blend` of `Light2D`
+    /// (`kind` of `Body` too).
     Kind,
     Intensity,
     Range,
     Angle,
     Blend,
+    /// The fields of `Body` beyond `kind`, `width` and `height`.
+    Shape,
+    Radius,
+    Depth,
+    GravityScale,
+    Friction,
+    Bounciness,
+    Density,
+    VelocityX,
+    VelocityY,
+    VelocityZ,
+    FixedRotation,
+    Sensor,
+    /// `volume` and `looping` of `Sound`.
+    Volume,
+    Looping,
     /// `background`, `camera`, `ambient` and `ambient_2d` of `Game`.
     Background,
     Camera,
@@ -279,6 +305,46 @@ pub(crate) enum EngineMethod {
     FindInGame,
     /// `Scene.find_by_tag(tag)`, in the tree of the game being played.
     FindTaggedInGame,
+    /// `Body.circle`, `rectangle`, `capsule`, `sphere` or `box`.
+    NewBody(BodyShape),
+    /// A method of `Body`, with the body first.
+    Body(BodyMethod),
+    /// `Sound.load(path)`.
+    LoadSound,
+    /// A method of `Sound`, with the sound first.
+    Sound(SoundMethod),
+    /// `Audio.volume()`.
+    Volume,
+    /// `Audio.set_volume(volume)`.
+    SetVolume,
+}
+
+/// The shape a static method of `Body` makes a body of.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BodyShape {
+    Circle,
+    Rectangle,
+    Capsule,
+    Sphere,
+    Box,
+}
+
+/// A method of `Body` that the runtime's fields of bodies run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BodyMethod {
+    ApplyImpulse,
+    ApplyImpulse3D,
+    Touching,
+    JustTouched,
+    JustSeparated,
+}
+
+/// A method of `Sound` that the runtime's fields of sounds run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SoundMethod {
+    Play,
+    Stop,
+    IsPlaying,
 }
 
 /// How a method of the engine is called.

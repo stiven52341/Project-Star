@@ -1,11 +1,14 @@
-//! Engine objects and methods (decision 70): the fields of colors and
-//! nodes are the runtime's own, the methods of `Node` are the runtime's
-//! functions of nodes, and `Input` reads the runtime's state, so they
-//! behave as in the compiled game.
+//! Engine objects and methods (decisions 70 and 72): the fields of colors,
+//! nodes, bodies and sounds are the runtime's own, the methods of `Node`
+//! are the runtime's functions of nodes, those of `Body` and `Sound` the
+//! runtime's methods of their fields, and `Input` and `Audio` read the
+//! runtime's state, so they behave as in the compiled game.
 
 use std::rc::Rc;
 use std::sync::Arc;
 
+use star_script_runtime::audio::{self, SoundFields};
+use star_script_runtime::bodies::{BodyFields, Contact};
 use star_script_runtime::color::ColorFields;
 use star_script_runtime::game::GameFields;
 use star_script_runtime::input::{action_state, axis, pointer};
@@ -15,9 +18,14 @@ use star_script_runtime::{Field, List};
 
 use super::object_of;
 use crate::error::RunError;
-use crate::host::{CameraRef, ClassParts, GameObject, Interpreted, NodeObject, NodeParts, Tags};
+use crate::host::{
+    BodyObject, CameraRef, ClassParts, GameObject, Interpreted, NodeObject, NodeParts, Tags,
+};
 use crate::play;
-use crate::tree::{ClassRef, EngineClass, EngineField, EngineMethod, FieldRef, NodeMethod};
+use crate::tree::{
+    BodyMethod, BodyShape, ClassRef, EngineClass, EngineField, EngineMethod, FieldRef, NodeMethod,
+    SoundMethod,
+};
 use crate::value::{Object, Value};
 
 /// A field of an engine class missing from the object: lowering only
@@ -37,6 +45,7 @@ enum Slot<'a> {
     Color(&'a Field<Rc<Object<ColorFields>>>),
     Tags(&'a Field<Tags>),
     Camera(&'a Field<Option<CameraRef>>),
+    Body(&'a Field<Option<Rc<BodyObject>>>),
 }
 
 /// The field `field` of `object`.
@@ -59,6 +68,7 @@ pub(super) fn read_field(object: &Value, field: FieldRef) -> Result<Value, RunEr
                     .map(|camera| Value::Node(Rc::clone(camera.node())))
             })
             .unwrap_or(Value::Null),
+        Slot::Body(body) => body.get().map_or(Value::Null, Value::Body),
     })
 }
 
@@ -81,6 +91,8 @@ pub(super) fn write_field(object: &Value, field: FieldRef, value: Value) -> Resu
                 Interpreted::as_camera_2d(&node).ok_or(WRONG_FIELD_VALUE)?,
             ));
         }
+        (Slot::Body(body), Value::Null) => body.set(None),
+        (Slot::Body(body), Value::Body(value)) => body.set(Some(value)),
         _ => return Err(WRONG_FIELD_VALUE),
     }
     Ok(())
@@ -92,6 +104,8 @@ fn slot(object: &Value, field: EngineField) -> Result<Slot<'_>, RunError> {
         Value::Color(color) => color_slot(&color.engine, field),
         Value::Node(node) => node_slot(&node.engine, field),
         Value::Game(game) => game_slot(&game.engine, field),
+        Value::Body(body) => body_slot(&body.engine, field),
+        Value::Sound(sound) => sound_slot(&sound.engine, field),
         _ => None,
     };
     slot.ok_or(MISSING_ENGINE_FIELD)
@@ -117,6 +131,7 @@ fn node_slot(parts: &NodeParts, field: EngineField) -> Option<Slot<'_>> {
         EngineField::ScaleX => Slot::Float(&node.scale_x),
         EngineField::ScaleY => Slot::Float(&node.scale_y),
         EngineField::Tags => Slot::Tags(&node.tags),
+        EngineField::Body => Slot::Body(&node.body),
         _ => match &parts.class {
             ClassParts::Node => return None,
             ClassParts::Camera2D(camera) => camera_slot(camera, field)?,
@@ -154,6 +169,35 @@ fn light_slot(light: &LightFields<Interpreted>, field: EngineField) -> Option<Sl
         EngineField::Range => Slot::Float(&light.range),
         EngineField::Angle => Slot::Float(&light.angle),
         EngineField::Blend => Slot::Float(&light.blend),
+        _ => return None,
+    })
+}
+
+fn body_slot(body: &BodyFields<Interpreted>, field: EngineField) -> Option<Slot<'_>> {
+    Some(match field {
+        EngineField::Kind => Slot::Text(&body.kind),
+        EngineField::Shape => Slot::Text(&body.shape),
+        EngineField::Radius => Slot::Float(&body.radius),
+        EngineField::Width => Slot::Float(&body.width),
+        EngineField::Height => Slot::Float(&body.height),
+        EngineField::Depth => Slot::Float(&body.depth),
+        EngineField::GravityScale => Slot::Float(&body.gravity_scale),
+        EngineField::Friction => Slot::Float(&body.friction),
+        EngineField::Bounciness => Slot::Float(&body.bounciness),
+        EngineField::Density => Slot::Float(&body.density),
+        EngineField::VelocityX => Slot::Float(&body.velocity_x),
+        EngineField::VelocityY => Slot::Float(&body.velocity_y),
+        EngineField::VelocityZ => Slot::Float(&body.velocity_z),
+        EngineField::FixedRotation => Slot::Bool(&body.fixed_rotation),
+        EngineField::Sensor => Slot::Bool(&body.sensor),
+        _ => return None,
+    })
+}
+
+fn sound_slot(sound: &SoundFields, field: EngineField) -> Option<Slot<'_>> {
+    Some(match field {
+        EngineField::Volume => Slot::Float(&sound.volume),
+        EngineField::Looping => Slot::Bool(&sound.looping),
         _ => return None,
     })
 }
@@ -198,6 +242,10 @@ pub(super) fn new_object(
                 fields,
                 NodeParts::new(name, parts),
             )))
+        }
+        EngineClass::Body | EngineClass::Sound => {
+            // Their `init` is private: only their static methods make them.
+            return Err(RunError::Internal("a body or sound built by a constructor"));
         }
     })
 }
@@ -276,8 +324,86 @@ pub(super) fn call(method: EngineMethod, arguments: &[Value]) -> Result<Value, R
                 |root| node_list(&nodes::find_by_tag::<Interpreted>(&root, tag)),
             )
         }
+        (EngineMethod::NewBody(shape), [kind, sizes @ ..]) => new_body(shape, kind, sizes)?,
+        (EngineMethod::Body(method), [Value::Body(body), arguments @ ..]) => {
+            body_method(method, &body.engine, arguments)?
+        }
+        (EngineMethod::LoadSound, [path]) => {
+            SoundFields::load(text(path)?).map_or(Value::Null, |fields| {
+                Value::Sound(Rc::new(Object::new(
+                    EngineClass::Sound.class(),
+                    Vec::new(),
+                    fields,
+                )))
+            })
+        }
+        (EngineMethod::Sound(method), [Value::Sound(sound)]) => sound_method(method, &sound.engine),
+        (EngineMethod::Volume, []) => Value::Float(audio::volume()),
+        (EngineMethod::SetVolume, [volume]) => {
+            audio::set_volume(float(volume)?);
+            Value::Null
+        }
         _ => return Err(RunError::Internal("engine method with other arguments")),
     })
+}
+
+/// `Body.circle` and the like: a new body of `kind` with the sizes of
+/// `shape`, as compiled.
+fn new_body(shape: BodyShape, kind: &Value, sizes: &[Value]) -> Result<Value, RunError> {
+    let kind = text(kind)?.to_owned();
+    let fields = match (shape, sizes) {
+        (BodyShape::Circle, [radius]) => BodyFields::circle(kind, float(radius)?),
+        (BodyShape::Rectangle, [width, height]) => {
+            BodyFields::rectangle(kind, float(width)?, float(height)?)
+        }
+        (BodyShape::Capsule, [height, radius]) => {
+            BodyFields::capsule(kind, float(height)?, float(radius)?)
+        }
+        (BodyShape::Sphere, [radius]) => BodyFields::sphere(kind, float(radius)?),
+        (BodyShape::Box, [width, height, depth]) => {
+            BodyFields::cuboid(kind, float(width)?, float(height)?, float(depth)?)
+        }
+        _ => return Err(RunError::Internal("a body without its sizes")),
+    };
+    Ok(Value::Body(Interpreted::new_body(fields)))
+}
+
+/// Runs the method of `Body` `method` on the fields `body`.
+fn body_method(
+    method: BodyMethod,
+    body: &BodyFields<Interpreted>,
+    arguments: &[Value],
+) -> Result<Value, RunError> {
+    let contacts = |which| node_list(&body.contacts(which));
+    Ok(match (method, arguments) {
+        (BodyMethod::ApplyImpulse, [x, y]) => {
+            body.apply_impulse(float(x)?, float(y)?, 0.0);
+            Value::Null
+        }
+        (BodyMethod::ApplyImpulse3D, [x, y, z]) => {
+            body.apply_impulse(float(x)?, float(y)?, float(z)?);
+            Value::Null
+        }
+        (BodyMethod::Touching, []) => contacts(Contact::Touching),
+        (BodyMethod::JustTouched, []) => contacts(Contact::JustTouched),
+        (BodyMethod::JustSeparated, []) => contacts(Contact::JustSeparated),
+        _ => return Err(RunError::Internal("method of `Body` with other arguments")),
+    })
+}
+
+/// Runs the method of `Sound` `method` on the fields `sound`.
+fn sound_method(method: SoundMethod, sound: &SoundFields) -> Value {
+    match method {
+        SoundMethod::Play => {
+            sound.play();
+            Value::Null
+        }
+        SoundMethod::Stop => {
+            sound.stop();
+            Value::Null
+        }
+        SoundMethod::IsPlaying => Value::Bool(sound.is_playing()),
+    }
 }
 
 /// Runs the method of `Node` `method` on `node`, as compiled: with the
@@ -443,6 +569,80 @@ mod tests {
         .expect("a search");
 
         assert_eq!(found, Value::list(vec![child]));
+    }
+
+    #[test]
+    fn contacts_found_by_the_physics_are_new_lists_of_nodes() {
+        let ball = seen(EngineClass::Node);
+        let wall = seen(EngineClass::Node);
+        let body = call(
+            EngineMethod::NewBody(BodyShape::Circle),
+            &[Value::text("dynamic"), Value::Float(0.25)],
+        )
+        .expect("a body");
+        write_field(&ball, FieldRef::Engine(EngineField::Body), body.clone())
+            .expect("the ball's body");
+        let (Value::Body(fields), Value::Node(wall_node)) = (&body, &wall) else {
+            panic!("a body and a node");
+        };
+        fields
+            .engine
+            .set_contacts(Contact::JustTouched, [wall_node]);
+
+        let touched = call(
+            EngineMethod::Body(BodyMethod::JustTouched),
+            std::slice::from_ref(&body),
+        );
+        let held = read_field(&ball, FieldRef::Engine(EngineField::Body));
+
+        assert_eq!(touched.ok(), Some(Value::list(vec![wall])));
+        assert_eq!(held.ok(), Some(body));
+    }
+
+    #[test]
+    fn impulses_add_up_until_the_physics_takes_them() {
+        let body = call(
+            EngineMethod::NewBody(BodyShape::Box),
+            &[
+                Value::text("dynamic"),
+                Value::Float(1.0),
+                Value::Float(2.0),
+                Value::Float(3.0),
+            ],
+        )
+        .expect("a body");
+        let push = |arguments: &[Value]| {
+            let mut all = vec![body.clone()];
+            all.extend_from_slice(arguments);
+            all
+        };
+
+        call(
+            EngineMethod::Body(BodyMethod::ApplyImpulse),
+            &push(&[Value::Float(1.0), Value::Float(2.0)]),
+        )
+        .expect("an impulse");
+        call(
+            EngineMethod::Body(BodyMethod::ApplyImpulse3D),
+            &push(&[Value::Float(1.0), Value::Float(0.0), Value::Float(4.0)]),
+        )
+        .expect("an impulse");
+
+        let Value::Body(fields) = &body else {
+            panic!("a body");
+        };
+        assert_eq!(fields.engine.take_impulse(), [2.0, 2.0, 4.0]);
+        assert_eq!(
+            read_field(&body, FieldRef::Engine(EngineField::Shape)).ok(),
+            Some(Value::text("box"))
+        );
+    }
+
+    #[test]
+    fn sounds_never_load_without_audio() {
+        let sound = call(EngineMethod::LoadSound, &[Value::text("jump.wav")]);
+
+        assert_eq!(sound.ok(), Some(Value::Null));
     }
 
     #[test]
