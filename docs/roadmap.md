@@ -1039,6 +1039,45 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [ ] 14.11 Building with the compiler from the editor: a “Build”
         command (and later the export of games) that compiles the project
         with Cargo, and a way to play that compiled build to check it.
+        Design proposed to the owner (awaiting approval):
+        - One command, “Play compiled”, next to “Play” in the bar (and
+          its menu): it saves, checks the project as “Play” does, writes
+          the game's generated Rust as a package of its own, builds it
+          with Cargo and runs it in the project's folder, with Cargo's
+          output and the game's in the Output panel and “Stop” working as
+          now. It is how a project is checked the way it will ship, since
+          “Play” runs it interpreted. A command that only builds, without
+          running, waits for the export of games: until then nothing
+          would use what it builds.
+        - Where and how it builds: as “Play” built before 14.10b, in the
+          editor's folder of games, one package per project named from
+          the project (`My Game` → `my_game`), with the repository's
+          lockfile, in the build profile of development (dependencies
+          optimized). Its target folder is the player's, so the engine,
+          the runtime and `star_script_engine` that the warm-up built for
+          the player are reused: only the game's own code is compiled
+          (seconds; minutes only after the engine changes). Release
+          builds, with their own long build of the engine, belong to the
+          export.
+        - What it builds: the `GeneratedProgram` the check already keeps
+          (`ProjectCheck::program`). A project without a game or main
+          scene is refused with the messages “Play” gives.
+        - In code: `PlayRequest` gains how it is played,
+          `Interpreted` (the player) or `Compiled { name, program }`;
+          `game_run` writes, builds and runs either one through the same
+          steps, and the Output panel says “Preparing the player…” or
+          “Building the game…” as fits. The package writing removed in
+          14.10b (`write_package`, `package_name`) comes back for it.
+        - Tests: the editor's test that a console project is built and
+          run compiled, the package name and lockfile tests (restored),
+          and a new one that plays a small project both ways and expects
+          the same output, the editor's own view of rule 3.7.
+        - Rejected: a release build (it rebuilds the whole engine with
+          LTO, minutes each time the engine changes: the export's job),
+          a “Build” that does not run what it builds (nothing to do with
+          the result until the export), and building inside the
+          project's folder (a target folder per project, each building
+          the engine again).
   - [ ] 14.12 Hot reload: changed scripts reload while the game is
         played, keeping the state of the objects that are still valid.
 - [ ] **Future — Consoles** (PlayStation, Xbox).
