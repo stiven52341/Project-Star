@@ -489,6 +489,52 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         inheritance and `override`, static members, null safety, number
         widening and `as`, equality, and the runtime errors of
         `star_script_runtime::fault` with the same messages.
+        Design proposed to the owner (awaiting approval):
+        - Objects are a new value, `Object(Rc<Object>)`: the class it
+          was created as, and the fields of every class of its hierarchy
+          in one row, the root's first. Lowering turns each field
+          (`class`, index) into its position in that row, so a subclass
+          finds its base's fields where the base does. Reading a field
+          copies its value and writing replaces it, without keeping
+          borrows open, as the compiled `Field` does. Equality is
+          identity (`Rc::ptr_eq`); objects that refer to each other are
+          not released, as in the compiled game.
+        - Methods of objects are functions whose first local is `self`.
+          Each class gets a table of its overridable methods, built at
+          lowering: a subclass starts from its base's table and puts its
+          overrides in their places. A call through an object takes the
+          function from its class's table, so each object runs its own
+          version; `private` methods and `super.method()` call their
+          function directly, as compiled.
+        - Construction keeps the two phases of the compiled code: each
+          class's constructor first runs its field values and the start
+          of `init` up to `super.init(…)` (or to the last assignment of
+          a pending field) into locals of its own, without `self`; then
+          it calls its base's constructor with its arguments; the root
+          creates the object with every field; and then each `init`
+          runs the rest of its body with `self`, from the root down.
+          The interpreter does it with recursion: each constructor's
+          locals stay alive while its base builds the object.
+        - `is` asks whether the object's class is the class or a
+          subclass (an ancestor table per class, built at lowering);
+          `as` to a subclass gives the object or `null`; narrowing after
+          `is` or `!= null` changes nothing at run time, since values
+          carry their class. `?.` on objects gives `null` without
+          running the arguments.
+        - Classes that extend engine classes (`Node`, `Game`, …) are
+          refused until 14.6; the object leaves room for the engine's
+          part (the `Host` fields of decision 65), so nodes will be the
+          same objects with their `NodeFields` added. Decorators (14.3)
+          are fields and methods the compiler writes, so they will only
+          need `Time.now`.
+    - [ ] 14.2a Objects of classes without a base: fields with and
+          without values, `init`, methods of objects and `self`,
+          `private` methods, fields of other objects, `?.` on objects,
+          equality by identity; with a new conformance program.
+    - [ ] 14.2b Inheritance: fields of the base, two-phase construction
+          with `super.init(…)`, `override` through the tables,
+          `super.method()`, `is`, `as` and narrowing: `objects.star`
+          gives the same output interpreted and compiled.
   - [ ] 14.3 The rest of the console language: decorators (the user's
         `Decorator` classes) and `Time.now` (the methods of strings,
         lists and numbers, and constants, came in 14.1b).
