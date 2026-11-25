@@ -33,11 +33,12 @@ pub mod tasks;
 mod test_host;
 
 pub use equality::StarEq;
-pub use fault::{fault, proven};
+pub use fault::{RuntimeError, fault, proven};
 pub use field::Field;
 pub use list::List;
 pub use operations::{
     Integer, concat, float_to_string, int_divide, int_remainder, print, text_length,
+    try_int_divide, try_int_remainder,
 };
 pub use plain::Plain;
 pub use tasks::Task;

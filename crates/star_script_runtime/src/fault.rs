@@ -1,6 +1,7 @@
 //! Runtime errors: what stops a game because it cannot continue correctly.
 
 use std::cell::Cell;
+use std::fmt;
 
 thread_local! {
     /// Whether this thread runs `parallel` functions, whose faults stop the
@@ -16,6 +17,48 @@ pub(crate) struct WorkerFault(pub(crate) String);
 pub(crate) fn mark_worker_thread() {
     ON_WORKER.with(|on_worker| on_worker.set(true));
 }
+
+/// A StarScript error found while running, such as dividing an integer by
+/// zero, before it stops anything: the interpreter returns it, and the
+/// generated Rust hands its message to [`fault`]. Both give the same text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeError {
+    message: String,
+}
+
+impl RuntimeError {
+    /// An error explained by `message`, in StarScript terms.
+    #[must_use]
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+
+    /// What went wrong, without the prefix that [`fault`] adds.
+    #[must_use]
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    /// Stops the game with this error (see [`fault`]).
+    #[cold]
+    #[track_caller]
+    pub fn stop(&self) -> ! {
+        fault(&self.message)
+    }
+}
+
+impl fmt::Display for RuntimeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{FAULT_PREFIX}{}", self.message)
+    }
+}
+
+impl std::error::Error for RuntimeError {}
+
+/// What every runtime error starts with, compiled or interpreted.
+const FAULT_PREFIX: &str = "StarScript runtime error: ";
 
 /// Stops the game with `message`, explained in StarScript terms.
 ///
@@ -40,7 +83,7 @@ pub fn fault(message: &str) -> ! {
     }
     #[allow(clippy::panic)]
     {
-        panic!("StarScript runtime error: {message}")
+        panic!("{FAULT_PREFIX}{message}")
     }
 }
 
@@ -59,6 +102,13 @@ pub fn proven<T>(value: Option<T>) -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn runtime_errors_read_as_faults() {
+        let error = RuntimeError::new("boom");
+        assert_eq!(error.message(), "boom");
+        assert_eq!(error.to_string(), "StarScript runtime error: boom");
+    }
 
     #[test]
     fn proven_values_are_returned() {

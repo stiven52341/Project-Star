@@ -434,7 +434,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `int`, `bigint`, `float`, `double`, `bool`, `string`, lists,
         objects, `null`), console programs (`static func main`,
         `Debug.print`), expressions, statements and control flow.
-        Design proposed to the owner (awaiting approval):
+        Design approved by the owner (2026-11-24, decision 66):
         - No external dependencies: `star_script` (lexer, parser,
           analysis) and `star_script_runtime` (the shared rules, such as
           integer division or the text of numbers).
@@ -460,12 +460,20 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           programs it covers that every step grows. What it cannot run
           yet is reported when the program is lowered, not halfway
           through running it.
-    - [ ] 14.1a The crate, values and console programs with static
+    - [x] 14.1a The crate, values and console programs with static
           functions: `main` and calls between static functions,
           literals, variables, arithmetic of the five number types, `as`
           between numbers, comparisons and logic, `if`, `while`, `for`
           over a range, `break`, `continue`, `return`, `Debug.print` and
-          `to_string`; with a new conformance program.
+          `to_string`; with a new conformance program. Done:
+          `functions.star` (calls and recursion, wrapping of the five
+          number types, `as`, short-circuit logic, loops) and
+          `division_fault` run interpreted with the same output; the
+          checks of the runtime got versions that return a
+          `RuntimeError` (`try_int_divide`, `try_int_remainder`).
+          Methods of objects are not lowered (nothing can create an
+          object yet), and fields, constants, lists, `null` and the other
+          methods are refused where the program uses them.
     - [ ] 14.1b Lists, `null`, `??`, constants and the methods that
           `basics.star` uses: `basics`, `division_fault` and
           `index_fault` give the same output interpreted and compiled

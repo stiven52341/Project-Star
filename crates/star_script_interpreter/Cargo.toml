@@ -1,0 +1,16 @@
+[package]
+name = "star_script_interpreter"
+description = "Interpreter of StarScript: runs programs without building them, for Play in the editor."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+star_script.workspace = true
+star_script_runtime.workspace = true
+
+[lints]
+workspace = true

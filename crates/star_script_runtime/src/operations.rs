@@ -1,6 +1,6 @@
 //! Operations whose StarScript meaning differs from plain Rust operators.
 
-use crate::fault;
+use crate::RuntimeError;
 
 /// An integer type of StarScript: `short` (`i16`), `int` (`i32`) or
 /// `bigint` (`i64`).
@@ -43,20 +43,38 @@ integer!(i16, i32, i64);
 #[must_use]
 #[track_caller]
 pub fn int_divide<I: Integer>(dividend: I, divisor: I) -> I {
-    if divisor == I::ZERO {
-        fault("integer division by zero");
-    }
-    dividend.wrapping_div(divisor)
+    try_int_divide(dividend, divisor).unwrap_or_else(|error| error.stop())
 }
 
 /// `a % b` between integers; the result has the sign of `a`.
 #[must_use]
 #[track_caller]
 pub fn int_remainder<I: Integer>(dividend: I, divisor: I) -> I {
+    try_int_remainder(dividend, divisor).unwrap_or_else(|error| error.stop())
+}
+
+/// [`int_divide`] that returns its error instead of stopping the game.
+///
+/// # Errors
+///
+/// When `divisor` is zero.
+pub fn try_int_divide<I: Integer>(dividend: I, divisor: I) -> Result<I, RuntimeError> {
     if divisor == I::ZERO {
-        fault("integer remainder by zero");
+        return Err(RuntimeError::new("integer division by zero"));
     }
-    dividend.wrapping_rem(divisor)
+    Ok(dividend.wrapping_div(divisor))
+}
+
+/// [`int_remainder`] that returns its error instead of stopping the game.
+///
+/// # Errors
+///
+/// When `divisor` is zero.
+pub fn try_int_remainder<I: Integer>(dividend: I, divisor: I) -> Result<I, RuntimeError> {
+    if divisor == I::ZERO {
+        return Err(RuntimeError::new("integer remainder by zero"));
+    }
+    Ok(dividend.wrapping_rem(divisor))
 }
 
 /// `text.length()`: how many characters it has (at most the largest `int`).
@@ -99,6 +117,13 @@ mod tests {
         assert_eq!(int_remainder(-7, 2), -1);
         assert_eq!(int_remainder(i64::MIN, -1), 0);
         assert_eq!(int_remainder(i16::MIN, -1_i16), 0);
+    }
+
+    #[test]
+    fn checked_division_returns_its_error() {
+        assert_eq!(try_int_divide(7, 2), Ok(3));
+        let error = try_int_remainder(7_i16, 0).map_err(|error| error.message().to_owned());
+        assert_eq!(error, Err("integer remainder by zero".to_owned()));
     }
 
     #[test]
