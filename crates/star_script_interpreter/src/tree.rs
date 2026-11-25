@@ -2,6 +2,7 @@
 //! running walks. Names are resolved, and conversions are written out, so
 //! the two operands of an operation always hold values of the same type.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use star_script::semantic::BuiltinMethod;
@@ -18,6 +19,42 @@ pub(crate) struct Code {
     pub(crate) classes: Vec<Class>,
     /// What starts the program.
     pub(crate) entry: Entry,
+    /// What a scene can build its nodes as, by the class name it writes:
+    /// every class of the program but the engine's node classes, which
+    /// the runtime names itself.
+    pub(crate) scene_classes: HashMap<String, SceneClass>,
+}
+
+/// A class, as the nodes of a scene see it.
+#[derive(Debug)]
+pub(crate) struct SceneClass {
+    /// What creates its objects for a scene, with `init()`; or why a
+    /// scene cannot (the analysis's reason, as compiled).
+    pub(crate) creation: Result<ConstructorId, String>,
+    /// Its `export` fields and its bases', which a scene can set.
+    pub(crate) exported: Vec<ExportedField>,
+}
+
+/// An `export` field, which a scene sets by its name.
+#[derive(Debug)]
+pub(crate) struct ExportedField {
+    pub(crate) name: String,
+    /// Its place in the row of script fields.
+    pub(crate) position: usize,
+    pub(crate) kind: ExportKind,
+}
+
+/// The types an `export` field can have.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ExportKind {
+    Short,
+    Int,
+    BigInt,
+    Float,
+    Double,
+    Bool,
+    String,
+    Color,
 }
 
 /// What starts a program.
@@ -29,6 +66,9 @@ pub(crate) enum Entry {
     /// A game: the constructor of the class that extends `Game`, whose
     /// object the engine plays.
     Game(ConstructorId),
+    /// A game without a `Game` class: a plain `Game` with the project's
+    /// main scene, at this path, as compiled.
+    Scene(Arc<str>),
 }
 
 /// Position of a function in the program.

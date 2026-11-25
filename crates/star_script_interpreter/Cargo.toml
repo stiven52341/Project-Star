@@ -24,5 +24,11 @@ star_script_engine.workspace = true
 name = "window"
 harness = false
 
+# The node game with its scenes, in a window too:
+# `cargo test -p star_script_interpreter --test window_scene -- --ignored`.
+[[test]]
+name = "window_scene"
+harness = false
+
 [lints]
 workspace = true

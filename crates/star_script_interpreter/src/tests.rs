@@ -11,6 +11,8 @@ use star_script_runtime::{game, tasks};
 use crate::host::Interpreted;
 use crate::{LowerErrorKind, Output, Program, ProgramKind, RunError, end_game};
 
+mod scenes;
+
 /// What `source` prints when interpreted, or why it stopped.
 fn run(source: &str) -> Result<String, RunError> {
     let checked = check_source(source).expect("a valid program");
@@ -253,7 +255,14 @@ const DELTA: f32 = 0.5;
 /// printed, and how it ended.
 fn play(source: &str, frames: usize) -> (String, Result<(), RunError>) {
     let checked = check_source(source).expect("a valid program");
-    let program = Program::lower(&checked).expect("a program the interpreter runs");
+    play_program(
+        &Program::lower(&checked).expect("a program the interpreter runs"),
+        frames,
+    )
+}
+
+/// [`play`] for a program already lowered.
+fn play_program(program: &Program, frames: usize) -> (String, Result<(), RunError>) {
     assert_eq!(program.kind(), ProgramKind::Game);
     let (buffer, output) = buffer();
     let game = program

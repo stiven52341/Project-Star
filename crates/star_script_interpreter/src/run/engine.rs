@@ -11,7 +11,7 @@ use star_script_runtime::game::GameFields;
 use star_script_runtime::input::{action_state, axis, pointer};
 use star_script_runtime::node_classes::{Camera2dFields, LightFields, SpriteFields};
 use star_script_runtime::nodes::{self, Host as _};
-use star_script_runtime::{Field, List, scene_tree};
+use star_script_runtime::{Field, List};
 
 use super::object_of;
 use crate::error::RunError;
@@ -262,9 +262,6 @@ pub(super) fn call(method: EngineMethod, arguments: &[Value]) -> Result<Value, R
         (EngineMethod::Start | EngineMethod::Update, _) => Value::Null,
         (EngineMethod::Node(method), [Value::Node(node), arguments @ ..]) => {
             node_method(method, node, arguments)?
-        }
-        (EngineMethod::LoadScene, [path]) => {
-            optional_node(scene_tree::load::<Interpreted>(text(path)?))
         }
         (EngineMethod::FindInGame, [name]) => {
             let name = text(name)?;

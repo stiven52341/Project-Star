@@ -142,13 +142,7 @@ impl<'a> Body<'a> {
                     LowerError::unsupported("this field of the engine", expression.span)
                 });
         }
-        let before: usize = classes
-            .ancestors(class)
-            .skip(1)
-            .filter(|base| classes.class(*base).origin != ClassOrigin::Native)
-            .map(|base| classes.class(base).fields.len())
-            .sum();
-        Ok(FieldRef::Script(before + index))
+        Ok(FieldRef::Script(script_field(self.analysis, class, index)))
     }
 
     /// The type of the field (`class`, `index`).
@@ -367,6 +361,19 @@ impl<'a> Body<'a> {
             body: self.block(body)?,
         })
     }
+}
+
+/// The place in the row of script fields of the field (`class`, `index`)
+/// of a class of the program: after those of its bases.
+pub(super) fn script_field(analysis: &Analysis, class: ClassId, index: usize) -> usize {
+    let classes = analysis.classes();
+    let before: usize = classes
+        .ancestors(class)
+        .skip(1)
+        .filter(|base| classes.class(*base).origin != ClassOrigin::Native)
+        .map(|base| classes.class(base).fields.len())
+        .sum();
+    before + index
 }
 
 /// The value a variable or field of `ty` starts with when none is given: an

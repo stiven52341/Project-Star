@@ -5,6 +5,7 @@ mod coroutines;
 mod engine;
 mod numbers;
 mod parallel;
+mod scenes;
 
 use std::any::Any;
 use std::cell::RefCell;
@@ -18,10 +19,13 @@ use crate::error::RunError;
 use crate::host::GameObject;
 use crate::tree::{
     Arithmetic, Class, ClassRef, Code, Constructor, ConstructorId, ConstructorRef, EngineCall,
-    EngineMethod, Entry, Expression, FieldRef, Function, FunctionId, MethodTarget, Statement,
+    EngineClass, EngineMethod, Entry, Expression, FieldRef, Function, FunctionId, MethodTarget,
+    Statement,
 };
 use crate::value::{Elements, Object, Value, read, write};
+
 use crate::{Output, ProgramKind};
+pub(crate) use scenes::{create, set_exported};
 
 /// What the engine calls on a node or the game.
 #[derive(Debug, Clone, Copy)]
@@ -83,8 +87,10 @@ impl Machine {
 
     /// Creates the game: the object of the class that extends `Game`.
     pub(crate) fn new_game(&self) -> Result<Rc<GameObject>, RunError> {
-        let Entry::Game(constructor) = self.code.entry else {
-            return Err(RunError::WrongKind(ProgramKind::Console));
+        let constructor = match &self.code.entry {
+            Entry::Game(constructor) => *constructor,
+            Entry::Scene(path) => return self.main_scene_game(path),
+            Entry::Main(_) => return Err(RunError::WrongKind(ProgramKind::Console)),
         };
         match self.construct(ConstructorRef::Script(constructor), Vec::new())? {
             Value::Game(game) => Ok(game),
@@ -92,6 +98,20 @@ impl Machine {
                 "a game class whose objects are not games",
             )),
         }
+    }
+
+    /// The game of a program without a `Game` class: a plain `Game` with
+    /// the main scene at `path`, as compiled.
+    fn main_scene_game(&self, path: &str) -> Result<Rc<GameObject>, RunError> {
+        let game = EngineClass::Game;
+        let Value::Game(game) = engine::new_object(game, game.class(), Vec::new(), &[])? else {
+            return Err(RunError::Internal("a `Game` that is not a game"));
+        };
+        let Value::Node(scene) = self.load_scene(path)? else {
+            return Err(RunError::MainScene(path.to_owned()));
+        };
+        game.engine.add_child(scene);
+        Ok(game)
     }
 
     /// Runs what `object` (a node or the game) does when the engine calls
@@ -114,6 +134,9 @@ impl Machine {
         call: EngineCall,
         arguments: Vec<Value>,
     ) -> Result<Value, RunError> {
+        if let (EngineMethod::LoadScene, [Value::String(path)]) = (method, arguments.as_slice()) {
+            return self.load_scene(path);
+        }
         if let EngineCall::Object { .. } = call
             && let Some(object) = arguments.first()
             && let Some(function) = self.class_of(object)?.override_of(method)

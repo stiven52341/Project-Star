@@ -48,80 +48,7 @@ class CountingGame extends Game {
 ";
 
 /// A sprite node that runs its own code every frame, in the game's tree.
-const NODE_GAME: &str = "
-class Ship extends Sprite {
-    init() {
-        super.init(\"Ship\", \"sprites/ship.png\")
-        color = Color(1.0, 0.5, 0.5, 1.0)
-    }
-
-    override func start() {
-        Debug.print(\"ship start\")
-    }
-
-    override func update(delta: float) {
-        x += 1.0
-        Debug.print(\"ship x \" + x.to_string())
-    }
-}
-
-class Drone extends Node {
-    export var speed = 1.0
-    export var label = \"none\"
-    export var tint = Color(1.0, 1.0, 1.0, 1.0)
-
-    init() {
-        super.init(\"Drone\")
-    }
-
-    override func start() {
-        Debug.print(\"drone start \" + name + \" \" + x.to_string() + \" \" + speed.to_string() + \" \" + label + \" \" + tint.r.to_string())
-    }
-}
-
-class NodeGame extends Game {
-    var frames = 0
-
-    override func start() {
-        background = Color(0.0, 0.0, 0.1, 1.0)
-        ambient_2d = Color(0.2, 0.2, 0.3, 1.0)
-        add_child(Light2D(\"Lamp\", \"point\"))
-        const fleet = Scene.load(\"levels/fleet.scene\")
-        if fleet != null {
-            add_child(fleet)
-            Debug.print(fleet.name + \" \" + fleet.children().length().to_string())
-            Debug.print(Scene.find_by_tag(\"ship\").length().to_string() + \" \" + (Scene.find_by_name(\"Wingman\") != null).to_string())
-            const leader = fleet.find_child(\"Leader\")
-            if leader is Sprite {
-                Debug.print(leader.texture + \" \" + leader.x.to_string() + \" \" + leader.color.g.to_string())
-            }
-            const torch = fleet.find_child(\"Torch\")
-            if torch is Light2D {
-                Debug.print(torch.kind + \" \" + torch.range.to_string() + \" \" + torch.angle.to_string())
-            }
-        }
-        Debug.print((Scene.load(\"levels/missing.scene\") == null).to_string())
-        Debug.print((Scene.load(\"levels/misspelled.scene\") == null).to_string())
-        const ship = Ship()
-        add_child(ship)
-        // Not `current`: the scene's camera is the one the game is seen from.
-        const eye = Camera2D(\"Eye\")
-        ship.add_child(eye)
-    }
-
-    override func update(delta: float) {
-        frames += 1
-        Debug.print(\"game frame \" + frames.to_string())
-        const view = camera
-        if view != null {
-            Debug.print(\"camera \" + view.name + \" \" + view.view_height.to_string())
-        }
-        if frames == 3 {
-            quit()
-        }
-    }
-}
-";
+const NODE_GAME: &str = include_str!("games/node_game.star");
 
 /// A ball that falls on a floor loaded from a scene, and closes the game
 /// when it lands.
@@ -320,62 +247,10 @@ size = [10.0, 1.0]
 
 /// The scene the node game loads, from the `assets` folder of its working
 /// directory.
-const FLEET_SCENE: &str = r#"
-format = 1
-
-[[node]]
-name = "Fleet"
-
-[[node]]
-name = "Leader"
-parent = 0
-tags = ["ship"]
-position = [1.5, 0.0]
-
-[node.sprite]
-texture = "sprites/leader.png"
-size = [1.0, 1.0]
-color = [1.0, 0.5, 0.5, 1.0]
-
-[[node]]
-name = "Wingman"
-class = "Drone"
-parent = 0
-tags = ["ship", "drone"]
-position = [-2.0, 0.0]
-
-[node.fields]
-speed = 4
-label = "wing"
-tint = [0.25, 1.0, 1.0, 1.0]
-
-[[node]]
-name = "Lookout"
-parent = 0
-
-[node.camera]
-view_height = 6.0
-main = true
-
-[[node]]
-name = "Torch"
-parent = 0
-rotation = 1.5
-
-[node.light_2d]
-kind = "spot"
-range = 4.0
-angle = 0.5
-"#;
+const FLEET_SCENE: &str = include_str!("games/fleet.scene");
 
 /// A scene whose node names a class the game does not have.
-const MISSPELLED_SCENE: &str = r#"
-format = 1
-
-[[node]]
-name = "Drone"
-class = "Dron"
-"#;
+const MISSPELLED_SCENE: &str = include_str!("games/misspelled.scene");
 
 fn settings(bindings: &[&str]) -> GameSettings {
     GameSettings {

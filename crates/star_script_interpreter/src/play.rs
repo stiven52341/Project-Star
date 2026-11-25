@@ -20,6 +20,33 @@ thread_local! {
     /// that game lives: as compiled, it exists from the moment the game
     /// object does, before it is played.
     static GAME_ROOT: RefCell<Option<Weak<NodeObject>>> = const { RefCell::new(None) };
+    /// The program loading a scene, whose classes the runtime's `Host`
+    /// creates the scene's nodes as.
+    static LOADING: RefCell<Option<Machine>> = const { RefCell::new(None) };
+}
+
+/// Runs `load` with `machine` as the program whose classes the nodes of
+/// scenes are created as; a scene loaded by a node's `init` meanwhile
+/// uses it too.
+pub(crate) fn loading_scenes<R>(machine: &Machine, load: impl FnOnce() -> R) -> R {
+    let previous = LOADING.with(|loading| {
+        loading
+            .try_borrow_mut()
+            .ok()
+            .and_then(|mut loading| loading.replace(machine.clone()))
+    });
+    let result = load();
+    LOADING.with(|loading| {
+        if let Ok(mut loading) = loading.try_borrow_mut() {
+            *loading = previous;
+        }
+    });
+    result
+}
+
+/// The program loading a scene, if one is.
+pub(crate) fn scene_program() -> Option<Machine> {
+    LOADING.with(|loading| loading.try_borrow().ok()?.clone())
 }
 
 /// Remembers `root` as the root of the game's tree.

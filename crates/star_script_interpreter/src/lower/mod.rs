@@ -7,6 +7,7 @@ mod expressions;
 mod waits;
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use star_script::Span;
 use star_script::ast::{ClassDecl, Expr, MemberKind, MethodDecl, SourceFile, VariableKind};
@@ -17,7 +18,7 @@ use star_script::semantic::{
 use crate::error::{LowerError, LowerErrorKind};
 use crate::tree::{
     Class, ClassRef, Code, ConstructorId, ConstructorRef, Coroutine, EngineClass, EngineMethod,
-    Entry, Expression, Function, FunctionId, Statement,
+    Entry, ExportKind, ExportedField, Expression, Function, FunctionId, SceneClass, Statement,
 };
 use body::Body;
 
@@ -189,6 +190,78 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
         constructors,
         classes,
         entry,
+        scene_classes: scene_classes(analysis, &tables)?,
+    })
+}
+
+/// What a scene can build its nodes as: every class but the engine's node
+/// classes (which the runtime creates by their own names), with the
+/// analysis's reason when a scene cannot use it, as compiled.
+fn scene_classes(
+    analysis: &Analysis,
+    tables: &Tables,
+) -> Result<HashMap<String, SceneClass>, LowerError> {
+    let table = analysis.classes();
+    let mut scene_classes = HashMap::new();
+    for (id, info) in table.iter() {
+        let check = table.check_scene_class(id);
+        if info.origin == ClassOrigin::Native && check.is_ok() {
+            continue;
+        }
+        let missing = || LowerError::internal("class without a place", Span::new(0, 0));
+        let creation = match check {
+            Ok(()) => Ok(tables.constructors.get(&id).copied().ok_or_else(missing)?),
+            Err(reason) => Err(reason.to_string()),
+        };
+        let class = SceneClass {
+            creation,
+            exported: exported_fields(analysis, id),
+        };
+        scene_classes.insert(info.name.clone(), class);
+    }
+    Ok(scene_classes)
+}
+
+/// The `export` fields of `class` and its bases.
+fn exported_fields(analysis: &Analysis, class: ClassId) -> Vec<ExportedField> {
+    let table = analysis.classes();
+    table
+        .ancestors(class)
+        .flat_map(|owner| {
+            table
+                .class(owner)
+                .fields
+                .iter()
+                .enumerate()
+                .filter(|(_, field)| field.is_exported)
+                .filter_map(move |(index, field)| {
+                    Some(ExportedField {
+                        name: field.name.clone(),
+                        position: body::script_field(analysis, owner, index),
+                        kind: export_kind(analysis, &field.ty)?,
+                    })
+                })
+        })
+        .collect()
+}
+
+/// How an `export` field of type `ty` takes a scene's value; the analysis
+/// lets no other type be exported.
+fn export_kind(analysis: &Analysis, ty: &Type) -> Option<ExportKind> {
+    Some(match ty {
+        Type::Short => ExportKind::Short,
+        Type::Int => ExportKind::Int,
+        Type::BigInt => ExportKind::BigInt,
+        Type::Float => ExportKind::Float,
+        Type::Double => ExportKind::Double,
+        Type::Bool => ExportKind::Bool,
+        Type::String => ExportKind::String,
+        Type::Class(class)
+            if analysis.classes().class(*class).name == EngineClass::Color.name() =>
+        {
+            ExportKind::Color
+        }
+        _ => return None,
     })
 }
 
@@ -230,10 +303,13 @@ fn entry(
                 .ok_or_else(|| LowerError::internal("game without a constructor", span))?;
             Ok(Entry::Game(constructor))
         }
-        (None, None) => Err(LowerError::new(
-            LowerErrorKind::NoEntryPoint,
-            Span::new(0, 0),
-        )),
+        (None, None) => match &analysis.settings().main_scene {
+            Some(scene) => Ok(Entry::Scene(Arc::from(scene.path.as_str()))),
+            None => Err(LowerError::new(
+                LowerErrorKind::NoEntryPoint,
+                Span::new(0, 0),
+            )),
+        },
     }
 }
 

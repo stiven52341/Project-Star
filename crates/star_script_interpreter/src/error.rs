@@ -78,6 +78,9 @@ pub enum RunError {
     /// The program was run as what it is not: a game as a console
     /// program, or the other way round. It holds what the program is.
     WrongKind(crate::ProgramKind),
+    /// The main scene of a game without a `Game` class, at this path,
+    /// could not be loaded (why was written as a warning).
+    MainScene(String),
     /// The interpreter's tree did not hold what running expected: a bug of
     /// the interpreter, not of the program.
     Internal(&'static str),
@@ -100,6 +103,9 @@ impl fmt::Display for RunError {
             Self::WrongKind(crate::ProgramKind::Console) => {
                 formatter.write_str("the program is a console program, not a game")
             }
+            Self::MainScene(path) => {
+                write!(formatter, "the main scene, \"{path}\", could not be loaded")
+            }
             Self::Internal(what) => write!(formatter, "internal interpreter error: {what}"),
         }
     }
@@ -110,7 +116,7 @@ impl std::error::Error for RunError {
         match self {
             Self::Fault(error) => Some(error),
             Self::Output(error) => Some(error),
-            Self::WrongKind(_) | Self::Internal(_) => None,
+            Self::WrongKind(_) | Self::MainScene(_) | Self::Internal(_) => None,
         }
     }
 }

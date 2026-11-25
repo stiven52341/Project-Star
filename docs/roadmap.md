@@ -728,7 +728,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           `Node` stay for 14.7). The window test has no test harness (a
           window needs the main thread) and plays only with
           `-- --ignored`; it passed on this machine.
-  - [ ] 14.7 Nodes and scenes: `Node`, `Sprite`, `Scene.load`, script
+  - [x] 14.7 Nodes and scenes: `Node`, `Sprite`, `Scene.load`, script
         classes named by scenes, `export var` values, tags and
         `find_by_name`/`find_by_tag`, global and local positions.
         Design approved by the owner (decision 71, 2026-11-24):
@@ -776,9 +776,19 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           (the engine's `start` and `update` too), and methods of the
           engine take `?.`. `Scene.load` already calls the runtime, which
           finds no scene without a game; reading them is 14.7b.
-    - [ ] 14.7b Scenes: `Scene.load` with the program's classes, `export`
+    - [x] 14.7b Scenes: `Scene.load` with the program's classes, `export`
           fields, main-scene programs, unit tests with scenes in memory
-          and the node game in the window test.
+          and the node game in the window test. Lowering keeps, for every
+          class a scene can name, its constructor or the analysis's
+          reason, and its `export` fields; the runtime's `Host::create`
+          and `set_exported` reach the program that loads the scene
+          through the thread, as games reach theirs. A runtime error in
+          the `init` of a scene's class stops the code that loaded it.
+          The node game and its scenes moved to
+          `star_script/tests/games/`, so the compiled `engine_game` test
+          and the interpreter's new `window_scene` test (a window opens
+          once per process) play the same files; both passed on this
+          machine with the same output.
   - [ ] 14.8 Physics, sounds and 3D (`Body`, `Sound`, `Audio`,
         `Node3D`, `Mesh`, `Light`, `Camera3D`).
   - [ ] 14.9 Blueprints: they become StarScript, so they need no

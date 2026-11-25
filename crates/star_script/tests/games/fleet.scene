@@ -1,0 +1,45 @@
+format = 1
+
+[[node]]
+name = "Fleet"
+
+[[node]]
+name = "Leader"
+parent = 0
+tags = ["ship"]
+position = [1.5, 0.0]
+
+[node.sprite]
+texture = "sprites/leader.png"
+size = [1.0, 1.0]
+color = [1.0, 0.5, 0.5, 1.0]
+
+[[node]]
+name = "Wingman"
+class = "Drone"
+parent = 0
+tags = ["ship", "drone"]
+position = [-2.0, 0.0]
+
+[node.fields]
+speed = 4
+label = "wing"
+tint = [0.25, 1.0, 1.0, 1.0]
+
+[[node]]
+name = "Lookout"
+parent = 0
+
+[node.camera]
+view_height = 6.0
+main = true
+
+[[node]]
+name = "Torch"
+parent = 0
+rotation = 1.5
+
+[node.light_2d]
+kind = "spot"
+range = 4.0
+angle = 0.5

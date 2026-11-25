@@ -26,7 +26,7 @@ use star_script_runtime::scene_fields::SceneValue;
 use star_script_runtime::scene_tree::NewNode;
 
 use crate::play;
-use crate::run::Hook;
+use crate::run::{self, Hook};
 use crate::tree::EngineClass;
 use crate::value::{Elements, Value};
 
@@ -115,9 +115,6 @@ impl CameraRef {
         &self.node
     }
 }
-
-/// Why the interpreter cannot make the nodes of scenes yet.
-const NO_SCENES: &str = "the interpreter cannot read scenes yet";
 
 impl Host for Interpreted {
     type Node = Rc<NodeObject>;
@@ -234,16 +231,16 @@ impl Host for Interpreted {
         color.engine.channels()
     }
 
-    fn create(_name: String, _class: NewNode<'_>) -> Result<Self::Node, String> {
-        Err(NO_SCENES.to_owned())
+    fn create(name: String, class: NewNode<'_>) -> Result<Self::Node, String> {
+        run::create(name, class)
     }
 
     fn set_exported(
-        _class: &str,
-        _node: &Self::Node,
-        _values: &[(String, SceneValue)],
+        class: &str,
+        node: &Self::Node,
+        values: &[(String, SceneValue)],
     ) -> Result<(), String> {
-        Err(NO_SCENES.to_owned())
+        run::set_exported(class, node, values)
     }
 
     fn new_body(fields: BodyFields<Self>) -> Self::Body {
