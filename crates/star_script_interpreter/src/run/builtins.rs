@@ -1,6 +1,6 @@
 //! The methods of basic types and lists, as the generated Rust runs them.
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use star_script::semantic::BuiltinMethod as Method;
 use star_script_runtime::text_length;
@@ -32,8 +32,8 @@ fn text_method(method: Method, text: &str, argument: Option<Value>) -> Result<Va
         (Method::Length, None) => Value::Int(text_length(text)),
         (Method::IsEmpty, None) => Value::Bool(text.is_empty()),
         (Method::Contains, Some(Value::String(part))) => Value::Bool(text.contains(&*part)),
-        (Method::ToUpper, None) => Value::String(Rc::from(text.to_uppercase())),
-        (Method::ToLower, None) => Value::String(Rc::from(text.to_lowercase())),
+        (Method::ToUpper, None) => Value::String(Arc::from(text.to_uppercase())),
+        (Method::ToLower, None) => Value::String(Arc::from(text.to_lowercase())),
         _ => return Err(WRONG_RECEIVER),
     })
 }

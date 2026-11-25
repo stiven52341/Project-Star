@@ -3,6 +3,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::error::RunError;
 use crate::tree::ClassRef;
@@ -33,7 +34,7 @@ pub(crate) enum Value {
     /// `bool`.
     Bool(bool),
     /// `string`. Texts never change, so copies share them.
-    String(Rc<str>),
+    String(Arc<str>),
     /// `[T]`: shared, as in the compiled game, so after `var a = b` a
     /// `push` through `a` is seen through `b`.
     List(Elements),
@@ -107,8 +108,9 @@ const MISSING_FIELD: RunError = RunError::Internal("field outside its object");
 
 impl Value {
     /// A text value.
+    #[cfg(test)]
     pub(crate) fn text(text: &str) -> Self {
-        Self::String(Rc::from(text))
+        Self::String(Arc::from(text))
     }
 
     /// A new list with these elements.
@@ -151,15 +153,15 @@ impl Value {
     }
 
     /// `self.to_string()`, written as the generated Rust writes it.
-    pub(crate) fn to_text(&self) -> Result<Rc<str>, RunError> {
+    pub(crate) fn to_text(&self) -> Result<Arc<str>, RunError> {
         Ok(match self {
-            Self::String(text) => Rc::clone(text),
-            Self::Short(value) => Rc::from(value.to_string()),
-            Self::Int(value) => Rc::from(value.to_string()),
-            Self::BigInt(value) => Rc::from(value.to_string()),
-            Self::Float(value) => Rc::from(star_script_runtime::float_to_string(value)),
-            Self::Double(value) => Rc::from(star_script_runtime::float_to_string(value)),
-            Self::Bool(value) => Rc::from(value.to_string()),
+            Self::String(text) => Arc::clone(text),
+            Self::Short(value) => Arc::from(value.to_string()),
+            Self::Int(value) => Arc::from(value.to_string()),
+            Self::BigInt(value) => Arc::from(value.to_string()),
+            Self::Float(value) => Arc::from(star_script_runtime::float_to_string(value)),
+            Self::Double(value) => Arc::from(star_script_runtime::float_to_string(value)),
+            Self::Bool(value) => Arc::from(value.to_string()),
             Self::Null | Self::List(_) | Self::Object(_) => {
                 return Err(RunError::Internal("`to_string` of a value without text"));
             }

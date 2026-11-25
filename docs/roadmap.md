@@ -606,7 +606,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           places of their own.
   - [ ] 14.5 Parallel functions: `parallel static func` on threads, with
         values copied in and out.
-        Design proposed to the owner (awaiting approval):
+        Design approved by the owner (decision 69, 2026-11-24):
         - Interpreted `parallel` functions run on the same threads as
           compiled ones: an awaited call goes through
           `star_script_runtime::parallel::run`, whose pool, copies and
@@ -636,9 +636,11 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           game), lowering the program again on each thread (slow, and a
           cache of programs per thread), and lists shared between threads
           (`Arc<Mutex>`: a cost on every list access of the game).
-    - [ ] 14.5a A program that can be shared between threads (`Arc`,
+    - [x] 14.5a A program that can be shared between threads (`Arc`,
           `Arc<str>` texts, constants of their own), with no change in
-          what programs do.
+          what programs do. The tree's constants are `Literal`s, which
+          give their value when run (a text shares the literal's), and a
+          test checks that the lowered program is `Send + Sync`.
     - [ ] 14.5b `parallel` functions: awaited calls on the runtime's
           threads with copies, direct calls between them, and their
           errors: `parallel.star` and `parallel_fault.star` give the same

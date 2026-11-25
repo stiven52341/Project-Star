@@ -190,3 +190,15 @@ fn awaits_wait_inside_loops_assignments_and_operators() {
                   Debug.print(total.to_string() + \" \" + list[0].to_string() + \" \" + lazy.to_string())\n }\n}\n";
     assert_eq!(run(source).ok().as_deref(), Some("3 4 true\n"));
 }
+
+#[test]
+fn the_lowered_program_can_be_shared_between_threads() {
+    fn shareable<T: Send + Sync>() {}
+    shareable::<crate::tree::Code>();
+}
+
+#[test]
+fn literals_give_their_values() {
+    let source = "class Main {\n static func main() {\n var text: string\n Debug.print(\"[\" + text + \"]\")\n Debug.print((\"a\" + \"b\").to_upper())\n Debug.print((2.5).to_string())\n }\n}\n";
+    assert_eq!(run(source).expect("a program that runs"), "[]\nAB\n2.5\n");
+}

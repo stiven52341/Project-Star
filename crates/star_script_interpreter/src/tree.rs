@@ -2,12 +2,15 @@
 //! running walks. Names are resolved, and conversions are written out, so
 //! the two operands of an operation always hold values of the same type.
 
+use std::sync::Arc;
+
 use star_script::semantic::BuiltinMethod;
 
 use crate::value::Value;
 
 /// A whole lowered program: what a [`crate::Program`] shares with the
-/// coroutines it starts.
+/// coroutines it starts and the threads of its `parallel` functions, so
+/// it holds no value that belongs to one thread (see [`Literal`]).
 #[derive(Debug)]
 pub(crate) struct Code {
     pub(crate) functions: Vec<Function>,
@@ -155,7 +158,7 @@ pub(crate) enum Statement {
 #[derive(Debug)]
 pub(crate) enum Expression {
     /// A value known before running: a literal.
-    Constant(Value),
+    Constant(Literal),
     /// The value of a local.
     Local(usize),
     /// A number converted to another number type, as Rust's `as` does;
@@ -256,6 +259,37 @@ pub(crate) enum Expression {
     /// An expression with an `await` inside (but not an `await` itself),
     /// which only the runner of coroutines can evaluate.
     Waits(Box<Expression>),
+}
+
+/// A value written in the program. Unlike a [`Value`], it can never be a
+/// list or an object, which belong to the thread that runs them: the tree
+/// is shared between threads.
+#[derive(Debug, Clone)]
+pub(crate) enum Literal {
+    Null,
+    Short(i16),
+    Int(i32),
+    BigInt(i64),
+    Float(f32),
+    Double(f64),
+    Bool(bool),
+    String(Arc<str>),
+}
+
+impl Literal {
+    /// The value it stands for: a text shares the literal's.
+    pub(crate) fn value(&self) -> Value {
+        match self {
+            Self::Null => Value::Null,
+            Self::Short(value) => Value::Short(*value),
+            Self::Int(value) => Value::Int(*value),
+            Self::BigInt(value) => Value::BigInt(*value),
+            Self::Float(value) => Value::Float(*value),
+            Self::Double(value) => Value::Double(*value),
+            Self::Bool(value) => Value::Bool(*value),
+            Self::String(text) => Value::String(Arc::clone(text)),
+        }
+    }
 }
 
 /// A call of an `async` method, before it is started or awaited.

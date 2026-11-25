@@ -2,8 +2,7 @@
 //! runner of coroutines knows which parts may stop and go on in another
 //! frame, and hands everything else to the usual runner (decision 68).
 
-use crate::tree::{Coroutine, Expression, Statement};
-use crate::value::Value;
+use crate::tree::{Coroutine, Expression, Literal, Statement};
 
 /// Marks the statements of a body; whether any of them waits.
 pub(super) fn mark_block(statements: &mut [Statement]) -> bool {
@@ -82,7 +81,7 @@ fn mark(expression: &mut Expression) -> bool {
         Expression::Waits(_) => return true,
     };
     if waits {
-        let inner = std::mem::replace(expression, Expression::Constant(Value::Null));
+        let inner = std::mem::replace(expression, Expression::Constant(Literal::Null));
         *expression = Expression::Waits(Box::new(inner));
     }
     waits

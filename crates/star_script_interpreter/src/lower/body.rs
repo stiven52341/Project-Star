@@ -1,6 +1,7 @@
 //! The body of a function: its locals and statements.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use star_script::ast::{
     AssignOperator, BinaryOperator, Block, ElseBranch, Expr, ExprKind, IfStatement, MethodDecl,
@@ -10,8 +11,7 @@ use star_script::semantic::{Analysis, ClassId, ClassOrigin, LocalId, Resolution,
 
 use super::Tables;
 use crate::error::LowerError;
-use crate::tree::{Arithmetic, Expression, Function, Statement};
-use crate::value::Value;
+use crate::tree::{Arithmetic, Expression, Function, Literal, Statement};
 
 /// What `self` is in the code being lowered.
 pub(super) enum Receiver {
@@ -361,14 +361,14 @@ impl<'a> Body<'a> {
 /// expression, so each run of the declaration gets a list of its own.
 pub(super) fn default_value(ty: &Type) -> Option<Expression> {
     let value = match ty {
-        Type::Short => Value::Short(0),
-        Type::Int => Value::Int(0),
-        Type::BigInt => Value::BigInt(0),
-        Type::Float => Value::Float(0.0),
-        Type::Double => Value::Double(0.0),
-        Type::Bool => Value::Bool(false),
-        Type::String => Value::text(""),
-        Type::Nullable(_) => Value::Null,
+        Type::Short => Literal::Short(0),
+        Type::Int => Literal::Int(0),
+        Type::BigInt => Literal::BigInt(0),
+        Type::Float => Literal::Float(0.0),
+        Type::Double => Literal::Double(0.0),
+        Type::Bool => Literal::Bool(false),
+        Type::String => Literal::String(Arc::from("")),
+        Type::Nullable(_) => Literal::Null,
         Type::List(_) => return Some(Expression::List(Vec::new())),
         _ => return None,
     };

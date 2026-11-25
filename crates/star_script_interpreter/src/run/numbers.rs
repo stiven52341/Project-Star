@@ -2,7 +2,7 @@
 //! integers wrap around, and dividing one by zero is a runtime error.
 
 use std::cmp::Ordering;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use star_script_runtime::{try_int_divide, try_int_remainder};
 
@@ -84,7 +84,7 @@ pub(super) fn arithmetic(
             Value::Double(float_arithmetic!(operator, *left, *right))
         }
         (Value::String(left), Value::String(right)) if operator == Arithmetic::Add => {
-            Value::String(Rc::from([&**left, &**right].concat()))
+            Value::String(Arc::from([&**left, &**right].concat()))
         }
         _ => return Err(MIXED_OPERANDS),
     })

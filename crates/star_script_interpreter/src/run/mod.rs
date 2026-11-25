@@ -6,6 +6,7 @@ mod numbers;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use star_script::semantic::BuiltinMethod;
 use star_script_runtime::try_index;
@@ -37,7 +38,7 @@ enum Flow {
 /// coroutines it starts can keep a copy after the call that started them.
 #[derive(Clone)]
 pub(crate) struct Machine {
-    code: Rc<Code>,
+    code: Arc<Code>,
     output: Output,
     /// The first runtime error of a coroutine, shared by every copy: once
     /// there is one, the program stops and no coroutine goes on.
@@ -48,7 +49,7 @@ pub(crate) struct Machine {
 type Frame = [Value];
 
 impl Machine {
-    pub(crate) fn new(code: Rc<Code>, output: Output) -> Self {
+    pub(crate) fn new(code: Arc<Code>, output: Output) -> Self {
         Self {
             code,
             output,
@@ -389,7 +390,7 @@ impl Machine {
 
     fn evaluate(&self, expression: &Expression, frame: &Frame) -> Result<Value, RunError> {
         Ok(match expression {
-            Expression::Constant(value) => value.clone(),
+            Expression::Constant(literal) => literal.value(),
             Expression::Local(slot) => frame
                 .get(*slot)
                 .cloned()

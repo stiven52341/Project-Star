@@ -30,6 +30,7 @@ mod value;
 use std::cell::RefCell;
 use std::io::Write;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use star_script::CheckedSource;
 
@@ -45,7 +46,7 @@ pub type Output = Rc<RefCell<dyn Write>>;
 /// share the same lowered code.
 #[derive(Debug, Clone)]
 pub struct Program {
-    code: Rc<tree::Code>,
+    code: Arc<tree::Code>,
 }
 
 impl Program {
@@ -58,7 +59,7 @@ impl Program {
     pub fn lower(checked: &CheckedSource) -> Result<Self, LowerError> {
         let code = lower::program(&checked.syntax, &checked.analysis)?;
         Ok(Self {
-            code: Rc::new(code),
+            code: Arc::new(code),
         })
     }
 
@@ -72,7 +73,7 @@ impl Program {
     /// When the program stops with a runtime error of StarScript, or its
     /// output cannot be written.
     pub fn run(&self, output: &Output) -> Result<(), RunError> {
-        let result = run::Machine::new(Rc::clone(&self.code), Rc::clone(output)).run();
+        let result = run::Machine::new(Arc::clone(&self.code), Rc::clone(output)).run();
         if result.is_err() {
             // The coroutines of a stopped program never go on.
             star_script_runtime::tasks::clear();

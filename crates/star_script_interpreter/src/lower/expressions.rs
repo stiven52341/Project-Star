@@ -1,5 +1,7 @@
 //! Expressions, with the conversions between number types written out.
 
+use std::sync::Arc;
+
 use star_script::Span;
 use star_script::ast::{BinaryOperator, Expr, ExprKind, Literal, Name, UnaryOperator};
 use star_script::semantic::{BuiltinMethod, ClassId, ClassOrigin, MethodInfo, Resolution, Type};
@@ -8,9 +10,8 @@ use super::Member;
 use super::body::Body;
 use crate::error::LowerError;
 use crate::tree::{
-    Arithmetic, ClassRef, Comparison, Coroutine, Expression, MethodTarget, NumberType,
+    self, Arithmetic, ClassRef, Comparison, Coroutine, Expression, MethodTarget, NumberType,
 };
-use crate::value::Value;
 
 /// The engine class whose `print` writes a line.
 const DEBUG_CLASS: &str = "Debug";
@@ -606,18 +607,22 @@ fn builtin_parameter(method: BuiltinMethod, receiver: &Type) -> Option<Type> {
 /// so `-32768` negates `32768` as a `short` to the same value the compiled
 /// game writes whole.
 #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
-fn literal_value(literal: &Literal, ty: &Type, expression: &Expr) -> Result<Value, LowerError> {
+fn literal_value(
+    literal: &Literal,
+    ty: &Type,
+    expression: &Expr,
+) -> Result<tree::Literal, LowerError> {
     Ok(match (literal, ty.non_null()) {
-        (Literal::Integer(value), Type::Short) => Value::Short(*value as i16),
-        (Literal::Integer(value), Type::Int) => Value::Int(*value as i32),
-        (Literal::Integer(value), Type::BigInt) => Value::BigInt(*value),
-        (Literal::Integer(value), Type::Float) => Value::Float(*value as f64 as f32),
-        (Literal::Integer(value), Type::Double) => Value::Double(*value as f64),
-        (Literal::Float(value), Type::Float) => Value::Float(*value as f32),
-        (Literal::Float(value), Type::Double) => Value::Double(*value),
-        (Literal::String(text), _) => Value::text(text),
-        (Literal::Bool(value), _) => Value::Bool(*value),
-        (Literal::Null, _) => Value::Null,
+        (Literal::Integer(value), Type::Short) => tree::Literal::Short(*value as i16),
+        (Literal::Integer(value), Type::Int) => tree::Literal::Int(*value as i32),
+        (Literal::Integer(value), Type::BigInt) => tree::Literal::BigInt(*value),
+        (Literal::Integer(value), Type::Float) => tree::Literal::Float(*value as f64 as f32),
+        (Literal::Integer(value), Type::Double) => tree::Literal::Double(*value as f64),
+        (Literal::Float(value), Type::Float) => tree::Literal::Float(*value as f32),
+        (Literal::Float(value), Type::Double) => tree::Literal::Double(*value),
+        (Literal::String(text), _) => tree::Literal::String(Arc::from(text.as_str())),
+        (Literal::Bool(value), _) => tree::Literal::Bool(*value),
+        (Literal::Null, _) => tree::Literal::Null,
         _ => {
             return Err(LowerError::internal(
                 "literal of an unexpected type",
