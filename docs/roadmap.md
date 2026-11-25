@@ -903,8 +903,17 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           cycle of dependencies between `star_script` and
           `star_blueprint`), and a runner of its own for blueprints (the
           runners of programs already compare both ways).
-    - [ ] 14.9a The templates: one program per template, and the editor's
+    - [x] 14.9a The templates: one program per template, and the editor's
           test that keeps them up to date.
+          `programs/blueprint_<template>.star` (lowercase names) for the
+          seven templates, each running its `update` for a few frames of
+          0.25 s. The movement templates read input actions, which a
+          program must declare to compile, so a program may come with
+          `NAME.actions` (one action per line, no bindings), read by both
+          the compiled and the interpreted runners; without a window no
+          action is held, so their axes give 0. The editor's test
+          `every_template_has_its_conformance_program` checks each
+          program's start and its `.actions` against the template.
     - [ ] 14.9b Every kind of node, and the example script in the
           interpreter's conformance.
   - [ ] 14.10 The interpreted player: the scene player of step e grows

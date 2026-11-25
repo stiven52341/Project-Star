@@ -1,7 +1,8 @@
 //! Conformance: the interpreter runs the programs that the compiler's
 //! end-to-end test builds and runs (`star_script/tests/programs`), and
 //! must print the same `.out` and stop with the same `.fault` (rule 3.7 of
-//! `CLAUDE.md`).
+//! `CLAUDE.md`). A program's `.actions`, if it has one, names the input
+//! actions it may read, one per line.
 
 // Test code: a failed step should stop the test with its explanation.
 #![allow(clippy::expect_used, clippy::panic)]
@@ -11,7 +12,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use star_script::check_source;
+use star_script::{GameSettings, InputAction, check_source_with};
 use star_script_interpreter::{Output, Program, RunError};
 
 const PROGRAMS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../star_script/tests/programs");
@@ -49,12 +50,29 @@ fn read_expected(program: &Path, extension: &str) -> Option<String> {
         .map(|text| text.replace("\r\n", "\n"))
 }
 
+/// The settings of `program`: the actions its `.actions` names, with no
+/// bindings, since no one presses them.
+fn settings(program: &Path) -> GameSettings {
+    let actions = read_expected(program, "actions").unwrap_or_default();
+    GameSettings {
+        actions: actions
+            .lines()
+            .map(|name| InputAction {
+                name: name.to_owned(),
+                bindings: Vec::new(),
+            })
+            .collect(),
+        main_scene: None,
+    }
+}
+
 fn check(path: &Path) -> Result<(), String> {
     let name = path
         .file_stem()
         .map_or_else(String::new, |stem| stem.to_string_lossy().into_owned());
     let source = fs::read_to_string(path).expect("readable program");
-    let checked = check_source(&source).map_err(|errors| format!("{name}: {errors:?}"))?;
+    let checked = check_source_with(&source, &settings(path))
+        .map_err(|errors| format!("{name}: {errors:?}"))?;
     let program = Program::lower(&checked).map_err(|error| format!("{name}: {error}"))?;
     let buffer = Rc::new(RefCell::new(Vec::new()));
     let output: Output = Rc::clone(&buffer) as Output;

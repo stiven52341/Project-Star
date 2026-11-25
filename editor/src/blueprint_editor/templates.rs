@@ -150,6 +150,41 @@ mod tests {
         }
     }
 
+    /// The conformance programs, which compiled and interpreted runs
+    /// compare (decision 73).
+    const PROGRAMS: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../crates/star_script/tests/programs"
+    );
+
+    /// Each template has a conformance program that starts with its current
+    /// translation, so both ways of running StarScript run the templates as
+    /// they are, and declares the actions it reads.
+    #[test]
+    fn every_template_has_its_conformance_program() {
+        let mut failures = Vec::new();
+        for template in BlueprintTemplate::ALL {
+            let blueprint = Blueprint::from_text(template.source()).unwrap();
+            let translation = star_blueprint::translate(&blueprint).unwrap();
+            let program = format!("{PROGRAMS}/blueprint_{}", template.name().to_lowercase());
+            let source = std::fs::read_to_string(format!("{program}.star")).unwrap_or_default();
+            if !source.starts_with(translation.source()) {
+                failures.push(format!(
+                    "{program}.star must start with the translation of {template:?}:\n{}",
+                    translation.source()
+                ));
+            }
+            let declared =
+                std::fs::read_to_string(format!("{program}.actions")).unwrap_or_default();
+            let declared: Vec<&str> = declared.lines().collect();
+            let read: Vec<&str> = template.actions().iter().map(|(name, _)| *name).collect();
+            if declared != read {
+                failures.push(format!("{program}.actions must list {read:?}"));
+            }
+        }
+        assert!(failures.is_empty(), "\n{}", failures.join("\n\n"));
+    }
+
     #[test]
     fn copies_take_the_name_they_are_given() {
         let blueprint =

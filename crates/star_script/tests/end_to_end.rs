@@ -2,7 +2,8 @@
 //! and run, comparing what they print with what is expected.
 //!
 //! Each `programs/NAME.star` comes with `NAME.out`, its expected output, and
-//! optionally `NAME.fault`: the runtime error it must stop with.
+//! optionally `NAME.fault`: the runtime error it must stop with, and
+//! `NAME.actions`: the input actions it may read, one per line.
 
 // Test code: a failed step should stop the test with its explanation.
 #![allow(clippy::expect_used, clippy::panic)]
@@ -14,8 +15,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use common::{ENGINE_CRATES, binary, build, compile_with, package_directory};
-use star_script::GameSettings;
 use star_script::package::Package;
+use star_script::{GameSettings, InputAction};
 
 const PROGRAMS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/programs");
 const EXAMPLE_SCRIPT: &str = include_str!("../examples/scripts/player.star");
@@ -38,10 +39,7 @@ fn programs_behave_as_expected() {
         let name = file_stem(&path);
         let source = fs::read_to_string(&path).expect("readable program");
         package
-            .add_program(
-                &name,
-                compile_with(&name, &source, &GameSettings::default()),
-            )
+            .add_program(&name, compile_with(&name, &source, &settings(&path)))
             .expect("valid program name");
         expectations.push(Expectation {
             output: read_expected(&path, "out").unwrap_or_default(),
@@ -78,6 +76,22 @@ fn example_program() -> (&'static str, String, &'static str) {
         format!("{EXAMPLE_SCRIPT}{main}"),
         "Quedan 3\nQuedan 1\nnadie\n",
     )
+}
+
+/// The settings of `program`: the actions its `.actions` names, with no
+/// bindings, since no one presses them.
+fn settings(program: &Path) -> GameSettings {
+    let actions = read_expected(program, "actions").unwrap_or_default();
+    GameSettings {
+        actions: actions
+            .lines()
+            .map(|name| InputAction {
+                name: name.to_owned(),
+                bindings: Vec::new(),
+            })
+            .collect(),
+        main_scene: None,
+    }
 }
 
 fn star_files() -> Vec<PathBuf> {
