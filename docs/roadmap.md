@@ -652,6 +652,65 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [ ] 14.6 Games: `Game` (`start`, `update`, `quit`) in a window of the
         engine, `Input` and its actions, `Color`, `Camera2D`, using the
         engine classes that f1 made shared.
+        Design proposed to the owner (awaiting approval):
+        - The interpreter is one more `Host` of `star_script_runtime`,
+          as the generated Rust is: the game loop, the input, the frame
+          of the nodes and the window stay in `star_script_runtime` and
+          `star_script_engine`, written once, and an interpreted game
+          runs through `star_script_engine::game::run::<Interpreted>`.
+          The interpreter keeps depending only on `star_script` and
+          `star_script_runtime` (a tool, with no engine): the code that
+          joins it with the engine is the player of 14.10, and here a
+          test. `CLAUDE.md` says so, as 14.1 promised.
+        - Engine objects: an object keeps its script fields as now, plus
+          the runtime's fields of its engine class (`ColorFields`,
+          `NodeFields` with `Camera2dFields`, `GameFields`), which the
+          `Host` must hand out by reference. So the object becomes
+          generic over that part (`Object<E>`), and a value says which
+          kind it holds: `Object`, `Color`, `Node`, `Game`. Code that
+          reads script fields works on any of them; the engine's code
+          gets its fields with no check that could fail. The classes of
+          later steps (`Sprite`, `Body`, `Node3D`…) are types with no
+          values in the `Host` for now, so they need no made-up answers.
+        - Engine classes in the program's tables: `Game`, `Node`,
+          `Camera2D` and `Color` get their place, so `is`, `as` and
+          classes that extend them work; `start` and `update` take
+          places in the table of overridable methods, doing nothing
+          unless a script overrides them. Their fields become tree nodes
+          of their own (read and set an engine field), and the methods
+          of `Input` call the runtime's functions, as compiled.
+        - The `Host`'s functions take no interpreter (`start(node)`), so
+          a game is run with the program kept per thread, as the runtime
+          keeps its coroutines and input. A runtime error is kept as a
+          coroutine's is: the rest of the frame is skipped, the game
+          closes after it, and the error is returned (the player of
+          14.10 prints it, as a compiled game's fault does).
+        - The program is a game when a class extends `Game` (one entry
+          point, as compiled: `main` or that class). The names of the
+          input actions become owned by the runtime (declared once per
+          game), since the interpreter reads them when it starts, not
+          when it is built.
+        - Tests: console programs with `Input` (`pointer.star`) and a new
+          `colors.star` (`Color`, `Camera2D`, classes that extend them)
+          in both suites; unit tests that turn frames without a window
+          (`star_script_runtime::game::run_frame`); and an ignored test,
+          like `engine_game.rs`, that plays the same game interpreted in
+          a window, with `star_script_engine` as a dev-dependency of the
+          interpreter.
+        - Rejected: the interpreter depending on the engine (every
+          console test would build wgpu, and the layers would change), a
+          game loop of its own (a second copy of what
+          `star_script_engine` does, whose order would have to match by
+          hand), and one object type with an optional engine part (the
+          `Host` must give fields by reference, and a missing part would
+          need a panic or a made-up value).
+    - [ ] 14.6a Engine objects: `Color`, `Camera2D` (with the fields of
+          `Node`), classes that extend them, `is`/`as` with engine
+          classes, and `Input`: `pointer.star` and `colors.star` conform.
+    - [ ] 14.6b Games: the interpreter as a `Host`, a class that extends
+          `Game` as the entry point, owned action names, errors that close
+          the game, frames without a window in unit tests and the ignored
+          window test.
   - [ ] 14.7 Nodes and scenes: `Node`, `Sprite`, `Scene.load`, script
         classes named by scenes, `export var` values, tags and
         `find_by_name`/`find_by_tag`, global and local positions.
