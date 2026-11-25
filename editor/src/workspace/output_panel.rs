@@ -5,7 +5,9 @@ use std::collections::VecDeque;
 
 use eframe::egui;
 
-use crate::game_run::{GameRun, OutputKind, OutputLine, PlayRequest, RunEnd, RunEvent, RunPhase};
+use crate::game_run::{
+    GameRun, OutputKind, OutputLine, PlayMode, PlayRequest, RunEnd, RunEvent, RunPhase,
+};
 use crate::style::{ERROR_COLOR, SUCCESS_COLOR};
 use crate::texts;
 
@@ -16,6 +18,9 @@ const MAX_LINES: usize = 5000;
 pub(crate) struct OutputPanel {
     run: Option<GameRun>,
     phase: Option<RunPhase>,
+    /// What is said while Cargo works: the player is prepared, or the
+    /// game is built.
+    building: &'static str,
     lines: VecDeque<OutputLine>,
     /// A message of the editor about the last “Play”, shown after the lines.
     note: Option<Note>,
@@ -32,6 +37,7 @@ impl OutputPanel {
         Self {
             run: None,
             phase: None,
+            building: "",
             lines: VecDeque::new(),
             note: None,
         }
@@ -45,6 +51,10 @@ impl OutputPanel {
     /// Builds and plays `request`, forgetting the last run's output.
     pub(crate) fn play(&mut self, request: PlayRequest, context: &egui::Context) {
         self.clear();
+        self.building = match request.mode {
+            PlayMode::Interpreted => texts::current().preparing_player,
+            PlayMode::Compiled { .. } => texts::current().building_game,
+        };
         let context = context.clone();
         match GameRun::start(request, move || context.request_repaint()) {
             Ok(run) => {
@@ -119,7 +129,7 @@ impl OutputPanel {
         match &self.phase {
             Some(RunPhase::Building) => {
                 ui.spinner();
-                ui.weak(texts::current().building_game);
+                ui.weak(self.building);
             }
             Some(RunPhase::Running) => {
                 ui.colored_label(SUCCESS_COLOR, texts::current().game_running);
@@ -147,7 +157,7 @@ impl OutputPanel {
                 if self.phase == Some(RunPhase::Building) {
                     ui.horizontal(|ui| {
                         ui.spinner();
-                        ui.weak(texts::current().building_game);
+                        ui.weak(self.building);
                     });
                 }
                 if let Some(note) = &self.note {

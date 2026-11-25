@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use eframe::egui;
-use star_script::codegen::EntryPoint;
+use star_script::codegen::{EntryPoint, GeneratedProgram};
 
 use crate::project_check::{CheckJob, CheckStatus, Problem, ProjectCheck};
 use crate::style::{ERROR_COLOR, SUCCESS_COLOR};
@@ -83,17 +83,18 @@ impl ProblemsPanel {
         }
     }
 
-    /// Whether the last check, which found no problems, left something to
-    /// play, or why not: a game or a main scene, which the player reads
-    /// from the project (decision 74).
-    pub(crate) fn playable(&self) -> Result<(), &'static str> {
+    /// The game's Rust, if the last check, which found no problems, left
+    /// something to play (a game or a main scene), or why not. The player
+    /// reads the project itself (decision 74); “Play compiled” builds this
+    /// (decision 75).
+    pub(crate) fn played_program(&self) -> Result<&GeneratedProgram, &'static str> {
         let texts = texts::current();
         let CompileState::Finished(check) = &self.state else {
             return Err(texts.nothing_to_play);
         };
         match &check.program {
             Some(program) if program.entry_point == EntryPoint::None => Err(texts.no_game_to_play),
-            Some(_) => Ok(()),
+            Some(program) => Ok(program),
             None => Err(texts.nothing_to_play),
         }
     }

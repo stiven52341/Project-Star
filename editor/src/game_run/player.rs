@@ -98,6 +98,14 @@ mod tests {
     }
 
     #[test]
+    fn no_project_gets_the_player_package_name() {
+        assert_ne!(
+            super::super::compiled::package_name(PLAYER_PACKAGE),
+            PLAYER_PACKAGE
+        );
+    }
+
+    #[test]
     fn the_player_depends_on_the_player_crate() {
         let manifest = manifest(Path::new("/engine"));
 

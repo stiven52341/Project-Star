@@ -237,6 +237,8 @@ pub(crate) struct Texts {
     // Playing.
     pub(crate) play: &'static str,
     pub(crate) play_hint: &'static str,
+    pub(crate) play_compiled: &'static str,
+    pub(crate) play_compiled_hint: &'static str,
     pub(crate) stop: &'static str,
     pub(crate) stop_hint: &'static str,
     pub(crate) output: &'static str,
@@ -245,6 +247,7 @@ pub(crate) struct Texts {
     pub(crate) show_levels: &'static str,
     pub(crate) console_empty: &'static str,
     pub(crate) output_empty: &'static str,
+    pub(crate) preparing_player: &'static str,
     pub(crate) building_game: &'static str,
     pub(crate) preparing_engine: &'static str,
     pub(crate) preparing_engine_hint: &'static str,

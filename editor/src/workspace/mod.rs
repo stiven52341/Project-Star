@@ -42,7 +42,7 @@ use self::problems_panel::{CheckEnd, ProblemsPanel};
 use self::unsaved_dialog::{UnsavedChoice, show_unsaved_dialog};
 use self::viewport::SceneViewport;
 use crate::editor_log::LogHistory;
-use crate::game_run::{EngineWarmUp, PlayRequest};
+use crate::game_run::{EngineWarmUp, PlayMode, PlayRequest};
 use crate::last_scenes::LastSceneStore;
 use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, Project, SCRIPT_EXTENSION};
 use crate::project_check::Problem;
@@ -78,6 +78,15 @@ enum Leaving {
     Quit,
 }
 
+/// How “Play” or “Play compiled” plays the project once it is checked.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PlayWay {
+    /// With the player, interpreted.
+    Interpreted,
+    /// Built with the compiler and Cargo.
+    Compiled,
+}
+
 /// What the panel below the view shows.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum BottomTab {
@@ -96,8 +105,9 @@ pub(crate) struct EditorWindow {
     /// The engine built in the background, so the first “Play” is quick.
     warm_up: Option<EngineWarmUp>,
     console: ConsolePanel,
-    /// “Play” waits for its check: the game is played if it finds nothing.
-    play_after_check: bool,
+    /// “Play” and “Play compiled” wait for their check: the game is played
+    /// this way if it finds nothing.
+    play_after_check: Option<PlayWay>,
     bottom_tab: BottomTab,
     documents: Documents,
     /// The scene to open again the next time the project is opened.
@@ -153,7 +163,7 @@ impl EditorWindow {
             output: OutputPanel::new(),
             warm_up: start_warm_up(context),
             console: ConsolePanel::new(log_history),
-            play_after_check: false,
+            play_after_check: None,
             bottom_tab: BottomTab::Assets,
             documents,
             last_scene,
@@ -273,12 +283,9 @@ impl EditorWindow {
                     self.documents.save_all();
                     self.problems.compile(self.project.directory(), ui.ctx());
                 }
-                Some(MenuAction::Play) => {
-                    // The game is built from what is shown, once checked.
-                    self.documents.save_all();
-                    self.problems.compile(self.project.directory(), ui.ctx());
-                    self.play_after_check = true;
-                    self.bottom_tab = BottomTab::Output;
+                Some(MenuAction::Play) => self.check_and_play(PlayWay::Interpreted, ui.ctx()),
+                Some(MenuAction::PlayCompiled) => {
+                    self.check_and_play(PlayWay::Compiled, ui.ctx());
                 }
                 Some(MenuAction::Stop) => self.output.stop(),
                 Some(MenuAction::ShowAbout) => self.about_open = true,
@@ -328,29 +335,43 @@ impl EditorWindow {
         let Some(end) = self.problems.update() else {
             return;
         };
-        let play = std::mem::take(&mut self.play_after_check);
-        match (end, play) {
-            (CheckEnd::WithProblems, true) => {
+        match (end, self.play_after_check.take()) {
+            (CheckEnd::WithProblems, Some(_)) => {
                 self.output.refuse(texts::current().play_blocked);
                 self.bottom_tab = BottomTab::Problems;
             }
-            (CheckEnd::WithProblems, false) => self.bottom_tab = BottomTab::Problems,
-            (CheckEnd::Clean, true) => self.play(context),
-            (CheckEnd::Clean, false) => {}
+            (CheckEnd::WithProblems, None) => self.bottom_tab = BottomTab::Problems,
+            (CheckEnd::Clean, Some(way)) => self.play(way, context),
+            (CheckEnd::Clean, None) => {}
         }
     }
 
-    /// Plays the project the last check found ready, with the player.
-    fn play(&mut self, context: &egui::Context) {
-        match self.problems.playable() {
-            Ok(()) => self.output.play(
-                PlayRequest {
-                    directory: self.project.directory().to_path_buf(),
-                },
-                context,
-            ),
-            Err(reason) => self.output.refuse(reason),
-        }
+    /// Saves and checks the project, to play it `way` if the check finds
+    /// nothing: the game is played from what is shown.
+    fn check_and_play(&mut self, way: PlayWay, context: &egui::Context) {
+        self.documents.save_all();
+        self.problems.compile(self.project.directory(), context);
+        self.play_after_check = Some(way);
+        self.bottom_tab = BottomTab::Output;
+    }
+
+    /// Plays `way` the project the last check found ready.
+    fn play(&mut self, way: PlayWay, context: &egui::Context) {
+        let mode = match (self.problems.played_program(), way) {
+            (Err(reason), _) => return self.output.refuse(reason),
+            (Ok(_), PlayWay::Interpreted) => PlayMode::Interpreted,
+            (Ok(program), PlayWay::Compiled) => PlayMode::Compiled {
+                name: self.project.settings().name().to_owned(),
+                program: program.clone(),
+            },
+        };
+        self.output.play(
+            PlayRequest {
+                directory: self.project.directory().to_path_buf(),
+                mode,
+            },
+            context,
+        );
     }
 
     /// Closing the window waits for an answer if blueprints are unsaved.

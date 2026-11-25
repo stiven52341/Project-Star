@@ -1036,10 +1036,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           the editor's tests play a console project and a project whose
           main scene is missing through the player, and the warm-up's
           test builds it.
-  - [ ] 14.11 Building with the compiler from the editor: a “Build”
+  - [x] 14.11 Building with the compiler from the editor: a “Build”
         command (and later the export of games) that compiles the project
         with Cargo, and a way to play that compiled build to check it.
-        Design proposed to the owner (awaiting approval):
+        Design approved by the owner (decision 75, 2026-11-24):
         - One command, “Play compiled”, next to “Play” in the bar (and
           its menu): it saves, checks the project as “Play” does, writes
           the game's generated Rust as a package of its own, builds it
@@ -1078,6 +1078,19 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           the result until the export), and building inside the
           project's folder (a target folder per project, each building
           the engine again).
+        Done: “Play compiled” sits after “Play” in the bar and in the
+        Project menu. `game_run::PlayMode` is `Interpreted` or
+        `Compiled { name, program }`, `game_run/compiled.rs` writes the
+        game's package (`write_game`, with `package_name` and
+        `write_package` back from before 14.10b), and the workspace's
+        `PlayWay` says how to play once the check ends;
+        `ProblemsPanel::played_program` gives the program or why there
+        is nothing to play. The Output panel says “Preparing the player…”
+        or “Building the game…”. Tests: the package name and lockfile
+        tests (restored), a console project built and run compiled, and
+        `projects_play_the_same_interpreted_and_compiled` (classes, a
+        loop, integer and float division and a coroutine that goes on
+        after `main`, the same output both ways).
   - [ ] 14.12 Hot reload: changed scripts reload while the game is
         played, keeping the state of the objects that are still valid.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

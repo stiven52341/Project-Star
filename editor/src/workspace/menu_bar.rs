@@ -31,6 +31,7 @@ pub(crate) enum MenuAction {
     CloseProject,
     Compile,
     Play,
+    PlayCompiled,
     Stop,
     ShowAbout,
     ChangeLanguage(Language),
@@ -123,7 +124,8 @@ fn edit_buttons(ui: &mut egui::Ui, steps: UndoSteps) -> Option<MenuAction> {
     None
 }
 
-/// “Compile”, “Play” and “Stop”, as menu entries or in the bar itself.
+/// “Compile”, “Play”, “Play compiled” and “Stop”, as menu entries or in
+/// the bar itself.
 /// Returns the one clicked.
 fn project_buttons(ui: &mut egui::Ui, compiling: bool, playing: bool) -> Option<MenuAction> {
     let texts = texts::current();
@@ -141,6 +143,16 @@ fn project_buttons(ui: &mut egui::Ui, compiling: bool, playing: bool) -> Option<
         .clicked()
     {
         action = Some(MenuAction::Play);
+    }
+    if ui
+        .add_enabled(
+            !compiling && !playing,
+            egui::Button::new(texts.play_compiled),
+        )
+        .on_hover_text(texts.play_compiled_hint)
+        .clicked()
+    {
+        action = Some(MenuAction::PlayCompiled);
     }
     if ui
         .add_enabled(playing, egui::Button::new(texts.stop))

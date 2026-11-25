@@ -5,10 +5,14 @@
 //! built once, by the warm-up), so a changed engine never plays with an
 //! old player.
 //!
+//! “Play compiled” (decision 75) goes through the same steps with the
+//! game's generated Rust, built as a package of its own.
+//!
 //! The engine's crates are those of the ProjectStar repository the editor
 //! was built from, so “Play” works while the editor runs from its sources;
 //! shipping the engine with the editor will come with its packaging.
 
+mod compiled;
 mod player;
 mod process;
 mod warm_up;
@@ -23,19 +27,21 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 
+use star_script::codegen::GeneratedProgram;
+
 use self::process::{Ended, Events};
 pub(crate) use self::warm_up::EngineWarmUp;
 use crate::texts;
 
 /// The `crates` folder of the repository, with the runtime and the engine.
 const ENGINE_CRATES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../crates");
-/// The repository's `Cargo.lock`: the player builds the same versions as
-/// the engine and the editor.
+/// The repository's `Cargo.lock`: the player and compiled games build the
+/// same versions as the engine and the editor, so they share one build.
 const ENGINE_LOCKFILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.lock");
 /// A crate that is always in the engine's folder, to tell that it is there.
 const ENGINE_CRATE: &str = "star_engine";
-/// Where the player is written and built, inside the repository's
-/// `target`: one build of it plays every project.
+/// Where the player and compiled games are written and built, inside the
+/// repository's `target`: one build of the engine serves them all.
 const BUILD_DIRECTORY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../target/star_editor_games");
 /// The folder of Cargo's results, inside [`BUILD_DIRECTORY`].
 const CARGO_TARGET: &str = "target";
@@ -51,7 +57,7 @@ const THREAD_NAME: &str = "play";
 /// Who wrote a line of the output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OutputKind {
-    /// Cargo, building the player.
+    /// Cargo, building the player or the game.
     Build,
     /// The game.
     Game,
@@ -67,7 +73,8 @@ pub(crate) struct OutputLine {
 /// What a run is doing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RunPhase {
-    /// Cargo is building the player, or confirming it is up to date.
+    /// Cargo is building the player or the game, or confirming it is up
+    /// to date.
     Building,
     /// The game is running.
     Running,
@@ -80,7 +87,7 @@ pub(crate) enum RunPhase {
 pub(crate) enum RunEnd {
     /// The game closed; with its exit code if it has one.
     Closed { success: bool, code: Option<i32> },
-    /// Cargo could not build the player: its output says why.
+    /// Cargo could not build the player or the game: its output says why.
     BuildFailed,
     /// The user stopped it.
     Stopped,
@@ -97,8 +104,23 @@ pub(crate) enum RunEvent {
 
 /// The project to play.
 pub(crate) struct PlayRequest {
-    /// The project's folder: the player runs in it and reads the project.
+    /// The project's folder: what is played runs in it, and finds its
+    /// files there.
     pub(crate) directory: PathBuf,
+    pub(crate) mode: PlayMode,
+}
+
+/// How a project is played.
+pub(crate) enum PlayMode {
+    /// By the player, with its StarScript interpreted: “Play”.
+    Interpreted,
+    /// Built with the compiler and Cargo, as it ships: “Play compiled”.
+    Compiled {
+        /// The project's name, which names its package.
+        name: String,
+        /// The game's Rust, from the project's check.
+        program: GeneratedProgram,
+    },
 }
 
 /// A game being built or played.
@@ -166,9 +188,9 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
         return RunEnd::Failed(texts::current().engine_not_found(engine));
     }
     events.send(RunEvent::Phase(RunPhase::Building));
-    let package = match player::write_player() {
-        Ok(package) => package,
-        Err(error) => return RunEnd::Failed(texts::current().player_not_written(&error)),
+    let (package, program) = match write_package(&request.mode) {
+        Ok(written) => written,
+        Err(end) => return end,
     };
     let output = Path::new(BUILD_DIRECTORY);
     match process::run(
@@ -183,7 +205,7 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
         Err(error) => return RunEnd::Failed(texts::current().cargo_not_started(&error)),
     }
     events.send(RunEvent::Phase(RunPhase::Running));
-    let mut game = Command::new(binary(output, player::PLAYER_PACKAGE));
+    let mut game = Command::new(binary(output, &program));
     game.current_dir(&request.directory);
     match process::run(game, OutputKind::Game, events, stop) {
         Ok(Ended::Exited(status)) => RunEnd::Closed {
@@ -192,6 +214,18 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
         },
         Ok(Ended::Stopped) => RunEnd::Stopped,
         Err(error) => RunEnd::Failed(texts::current().game_not_started(&error)),
+    }
+}
+
+/// Writes the package that plays as `mode` asks: its folder, and the name
+/// of its program.
+fn write_package(mode: &PlayMode) -> Result<(PathBuf, String), RunEnd> {
+    match mode {
+        PlayMode::Interpreted => player::write_player()
+            .map(|package| (package, player::PLAYER_PACKAGE.to_owned()))
+            .map_err(|error| RunEnd::Failed(texts::current().player_not_written(&error))),
+        PlayMode::Compiled { name, program } => compiled::write_game(name, program)
+            .map_err(|error| RunEnd::Failed(texts::current().game_not_written(&error))),
     }
 }
 
@@ -269,8 +303,9 @@ mod tests {
     }
 
     /// Plays a project with `files` (paths inside it) and gives what
-    /// happened, until the run finished.
-    fn play_project(name: &str, files: &[(&str, &str)]) -> Vec<RunEvent> {
+    /// happened, until the run finished: interpreted, or compiled from
+    /// the Rust its check gives.
+    fn play_project(name: &str, files: &[(&str, &str)], compiled: bool) -> Vec<RunEvent> {
         let project = crate::project::TestDirectory::new(name);
         std::fs::create_dir_all(project.path().join("assets")).expect("assets folder");
         for (path, text) in files {
@@ -278,8 +313,23 @@ mod tests {
             std::fs::create_dir_all(path.parent().expect("a folder")).expect("folder");
             std::fs::write(path, text).expect("file");
         }
+        let mode = if compiled {
+            let check = crate::project_check::check_project_with(
+                project.path(),
+                &crate::project_check::OpenTexts::new(),
+                crate::project_check::CheckGoal::Compile,
+            );
+            let problems: Vec<String> = check.problems.iter().map(ToString::to_string).collect();
+            PlayMode::Compiled {
+                name: format!("Editor test {name}"),
+                program: check.program.unwrap_or_else(|| panic!("{problems:?}")),
+            }
+        } else {
+            PlayMode::Interpreted
+        };
         let request = PlayRequest {
             directory: project.path().to_path_buf(),
+            mode,
         };
 
         let run = GameRun::start(request, || {}).expect("thread started");
@@ -307,18 +357,32 @@ mod tests {
             .join("\n")
     }
 
+    const CONSOLE_PROJECT: [(&str, &str); 2] = [
+        ("project.toml", "[project]\nname = \"Console\"\n"),
+        (
+            "assets/main.star",
+            "class Main {\n static func main() {\n Debug.print(\"hello from the game\")\n }\n}\n",
+        ),
+    ];
+
+    /// A console program that prints numbers, texts, lists and objects,
+    /// with a coroutine that goes on after `main`.
+    const BOTH_WAYS_PROJECT: [(&str, &str); 2] = [
+        ("project.toml", "[project]\nname = \"Both ways\"\n"),
+        (
+            "assets/main.star",
+            "class Point {\n var x: int\n init(x: int) {\n self.x = x\n }\n}\n\
+             class Main {\n static async func later() {\n await Time.next_frame()\n Debug.print(\"later\")\n }\n \
+             static func main() {\n const points = [Point(1), Point(2)]\n var total = 0\n \
+             for point in points {\n total += point.x\n }\n \
+             Debug.print(\"total \" + total.to_string() + \" \" + (7 / 2).to_string() + \" \" + (7.0 / 2.0).to_string())\n \
+             later()\n Debug.print(\"main ends\")\n }\n}\n",
+        ),
+    ];
+
     #[test]
     fn projects_are_played_by_the_player_in_their_folder() {
-        let events = play_project(
-            "play_console",
-            &[
-                ("project.toml", "[project]\nname = \"Console\"\n"),
-                (
-                    "assets/main.star",
-                    "class Main {\n static func main() {\n Debug.print(\"hello from the game\")\n }\n}\n",
-                ),
-            ],
-        );
+        let events = play_project("play_console", &CONSOLE_PROJECT, false);
 
         let printed = RunEvent::Output(OutputLine {
             kind: OutputKind::Game,
@@ -343,6 +407,7 @@ mod tests {
                 "project.toml",
                 "[project]\nname = \"Scene\"\nmain_scene = \"scenes/missing.scene\"\n",
             )],
+            false,
         );
 
         let output = game_output(&events);
@@ -357,6 +422,36 @@ mod tests {
                 ..
             })))
         ));
+    }
+
+    #[test]
+    fn projects_are_built_and_played_compiled_in_their_folder() {
+        let events = play_project("play_compiled", &CONSOLE_PROJECT, true);
+
+        let printed = RunEvent::Output(OutputLine {
+            kind: OutputKind::Game,
+            text: "hello from the game".to_owned(),
+        });
+        assert!(events.contains(&printed), "{events:#?}");
+        assert_eq!(
+            events.last(),
+            Some(&RunEvent::Phase(RunPhase::Finished(RunEnd::Closed {
+                success: true,
+                code: Some(0)
+            })))
+        );
+    }
+
+    /// Rule 3.7 of `CLAUDE.md`, as the editor plays: the same project
+    /// prints the same played interpreted and compiled.
+    #[test]
+    fn projects_play_the_same_interpreted_and_compiled() {
+        let interpreted = play_project("both_interpreted", &BOTH_WAYS_PROJECT, false);
+        let compiled = play_project("both_compiled", &BOTH_WAYS_PROJECT, true);
+
+        let printed = game_output(&interpreted);
+        assert_eq!(printed, "total 3 3 3.5\nmain ends\nlater");
+        assert_eq!(game_output(&compiled), printed);
     }
 
     #[test]
