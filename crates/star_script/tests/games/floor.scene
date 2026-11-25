@@ -1,0 +1,11 @@
+# The floor of the physics game.
+format = 1
+
+[[node]]
+name = "Floor"
+position = [0.0, -2.0]
+
+[node.body]
+kind = "static"
+shape = "rectangle"
+size = [10.0, 1.0]

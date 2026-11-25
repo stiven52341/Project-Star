@@ -789,7 +789,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           and the interpreter's new `window_scene` test (a window opens
           once per process) play the same files; both passed on this
           machine with the same output.
-  - [ ] 14.8 Physics, sounds and 3D (`Body`, `Sound`, `Audio`,
+  - [x] 14.8 Physics, sounds and 3D (`Body`, `Sound`, `Audio`,
         `Node3D`, `Mesh`, `Light`, `Camera3D`).
         Design approved by the owner (decision 72, 2026-11-24):
         - Bodies and sounds become objects of the interpreter with the
@@ -858,8 +858,17 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           (`Main().SIZE`) compiles (the object is evaluated for its
           effects) but the interpreter refuses it; it needs an expression
           that evaluates one value and gives another, in both runners.
-    - [ ] 14.8c Games in windows: the window test plays every game of
+    - [x] 14.8c Games in windows: the window test plays every game of
           `engine_game.rs` interpreted, each in its own process.
+          The games of `engine_game.rs`, their scenes and their expected
+          output (`.out`) are files of `star_script/tests/games/`, read by
+          the compiled test and by the interpreter's `window` test, which
+          plays each one in a child process of itself (`window --play
+          <game>`) with the project's actions and an asset folder of its
+          own: counting (with `Sound` and `Audio`), a misspelled binding,
+          nodes and scenes, 2D and 3D physics, coroutines and a missing
+          main scene. `window_scene` folded into it. Both passed on this
+          machine with the same output.
   - [ ] 14.9 Blueprints: they become StarScript, so they need no
         interpreter of their own; conformance tests with the blueprint
         templates.

@@ -18,16 +18,11 @@ star_script_runtime.workspace = true
 star_engine.workspace = true
 star_script_engine.workspace = true
 
-# Opens a window, which needs the main thread: run it with
+# Plays every game of `star_script`'s `engine_game` test in a window,
+# which needs the main thread (each game in a child process): run it with
 # `cargo test -p star_script_interpreter --test window -- --ignored`.
 [[test]]
 name = "window"
-harness = false
-
-# The node game with its scenes, in a window too:
-# `cargo test -p star_script_interpreter --test window_scene -- --ignored`.
-[[test]]
-name = "window_scene"
 harness = false
 
 [lints]

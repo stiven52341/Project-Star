@@ -1,0 +1,30 @@
+# The floor of the 3D physics game: a mesh with a body, and a spot.
+format = 1
+
+[[node]]
+name = "Floor"
+
+[node.transform_3d]
+position = [0.0, -2.0, 0.0]
+
+[node.mesh]
+shape = "cube"
+size = [10.0, 1.0, 10.0]
+
+[node.body_3d]
+kind = "static"
+shape = "box"
+size = [10.0, 1.0, 10.0]
+
+[[node]]
+name = "Spot"
+parent = 0
+
+[node.transform_3d]
+position = [0.0, 4.0, 0.0]
+rotation = [-1.5, 0.0, 0.0]
+
+[node.light]
+kind = "spot"
+range = 8.0
+angle = 0.5

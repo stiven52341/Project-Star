@@ -1,0 +1,8 @@
+frame 1
+blink
+frame 2
+later
+blink
+frame 3
+frame 4
+frame 5

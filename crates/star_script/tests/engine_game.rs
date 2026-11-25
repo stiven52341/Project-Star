@@ -16,240 +16,17 @@ use common::{ENGINE_CRATES, binary, build, compile_with, package_directory};
 use star_script::package::Package;
 use star_script::{GameSettings, InputAction, MainScene};
 
-/// Counts its frames and closes itself after the third one. Nobody presses
-/// `jump` while the test runs.
-const GAME: &str = "
-class CountingGame extends Game {
-    var frames = 0
-    // The test's game has no sounds: it stays null, with a warning.
-    var beep = Sound.load(\"sounds/beep.wav\")
-
-    override func start() {
-        Debug.print(\"start\")
-    }
-
-    override func update(delta: float) {
-        frames += 1
-        Debug.print(\"frame \" + frames.to_string() + \" \" + (delta >= 0.0).to_string())
-        if Input.is_down(\"jump\") || Input.just_pressed(\"jump\") || Input.strength(\"jump\") > 0.0 || Input.axis(\"jump\", \"jump\") != 0.0 {
-            Debug.print(\"jump\")
-        }
-        // Where the mouse is depends on the desktop: only read it.
-        if Input.has_pointer() && Input.pointer_x() + Input.pointer_y() > 1000000.0 {
-            Debug.print(\"far away\")
-        }
-        beep?.play()
-        Audio.set_volume(Audio.volume())
-        if frames == 3 {
-            quit()
-        }
-    }
-}
-";
-
-/// A sprite node that runs its own code every frame, in the game's tree.
+/// The games, their scenes and what they print, in `games/`: the
+/// interpreter's `window` test plays the same files and expects the same
+/// output (rule 3.7 of `CLAUDE.md`).
+const GAME: &str = include_str!("games/counting_game.star");
 const NODE_GAME: &str = include_str!("games/node_game.star");
-
-/// A ball that falls on a floor loaded from a scene, and closes the game
-/// when it lands.
-const PHYSICS_GAME: &str = "
-class Ball extends Node {
-    init() {
-        super.init(\"Ball\")
-        body = Body.circle(\"dynamic\", 0.5)
-    }
-}
-
-class PhysicsGame extends Game {
-    var frames = 0
-    var ball = Ball()
-
-    override func start() {
-        const floor = Scene.load(\"levels/floor.scene\")
-        if floor != null {
-            add_child(floor)
-            const solid = floor.body
-            if solid != null {
-                Debug.print(solid.kind + \" \" + solid.shape + \" \" + solid.width.to_string())
-            }
-        }
-        add_child(ball)
-    }
-
-    override func update(delta: float) {
-        frames += 1
-        const solid = ball.body
-        if solid != null {
-            for other in solid.just_touched() {
-                Debug.print(\"landed on \" + other.name + \" \" + (ball.y < 0.0).to_string())
-                quit()
-            }
-        }
-        if frames == 600 {
-            Debug.print(\"never landed\")
-            quit()
-        }
-    }
-}
-";
-
-/// A ball that falls in 3D onto a floor of a scene, seen from a 3D camera
-/// and lit by the sun.
-const PHYSICS_3D_GAME: &str = "
-class Ball extends Mesh {
-    init() {
-        super.init(\"Ball\", \"sphere\")
-        color = Color(0.5, 0.7, 1.0, 1.0)
-        body = Body.sphere(\"dynamic\", 0.5)
-    }
-}
-
-class Physics3dGame extends Game {
-    var frames = 0
-    var ball = Ball()
-
-    override func start() {
-        const floor = Scene.load(\"levels/floor_3d.scene\")
-        if floor != null {
-            add_child(floor)
-            const solid = floor.body
-            if solid != null {
-                Debug.print(solid.shape + \" \" + solid.depth.to_string() + \" \" + (floor is Mesh).to_string())
-            }
-            const spot = floor.find_child(\"Spot\")
-            if spot is Light {
-                Debug.print(spot.kind + \" \" + spot.angle.to_string() + \" \" + spot.blend.to_string())
-            }
-        }
-        const eye = Camera3D(\"Eye\")
-        eye.y = 2.0
-        eye.z = 8.0
-        eye.look_at(0.0, 0.0, 0.0)
-        camera_3d = eye
-        add_child(eye)
-        const sun = Light(\"Sun\", \"directional\")
-        sun.pitch = -1.0
-        add_child(sun)
-        ambient = Color(0.2, 0.2, 0.2, 1.0)
-        add_child(ball)
-    }
-
-    override func update(delta: float) {
-        frames += 1
-        const solid = ball.body
-        if solid != null {
-            for other in solid.just_touched() {
-                Debug.print(\"landed on \" + other.name + \" \" + (ball.y < 0.0).to_string())
-                quit()
-            }
-        }
-        if frames == 600 {
-            Debug.print(\"never landed\")
-            quit()
-        }
-    }
-}
-";
-
-/// A node whose coroutine prints every frame until it leaves the tree, and
-/// a coroutine of the game that waits for a frame.
-const COROUTINE_GAME: &str = "
-class Blinker extends Node {
-    init() {
-        super.init(\"Blinker\")
-    }
-
-    async func blink() {
-        while true {
-            Debug.print(\"blink\")
-            await Time.next_frame()
-        }
-    }
-
-    override func start() {
-        blink()
-    }
-}
-
-class CoroutineGame extends Game {
-    var frames = 0
-    var blinker = Blinker()
-
-    override func start() {
-        add_child(blinker)
-        later()
-    }
-
-    async func later() {
-        await Time.next_frame()
-        Debug.print(\"later\")
-    }
-
-    override func update(delta: float) {
-        frames += 1
-        Debug.print(\"frame \" + frames.to_string())
-        if frames == 3 {
-            blinker.remove()
-        }
-        if frames == 5 {
-            quit()
-        }
-    }
-}
-";
-
-/// The floor of the 3D physics game: a mesh with a body.
-const FLOOR_3D_SCENE: &str = r#"
-format = 1
-
-[[node]]
-name = "Floor"
-
-[node.transform_3d]
-position = [0.0, -2.0, 0.0]
-
-[node.mesh]
-shape = "cube"
-size = [10.0, 1.0, 10.0]
-
-[node.body_3d]
-kind = "static"
-shape = "box"
-size = [10.0, 1.0, 10.0]
-
-[[node]]
-name = "Spot"
-parent = 0
-
-[node.transform_3d]
-position = [0.0, 4.0, 0.0]
-rotation = [-1.5, 0.0, 0.0]
-
-[node.light]
-kind = "spot"
-range = 8.0
-angle = 0.5
-"#;
-
-/// The floor of the physics game.
-const FLOOR_SCENE: &str = r#"
-format = 1
-
-[[node]]
-name = "Floor"
-position = [0.0, -2.0]
-
-[node.body]
-kind = "static"
-shape = "rectangle"
-size = [10.0, 1.0]
-"#;
-
-/// The scene the node game loads, from the `assets` folder of its working
-/// directory.
+const PHYSICS_GAME: &str = include_str!("games/physics_game.star");
+const PHYSICS_3D_GAME: &str = include_str!("games/physics_3d_game.star");
+const COROUTINE_GAME: &str = include_str!("games/coroutine_game.star");
+const FLOOR_SCENE: &str = include_str!("games/floor.scene");
+const FLOOR_3D_SCENE: &str = include_str!("games/floor_3d.scene");
 const FLEET_SCENE: &str = include_str!("games/fleet.scene");
-
-/// A scene whose node names a class the game does not have.
 const MISSPELLED_SCENE: &str = include_str!("games/misspelled.scene");
 
 fn settings(bindings: &[&str]) -> GameSettings {
@@ -332,7 +109,7 @@ fn games_run_in_the_engine_until_they_quit() {
 
     build(&directory);
     let (stdout, _) = play(&directory, "counting_game");
-    assert_eq!(stdout, "start\nframe 1 true\nframe 2 true\nframe 3 true\n");
+    assert_eq!(stdout, include_str!("games/counting_game.out"));
 
     let levels = directory.join("assets/levels");
     std::fs::create_dir_all(&levels).expect("asset folder created");
@@ -343,31 +120,19 @@ fn games_run_in_the_engine_until_they_quit() {
         stderr.contains("node \"Drone\": there is no class \"Dron\""),
         "the misspelled class is reported:\n{stderr}"
     );
-    assert_eq!(
-        stdout,
-        "Fleet 4\n2 true\nsprites/leader.png 1.5 0.5\nspot 4.0 0.5\ntrue\ntrue\n\
-         game frame 1\nship start\nship x 1.0\ndrone start Wingman -2.0 4.0 wing 0.25\n\
-         game frame 2\ncamera Lookout 6.0\nship x 2.0\n\
-         game frame 3\ncamera Lookout 6.0\nship x 3.0\n"
-    );
+    assert_eq!(stdout, include_str!("games/node_game.out"));
 
     std::fs::write(levels.join("floor.scene"), FLOOR_SCENE).expect("scene written");
     let (stdout, _) = play(&directory, "physics_game");
-    assert_eq!(stdout, "static rectangle 10.0\nlanded on Floor true\n");
+    assert_eq!(stdout, include_str!("games/physics_game.out"));
 
     std::fs::write(levels.join("floor_3d.scene"), FLOOR_3D_SCENE).expect("scene written");
     let (stdout, _) = play(&directory, "physics_3d_game");
-    assert_eq!(
-        stdout,
-        "box 10.0 true\nspot 0.5 0.2\nlanded on Floor true\n"
-    );
+    assert_eq!(stdout, include_str!("games/physics_3d_game.out"));
 
     let (stdout, _) = play(&directory, "coroutine_game");
     // The blinker's coroutine ends with frame 3, when it leaves the tree.
-    assert_eq!(
-        stdout,
-        "frame 1\nblink\nframe 2\nlater\nblink\nframe 3\nframe 4\nframe 5\n"
-    );
+    assert_eq!(stdout, include_str!("games/coroutine_game.out"));
 
     scene_only_games_need_their_scene(&directory);
 

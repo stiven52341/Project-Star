@@ -1,0 +1,16 @@
+Fleet 4
+2 true
+sprites/leader.png 1.5 0.5
+spot 4.0 0.5
+true
+true
+game frame 1
+ship start
+ship x 1.0
+drone start Wingman -2.0 4.0 wing 0.25
+game frame 2
+camera Lookout 6.0
+ship x 2.0
+game frame 3
+camera Lookout 6.0
+ship x 3.0

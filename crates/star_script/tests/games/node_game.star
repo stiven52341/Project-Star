@@ -1,3 +1,6 @@
+// Sprite nodes that run their own code every frame in the game's tree,
+// with a camera and the scenes `levels/fleet.scene` and
+// `levels/misspelled.scene`.
 class Ship extends Sprite {
     init() {
         super.init("Ship", "sprites/ship.png")
