@@ -11,7 +11,10 @@ use star_script_runtime::try_index;
 
 use crate::Program;
 use crate::error::RunError;
-use crate::tree::{Arithmetic, ConstructorId, Expression, FunctionId, MethodTarget, Statement};
+use crate::tree::{
+    Arithmetic, ClassRef, Constructor, ConstructorId, Expression, FunctionId, MethodTarget,
+    Statement,
+};
 use crate::value::{Elements, Object, Value, read, write};
 
 /// What a statement leaves the code around it to do.
@@ -174,18 +177,31 @@ impl<'a> Machine<'a> {
         Ok(Flow::Next)
     }
 
-    /// Builds an object: the fields' values and the start of `init` run
-    /// before the object exists, then the rest of `init` with `self`.
+    /// Builds an object of the constructor's class.
     fn construct(
         &mut self,
         constructor: ConstructorId,
-        mut frame: Vec<Value>,
+        arguments: Vec<Value>,
     ) -> Result<Value, RunError> {
-        let program = self.program;
-        let constructor = program
-            .constructors
-            .get(constructor.0)
-            .ok_or(RunError::Internal("unknown constructor"))?;
+        let class = self.constructor(constructor)?.class;
+        let object = self.build(constructor, arguments, class, &mut Vec::new())?;
+        Ok(Value::Object(object))
+    }
+
+    /// Runs a constructor for an object of `class`: its fields' values and
+    /// the start of its `init` before the object exists; then its base's
+    /// constructor (which builds the object), or, in the root class, the
+    /// object itself, with the fields of its own class first and then
+    /// `subclass_fields` from the closest subclass down; and then the rest
+    /// of `init` with `self`. So `init`s finish from the root down.
+    fn build(
+        &mut self,
+        constructor: ConstructorId,
+        mut frame: Vec<Value>,
+        class: ClassRef,
+        subclass_fields: &mut Vec<Vec<Value>>,
+    ) -> Result<Rc<Object>, RunError> {
+        let constructor = self.constructor(constructor)?;
         frame.resize(constructor.slots, Value::Null);
         if !matches!(self.block(&constructor.setup, &mut frame)?, Flow::Next) {
             return Err(RunError::Internal("`init` left before its object exists"));
@@ -200,11 +216,58 @@ impl<'a> Machine<'a> {
                     .ok_or(RunError::Internal("field value outside its constructor"))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let object = Value::Object(Rc::new(Object::new(constructor.class, fields)));
-        store(&mut frame, constructor.self_slot, object.clone())?;
+        let object = if let Some(base) = &constructor.base {
+            let arguments = self.evaluate_all(&base.arguments, &frame)?;
+            subclass_fields.push(fields);
+            self.build(base.constructor, arguments, class, subclass_fields)?
+        } else {
+            let mut row = fields;
+            for fields in subclass_fields.drain(..).rev() {
+                row.extend(fields);
+            }
+            Rc::new(Object::new(class, row))
+        };
+        store(
+            &mut frame,
+            constructor.self_slot,
+            Value::Object(Rc::clone(&object)),
+        )?;
         // A `return` in `init` only ends it: the object is built anyway.
         self.block(&constructor.rest, &mut frame)?;
         Ok(object)
+    }
+
+    fn constructor(&self, constructor: ConstructorId) -> Result<&'a Constructor, RunError> {
+        self.program
+            .constructors
+            .get(constructor.0)
+            .ok_or(RunError::Internal("unknown constructor"))
+    }
+
+    /// The field at `position` of an object; with `?.`, `null` for no
+    /// object.
+    fn field(
+        &mut self,
+        object: &Expression,
+        position: usize,
+        null_safe: bool,
+        frame: &Frame,
+    ) -> Result<Value, RunError> {
+        match self.evaluate(object, frame)? {
+            Value::Null if null_safe => Ok(Value::Null),
+            object => object_of(&object)?.field(position),
+        }
+    }
+
+    /// Whether `value` is an object of `class` or of a subclass.
+    fn is_instance(&self, value: &Value, class: ClassRef) -> bool {
+        let Value::Object(object) = value else {
+            return false;
+        };
+        self.program
+            .classes
+            .get(object.class.0)
+            .is_some_and(|own| own.ancestors.contains(&class))
     }
 
     /// A method of the object `receiver`, with `self` as its first local.
@@ -339,10 +402,16 @@ impl<'a> Machine<'a> {
                 object,
                 position,
                 null_safe,
-            } => match self.evaluate(object, frame)? {
-                Value::Null if *null_safe => Value::Null,
-                object => object_of(&object)?.field(*position)?,
-            },
+            } => self.field(object, *position, *null_safe, frame)?,
+            Expression::IsInstance { value, class } => {
+                let value = self.evaluate(value, frame)?;
+                Value::Bool(self.is_instance(&value, *class))
+            }
+            Expression::Downcast { value, class } => {
+                let value = self.evaluate(value, frame)?;
+                let is_instance = self.is_instance(&value, *class);
+                if is_instance { value } else { Value::Null }
+            }
             Expression::Print(message) => {
                 let message = self.evaluate(message, frame)?.to_text()?;
                 writeln!(self.output, "{message}").map_err(RunError::Output)?;

@@ -58,11 +58,25 @@ fn programs_need_one_main() {
 
 #[test]
 fn what_cannot_run_yet_is_refused_before_running() {
-    let inheritance = "class Base {\n}\nclass Main extends Base {\n static func main() {\n }\n}\n";
+    let node = "class Player extends Node {\n init() {\n super.init(\"player\")\n }\n}\nclass Main {\n static func main() {\n }\n}\n";
     assert_eq!(
-        lowering_error(inheritance),
-        LowerErrorKind::Unsupported("inheritance")
+        lowering_error(node),
+        LowerErrorKind::Unsupported("classes that extend engine classes")
     );
+}
+
+#[test]
+fn subclasses_override_and_call_their_base() {
+    // The subclass is written first: tables are built bases first.
+    let source = "class Loud extends Quiet {\n var volume: int\n \
+                  init(level: int) {\n super.init(\"loud\")\n volume = level\n }\n \
+                  override func say() -> string {\n return super.say() + \"!\" + volume.to_string()\n }\n}\n\
+                  class Quiet {\n var word: string\n init(word: string) {\n self.word = word\n }\n \
+                  func say() -> string {\n return word\n }\n}\n\
+                  class Main {\n static func main() {\n const voice: Quiet = Loud(3)\n \
+                  Debug.print(voice.say())\n Debug.print((voice is Loud).to_string())\n \
+                  const quiet = Quiet(\"shh\")\n Debug.print(((quiet as Loud) == null).to_string())\n }\n}\n";
+    assert_eq!(run(source).ok().as_deref(), Some("loud!3\ntrue\ntrue\n"));
 }
 
 #[test]

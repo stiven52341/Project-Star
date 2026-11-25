@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use star_script::Span;
 use star_script::ast::{ClassDecl, Expr, MemberKind, MethodDecl, SourceFile, VariableKind};
 use star_script::semantic::{
-    Analysis, ClassId, ClassInfo, ClassOrigin, Execution, MethodInfo, Type,
+    Analysis, ClassId, ClassInfo, ClassOrigin, Execution, MemberRef, MethodInfo, Type,
 };
 
 use crate::Program;
@@ -41,6 +41,8 @@ struct Tables {
     overridable: HashMap<(ClassId, usize), usize>,
     /// The table of each class, in the order of the classes.
     methods: Vec<Vec<FunctionId>>,
+    /// Each class and its bases, in the order of the classes.
+    ancestors: Vec<Vec<ClassRef>>,
 }
 
 impl Tables {
@@ -69,6 +71,9 @@ struct ScriptClass<'a> {
     id: ClassId,
     info: &'a ClassInfo,
     declaration: &'a ClassDecl,
+    /// Its methods that objects run their own version of: (index of the
+    /// method, its function).
+    overridable: Vec<(usize, FunctionId)>,
 }
 
 /// Lowers the whole program.
@@ -85,11 +90,17 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Progra
             .classes
             .get(declaration)
             .ok_or_else(|| LowerError::internal("class without declaration", name))?;
-        if info.base.is_some() {
-            return Err(LowerError::unsupported("inheritance", name));
+        let extends_engine = info
+            .base
+            .is_some_and(|base| analysis.classes().class(base).origin == ClassOrigin::Native);
+        if extends_engine {
+            return Err(LowerError::unsupported(
+                "classes that extend engine classes",
+                name,
+            ));
         }
         tables.classes.insert(id, ClassRef(classes.len()));
-        let mut table = Vec::new();
+        let mut overridable = Vec::new();
         for (index, method) in info.methods.iter().enumerate() {
             let declaration = method_declaration(declaration, method)?;
             check_method(method, declaration.name.span)?;
@@ -104,8 +115,7 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Progra
                 main = Some(function);
             }
             if !method.is_static && !method.is_private {
-                tables.overridable.insert((id, index), table.len());
-                table.push(function);
+                overridable.push((index, function));
             }
             tables.functions.insert(Member::Method(id, index), function);
             pending.push(Pending::Method {
@@ -114,7 +124,6 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Progra
                 info: method,
             });
         }
-        tables.methods.push(table);
         for (index, constant) in info.constants.iter().enumerate() {
             let value = constant_value(declaration, constant.span)?;
             tables
@@ -130,8 +139,10 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Progra
             id,
             info,
             declaration,
+            overridable,
         });
     }
+    method_tables(analysis, &mut tables, &classes)?;
     let main =
         main.ok_or_else(|| LowerError::new(LowerErrorKind::NoEntryPoint, Span::new(0, 0)))?;
     let functions = pending
@@ -152,7 +163,8 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Progra
     let classes = tables
         .methods
         .into_iter()
-        .map(|methods| Class { methods })
+        .zip(tables.ancestors)
+        .map(|(methods, ancestors)| Class { methods, ancestors })
         .collect();
     Ok(Program {
         functions,
@@ -160,6 +172,88 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Progra
         classes,
         main,
     })
+}
+
+/// The table of overridable methods of every class: a subclass starts
+/// from its base's table, puts its overrides in the places of the methods
+/// they replace and adds its new methods at the end. Bases are filled in
+/// first, wherever they are written.
+fn method_tables(
+    analysis: &Analysis,
+    tables: &mut Tables,
+    classes: &[ScriptClass<'_>],
+) -> Result<(), LowerError> {
+    let table_classes = analysis.classes();
+    let depth = |class: &ScriptClass<'_>| table_classes.ancestors(class.id).count();
+    let mut order: Vec<&ScriptClass<'_>> = classes.iter().collect();
+    order.sort_by_key(|class| depth(class));
+    let mut methods: Vec<Option<Vec<FunctionId>>> = vec![None; classes.len()];
+    for class in order {
+        let span = class.declaration.name.span;
+        let base = class.info.base;
+        let mut table = match base.and_then(|base| tables.classes.get(&base)) {
+            Some(base) => methods
+                .get(base.0)
+                .cloned()
+                .flatten()
+                .ok_or_else(|| LowerError::internal("base without a table", span))?,
+            None => Vec::new(),
+        };
+        for (index, function) in &class.overridable {
+            let method = class
+                .info
+                .methods
+                .get(*index)
+                .ok_or_else(|| LowerError::internal("unknown method", span))?;
+            let overridden = base
+                .filter(|_| method.is_override)
+                .and_then(|base| overridden_place(analysis, tables, base, &method.name));
+            let place = if let Some(place) = overridden {
+                let slot = table
+                    .get_mut(place)
+                    .ok_or_else(|| LowerError::internal("place outside the table", span))?;
+                *slot = *function;
+                place
+            } else {
+                table.push(*function);
+                table.len() - 1
+            };
+            tables.overridable.insert((class.id, *index), place);
+        }
+        let position = tables
+            .classes
+            .get(&class.id)
+            .ok_or_else(|| LowerError::internal("class without a position", span))?;
+        if let Some(entry) = methods.get_mut(position.0) {
+            *entry = Some(table);
+        }
+    }
+    tables.methods = methods.into_iter().map(Option::unwrap_or_default).collect();
+    tables.ancestors = classes
+        .iter()
+        .map(|class| {
+            table_classes
+                .ancestors(class.id)
+                .filter_map(|id| tables.classes.get(&id).copied())
+                .collect()
+        })
+        .collect();
+    Ok(())
+}
+
+/// The place in the tables of the method `name` that `base` (or one of
+/// its bases) has, which an override takes.
+fn overridden_place(
+    analysis: &Analysis,
+    tables: &Tables,
+    base: ClassId,
+    name: &str,
+) -> Option<usize> {
+    let found = analysis.classes().find_member(base, name)?;
+    let MemberRef::Method(index) = found.member else {
+        return None;
+    };
+    tables.overridable.get(&(found.class, index)).copied()
 }
 
 /// Lowers a method or a constant.

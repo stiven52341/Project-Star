@@ -6,7 +6,7 @@ use star_script::semantic::{BuiltinMethod, ClassId, ClassOrigin, Resolution, Typ
 use super::Member;
 use super::body::Body;
 use crate::error::LowerError;
-use crate::tree::{Arithmetic, Comparison, Expression, MethodTarget, NumberType};
+use crate::tree::{Arithmetic, ClassRef, Comparison, Expression, MethodTarget, NumberType};
 use crate::value::Value;
 
 /// The engine class whose `print` writes a line.
@@ -48,8 +48,11 @@ impl Body<'_> {
             }),
             ExprKind::Array(elements) => self.array(expression, elements),
             ExprKind::SelfValue => self.self_value(expression),
-            ExprKind::Super => Err(LowerError::unsupported("inheritance", span)),
-            ExprKind::TypeTest { .. } => Err(LowerError::unsupported("`is`", span)),
+            ExprKind::Super => Err(LowerError::internal("`super` used as a value", span)),
+            ExprKind::TypeTest { value, type_ref } => Ok(Expression::IsInstance {
+                value: Box::new(self.expression(value)?),
+                class: self.class_named(&type_ref.to_string(), expression)?,
+            }),
             ExprKind::Await(_) => Err(LowerError::unsupported("`await`", span)),
         }
     }
@@ -94,16 +97,9 @@ impl Body<'_> {
 
     fn name(&self, expression: &Expr) -> Result<Expression, LowerError> {
         match self.resolution(expression)? {
-            Some(Resolution::Local(local)) => {
-                // Read where a check proved it is not `null`: a nullable
-                // value that is not `null` is already the value itself.
-                let declared = self.local_type(local, expression)?;
-                let known = self.type_of(expression)?;
-                if declared != known && declared.non_null() != *known {
-                    return Err(LowerError::unsupported("`is`", expression.span));
-                }
-                Ok(Expression::Local(self.slot(local, expression)?))
-            }
+            // Read where a check proved more about it (`!= null`, `is`),
+            // it is still the same value: values carry their class.
+            Some(Resolution::Local(local)) => Ok(Expression::Local(self.slot(local, expression)?)),
             Some(Resolution::Constant { class, index }) => self.constant(class, index, expression),
             Some(Resolution::Field { class, index }) => Ok(Expression::Field {
                 object: Box::new(self.self_value(expression)?),
@@ -209,7 +205,8 @@ impl Body<'_> {
         Ok((self.value_as(left, common)?, self.value_as(right, common)?))
     }
 
-    /// `value as Type` between numbers.
+    /// `value as Type`: between numbers, to a base class (nothing to do)
+    /// or to a subclass (the object, or `null` if it is not one).
     fn cast(&self, expression: &Expr, value: &Expr) -> Result<Expression, LowerError> {
         let target = self.type_of(expression)?;
         let from = self.type_of(value)?;
@@ -217,13 +214,48 @@ impl Body<'_> {
         if from == target {
             return Ok(lowered);
         }
-        if !from.is_numeric() || !target.is_numeric() {
+        if from.is_numeric() && target.is_numeric() {
+            return convert(lowered, target, expression);
+        }
+        let (Some(from_class), Some(to_class)) = (from.class(), target.class()) else {
+            return Err(LowerError::internal(
+                "cast between unrelated types",
+                expression.span,
+            ));
+        };
+        if self.analysis.classes().is_subclass(from_class, to_class) {
+            return Ok(lowered);
+        }
+        Ok(Expression::Downcast {
+            value: Box::new(lowered),
+            class: self.class_ref(to_class, expression)?,
+        })
+    }
+
+    /// The class of the program called `name`, as `is` names it.
+    fn class_named(&self, name: &str, expression: &Expr) -> Result<ClassRef, LowerError> {
+        let class = self
+            .analysis
+            .classes()
+            .find(name)
+            .ok_or_else(|| LowerError::internal("unknown class", expression.span))?;
+        self.class_ref(class, expression)
+    }
+
+    /// The position of `class`, a class of the program; engine classes
+    /// are refused.
+    fn class_ref(&self, class: ClassId, expression: &Expr) -> Result<ClassRef, LowerError> {
+        if self.analysis.classes().class(class).origin == ClassOrigin::Native {
             return Err(LowerError::unsupported(
-                "`as` between classes",
+                "`is` and `as` with engine classes",
                 expression.span,
             ));
         }
-        convert(lowered, target, expression)
+        self.tables
+            .classes
+            .get(&class)
+            .copied()
+            .ok_or_else(|| LowerError::internal("class without a position", expression.span))
     }
 
     /// `[a, b, c]`, each element converted to the list's element type.
@@ -302,7 +334,13 @@ impl Body<'_> {
         let (receiver, null_safe) = match &callee.kind {
             ExprKind::Name(_) => (self.self_value(callee)?, false),
             ExprKind::Member { object, .. } if matches!(object.kind, ExprKind::Super) => {
-                return Err(LowerError::unsupported("inheritance", callee.span));
+                // The base's version, whatever the object overrides.
+                return Ok(Expression::CallMethod {
+                    target: MethodTarget::Direct(function),
+                    receiver: Box::new(self.self_value(callee)?),
+                    arguments,
+                    null_safe: false,
+                });
             }
             ExprKind::Member {
                 object, null_safe, ..

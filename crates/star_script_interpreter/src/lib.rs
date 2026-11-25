@@ -17,9 +17,9 @@
 //! 2. [`Program::run`] walks that tree. StarScript's runtime errors, such
 //!    as dividing an integer by zero, come back as a [`RunError`].
 //!
-//! For now it runs console programs: static functions and objects of
-//! classes without a base (Phase 14 of `docs/roadmap.md` brings the rest
-//! of the language step by step).
+//! For now it runs console programs: static functions, classes and
+//! inheritance (Phase 14 of `docs/roadmap.md` brings the rest of the
+//! language step by step).
 
 mod error;
 mod lower;

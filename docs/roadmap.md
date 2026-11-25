@@ -485,7 +485,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           compute their value each time, as compiled. The runtime's
           index check got `try_index`, so both stop with the same
           message.
-  - [ ] 14.2 Classes: fields, methods, constructors and `init`,
+  - [x] 14.2 Classes: fields, methods, constructors and `init`,
         inheritance and `override`, static members, null safety, number
         widening and `as`, equality, and the runtime errors of
         `star_script_runtime::fault` with the same messages.
@@ -533,10 +533,13 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           equality by identity; with a new conformance program. Done:
           `classes.star` runs both ways with the same output. Programs
           with inheritance are refused when lowered, for now.
-    - [ ] 14.2b Inheritance: fields of the base, two-phase construction
+    - [x] 14.2b Inheritance: fields of the base, two-phase construction
           with `super.init(…)`, `override` through the tables,
           `super.method()`, `is`, `as` and narrowing: `objects.star`
-          gives the same output interpreted and compiled.
+          gives the same output interpreted and compiled. Done; the
+          tables are built bases first, wherever classes are written.
+          Classes that extend engine classes are refused until 14.6.
+          `decorators.star` only lacks `Time.now` (14.3).
   - [ ] 14.3 The rest of the console language: decorators (the user's
         `Decorator` classes) and `Time.now` (the methods of strings,
         lists and numbers, and constants, came in 14.1b).

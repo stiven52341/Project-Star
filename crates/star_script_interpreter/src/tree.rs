@@ -24,6 +24,8 @@ pub(crate) struct Class {
     /// The function of each method that objects run their own version
     /// of, by its place in the table.
     pub(crate) methods: Vec<FunctionId>,
+    /// The class itself and its bases: what `is` accepts.
+    pub(crate) ancestors: Vec<ClassRef>,
 }
 
 /// How objects of a class are built, in the two phases of the language.
@@ -36,13 +38,23 @@ pub(crate) struct Constructor {
     /// Before the object exists: the fields' values and the start of
     /// `init`, which put each field's value in its local.
     pub(crate) setup: Vec<Statement>,
-    /// The local that holds each field's value when the object is built,
-    /// in the order of the object's fields.
+    /// The local that holds the value of each field the class declares
+    /// when the object is built, in order.
     pub(crate) fields: Vec<usize>,
+    /// The constructor of the base, with its arguments (evaluated in this
+    /// constructor's locals): it builds the object.
+    pub(crate) base: Option<BaseConstructor>,
     /// The local that holds the object once it exists: `self`.
     pub(crate) self_slot: usize,
     /// The rest of `init`, with `self`.
     pub(crate) rest: Vec<Statement>,
+}
+
+/// The call of a base's constructor: `super.init(…)`, written or not.
+#[derive(Debug)]
+pub(crate) struct BaseConstructor {
+    pub(crate) constructor: ConstructorId,
+    pub(crate) arguments: Vec<Expression>,
 }
 
 /// Which function a call of a method of an object runs.
@@ -185,6 +197,17 @@ pub(crate) enum Expression {
         object: Box<Expression>,
         position: usize,
         null_safe: bool,
+    },
+    /// `value is Class`: whether the value is an object of the class or
+    /// of a subclass (`null` is not).
+    IsInstance {
+        value: Box<Expression>,
+        class: ClassRef,
+    },
+    /// `value as Subclass`: the object if it is one, else `null`.
+    Downcast {
+        value: Box<Expression>,
+        class: ClassRef,
     },
     /// `Debug.print(text)`.
     Print(Box<Expression>),
