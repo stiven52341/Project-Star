@@ -858,6 +858,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           (`Main().SIZE`) compiles (the object is evaluated for its
           effects) but the interpreter refuses it; it needs an expression
           that evaluates one value and gives another, in both runners.
+          Closed after 14.9: `Expression::Then` runs the object for its
+          effects and gives the constant, in both runners, with the
+          conformance program `programs/constants_through_objects.star`.
     - [x] 14.8c Games in windows: the window test plays every game of
           `engine_game.rs` interpreted, each in its own process.
           The games of `engine_game.rs`, their scenes and their expected

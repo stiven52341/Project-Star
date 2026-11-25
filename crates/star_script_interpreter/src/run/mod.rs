@@ -562,6 +562,7 @@ impl Machine {
             Expression::Downcast { value, class } => {
                 self.downcast(self.evaluate(value, frame)?, *class)
             }
+            Expression::Then(first, value) => self.evaluate_pair(first, value, frame)?.1,
             Expression::Now => Value::Float(star_script_runtime::tasks::now()),
             Expression::Print(message) => {
                 self.print(&self.evaluate(message, frame)?.to_text()?)?;

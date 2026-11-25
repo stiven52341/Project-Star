@@ -67,11 +67,20 @@ fn programs_need_one_main() {
 
 #[test]
 fn what_cannot_run_yet_is_refused_before_running() {
-    let constant = "class Main {\n const SIZE = 2\n static func main() {\n Debug.print(Main().SIZE.to_string())\n }\n}\n";
+    // The compiler refuses it too, when it generates the class.
+    let sound = "class Loud extends Sound {\n}\nclass Main {\n static func main() {\n }\n}\n";
     assert_eq!(
-        lowering_error(constant),
-        LowerErrorKind::Unsupported("objects")
+        lowering_error(sound),
+        LowerErrorKind::Unsupported("classes that extend this engine class")
     );
+}
+
+#[test]
+fn constants_through_objects_still_evaluate_the_object() {
+    let source = "class Main {\n const SIZE = 2\n static func main() {\n \
+                  Debug.print(Main.make().SIZE.to_string())\n }\n \
+                  static func make() -> Main {\n Debug.print(\"made\")\n return Main()\n }\n}\n";
+    assert_eq!(run(source).ok().as_deref(), Some("made\n2\n"));
 }
 
 #[test]

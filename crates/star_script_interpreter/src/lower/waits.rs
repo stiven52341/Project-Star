@@ -57,6 +57,7 @@ fn mark(expression: &mut Expression) -> bool {
         | Expression::Equal(left, right)
         | Expression::And(left, right)
         | Expression::Or(left, right)
+        | Expression::Then(left, right)
         | Expression::Coalesce(left, right)
         | Expression::Index {
             list: left,

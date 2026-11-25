@@ -161,10 +161,15 @@ impl Body<'_> {
     ) -> Result<Expression, LowerError> {
         match self.resolution(expression)? {
             Some(Resolution::Constant { class, index }) => {
-                if !matches!(self.resolution(object)?, Some(Resolution::Class(_))) {
-                    return Err(LowerError::unsupported("objects", object.span));
+                let constant = self.constant(class, index, expression)?;
+                if matches!(self.resolution(object)?, Some(Resolution::Class(_))) {
+                    return Ok(constant);
                 }
-                self.constant(class, index, expression)
+                // Through an object: it is still evaluated, for its effects.
+                Ok(Expression::Then(
+                    Box::new(self.expression(object)?),
+                    Box::new(constant),
+                ))
             }
             Some(Resolution::Field { class, index }) => Ok(Expression::Field {
                 object: Box::new(self.expression(object)?),

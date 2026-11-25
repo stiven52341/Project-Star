@@ -559,6 +559,9 @@ pub(crate) enum Expression {
     And(Box<Expression>, Box<Expression>),
     /// `left || right`: the right side only runs if the left one fails.
     Or(Box<Expression>, Box<Expression>),
+    /// Runs the first expression for its effects and gives the second:
+    /// a constant read through an object, which still evaluates the object.
+    Then(Box<Expression>, Box<Expression>),
     /// A call of a static function, with its arguments already converted
     /// to the types of its parameters.
     Call {

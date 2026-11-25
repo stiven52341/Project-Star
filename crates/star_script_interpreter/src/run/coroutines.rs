@@ -455,6 +455,10 @@ impl Machine {
                     self.condition_waiting(left, frame).await?
                         || self.condition_waiting(right, frame).await?,
                 ),
+                Expression::Then(first, value) => {
+                    self.value(first, frame).await?;
+                    self.value(value, frame).await?
+                }
                 Expression::Coalesce(value, fallback) => match self.value(value, frame).await? {
                     Value::Null => self.value(fallback, frame).await?,
                     value => value,
