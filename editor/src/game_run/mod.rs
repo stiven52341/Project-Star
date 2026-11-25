@@ -1,5 +1,9 @@
-//! “Play”: the game's generated Rust built with Cargo and run in its own
-//! window, on a thread of its own so the editor keeps drawing.
+//! “Play”: the player (`star_player`, decision 74) run in the project's
+//! folder, where it reads the project and plays it with its StarScript
+//! interpreted, in its own window, on a thread of its own so the editor
+//! keeps drawing. Cargo first confirms the player is up to date (it is
+//! built once, by the warm-up), so a changed engine never plays with an
+//! old player.
 //!
 //! The engine's crates are those of the ProjectStar repository the editor
 //! was built from, so “Play” works while the editor runs from its sources;
@@ -11,7 +15,6 @@ mod warm_up;
 
 use std::env;
 use std::ffi::OsString;
-use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -20,23 +23,19 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 
-use star_script::MainScene;
-use star_script::codegen::{EntryPoint, GeneratedProgram};
-use star_script::package::Package;
-
 use self::process::{Ended, Events};
 pub(crate) use self::warm_up::EngineWarmUp;
 use crate::texts;
 
 /// The `crates` folder of the repository, with the runtime and the engine.
 const ENGINE_CRATES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../crates");
-/// The repository's `Cargo.lock`: games build the same versions as the
-/// engine and the editor, so every project shares one build of them.
+/// The repository's `Cargo.lock`: the player builds the same versions as
+/// the engine and the editor.
 const ENGINE_LOCKFILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.lock");
 /// A crate that is always in the engine's folder, to tell that it is there.
 const ENGINE_CRATE: &str = "star_engine";
-/// Where games are written and built, inside the repository's `target`: one
-/// build of the engine is shared by every project.
+/// Where the player is written and built, inside the repository's
+/// `target`: one build of it plays every project.
 const BUILD_DIRECTORY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../target/star_editor_games");
 /// The folder of Cargo's results, inside [`BUILD_DIRECTORY`].
 const CARGO_TARGET: &str = "target";
@@ -46,15 +45,13 @@ const DEBUG_PROFILE: &str = "debug";
 const CARGO_VARIABLE: &str = "CARGO";
 /// Cargo, when the editor was not started by it.
 const DEFAULT_CARGO: &str = "cargo";
-/// Name of the package of a project whose name has no letter to keep.
-const FALLBACK_PACKAGE_NAME: &str = "game";
 /// Name of the thread that builds and runs the game.
 const THREAD_NAME: &str = "play";
 
 /// Who wrote a line of the output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OutputKind {
-    /// Cargo, building the game.
+    /// Cargo, building the player.
     Build,
     /// The game.
     Game,
@@ -70,7 +67,7 @@ pub(crate) struct OutputLine {
 /// What a run is doing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RunPhase {
-    /// Cargo is building the game.
+    /// Cargo is building the player, or confirming it is up to date.
     Building,
     /// The game is running.
     Running,
@@ -83,7 +80,7 @@ pub(crate) enum RunPhase {
 pub(crate) enum RunEnd {
     /// The game closed; with its exit code if it has one.
     Closed { success: bool, code: Option<i32> },
-    /// Cargo could not build the game: its output says why.
+    /// Cargo could not build the player: its output says why.
     BuildFailed,
     /// The user stopped it.
     Stopped,
@@ -98,30 +95,10 @@ pub(crate) enum RunEvent {
     Phase(RunPhase),
 }
 
-/// The game of a project, ready to play.
+/// The project to play.
 pub(crate) struct PlayRequest {
-    /// The project's name, which names its package.
-    pub(crate) name: String,
-    /// The project's folder: the game runs in it, so it finds `assets/`.
+    /// The project's folder: the player runs in it and reads the project.
     pub(crate) directory: PathBuf,
-    /// What is played.
-    pub(crate) game: PlayedGame,
-}
-
-/// What “Play” builds and runs.
-pub(crate) enum PlayedGame {
-    /// The game's Rust code, built as a package of its own.
-    Program(GeneratedProgram),
-    /// The main scene of a project without scripts, played by the scene
-    /// player that every such project shares.
-    Scene(MainScene),
-}
-
-/// A program ready to build: its package and how to run it once built.
-struct Build {
-    package: PathBuf,
-    binary: String,
-    arguments: Vec<String>,
 }
 
 /// A game being built or played.
@@ -188,13 +165,14 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
     if !engine_is_available() {
         return RunEnd::Failed(texts::current().engine_not_found(engine));
     }
-    let build = match prepare_build(request, events) {
-        Ok(build) => build,
-        Err(end) => return end,
+    events.send(RunEvent::Phase(RunPhase::Building));
+    let package = match player::write_player() {
+        Ok(package) => package,
+        Err(error) => return RunEnd::Failed(texts::current().player_not_written(&error)),
     };
     let output = Path::new(BUILD_DIRECTORY);
     match process::run(
-        build_command(&build.package, output),
+        build_command(&package, output),
         OutputKind::Build,
         events,
         stop,
@@ -205,8 +183,8 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
         Err(error) => return RunEnd::Failed(texts::current().cargo_not_started(&error)),
     }
     events.send(RunEvent::Phase(RunPhase::Running));
-    let mut game = Command::new(binary(output, &build.binary));
-    game.args(&build.arguments).current_dir(&request.directory);
+    let mut game = Command::new(binary(output, player::PLAYER_PACKAGE));
+    game.current_dir(&request.directory);
     match process::run(game, OutputKind::Game, events, stop) {
         Ok(Ended::Exited(status)) => RunEnd::Closed {
             success: status.success(),
@@ -217,57 +195,9 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
     }
 }
 
-/// Writes the package that plays `request`, telling the editor it is being
-/// built. A scene is played by the shared player: Cargo builds it once
-/// and, from then on, only checks that it is up to date (well under a
-/// second), so a changed engine never plays with an old player.
-fn prepare_build(request: &PlayRequest, events: &Events) -> Result<Build, RunEnd> {
-    match &request.game {
-        PlayedGame::Program(program) => {
-            // Without a game or a `main` the crate has no `fn main`, and
-            // Cargo's error would not say what is missing.
-            if program.entry_point == EntryPoint::None {
-                return Err(RunEnd::Failed(texts::current().no_game_to_play.to_owned()));
-            }
-            events.send(RunEvent::Phase(RunPhase::Building));
-            let name = package_name(&request.name);
-            let package = Path::new(BUILD_DIRECTORY).join(&name);
-            write_package(&name, program, Path::new(ENGINE_CRATES), &package)
-                .map_err(|error| RunEnd::Failed(texts::current().game_not_written(&error)))?;
-            Ok(Build {
-                package,
-                binary: name,
-                arguments: Vec::new(),
-            })
-        }
-        PlayedGame::Scene(scene) => {
-            events.send(RunEvent::Phase(RunPhase::Building));
-            let package = player::write_player()
-                .map_err(|error| RunEnd::Failed(texts::current().game_not_written(&error)))?;
-            Ok(Build {
-                package,
-                binary: player::PLAYER_PACKAGE.to_owned(),
-                arguments: vec![scene.path.clone(), scene.title.clone()],
-            })
-        }
-    }
-}
-
-/// Whether the engine's crates are where games are built from.
+/// Whether the engine's crates are where the player is built from.
 fn engine_is_available() -> bool {
     Path::new(ENGINE_CRATES).join(ENGINE_CRATE).is_dir()
-}
-
-fn write_package(
-    name: &str,
-    program: &GeneratedProgram,
-    engine: &Path,
-    directory: &Path,
-) -> io::Result<()> {
-    let lockfile = fs::read_to_string(ENGINE_LOCKFILE)?;
-    let mut package = Package::new(name, engine)?.with_lockfile(lockfile);
-    package.add_program(name, program.clone())?;
-    package.write(directory)
 }
 
 /// `cargo build` of the package in `package`, with its results in `output`.
@@ -282,29 +212,12 @@ fn build_command(package: &Path, output: &Path) -> Command {
     command
 }
 
-/// The game's executable, once built.
+/// The executable of the package `name`, once built.
 fn binary(output: &Path, name: &str) -> PathBuf {
     output
         .join(CARGO_TARGET)
         .join(DEBUG_PROFILE)
         .join(format!("{name}{}", env::consts::EXE_SUFFIX))
-}
-
-/// A valid package name from a project's name: `My Game` → `my_game`.
-fn package_name(project: &str) -> String {
-    let name: String = project
-        .trim()
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect();
-    if name.starts_with(|c: char| c.is_ascii_alphabetic()) {
-        name
-    } else if name.chars().any(|c| c.is_ascii_alphanumeric()) {
-        format!("{FALLBACK_PACKAGE_NAME}_{name}")
-    } else {
-        FALLBACK_PACKAGE_NAME.to_owned()
-    }
 }
 
 #[cfg(test)]
@@ -322,34 +235,8 @@ mod tests {
     const NEVER_END_VARIABLE: &str = "STAR_EDITOR_TEST_NEVER_END";
 
     #[test]
-    fn package_names_come_from_the_project_name() {
-        assert_eq!(package_name("My Game"), "my_game");
-        assert_eq!(package_name("2048"), "game_2048");
-        assert_eq!(package_name("¡Ñ!"), "game");
-    }
-
-    #[test]
     fn the_engine_is_found_in_the_repository() {
         assert!(engine_is_available());
-    }
-
-    #[test]
-    fn games_share_the_engine_lockfile() {
-        let package = Path::new(BUILD_DIRECTORY).join("editor_test_lockfile");
-        let program = star_script::compile_source("class Main {\n static func main() {}\n}\n")
-            .expect("valid program");
-
-        write_package(
-            "editor_test_lockfile",
-            &program,
-            Path::new(ENGINE_CRATES),
-            &package,
-        )
-        .expect("written");
-
-        let written = fs::read_to_string(package.join("Cargo.lock")).expect("lockfile");
-        let engine = fs::read_to_string(ENGINE_LOCKFILE).expect("engine lockfile");
-        assert_eq!(written, engine);
     }
 
     #[test]
@@ -381,18 +268,18 @@ mod tests {
         );
     }
 
-    #[test]
-    fn programs_are_built_and_played_in_their_project() {
-        let project = crate::project::TestDirectory::new("play_console");
-        std::fs::create_dir_all(project.path()).expect("project folder");
-        let program = star_script::compile_source(
-            "class Main {\n static func main() {\n Debug.print(\"hello from the game\")\n }\n}\n",
-        )
-        .expect("valid program");
+    /// Plays a project with `files` (paths inside it) and gives what
+    /// happened, until the run finished.
+    fn play_project(name: &str, files: &[(&str, &str)]) -> Vec<RunEvent> {
+        let project = crate::project::TestDirectory::new(name);
+        std::fs::create_dir_all(project.path().join("assets")).expect("assets folder");
+        for (path, text) in files {
+            let path = project.path().join(path);
+            std::fs::create_dir_all(path.parent().expect("a folder")).expect("folder");
+            std::fs::write(path, text).expect("file");
+        }
         let request = PlayRequest {
-            name: "Editor test console".to_owned(),
             directory: project.path().to_path_buf(),
-            game: PlayedGame::Program(program),
         };
 
         let run = GameRun::start(request, || {}).expect("thread started");
@@ -405,6 +292,34 @@ mod tests {
                 break;
             }
         }
+        events
+    }
+
+    /// What the game wrote, its standard and error output together.
+    fn game_output(events: &[RunEvent]) -> String {
+        events
+            .iter()
+            .filter_map(|event| match event {
+                RunEvent::Output(line) if line.kind == OutputKind::Game => Some(line.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn projects_are_played_by_the_player_in_their_folder() {
+        let events = play_project(
+            "play_console",
+            &[
+                ("project.toml", "[project]\nname = \"Console\"\n"),
+                (
+                    "assets/main.star",
+                    "class Main {\n static func main() {\n Debug.print(\"hello from the game\")\n }\n}\n",
+                ),
+            ],
+        );
+
         let printed = RunEvent::Output(OutputLine {
             kind: OutputKind::Game,
             text: "hello from the game".to_owned(),
@@ -420,62 +335,28 @@ mod tests {
     }
 
     #[test]
-    fn scenes_are_played_by_the_scene_player() {
-        let project = crate::project::TestDirectory::new("play_scene");
-        std::fs::create_dir_all(project.path()).expect("project folder");
-        let request = PlayRequest {
-            name: "Editor test scene".to_owned(),
-            directory: project.path().to_path_buf(),
-            // Missing, so the player stops at once instead of playing it.
-            game: PlayedGame::Scene(MainScene {
-                path: "scenes/missing.scene".to_owned(),
-                title: "Scene".to_owned(),
-            }),
-        };
+    fn main_scenes_are_played_by_the_player() {
+        // Missing, so the player stops at once instead of playing it.
+        let events = play_project(
+            "play_scene",
+            &[(
+                "project.toml",
+                "[project]\nname = \"Scene\"\nmain_scene = \"scenes/missing.scene\"\n",
+            )],
+        );
 
-        let run = GameRun::start(request, || {}).expect("thread started");
-
-        let mut errors = String::new();
-        let mut end = None;
-        while let Ok(event) = run.receiver.recv_timeout(BUILD_TIMEOUT) {
-            match event {
-                RunEvent::Output(line) if line.kind == OutputKind::Game => {
-                    errors.push_str(&line.text);
-                }
-                RunEvent::Phase(RunPhase::Finished(finished)) => {
-                    end = Some(finished);
-                    break;
-                }
-                _ => {}
-            }
-        }
+        let output = game_output(&events);
         assert!(
-            errors.contains("\"scenes/missing.scene\", could not be loaded"),
-            "{errors}"
+            output.contains("\"scenes/missing.scene\", could not be loaded"),
+            "{output}"
         );
-        assert!(matches!(end, Some(RunEnd::Closed { success: false, .. })));
-    }
-
-    #[test]
-    fn programs_without_a_game_are_not_built() {
-        let program = star_script::compile_source(
-            "class Rock extends Node {\n init() { super.init(\"Rock\") }\n}\n",
-        )
-        .expect("valid program");
-        let request = PlayRequest {
-            name: "Editor test no game".to_owned(),
-            directory: std::env::temp_dir(),
-            game: PlayedGame::Program(program),
-        };
-
-        let run = GameRun::start(request, || {}).expect("thread started");
-
-        assert_eq!(
-            run.receiver.recv_timeout(TIMEOUT),
-            Ok(RunEvent::Phase(RunPhase::Finished(RunEnd::Failed(
-                texts::current().no_game_to_play.to_owned()
-            ))))
-        );
+        assert!(matches!(
+            events.last(),
+            Some(RunEvent::Phase(RunPhase::Finished(RunEnd::Closed {
+                success: false,
+                ..
+            })))
+        ));
     }
 
     #[test]

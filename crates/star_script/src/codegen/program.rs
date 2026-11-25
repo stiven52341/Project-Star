@@ -6,7 +6,7 @@ use super::native;
 use super::statements::{Body, BodyKind};
 use super::writer::Writer;
 use super::{
-    CodegenError, CodegenErrorKind, Context, Entry, EntryPoint, GeneratedProgram, Result, internal,
+    CodegenError, CodegenErrorKind, Context, EntryPoint, GeneratedProgram, Result, internal,
 };
 use crate::Span;
 use crate::ast::{ClassDecl, ConstructorDecl, Expr, MemberKind, MethodDecl, VariableKind};
@@ -92,7 +92,7 @@ impl<'a> ClassItem<'a> {
 }
 
 /// Generates the whole file.
-pub(super) fn generate(context: Context<'_>, entry: Entry) -> Result<GeneratedProgram> {
+pub(super) fn generate(context: Context<'_>) -> Result<GeneratedProgram> {
     let game = context
         .analysis
         .classes()
@@ -133,10 +133,7 @@ pub(super) fn generate(context: Context<'_>, entry: Entry) -> Result<GeneratedPr
     out.close("}");
     scene_classes(context, &mut out);
     super::scene_fields::scene_fields(context, &mut out);
-    let entry_point = match entry {
-        Entry::FromProgram => entry_point(context, &mut out, &items, game)?,
-        Entry::Player => player_entry_point(&mut out),
-    };
+    let entry_point = entry_point(context, &mut out, &items, game)?;
     Ok(GeneratedProgram {
         code: out.finish(),
         entry_point,
@@ -333,22 +330,6 @@ fn main_scene_entry_point(context: Context<'_>, out: &mut Writer) -> EntryPoint 
     );
     native::main_scene_game(out);
     EntryPoint::MainScene
-}
-
-/// Writes `fn main` for the scene player: the scene and the title come
-/// from its arguments. It has no input actions: without scripts, nothing
-/// would read them.
-fn player_entry_point(out: &mut Writer) -> EntryPoint {
-    const PLAYER: &str = "::star_script_engine::player";
-    out.line("");
-    native::game_entry_point(
-        out,
-        &format!("main_scene_game_(&{PLAYER}::argument({PLAYER}::SCENE_ARGUMENT, \"scene\")?)?"),
-        &format!("{PLAYER}::argument({PLAYER}::TITLE_ARGUMENT, \"title\")?"),
-        &[],
-    );
-    native::main_scene_game(out);
-    EntryPoint::Player
 }
 
 /// Whether `class` is the game: it extends `Game` and no class extends it,

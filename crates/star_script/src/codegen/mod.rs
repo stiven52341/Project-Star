@@ -48,32 +48,7 @@ pub fn generate(
     syntax: &SourceFile,
     analysis: &Analysis,
 ) -> std::result::Result<GeneratedProgram, CodegenError> {
-    program::generate(Context { syntax, analysis }, Entry::FromProgram)
-}
-
-/// Generates the scene player: a game with no classes of its own that
-/// plays the scene named by its first argument, with its second argument
-/// as the window's title (`player scenes/level.scene "My game"`). One build
-/// of it plays any project without scripts. `syntax` and `analysis` are
-/// those of an empty program.
-///
-/// # Errors
-///
-/// As [`generate`].
-pub fn generate_player(
-    syntax: &SourceFile,
-    analysis: &Analysis,
-) -> std::result::Result<GeneratedProgram, CodegenError> {
-    program::generate(Context { syntax, analysis }, Entry::Player)
-}
-
-/// Where the generated program starts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Entry {
-    /// Where its classes say: `main`, a game or the project's main scene.
-    FromProgram,
-    /// The scene player of [`generate_player`].
-    Player,
+    program::generate(Context { syntax, analysis })
 }
 
 /// The Rust code of a program.
@@ -89,10 +64,7 @@ impl GeneratedProgram {
     /// Whether the code needs the engine (`star_engine`) besides the runtime.
     #[must_use]
     pub fn uses_engine(&self) -> bool {
-        matches!(
-            self.entry_point,
-            EntryPoint::Game | EntryPoint::MainScene | EntryPoint::Player
-        )
+        matches!(self.entry_point, EntryPoint::Game | EntryPoint::MainScene)
     }
 }
 
@@ -108,9 +80,6 @@ pub enum EntryPoint {
     /// It has no game class: it plays the project's main scene in a window
     /// of the engine.
     MainScene,
-    /// It plays the scene its arguments name: the scene player of
-    /// [`generate_player`].
-    Player,
 }
 
 /// Why a program could not be translated to Rust.

@@ -2,8 +2,9 @@
 //! blueprints, the input actions they use and the classes its scenes name.
 //!
 //! It is what “Compile” runs: everything the StarScript compiler can tell
-//! before Cargo builds the generated Rust. When it finds nothing wrong, it
-//! keeps that Rust, for “Play” to build.
+//! before Cargo builds the generated Rust. When it finds nothing wrong,
+//! “Play” runs the player on the project, and it keeps that Rust, which
+//! tells whether there is anything to play (and for “Build”, 14.11).
 
 mod job;
 mod problem;
@@ -18,8 +19,7 @@ use std::path::Path;
 use star_script::codegen::{self, EntryPoint, GeneratedProgram};
 use star_script::semantic::{Analysis, ClassTable, LocalInfo};
 use star_script::{
-    CompileError, GameSettings, MainScene, Position, SourceSet, Span, analyze_program_with,
-    check_program_with,
+    CompileError, GameSettings, Position, SourceSet, Span, analyze_program_with, check_program_with,
 };
 
 pub(crate) use self::job::{CheckJob, CheckStatus};
@@ -40,12 +40,11 @@ pub(crate) struct ProjectCheck {
     /// Every mistake found: in `project.toml` first, then in the scripts and
     /// blueprints, then in the scenes.
     pub(crate) problems: Vec<Problem>,
-    /// The Rust code of the game, if there are scripts and no problems.
+    /// The Rust code of the game, if there are scripts or a main scene,
+    /// and no problems: how it starts tells whether “Play” has something
+    /// to play (the player reads the project itself, decision 74), and
+    /// “Build” will build it.
     pub(crate) program: Option<GeneratedProgram>,
-    /// The main scene, if the project plays nothing else: no scripts, no
-    /// blueprints and no problems. The scene player plays it, so “Play”
-    /// does not build `program`.
-    pub(crate) scene_only: Option<MainScene>,
     /// What the program declares, if its files could be read, even with
     /// mistakes in their meaning.
     pub(crate) outline: Option<ProgramOutline>,
@@ -121,8 +120,8 @@ pub(crate) type OpenTexts = HashMap<String, String>;
 /// What a check is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CheckGoal {
-    /// “Compile”: everything, and the program translated to Rust for
-    /// “Play”.
+    /// “Compile”: everything, and the program translated to Rust, which
+    /// “Play” looks at to tell whether there is a game.
     Compile,
     /// Marking mistakes and suggesting names while scripts are written:
     /// only the program's code is checked (its translation to Rust too, for
@@ -188,16 +187,10 @@ pub(crate) fn check_project_with(
         None => None,
     };
     let program = generated.filter(|_| problems.is_empty());
-    let scene_only = settings.main_scene.filter(|_| scripts == 0).filter(|_| {
-        program
-            .as_ref()
-            .is_some_and(|program| program.entry_point == EntryPoint::MainScene)
-    });
     ProjectCheck {
         scripts,
         problems,
         program,
-        scene_only,
         outline,
     }
 }

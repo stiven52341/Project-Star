@@ -929,7 +929,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           `star_script/tests/example/player_main.star` and `.out`, read
           by the end-to-end test and by the interpreter's new
           `the_example_script_behaves_as_compiled`.
-  - [ ] 14.10 The interpreted player: the scene player of step e grows
+  - [x] 14.10 The interpreted player: the scene player of step e grows
         into a player that loads the project's scripts when it starts;
         “Play” uses it for every project, and any project plays in about
         a second.
@@ -1015,9 +1015,27 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           scene-only project with a missing scene, a script mistake, a
           misspelled binding and a runtime error while the game is
           created.
-    - [ ] 14.10b The editor plays every project with it: the warm-up
+    - [x] 14.10b The editor plays every project with it: the warm-up
           builds it, “Play” runs it, and the compiled scene player is
           removed.
+          `game_run/player.rs` writes the package `_star_player` (its
+          `main` calls `star_player::main`, with the repository's
+          lockfile and the engine's profile) in the editor's folder of
+          games; the warm-up builds it, and “Play” lets Cargo confirm it
+          is up to date (0.26 s measured) and runs it in the project's
+          folder. `PlayRequest` is only the folder now (`PlayedGame`, the
+          package per project and `package_name` went away), and the
+          check's `ProjectCheck` lost `scene_only`: its `program` only
+          tells whether there is a game (`ProblemsPanel::playable`,
+          refusing with the same messages as before). Removed:
+          `star_script::player_program`, `codegen::generate_player`,
+          `EntryPoint::Player`, `star_script_engine::player` and the
+          scene player's part of `engine_game.rs` (whose package folder
+          now drops programs of earlier runs). The texts of “Play” speak
+          of preparing the player instead of building the game. Tests:
+          the editor's tests play a console project and a project whose
+          main scene is missing through the player, and the warm-up's
+          test builds it.
   - [ ] 14.11 Building with the compiler from the editor: a “Build”
         command (and later the export of games) that compiles the project
         with Cargo, and a way to play that compiled build to check it.

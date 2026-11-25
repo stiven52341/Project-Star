@@ -340,18 +340,16 @@ impl EditorWindow {
         }
     }
 
-    /// Plays the game the last check translated.
+    /// Plays the project the last check found ready, with the player.
     fn play(&mut self, context: &egui::Context) {
-        match self.problems.played_game() {
-            Some(game) => self.output.play(
+        match self.problems.playable() {
+            Ok(()) => self.output.play(
                 PlayRequest {
-                    name: self.project.settings().name().to_owned(),
                     directory: self.project.directory().to_path_buf(),
-                    game,
                 },
                 context,
             ),
-            None => self.output.refuse(texts::current().nothing_to_play),
+            Err(reason) => self.output.refuse(reason),
         }
     }
 

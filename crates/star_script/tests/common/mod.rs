@@ -12,8 +12,13 @@ use star_script::{GameSettings, compile_source_with};
 pub const ENGINE_CRATES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
 
 /// Where a test writes its package: in Cargo's folder for test files.
+/// Programs written by an earlier version of the test are removed, or they
+/// would be built too; its build is kept, to be reused.
 pub fn package_directory(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_TARGET_TMPDIR")).join(name)
+    let directory = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    // Missing the first time.
+    let _ = std::fs::remove_dir_all(directory.join("src"));
+    directory
 }
 
 pub fn compile_with(name: &str, source: &str, settings: &GameSettings) -> GeneratedProgram {

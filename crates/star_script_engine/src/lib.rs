@@ -3,7 +3,7 @@
 //! Games compiled from StarScript depend on this crate; StarScript
 //! programmers never see it. It holds the part of a game that is the same
 //! for every program — reading scenes, playing sounds, sharing the input
-//! with the runtime, the scene player's arguments — as ordinary Rust, built
+//! with the runtime — as ordinary Rust, built
 //! once with the engine instead of being generated again into every game.
 //! The StarScript interpreter uses it too, as one more `Host` of the
 //! runtime (decisions 64 and 70).
@@ -12,7 +12,6 @@ pub mod audio;
 pub mod game;
 pub mod input;
 mod mirror;
-pub mod player;
 pub mod scenes;
 
 use std::cell::RefCell;

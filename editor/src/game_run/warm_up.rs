@@ -1,7 +1,6 @@
-//! Preparing the engine when a project opens: the scene player, which has
-//! the same dependencies as every game, is built in the background, so the
-//! first “Play” finds the engine (and the player) already built and only
-//! builds the game's code.
+//! Preparing the engine when a project opens: the player, with the engine
+//! and the interpreter, is built in the background, so the first “Play”
+//! finds it built and only lets Cargo confirm it is up to date.
 //!
 //! A “Play” started meanwhile is not lost: Cargo makes its build wait for
 //! this one and then reuses what it built.
@@ -78,7 +77,7 @@ impl Drop for EngineWarmUp {
     }
 }
 
-/// Builds the scene player, telling the log how it went.
+/// Builds the player, telling the log how it went.
 fn prepare(stop: &AtomicBool) {
     let package = match write_player() {
         Ok(package) => package,

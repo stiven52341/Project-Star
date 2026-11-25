@@ -99,12 +99,6 @@ fn games_run_in_the_engine_until_they_quit() {
     package
         .add_program("scene_game", compile_with("scene_game", "", &scene_only))
         .expect("valid name");
-    package
-        .add_program(
-            "scene_player",
-            star_script::player_program().expect("valid player"),
-        )
-        .expect("valid name");
     package.write(&directory).expect("package written");
 
     build(&directory);
@@ -146,8 +140,8 @@ fn games_run_in_the_engine_until_they_quit() {
     );
 }
 
-/// The scene-only game and the scene player stop, saying which scene they
-/// could not load (a scene they load would play until closed).
+/// The scene-only game stops, saying which scene it could not load (a
+/// scene it loads would play until closed).
 fn scene_only_games_need_their_scene(directory: &Path) {
     let output = Command::new(binary(directory, "scene_game"))
         .current_dir(directory)
@@ -161,27 +155,5 @@ fn scene_only_games_need_their_scene(directory: &Path) {
         String::from_utf8_lossy(&output.stderr)
             .contains("the main scene, \"levels/nowhere.scene\", could not be loaded"),
         "the error names the scene"
-    );
-
-    let without_arguments = Command::new(binary(directory, "scene_player"))
-        .current_dir(directory)
-        .output()
-        .expect("the player runs");
-    assert!(!without_arguments.status.success());
-    assert!(
-        String::from_utf8_lossy(&without_arguments.stderr)
-            .contains("play a scene with `player <scene> <title>`"),
-        "the player says how to run it"
-    );
-    let missing_scene = Command::new(binary(directory, "scene_player"))
-        .args(["levels/elsewhere.scene", "Player"])
-        .current_dir(directory)
-        .output()
-        .expect("the player runs");
-    assert!(!missing_scene.status.success());
-    assert!(
-        String::from_utf8_lossy(&missing_scene.stderr)
-            .contains("the main scene, \"levels/elsewhere.scene\", could not be loaded"),
-        "the player names the scene it was given"
     );
 }

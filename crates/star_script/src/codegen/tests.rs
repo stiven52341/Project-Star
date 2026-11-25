@@ -155,24 +155,6 @@ fn programs_without_a_game_play_the_main_scene() {
 }
 
 #[test]
-fn the_player_reads_its_scene_and_title_from_its_arguments() {
-    let player = crate::player_program().expect("valid program");
-
-    assert_eq!(player.entry_point, EntryPoint::Player);
-    assert!(player.uses_engine());
-    assert!(
-        player
-            .code
-            .contains("main_scene_game_(&::star_script_engine::player::argument(::star_script_engine::player::SCENE_ARGUMENT, \"scene\")?)?")
-    );
-    assert!(
-        player
-            .code
-            .contains(".with_title(::star_script_engine::player::argument(::star_script_engine::player::TITLE_ARGUMENT, \"title\")?)")
-    );
-}
-
-#[test]
 fn console_programs_do_not_need_the_engine() {
     let program = compile_source("class A { static func main() {} }").expect("valid program");
 

@@ -232,10 +232,10 @@ impl Texts {
         }
     }
 
-    pub(crate) fn game_not_written(&self, error: &std::io::Error) -> String {
+    pub(crate) fn player_not_written(&self, error: &std::io::Error) -> String {
         match self.language {
-            Language::English => format!("Could not write the game's Rust code: {error}"),
-            Language::Spanish => format!("No se pudo escribir el código Rust del juego: {error}"),
+            Language::English => format!("Could not write the player's package: {error}"),
+            Language::Spanish => format!("No se pudo escribir el paquete del reproductor: {error}"),
         }
     }
 
