@@ -1091,7 +1091,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `projects_play_the_same_interpreted_and_compiled` (classes, a
         loop, integer and float division and a coroutine that goes on
         after `main`, the same output both ways).
-  - [ ] 14.12 Hot reload: changed scripts reload while the game is
+  - [x] 14.12 Hot reload: changed scripts reload while the game is
         played, keeping the state of the objects that are still valid.
         Design approved by the owner (decision 76, 2026-11-24):
         - What sets it off: saving. While it plays, the player looks
@@ -1183,7 +1183,24 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           field only `init` gives a value; coroutines end and are
           counted; dropped objects are not remembered; only a game
           playing is reloaded.
-    - [ ] 14.12b The player: watching the files, reloading between
+    - [x] 14.12b The player: watching the files, reloading between
           frames through `star_script_engine`, with its tests and the
-          window test.
+          window test. `star_script_engine::game::run_with_step` calls a
+          step before each frame's code with the seconds since the last
+          one (`run` is it with an empty step, for compiled games).
+          `star_player`'s `watch::Scripts` looks at the program files of
+          `assets/` (the same listing `Project::read` uses) every
+          `DEFAULT_CHECK_INTERVAL` of `star_assets`, by path,
+          modification time and length, so new and removed files count.
+          When they changed, the player reads the project again and
+          reloads its program, saying on the error output (the standard
+          output is the game's) how many objects it kept and coroutines
+          ended, or the mistakes or the reason it was not reloaded, with
+          “the game goes on with the code it had”. Tests: the watcher
+          (changed, new and removed files; other files are not the
+          program), reloading a saved project into a game playing, a
+          program with mistakes and one its objects cannot follow; the
+          window test plays a game that prints with its old script,
+          saves the script again while it plays and expects the new
+          output with the frames kept.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

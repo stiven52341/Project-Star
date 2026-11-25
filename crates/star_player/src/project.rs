@@ -178,7 +178,11 @@ impl Project {
 /// folders, as paths inside the assets folder (`prefix` is `folder`'s),
 /// with `/` between folders on every platform, sorted by name. Hidden files
 /// and folders are left out, as the editor leaves them out.
-fn program_files(folder: &Path, prefix: &str, paths: &mut Vec<String>) -> std::io::Result<()> {
+pub(crate) fn program_files(
+    folder: &Path,
+    prefix: &str,
+    paths: &mut Vec<String>,
+) -> std::io::Result<()> {
     let mut entries = fs::read_dir(folder)?.collect::<std::io::Result<Vec<_>>>()?;
     entries.sort_by_key(fs::DirEntry::file_name);
     for entry in entries {

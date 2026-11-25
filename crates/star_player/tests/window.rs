@@ -1,6 +1,7 @@
 //! Small project folders played by the player in a real window of the
 //! engine, as “Play” plays them: a game with a blueprint, a project with
-//! only a main scene, and projects that must stop saying why.
+//! only a main scene, projects that must stop saying why, and a game whose
+//! script is saved again while it plays (hot reload).
 //!
 //! It needs a screen and a GPU (or a software renderer), and the window
 //! needs the main thread, so it has no test harness and only plays when
@@ -12,8 +13,9 @@
 // Test code: a failed step should stop the test with its explanation.
 #![allow(clippy::expect_used, clippy::panic)]
 
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use std::process::{Command, ExitCode};
+use std::process::{Command, ExitCode, Stdio};
 
 /// How a project must end.
 enum Ending {
@@ -99,12 +101,34 @@ const PROJECTS: [TestProject; 5] = [
     },
 ];
 
+/// The game of the hot reload test, before its script is saved again: it
+/// prints once, and gives up if no reload comes.
+const BEFORE_RELOAD: &str = "class Main extends Game {\n  var frames = 0\n  \
+     override func update(delta: float) {\n    frames += 1\n    \
+     if frames == 1 {\n      Debug.print(\"old\")\n    }\n    \
+     if Time.now() > 20.0 {\n      Debug.print(\"no reload\")\n      quit()\n    }\n  }\n}\n";
+
+/// The same game saved again: it says whether it kept its frames, and ends.
+const AFTER_RELOAD: &str = "class Main extends Game {\n  var frames = 0\n  \
+     override func update(delta: float) {\n    frames += 1\n    \
+     Debug.print(\"new, frames kept: \" + (frames > 1).to_string())\n    quit()\n  }\n}\n";
+
+const HOT_RELOAD: TestProject = TestProject {
+    name: "hot_reload",
+    files: &[
+        ("project.toml", MANIFEST),
+        ("assets/main.star", BEFORE_RELOAD),
+    ],
+    ending: Ending::Prints("old\nnew, frames kept: true\n"),
+};
+
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().collect();
     if let Some(position) = arguments.iter().position(|argument| argument == "--play") {
         let name = arguments.get(position + 1).expect("the name of a project");
         let project = PROJECTS
             .iter()
+            .chain([&HOT_RELOAD])
             .find(|project| project.name == name)
             .expect("a project of the test");
         return match star_player::play(&folder(project)) {
@@ -122,9 +146,10 @@ fn main() -> ExitCode {
     let failures: Vec<String> = PROJECTS
         .iter()
         .filter_map(|project| check(project).err())
+        .chain(check_hot_reload().err())
         .collect();
     assert!(failures.is_empty(), "\n{}", failures.join("\n\n"));
-    println!("window: ok ({} projects)", PROJECTS.len());
+    println!("window: ok ({} projects)", PROJECTS.len() + 1);
     ExitCode::SUCCESS
 }
 
@@ -150,6 +175,45 @@ fn check(project: &TestProject) -> Result<(), String> {
             "{name}: should have stopped saying `{reason}`:\n{stderr}"
         )),
     }
+}
+
+/// Plays the hot reload project in a child process, saving its script
+/// again once it printed with the old one.
+fn check_hot_reload() -> Result<(), String> {
+    let project = &HOT_RELOAD;
+    write(project);
+    let executable = std::env::current_exe().expect("the test's own executable");
+    let mut child = Command::new(executable)
+        .args(["--play", project.name])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("the child process runs");
+    let stdout = child.stdout.take().expect("the child's output");
+    let mut printed = String::new();
+    for line in BufReader::new(stdout).lines() {
+        let line = line.expect("a line of output");
+        if line == "old" {
+            std::fs::write(folder(project).join("assets/main.star"), AFTER_RELOAD)
+                .expect("script saved again");
+        }
+        printed.push_str(&line);
+        printed.push('\n');
+    }
+    let output = child.wait_with_output().expect("the child ends");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let Ending::Prints(expected) = project.ending else {
+        unreachable!("the hot reload project ends well");
+    };
+    if !output.status.success() {
+        return Err(format!("hot_reload failed:\n{stderr}"));
+    }
+    if printed != expected || !stderr.contains("scripts reloaded: 1 objects kept") {
+        return Err(format!(
+            "hot_reload: unexpected output\n--- expected\n{expected}--- found\n{printed}--- errors\n{stderr}"
+        ));
+    }
+    Ok(())
 }
 
 /// The folder of `project`.

@@ -30,9 +30,27 @@ pub fn run<H: Host>(
     actions: &[&str],
     new_game: impl FnOnce() -> EngineResult<H::Game>,
 ) -> EngineResult<()> {
+    run_with_step::<H>(app, actions, new_game, |_| {})
+}
+
+/// [`run`], calling `between_frames` before each frame's code runs, with
+/// the seconds since the last frame: where the interpreted player reloads
+/// the scripts saved while the game plays (decision 76). Compiled games
+/// use [`run`].
+///
+/// # Errors
+///
+/// The error creating the game, or the engine's running it.
+pub fn run_with_step<H: Host>(
+    app: App,
+    actions: &[&str],
+    new_game: impl FnOnce() -> EngineResult<H::Game>,
+    between_frames: impl FnMut(f32) + 'static,
+) -> EngineResult<()> {
     let audio = crate::connect_runtime(app.asset_folder());
     let game = new_game()?;
-    app.run_game(EngineGame::<H> {
+    app.run_game(EngineGame::<H, _> {
+        between_frames,
         audio,
         game,
         actions: actions.iter().map(|name| (*name).to_owned()).collect(),
@@ -44,7 +62,9 @@ pub fn run<H: Host>(
 }
 
 /// Connects a StarScript game with the engine's game loop.
-struct EngineGame<H: Host> {
+struct EngineGame<H: Host, S> {
+    /// What runs between two frames, before the frame's code.
+    between_frames: S,
     /// Where `Sound`s play: silent until the engine gives the game its audio.
     audio: Rc<RefCell<Audio>>,
     game: H::Game,
@@ -60,7 +80,7 @@ struct EngineGame<H: Host> {
     mirror: ScriptNodes,
 }
 
-impl<H: Host> Game for EngineGame<H> {
+impl<H: Host, S: FnMut(f32) + 'static> Game for EngineGame<H, S> {
     fn start(&mut self, context: &mut GameContext<'_>) -> EngineResult<()> {
         *self.audio.borrow_mut() = context.world().audio();
         H::start_game(&self.game);
@@ -73,6 +93,7 @@ impl<H: Host> Game for EngineGame<H> {
             share_pointer(&input, &self.view(world), world.window_size());
         }
         let delta = world.time().delta_seconds();
+        (self.between_frames)(delta);
         let root = H::game(&self.game).root().clone();
         sync_bodies::<H>(
             world,
@@ -102,7 +123,7 @@ impl<H: Host> Game for EngineGame<H> {
     }
 }
 
-impl<H: Host> EngineGame<H> {
+impl<H: Host, S> EngineGame<H, S> {
     /// The engine's camera that shows the game from its `camera_3d`, or
     /// else from its `camera`.
     fn view(&self, world: &World) -> Camera {

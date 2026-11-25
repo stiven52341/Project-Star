@@ -8,15 +8,20 @@
 //! through `star_script_engine`, as a compiled game is played: the same
 //! window title, input actions, assets folder, output and runtime errors.
 //!
+//! While a game plays, the scripts and blueprints saved meanwhile are
+//! reloaded between two frames, keeping the game's objects (hot reload,
+//! decision 76).
+//!
 //! The editor builds a program whose `main` is [`main`], outside its own
 //! workspace (decision 63), and runs it in the project's folder.
 
 pub mod project;
 mod settings;
+mod watch;
 
 use std::cell::RefCell;
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::rc::Rc;
 
@@ -25,9 +30,10 @@ use star_engine::star_core::{EngineError, EngineResult};
 use star_engine::star_input::{ActionMap, Binding};
 use star_script::InputAction;
 use star_script_interpreter::host::Interpreted;
-use star_script_interpreter::{Output, Program, ProgramKind, RunError, end_game};
+use star_script_interpreter::{Output, Program, ProgramKind, RunError, end_game, reload};
 
 use crate::project::{Problems, Project};
+use crate::watch::Scripts;
 
 /// Why a project could not be played to its end.
 #[derive(Debug)]
@@ -98,12 +104,18 @@ pub fn play(directory: &Path) -> Result<(), PlayError> {
     let output: Output = Rc::new(RefCell::new(std::io::stdout()));
     match program.kind() {
         ProgramKind::Console => program.run(&output).map_err(PlayError::Run),
-        ProgramKind::Game => play_game(&project, &program, &output),
+        ProgramKind::Game => play_game(directory, &project, &program, &output),
     }
 }
 
-/// Plays the game `program` of `project` in a window of the engine.
-fn play_game(project: &Project, program: &Program, output: &Output) -> Result<(), PlayError> {
+/// Plays the game `program` of `project`, in `directory`, in a window of
+/// the engine, reloading its scripts when they are saved.
+fn play_game(
+    directory: &Path,
+    project: &Project,
+    program: &Program,
+    output: &Output,
+) -> Result<(), PlayError> {
     let actions = &project.settings().actions;
     let action_map = action_map(actions)?;
     let names: Vec<&str> = actions.iter().map(|action| action.name.as_str()).collect();
@@ -115,21 +127,62 @@ fn play_game(project: &Project, program: &Program, output: &Output) -> Result<()
     // A runtime error while the game is created is the game's, not the
     // engine's: it is printed as a compiled game prints it.
     let mut failed_start = None;
-    let played = star_script_engine::game::run::<Interpreted>(app, &names, || {
-        program.new_game(output).map_err(|error| {
-            let reason = error.to_string();
-            failed_start = Some(error);
-            EngineError::Initialization {
-                subsystem: "player",
-                reason,
-            }
-        })
-    });
+    let between_frames = reloader(directory.to_owned(), project.assets_folder());
+    let played = star_script_engine::game::run_with_step::<Interpreted>(
+        app,
+        &names,
+        || {
+            program.new_game(output).map_err(|error| {
+                let reason = error.to_string();
+                failed_start = Some(error);
+                EngineError::Initialization {
+                    subsystem: "player",
+                    reason,
+                }
+            })
+        },
+        between_frames,
+    );
     if let Some(error) = failed_start {
         return Err(PlayError::Run(error));
     }
     played?;
     end_game().map_err(PlayError::Run)
+}
+
+/// What runs between two frames of a game: when its scripts or blueprints
+/// changed, it reloads the project in `directory` and says how it went on
+/// the error output (the standard output is the game's own).
+fn reloader(directory: PathBuf, assets: PathBuf) -> impl FnMut(f32) + 'static {
+    let mut scripts = Scripts::new(assets);
+    move |seconds| {
+        if scripts.changed(seconds) {
+            eprintln!("{}", reload_project(&directory));
+        }
+    }
+}
+
+/// Reloads the program of the project in `directory` into the game this
+/// thread plays: what happened, to be told to whoever plays it.
+fn reload_project(directory: &Path) -> String {
+    let program = match Project::read(directory).and_then(|project| project.program()) {
+        Ok(program) => program,
+        Err(problems) => {
+            return format!(
+                "{problems}\nthe scripts were not reloaded: the game goes on with the code it had"
+            );
+        }
+    };
+    match reload(&program) {
+        Ok(reloaded) if reloaded.coroutines_ended > 0 => format!(
+            "scripts reloaded: {} objects kept, {} coroutines ended (play again to start them anew)",
+            reloaded.objects, reloaded.coroutines_ended
+        ),
+        Ok(reloaded) => format!("scripts reloaded: {} objects kept", reloaded.objects),
+        Err(error) => format!(
+            "the scripts were not reloaded: {error}; the game goes on with the code it had (play again to use the new code)"
+        ),
+    }
 }
 
 /// The project's input actions, as the engine reads them; a binding it
@@ -146,3 +199,6 @@ fn action_map(actions: &[InputAction]) -> EngineResult<ActionMap> {
     }
     Ok(map)
 }
+
+#[cfg(test)]
+mod tests;
