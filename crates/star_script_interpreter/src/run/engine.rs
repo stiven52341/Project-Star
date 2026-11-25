@@ -12,8 +12,10 @@ use star_script_runtime::bodies::{BodyFields, Contact};
 use star_script_runtime::color::ColorFields;
 use star_script_runtime::game::GameFields;
 use star_script_runtime::input::{action_state, axis, pointer};
-use star_script_runtime::node_classes::{Camera2dFields, LightFields, SpriteFields};
-use star_script_runtime::nodes::{self, Host as _};
+use star_script_runtime::node_classes::{
+    Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields,
+};
+use star_script_runtime::nodes::{self, Host as _, Node3dFields};
 use star_script_runtime::{Field, List};
 
 use super::object_of;
@@ -45,6 +47,7 @@ enum Slot<'a> {
     Color(&'a Field<Rc<Object<ColorFields>>>),
     Tags(&'a Field<Tags>),
     Camera(&'a Field<Option<CameraRef>>),
+    Camera3D(&'a Field<Option<CameraRef<Camera3dFields>>>),
     Body(&'a Field<Option<Rc<BodyObject>>>),
 }
 
@@ -61,13 +64,8 @@ pub(super) fn read_field(object: &Value, field: FieldRef) -> Result<Value, RunEr
         Slot::Text(text) => Value::String(text.read(|text| Arc::from(text.as_str()))),
         Slot::Color(color) => Value::Color(color.get()),
         Slot::Tags(tags) => Value::List(tags.get().0),
-        Slot::Camera(camera) => camera
-            .read(|camera| {
-                camera
-                    .as_ref()
-                    .map(|camera| Value::Node(Rc::clone(camera.node())))
-            })
-            .unwrap_or(Value::Null),
+        Slot::Camera(camera) => camera.read(|camera| camera_value(camera.as_ref())),
+        Slot::Camera3D(camera) => camera.read(|camera| camera_value(camera.as_ref())),
         Slot::Body(body) => body.get().map_or(Value::Null, Value::Body),
     })
 }
@@ -91,11 +89,22 @@ pub(super) fn write_field(object: &Value, field: FieldRef, value: Value) -> Resu
                 Interpreted::as_camera_2d(&node).ok_or(WRONG_FIELD_VALUE)?,
             ));
         }
+        (Slot::Camera3D(camera), Value::Null) => camera.set(None),
+        (Slot::Camera3D(camera), Value::Node(node)) => {
+            camera.set(Some(
+                Interpreted::as_camera_3d(&node).ok_or(WRONG_FIELD_VALUE)?,
+            ));
+        }
         (Slot::Body(body), Value::Null) => body.set(None),
         (Slot::Body(body), Value::Body(value)) => body.set(Some(value)),
         _ => return Err(WRONG_FIELD_VALUE),
     }
     Ok(())
+}
+
+/// The node of the camera a field of the game holds, or `null`.
+fn camera_value<F>(camera: Option<&CameraRef<F>>) -> Value {
+    camera.map_or(Value::Null, |camera| Value::Node(Rc::clone(camera.node())))
 }
 
 /// Where the runtime keeps the field `field` of `object`.
@@ -132,19 +141,66 @@ fn node_slot(parts: &NodeParts, field: EngineField) -> Option<Slot<'_>> {
         EngineField::ScaleY => Slot::Float(&node.scale_y),
         EngineField::Tags => Slot::Tags(&node.tags),
         EngineField::Body => Slot::Body(&node.body),
-        _ => match &parts.class {
-            ClassParts::Node => return None,
-            ClassParts::Camera2D(camera) => camera_slot(camera, field)?,
-            ClassParts::Sprite(sprite) => sprite_slot(sprite, field)?,
-            ClassParts::Light2D(light) => light_slot(light, field)?,
+        _ => match (field, &parts.node_3d) {
+            (
+                EngineField::Z | EngineField::Pitch | EngineField::Yaw | EngineField::ScaleZ,
+                Some(node_3d),
+            ) => node_3d_slot(node_3d, field)?,
+            _ => class_slot(&parts.class, field)?,
         },
     })
+}
+
+fn node_3d_slot(node: &Node3dFields, field: EngineField) -> Option<Slot<'_>> {
+    Some(Slot::Float(match field {
+        EngineField::Z => &node.z,
+        EngineField::Pitch => &node.pitch,
+        EngineField::Yaw => &node.yaw,
+        EngineField::ScaleZ => &node.scale_z,
+        _ => return None,
+    }))
+}
+
+/// Where the runtime keeps the field `field` of the node class `class`.
+fn class_slot(class: &ClassParts, field: EngineField) -> Option<Slot<'_>> {
+    match class {
+        ClassParts::Node => None,
+        ClassParts::Camera2D(camera) => camera_slot(camera, field),
+        ClassParts::Sprite(sprite) => sprite_slot(sprite, field),
+        ClassParts::Light2D(light) | ClassParts::Light(light) => light_slot(light, field),
+        ClassParts::Mesh(mesh) => mesh_slot(mesh, field),
+        ClassParts::Camera3D(camera) => camera_3d_slot(camera, field),
+    }
 }
 
 fn camera_slot(camera: &Camera2dFields, field: EngineField) -> Option<Slot<'_>> {
     Some(match field {
         EngineField::ViewHeight => Slot::Float(&camera.view_height),
         EngineField::Main => Slot::Bool(&camera.main),
+        _ => return None,
+    })
+}
+
+fn camera_3d_slot(camera: &Camera3dFields, field: EngineField) -> Option<Slot<'_>> {
+    Some(match field {
+        EngineField::Fov => Slot::Float(&camera.fov),
+        EngineField::Main => Slot::Bool(&camera.main),
+        _ => return None,
+    })
+}
+
+fn mesh_slot(mesh: &MeshFields<Interpreted>, field: EngineField) -> Option<Slot<'_>> {
+    Some(match field {
+        EngineField::Shape => Slot::Text(&mesh.shape),
+        EngineField::Width => Slot::Float(&mesh.width),
+        EngineField::Height => Slot::Float(&mesh.height),
+        EngineField::Depth => Slot::Float(&mesh.depth),
+        EngineField::Radius => Slot::Float(&mesh.radius),
+        EngineField::Tint => Slot::Color(&mesh.color),
+        EngineField::Metallic => Slot::Float(&mesh.metallic),
+        EngineField::Roughness => Slot::Float(&mesh.roughness),
+        EngineField::Texture => Slot::Text(&mesh.texture),
+        EngineField::Pixelated => Slot::Bool(&mesh.pixelated),
         _ => return None,
     })
 }
@@ -206,6 +262,7 @@ fn game_slot(game: &GameFields<Interpreted>, field: EngineField) -> Option<Slot<
     Some(match field {
         EngineField::Background => Slot::Color(&game.background),
         EngineField::Camera => Slot::Camera(&game.camera),
+        EngineField::Camera3D => Slot::Camera3D(&game.camera_3d),
         EngineField::Ambient => Slot::Color(&game.ambient),
         EngineField::Ambient2D => Slot::Color(&game.ambient_2d),
         _ => return None,
@@ -235,14 +292,18 @@ pub(super) fn new_object(
             let game: GameObject = Object::new(class, fields, GameFields::new(root));
             Value::Game(Rc::new(game))
         }
-        EngineClass::Node | EngineClass::Camera2D | EngineClass::Sprite | EngineClass::Light2D => {
-            let (name, parts) = node_parts(engine, arguments)?;
-            Value::Node(Rc::new(Object::new(
-                class,
-                fields,
-                NodeParts::new(name, parts),
-            )))
-        }
+        EngineClass::Node
+        | EngineClass::Camera2D
+        | EngineClass::Sprite
+        | EngineClass::Light2D
+        | EngineClass::Node3D
+        | EngineClass::Mesh
+        | EngineClass::Light
+        | EngineClass::Camera3D => Value::Node(Rc::new(Object::new(
+            class,
+            fields,
+            node_parts(engine, arguments)?,
+        ))),
         EngineClass::Body | EngineClass::Sound => {
             // Their `init` is private: only their static methods make them.
             return Err(RunError::Internal("a body or sound built by a constructor"));
@@ -250,9 +311,9 @@ pub(super) fn new_object(
     })
 }
 
-/// The name of a new node of the node class `engine`, and the fields of
-/// its class, from the arguments of its constructor.
-fn node_parts(engine: EngineClass, arguments: &[Value]) -> Result<(String, ClassParts), RunError> {
+/// The runtime's fields of a new node of the node class `engine`, from
+/// the arguments of its constructor.
+fn node_parts(engine: EngineClass, arguments: &[Value]) -> Result<NodeParts, RunError> {
     let (name, parts) = match (engine, arguments) {
         (EngineClass::Node, [name]) => (name, ClassParts::Node),
         (EngineClass::Camera2D, [name]) => {
@@ -266,9 +327,24 @@ fn node_parts(engine: EngineClass, arguments: &[Value]) -> Result<(String, Class
             name,
             ClassParts::Light2D(LightFields::new_2d(text(kind)?.to_owned())),
         ),
+        (EngineClass::Node3D, [name]) => {
+            return Ok(NodeParts::new_3d(text(name)?.to_owned(), ClassParts::Node));
+        }
+        (EngineClass::Mesh, [name, shape]) => {
+            let mesh = ClassParts::Mesh(MeshFields::new(text(shape)?.to_owned()));
+            return Ok(NodeParts::new_3d(text(name)?.to_owned(), mesh));
+        }
+        (EngineClass::Light, [name, kind]) => {
+            let light = ClassParts::Light(LightFields::new_3d(text(kind)?.to_owned()));
+            return Ok(NodeParts::new_3d(text(name)?.to_owned(), light));
+        }
+        (EngineClass::Camera3D, [name]) => {
+            let camera = ClassParts::Camera3D(Rc::new(Camera3dFields::new()));
+            return Ok(NodeParts::new_3d(text(name)?.to_owned(), camera));
+        }
         _ => return Err(RunError::Internal("a node without its arguments")),
     };
-    Ok((text(name)?.to_owned(), parts))
+    Ok(NodeParts::new(text(name)?.to_owned(), parts))
 }
 
 /// The root of a game's tree: a `Node` called `Game`, as compiled.
@@ -456,6 +532,23 @@ fn node_method(
         }
         (NodeMethod::Rotate, [angle]) => {
             nodes::rotate::<Runtime>(node, float(angle)?);
+            Value::Null
+        }
+        (NodeMethod::GlobalZ, []) => Value::Float(nodes::global_position::<Runtime>(node)[2]),
+        (NodeMethod::LookAt, [x, y, z]) => {
+            nodes::look_at::<Runtime>(node, float(x)?, float(y)?, float(z)?);
+            Value::Null
+        }
+        (NodeMethod::SetGlobalPosition3D, [x, y, z]) => {
+            nodes::set_global_position_3d::<Runtime>(node, [float(x)?, float(y)?, float(z)?]);
+            Value::Null
+        }
+        (NodeMethod::Translate3D, [x, y, z]) => {
+            nodes::translate_3d::<Runtime>(node, float(x)?, float(y)?, float(z)?);
+            Value::Null
+        }
+        (NodeMethod::TranslateGlobal3D, [x, y, z]) => {
+            nodes::translate_global_3d::<Runtime>(node, float(x)?, float(y)?, float(z)?);
             Value::Null
         }
         _ => return Err(RunError::Internal("method of `Node` with other arguments")),

@@ -64,13 +64,18 @@ impl Tables {
     }
 }
 
-/// The engine classes that classes of the program can extend for now.
-const EXTENDABLE: [EngineClass; 5] = [
+/// The engine classes that classes of the program can extend: the game
+/// and the nodes, as compiled.
+const EXTENDABLE: [EngineClass; 9] = [
     EngineClass::Node,
     EngineClass::Camera2D,
     EngineClass::Game,
     EngineClass::Sprite,
     EngineClass::Light2D,
+    EngineClass::Node3D,
+    EngineClass::Mesh,
+    EngineClass::Light,
+    EngineClass::Camera3D,
 ];
 
 /// A member of the program, before its code is lowered.
@@ -581,4 +586,46 @@ fn is_entry_point(method: &MethodInfo) -> bool {
         && method.is_static
         && method.parameters.is_empty()
         && method.return_type == Type::Void
+}
+
+#[cfg(test)]
+mod tests {
+    use star_script::check_source;
+    use star_script::semantic::ClassOrigin;
+
+    use super::{body, expressions};
+
+    /// The engine's methods that lowering turns into something else than
+    /// a call of the engine: `Debug.print` and the clock.
+    fn lowered_apart(class: &str) -> bool {
+        matches!(class, "Debug" | "Time")
+    }
+
+    #[test]
+    fn every_method_and_field_of_the_engine_is_interpreted() {
+        let checked =
+            check_source("class Main {\n static func main() {\n }\n}\n").expect("a valid program");
+        let mut missing = Vec::new();
+        for (_, class) in checked.analysis.classes().iter() {
+            if class.origin != ClassOrigin::Native || lowered_apart(&class.name) {
+                continue;
+            }
+            for method in &class.methods {
+                let known = if method.is_static {
+                    expressions::static_method(&class.name, &method.name).is_some()
+                } else {
+                    expressions::object_method(&class.name, &method.name).is_some()
+                };
+                if !known {
+                    missing.push(format!("{}.{}()", class.name, method.name));
+                }
+            }
+            for field in &class.fields {
+                if body::engine_field(&class.name, &field.name).is_none() {
+                    missing.push(format!("{}.{}", class.name, field.name));
+                }
+            }
+        }
+        assert!(missing.is_empty(), "not interpreted: {missing:?}");
+    }
 }

@@ -21,9 +21,9 @@
 //! ([`Program::new_game`]): the interpreter is a `Host` of
 //! `star_script_runtime` ([`host::Interpreted`]), so
 //! `star_script_engine` plays its games as it plays compiled ones. For now
-//! games have `Input`, `Color`, `Node`, `Camera2D`, `Sprite`, `Light2D`,
-//! scenes, `Body`, `Sound` and `Audio` (Phase 14 of `docs/roadmap.md`
-//! brings the rest of the language step by step).
+//! games have every engine class: `Input`, `Color`, the 2D and 3D nodes,
+//! scenes, `Body`, `Sound` and `Audio`. Every program of the compiler's
+//! end-to-end test behaves the same interpreted (its conformance test).
 
 mod error;
 pub mod host;

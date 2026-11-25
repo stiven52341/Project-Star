@@ -841,10 +841,23 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           static, not by their class. Unit tests cover contacts set by the
           physics, impulses that add up until the physics takes them, and
           sounds that do not load without audio.
-    - [ ] 14.8b 3D: `Node3D`, `Mesh`, `Light`, `Camera3D`, their methods,
+    - [x] 14.8b 3D: `Node3D`, `Mesh`, `Light`, `Camera3D`, their methods,
           `Game.camera_3d` and 3D nodes in scenes; `nodes_3d.star` and
           `placement.star` conform, and the conformance test covers every
           program.
+          A 3D node's parts hold `Node3dFields` in an `Rc` (the `Host`'s
+          `Node3D`), and `Camera3D`'s fields are kept apart as
+          `Camera2D`'s (the `Host`'s camera reference is generic over
+          them). The methods of `Node3D` are runtime calls that scripts
+          may override, scenes create every 3D node, and classes may
+          extend them all. The conformance test now runs every program of
+          `programs/`, and a new unit test checks that lowering knows
+          every method and field of every engine class, so nothing of the
+          engine is left to the compiler alone. One gap found on the way,
+          older than this step: reading a constant through an object
+          (`Main().SIZE`) compiles (the object is evaluated for its
+          effects) but the interpreter refuses it; it needs an expression
+          that evaluates one value and gives another, in both runners.
     - [ ] 14.8c Games in windows: the window test plays every game of
           `engine_game.rs` interpreted, each in its own process.
   - [ ] 14.9 Blueprints: they become StarScript, so they need no

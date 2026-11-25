@@ -94,12 +94,16 @@ pub(crate) enum EngineClass {
     Light2D,
     Body,
     Sound,
+    Node3D,
+    Mesh,
+    Light,
+    Camera3D,
 }
 
 impl EngineClass {
     /// Every engine class the interpreter knows, in the order of their
     /// places.
-    pub(crate) const ALL: [Self; 8] = [
+    pub(crate) const ALL: [Self; 12] = [
         Self::Color,
         Self::Node,
         Self::Camera2D,
@@ -108,6 +112,10 @@ impl EngineClass {
         Self::Light2D,
         Self::Body,
         Self::Sound,
+        Self::Node3D,
+        Self::Mesh,
+        Self::Light,
+        Self::Camera3D,
     ];
 
     /// Its place among the classes.
@@ -126,6 +134,10 @@ impl EngineClass {
             Self::Light2D => "Light2D",
             Self::Body => "Body",
             Self::Sound => "Sound",
+            Self::Node3D => "Node3D",
+            Self::Mesh => "Mesh",
+            Self::Light => "Light",
+            Self::Camera3D => "Camera3D",
         }
     }
 }
@@ -226,9 +238,20 @@ pub(crate) enum EngineField {
     Tags,
     /// `body` of `Node`.
     Body,
-    /// `view_height` and `main` of `Camera2D`.
+    /// `view_height` and `main` of `Camera2D` (`main` of `Camera3D` too).
     ViewHeight,
     Main,
+    /// `z`, `pitch`, `yaw` and `scale_z` of `Node3D`.
+    Z,
+    Pitch,
+    Yaw,
+    ScaleZ,
+    /// `fov` of `Camera3D`.
+    Fov,
+    /// `metallic` and `roughness` of `Mesh` (its other fields are those of
+    /// `Sprite` and `Body`).
+    Metallic,
+    Roughness,
     /// `texture`, `width`, `height`, `layer`, `pixelated` and `color` of
     /// `Sprite` (`color` of `Light2D` too, `width` and `height` of
     /// `Body`).
@@ -261,9 +284,11 @@ pub(crate) enum EngineField {
     /// `volume` and `looping` of `Sound`.
     Volume,
     Looping,
-    /// `background`, `camera`, `ambient` and `ambient_2d` of `Game`.
+    /// `background`, `camera`, `camera_3d`, `ambient` and `ambient_2d` of
+    /// `Game`.
     Background,
     Camera,
+    Camera3D,
     Ambient,
     Ambient2D,
 }
@@ -360,7 +385,8 @@ pub(crate) enum EngineCall {
     Base,
 }
 
-/// A method of `Node` that the runtime's functions of nodes run.
+/// A method of `Node` (or `Node3D`) that the runtime's functions of nodes
+/// run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum NodeMethod {
     AddChild,
@@ -379,6 +405,11 @@ pub(crate) enum NodeMethod {
     Translate,
     TranslateGlobal,
     Rotate,
+    LookAt,
+    GlobalZ,
+    SetGlobalPosition3D,
+    Translate3D,
+    TranslateGlobal3D,
 }
 
 impl NodeMethod {
@@ -401,6 +432,11 @@ impl NodeMethod {
             "translate" => Self::Translate,
             "translate_global" => Self::TranslateGlobal,
             "rotate" => Self::Rotate,
+            "look_at" => Self::LookAt,
+            "global_z" => Self::GlobalZ,
+            "set_global_position_3d" => Self::SetGlobalPosition3D,
+            "translate_3d" => Self::Translate3D,
+            "translate_global_3d" => Self::TranslateGlobal3D,
             _ => return None,
         })
     }

@@ -88,20 +88,21 @@ impl Machine {
 /// # Errors
 ///
 /// Why the node cannot be created: the class cannot be used by a scene,
-/// its `init` failed, or the interpreter cannot make its nodes yet.
+/// or its `init` failed.
 pub(crate) fn create(name: String, class: NewNode<'_>) -> Result<Rc<NodeObject>, String> {
     let (engine, arguments) = match class {
         NewNode::Node => (EngineClass::Node, Vec::new()),
         NewNode::Camera2D => (EngineClass::Camera2D, Vec::new()),
         NewNode::Sprite { texture } => (EngineClass::Sprite, vec![text(texture)]),
         NewNode::Light2D { kind } => (EngineClass::Light2D, vec![text(kind)]),
+        NewNode::Node3D => (EngineClass::Node3D, Vec::new()),
+        NewNode::Mesh { shape } => (EngineClass::Mesh, vec![text(shape)]),
+        NewNode::Light { kind } => (EngineClass::Light, vec![text(kind)]),
+        NewNode::Camera3D => (EngineClass::Camera3D, Vec::new()),
         NewNode::Script(class) => {
             return play::scene_program()
                 .ok_or_else(|| NO_PROGRAM.to_owned())?
                 .new_scene_object(class);
-        }
-        NewNode::Node3D | NewNode::Mesh { .. } | NewNode::Light { .. } | NewNode::Camera3D => {
-            return Err("the interpreter cannot create 3D nodes yet".to_owned());
         }
     };
     let arguments: Vec<Value> = std::iter::once(Value::String(Arc::from(name)))

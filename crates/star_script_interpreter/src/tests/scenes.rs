@@ -3,7 +3,7 @@
 
 use star_script::{GameSettings, MainScene, check_source_with};
 use star_script_runtime::scene_fields::SceneValue;
-use star_script_runtime::scenes::{self, SceneNode};
+use star_script_runtime::scenes::{self, SceneMesh, SceneNode, SceneTransform3D};
 
 use super::{play, play_program};
 use crate::{Program, RunError};
@@ -33,9 +33,12 @@ fn scene_node(name: &str, class: Option<&str>, parent: Option<usize>) -> SceneNo
 /// (a `Drone` with only its `speed`),
 /// `misspelled.scene` (a class the program does not have), `wrong.scene`
 /// (a value that does not fit its field) and `broken.scene` (a class
-/// whose `init` fails).
+/// whose `init` fails), and `space.scene` (3D nodes).
 fn load_scenes_from_memory() {
     scenes::set_loader(|path| {
+        if path == "space.scene" {
+            return Ok(space_scene());
+        }
         let mut root = scene_node("Fleet", None, None);
         root.tags = vec!["fleet".to_owned()];
         let mut drone = scene_node("Wingman", Some("Drone"), Some(0));
@@ -60,6 +63,39 @@ fn load_scenes_from_memory() {
         }
         Ok(nodes)
     });
+}
+
+/// A `Node3D` holding a cube one unit deep, and a camera.
+fn space_scene() -> Vec<SceneNode> {
+    let mut cube = scene_node("Cube", Some("Mesh"), Some(0));
+    cube.transform_3d = Some(SceneTransform3D {
+        x: 0.0,
+        y: 0.0,
+        z: 1.0,
+        pitch: 0.0,
+        yaw: 0.0,
+        roll: 0.0,
+        scale_x: 1.0,
+        scale_y: 1.0,
+        scale_z: 2.0,
+    });
+    cube.mesh = Some(SceneMesh {
+        shape: "cube".to_owned(),
+        width: 1.0,
+        height: 1.0,
+        depth: 1.0,
+        radius: 0.5,
+        color: [1.0, 0.5, 0.5, 1.0],
+        metallic: 0.0,
+        roughness: 0.75,
+        texture: String::new(),
+        pixelated: false,
+    });
+    vec![
+        scene_node("Space", Some("Node3D"), None),
+        cube,
+        scene_node("Eye", Some("Camera3D"), Some(0)),
+    ]
 }
 
 /// The classes the scenes name, and a game that loads them.
@@ -140,4 +176,19 @@ fn main_scenes_that_cannot_be_loaded_stop_the_game() {
         error.map(|error| error.to_string()),
         Some("the main scene, \"nowhere.scene\", could not be loaded".to_owned())
     );
+}
+
+#[test]
+fn scenes_create_3d_nodes() {
+    load_scenes_from_memory();
+    let source = "class Space extends Game {\n override func start() {\n \
+                  const space = Scene.load(\"space.scene\")\n const cube = space?.find_child(\"Cube\") as Mesh\n \
+                  if cube != null {\n Debug.print(cube.shape + \" \" + cube.roughness.to_string() + \" \" + cube.z.to_string() + \" \" + cube.scale_z.to_string() + \" \" + cube.color.g.to_string())\n }\n \
+                  Debug.print(((space?.find_child(\"Eye\") is Camera3D)).to_string() + \" \" + (space is Node3D).to_string())\n }\n \
+                  override func update(delta: float) {\n quit()\n }\n}\n";
+
+    let (printed, result) = play(source, 2);
+
+    assert_eq!(printed, "cube 0.75 1.0 2.0 0.5\ntrue true\n");
+    assert!(result.is_ok(), "{result:?}");
 }

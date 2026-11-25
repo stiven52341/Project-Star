@@ -24,6 +24,8 @@ const INPUT_CLASS: &str = "Input";
 const GAME_CLASS: &str = "Game";
 /// The engine class of nodes.
 const NODE_CLASS: &str = "Node";
+/// The engine class of 3D nodes.
+const NODE_3D_CLASS: &str = "Node3D";
 /// The engine class that loads scenes and searches the game's tree.
 const SCENE_CLASS: &str = "Scene";
 /// The engine class of physics bodies.
@@ -546,9 +548,9 @@ impl Body<'_> {
     }
 }
 
-/// The static method `name` of the engine class `class` (`Input` or
-/// `Scene`).
-fn static_method(class: &str, name: &str) -> Option<EngineMethod> {
+/// The static method `name` of the engine class `class` (`Input`,
+/// `Scene`, `Body`, `Sound` or `Audio`).
+pub(super) fn static_method(class: &str, name: &str) -> Option<EngineMethod> {
     Some(match (class, name) {
         (INPUT_CLASS, "is_down") => EngineMethod::IsDown,
         (INPUT_CLASS, "just_pressed") => EngineMethod::JustPressed,
@@ -581,7 +583,7 @@ pub(super) fn object_method(class: &str, name: &str) -> Option<EngineMethod> {
         (GAME_CLASS, "add_child") => EngineMethod::AddChild,
         (GAME_CLASS | NODE_CLASS, "start") => EngineMethod::Start,
         (GAME_CLASS | NODE_CLASS, "update") => EngineMethod::Update,
-        (NODE_CLASS, name) => EngineMethod::Node(NodeMethod::named(name)?),
+        (NODE_CLASS | NODE_3D_CLASS, name) => EngineMethod::Node(NodeMethod::named(name)?),
         (BODY_CLASS, "apply_impulse") => EngineMethod::Body(BodyMethod::ApplyImpulse),
         (BODY_CLASS, "apply_impulse_3d") => EngineMethod::Body(BodyMethod::ApplyImpulse3D),
         (BODY_CLASS, "touching") => EngineMethod::Body(BodyMethod::Touching),

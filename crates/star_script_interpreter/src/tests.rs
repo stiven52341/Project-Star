@@ -67,20 +67,10 @@ fn programs_need_one_main() {
 
 #[test]
 fn what_cannot_run_yet_is_refused_before_running() {
-    let mesh = "class Rock extends Node3D {\n init() {\n super.init(\"rock\")\n }\n}\nclass Main {\n static func main() {\n }\n}\n";
+    let constant = "class Main {\n const SIZE = 2\n static func main() {\n Debug.print(Main().SIZE.to_string())\n }\n}\n";
     assert_eq!(
-        lowering_error(mesh),
-        LowerErrorKind::Unsupported("classes that extend this engine class")
-    );
-    let method = "class Main {\n static func aim(rock: Node3D) {\n rock.look_at(0.0, 0.0, 0.0)\n }\n static func main() {\n }\n}\n";
-    assert_eq!(
-        lowering_error(method),
-        LowerErrorKind::Unsupported("this method of the engine")
-    );
-    let field = "class Main {\n static func depth(rock: Node3D) -> float {\n return rock.z\n }\n static func main() {\n }\n}\n";
-    assert_eq!(
-        lowering_error(field),
-        LowerErrorKind::Unsupported("this field of the engine")
+        lowering_error(constant),
+        LowerErrorKind::Unsupported("objects")
     );
 }
 
@@ -315,6 +305,34 @@ fn nodes_of_the_game_run_and_main_cameras_are_seen_from() {
         "camera none\neye start\neye 0.5\ncamera Eye\neye 1.0\ncamera Eye\neye 1.5\n"
     );
     assert!(result.is_ok(), "{result:?}");
+}
+
+#[test]
+fn main_3d_cameras_are_seen_from() {
+    let source = "class Eye extends Camera3D {\n init() {\n super.init(\"Eye\")\n main = true\n }\n \
+                  override func update(delta: float) {\n z += delta\n }\n}\n\
+                  class Level extends Game {\n init() {\n add_child(Eye())\n }\n \
+                  override func update(delta: float) {\n Debug.print(\"camera \" + (camera_3d?.name ?? \"none\") + \" \" + (camera == null).to_string())\n \
+                  if (camera_3d?.z ?? 0.0) >= 1.0 {\n quit()\n }\n }\n}\n";
+
+    let (printed, result) = play(source, 10);
+
+    assert_eq!(
+        printed,
+        "camera none true\ncamera Eye true\ncamera Eye true\n"
+    );
+    assert!(result.is_ok(), "{result:?}");
+}
+
+#[test]
+fn scripts_override_the_methods_of_node_3d() {
+    let source = "class Probe extends Node3D {\n init() {\n super.init(\"Probe\")\n }\n \
+                  override func global_z() -> float {\n return super.global_z() + 100.0\n }\n}\n\
+                  class Main {\n static func main() {\n const probe: Node3D = Probe()\n probe.z = 2.0\n \
+                  const holder = Node3D(\"Holder\")\n holder.z = 1.0\n holder.add_child(probe)\n \
+                  Debug.print(probe.global_z().to_string() + \" \" + holder.global_z().to_string())\n }\n}\n";
+
+    assert_eq!(run(source).ok().as_deref(), Some("103.0 1.0\n"));
 }
 
 #[test]

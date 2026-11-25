@@ -16,45 +16,30 @@ use star_script_interpreter::{Output, Program, RunError};
 
 const PROGRAMS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../star_script/tests/programs");
 
-/// The programs the interpreter covers so far: each step of Phase 14 of
-/// `docs/roadmap.md` adds the ones its part of the language completes.
-const COVERED: [&str; 16] = [
-    "basics",
-    "bodies",
-    "classes",
-    "colors",
-    "coroutines",
-    "decorators",
-    "division_fault",
-    "finding",
-    "functions",
-    "index_fault",
-    "nodes",
-    "objects",
-    "parallel",
-    "parallel_fault",
-    "pointer",
-    "sounds",
-];
+/// The programs of the compiler's end-to-end test: every one of them must
+/// behave the same interpreted, so a feature cannot reach one side only.
+fn programs() -> Vec<PathBuf> {
+    let mut programs: Vec<PathBuf> = fs::read_dir(PROGRAMS)
+        .expect("the folder of programs")
+        .map(|entry| entry.expect("an entry of the folder").path())
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "star")
+        })
+        .collect();
+    programs.sort();
+    programs
+}
 
 #[test]
-fn covered_programs_behave_as_compiled() {
-    let failures: Vec<String> = COVERED
+fn every_program_behaves_as_compiled() {
+    let programs = programs();
+    assert!(!programs.is_empty(), "no programs in {PROGRAMS}");
+    let failures: Vec<String> = programs
         .iter()
-        .filter_map(|name| check(name).err())
+        .filter_map(|path| check(path).err())
         .collect();
     assert!(failures.is_empty(), "\n{}", failures.join("\n\n"));
-}
-
-#[test]
-fn every_covered_program_exists() {
-    for name in COVERED {
-        assert!(program(name).is_file(), "missing program {name}");
-    }
-}
-
-fn program(name: &str) -> PathBuf {
-    Path::new(PROGRAMS).join(name).with_extension("star")
 }
 
 /// The expected output (or fault) of `program`, with `\n` line ends.
@@ -64,22 +49,24 @@ fn read_expected(program: &Path, extension: &str) -> Option<String> {
         .map(|text| text.replace("\r\n", "\n"))
 }
 
-fn check(name: &str) -> Result<(), String> {
-    let path = program(name);
-    let source = fs::read_to_string(&path).expect("readable program");
+fn check(path: &Path) -> Result<(), String> {
+    let name = path
+        .file_stem()
+        .map_or_else(String::new, |stem| stem.to_string_lossy().into_owned());
+    let source = fs::read_to_string(path).expect("readable program");
     let checked = check_source(&source).map_err(|errors| format!("{name}: {errors:?}"))?;
     let program = Program::lower(&checked).map_err(|error| format!("{name}: {error}"))?;
     let buffer = Rc::new(RefCell::new(Vec::new()));
     let output: Output = Rc::clone(&buffer) as Output;
     let result = program.run(&output);
     let printed = String::from_utf8_lossy(&buffer.borrow()).into_owned();
-    let expected = read_expected(&path, "out").unwrap_or_default();
+    let expected = read_expected(path, "out").unwrap_or_default();
     if printed != expected {
         return Err(format!(
             "{name}: unexpected output\n--- expected\n{expected}--- found\n{printed}"
         ));
     }
-    let fault = read_expected(&path, "fault").map(|fault| fault.trim().to_owned());
+    let fault = read_expected(path, "fault").map(|fault| fault.trim().to_owned());
     match (fault, result) {
         (None, Ok(())) => Ok(()),
         (None, Err(error)) => Err(format!("{name}: failed unexpectedly: {error}")),

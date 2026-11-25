@@ -6,10 +6,7 @@
 //! [`crate::Program::new_game`].
 //!
 //! Its types are public only so the engine can name them; what they hold
-//! stays the interpreter's. The engine classes of later steps of Phase 14
-//! (`Node3D`, `Camera3D`, `Mesh` and `Light`) are [`NotYet`] or never
-//! found here: no value of them exists, so the runtime is never handed
-//! one.
+//! stays the interpreter's.
 
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
@@ -36,11 +33,8 @@ pub use crate::value::Object;
 /// The interpreter's objects, as the runtime sees them.
 pub enum Interpreted {}
 
-/// An engine class the interpreter cannot make objects of yet.
-#[derive(Clone, Copy)]
-pub enum NotYet {}
-
-/// An object of `Node`, `Camera2D` or a class that extends one.
+/// An object of `Node`, one of its engine subclasses or a class that
+/// extends one.
 pub type NodeObject = Object<NodeParts>;
 
 /// The game: an object of the class that extends `Game`.
@@ -52,10 +46,12 @@ pub type BodyObject = Object<BodyFields<Interpreted>>;
 /// A `Sound`: an object with the runtime's fields of sounds.
 pub type SoundObject = Object<SoundFields>;
 
-/// The runtime's fields of a node: those of `Node`, and those of its node
-/// class.
+/// The runtime's fields of a node: those of `Node`, those of `Node3D` if
+/// it is a 3D node (kept apart, so they can be handed out on their own),
+/// and those of its node class.
 pub struct NodeParts {
     pub(crate) node: NodeFields<Interpreted>,
+    pub(crate) node_3d: Option<Rc<Node3dFields>>,
     pub(crate) class: ClassParts,
 }
 
@@ -68,14 +64,29 @@ pub(crate) enum ClassParts {
     Camera2D(Rc<Camera2dFields>),
     Sprite(SpriteFields<Interpreted>),
     Light2D(LightFields<Interpreted>),
+    Mesh(MeshFields<Interpreted>),
+    Light(LightFields<Interpreted>),
+    /// A `Camera3D`, whose fields are kept apart as a `Camera2D`'s.
+    Camera3D(Rc<Camera3dFields>),
 }
 
 impl NodeParts {
-    /// The fields of a new node called `name`, with those of its class.
+    /// The fields of a new 2D node called `name`, with those of its
+    /// class.
     pub(crate) fn new(name: String, class: ClassParts) -> Self {
         Self {
             node: NodeFields::new(name),
+            node_3d: None,
             class,
+        }
+    }
+
+    /// The fields of a new 3D node called `name`, with those of its
+    /// class.
+    pub(crate) fn new_3d(name: String, class: ClassParts) -> Self {
+        Self {
+            node_3d: Some(Rc::new(Node3dFields::new())),
+            ..Self::new(name, class)
         }
     }
 
@@ -102,6 +113,30 @@ impl NodeParts {
             _ => None,
         }
     }
+
+    /// The fields of `Mesh`, if it is one.
+    pub(crate) const fn mesh(&self) -> Option<&MeshFields<Interpreted>> {
+        match &self.class {
+            ClassParts::Mesh(fields) => Some(fields),
+            _ => None,
+        }
+    }
+
+    /// The fields of `Light`, if it is one.
+    pub(crate) const fn light(&self) -> Option<&LightFields<Interpreted>> {
+        match &self.class {
+            ClassParts::Light(fields) => Some(fields),
+            _ => None,
+        }
+    }
+
+    /// The fields of `Camera3D`, if it is one.
+    pub(crate) const fn camera_3d(&self) -> Option<&Rc<Camera3dFields>> {
+        match &self.class {
+            ClassParts::Camera3D(fields) => Some(fields),
+            _ => None,
+        }
+    }
 }
 
 /// A node's `tags`: a list of the interpreter, so a `push` of a script is
@@ -109,26 +144,40 @@ impl NodeParts {
 #[derive(Clone)]
 pub struct Tags(pub(crate) Elements);
 
-/// A `Camera2D`: the node, and its fields of camera.
-#[derive(Clone)]
-pub struct CameraRef {
+/// A `Camera2D` (or, with `Camera3dFields`, a `Camera3D`): the node, and
+/// its fields of camera.
+pub struct CameraRef<F = Camera2dFields> {
     node: Rc<NodeObject>,
-    fields: Rc<Camera2dFields>,
+    fields: Rc<F>,
 }
 
-impl CameraRef {
+impl<F> CameraRef<F> {
+    fn new(node: &Rc<NodeObject>, fields: &Rc<F>) -> Self {
+        Self {
+            node: Rc::clone(node),
+            fields: Rc::clone(fields),
+        }
+    }
+
     /// The camera as a node.
     pub(crate) const fn node(&self) -> &Rc<NodeObject> {
         &self.node
     }
 }
 
+/// Not derived: a derived `Clone` would ask the fields to be `Clone`.
+impl<F> Clone for CameraRef<F> {
+    fn clone(&self) -> Self {
+        Self::new(&self.node, &self.fields)
+    }
+}
+
 impl Host for Interpreted {
     type Node = Rc<NodeObject>;
     type WeakNode = Weak<NodeObject>;
-    type Node3D = NotYet;
+    type Node3D = Rc<Node3dFields>;
     type Camera2D = CameraRef;
-    type Camera3D = NotYet;
+    type Camera3D = CameraRef<Camera3dFields>;
     type Body = Rc<BodyObject>;
     type Color = Rc<Object<ColorFields>>;
     type Game = Rc<GameObject>;
@@ -150,20 +199,16 @@ impl Host for Interpreted {
         Rc::ptr_eq(node, other)
     }
 
-    fn as_node_3d(_node: &Self::Node) -> Option<Self::Node3D> {
-        None
+    fn as_node_3d(node: &Self::Node) -> Option<Self::Node3D> {
+        node.engine.node_3d.clone()
     }
 
     fn node_3d(node: &Self::Node3D) -> &Node3dFields {
-        match *node {}
+        node
     }
 
     fn as_camera_2d(node: &Self::Node) -> Option<Self::Camera2D> {
-        let fields = node.engine.camera_2d()?;
-        Some(CameraRef {
-            node: Rc::clone(node),
-            fields: Rc::clone(fields),
-        })
+        Some(CameraRef::new(node, node.engine.camera_2d()?))
     }
 
     fn camera_2d(camera: &Self::Camera2D) -> &Camera2dFields {
@@ -174,28 +219,28 @@ impl Host for Interpreted {
         Rc::clone(&camera.node)
     }
 
-    fn as_camera_3d(_node: &Self::Node) -> Option<Self::Camera3D> {
-        None
+    fn as_camera_3d(node: &Self::Node) -> Option<Self::Camera3D> {
+        Some(CameraRef::new(node, node.engine.camera_3d()?))
     }
 
     fn camera_3d(camera: &Self::Camera3D) -> &Camera3dFields {
-        match *camera {}
+        &camera.fields
     }
 
     fn camera_3d_node(camera: &Self::Camera3D) -> Self::Node {
-        match *camera {}
+        Rc::clone(&camera.node)
     }
 
     fn with_sprite<R>(node: &Self::Node, read: impl FnOnce(&SpriteFields<Self>) -> R) -> Option<R> {
         node.engine.sprite().map(read)
     }
 
-    fn with_mesh<R>(_node: &Self::Node, _read: impl FnOnce(&MeshFields<Self>) -> R) -> Option<R> {
-        None
+    fn with_mesh<R>(node: &Self::Node, read: impl FnOnce(&MeshFields<Self>) -> R) -> Option<R> {
+        node.engine.mesh().map(read)
     }
 
-    fn with_light<R>(_node: &Self::Node, _read: impl FnOnce(&LightFields<Self>) -> R) -> Option<R> {
-        None
+    fn with_light<R>(node: &Self::Node, read: impl FnOnce(&LightFields<Self>) -> R) -> Option<R> {
+        node.engine.light().map(read)
     }
 
     fn with_light_2d<R>(
@@ -297,6 +342,49 @@ mod tests {
 
         assert!(Rc::ptr_eq(&Interpreted::camera_2d_node(&seen), &camera));
         assert!(Interpreted::as_camera_2d(&node(EngineClass::Node, ClassParts::Node)).is_none());
+    }
+
+    #[test]
+    fn three_d_nodes_hand_out_their_fields() {
+        let node = |class: EngineClass, parts: ClassParts| {
+            Rc::new(Object::new(
+                class.class(),
+                Vec::new(),
+                NodeParts::new_3d("Seen".to_owned(), parts),
+            ))
+        };
+        let mesh = node(
+            EngineClass::Mesh,
+            ClassParts::Mesh(MeshFields::new("cube".to_owned())),
+        );
+        let camera = node(
+            EngineClass::Camera3D,
+            ClassParts::Camera3D(Rc::new(Camera3dFields::new())),
+        );
+        mesh.engine
+            .node_3d
+            .as_ref()
+            .expect("the fields of a 3D node")
+            .z
+            .set(4.0);
+
+        let depth =
+            Interpreted::as_node_3d(&mesh).map(|fields| Interpreted::node_3d(&fields).z.get());
+        let seen = Interpreted::as_camera_3d(&camera).expect("a camera");
+
+        assert_eq!(depth, Some(4.0));
+        assert_eq!(
+            Interpreted::with_mesh(&mesh, |mesh| mesh.shape.read(Clone::clone)),
+            Some("cube".to_owned())
+        );
+        assert!(Interpreted::as_camera_3d(&mesh).is_none());
+        assert!(Rc::ptr_eq(&Interpreted::camera_3d_node(&seen), &camera));
+        let plain = Rc::new(Object::new(
+            EngineClass::Node.class(),
+            Vec::new(),
+            NodeParts::new("Flat".to_owned(), ClassParts::Node),
+        ));
+        assert!(Interpreted::as_node_3d(&plain).is_none());
     }
 
     #[test]
