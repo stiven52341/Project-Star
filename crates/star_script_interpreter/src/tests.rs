@@ -1,16 +1,19 @@
 //! Lowering and running small programs.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use star_script::check_source;
 
-use crate::{LowerErrorKind, Program, RunError};
+use crate::{LowerErrorKind, Output, Program, RunError};
 
 /// What `source` prints when interpreted, or why it stopped.
 fn run(source: &str) -> Result<String, RunError> {
     let checked = check_source(source).expect("a valid program");
     let program = Program::lower(&checked).expect("a program the interpreter runs");
-    let mut output = Vec::new();
-    program.run(&mut output)?;
-    Ok(String::from_utf8(output).expect("UTF-8 output"))
+    let (buffer, output) = buffer();
+    program.run(&output)?;
+    Ok(String::from_utf8(buffer.take()).expect("UTF-8 output"))
 }
 
 /// Why `source` cannot be prepared.
@@ -119,10 +122,29 @@ fn reading_past_the_end_is_a_fault() {
 fn run_with_output(source: &str) -> (String, Option<RunError>) {
     let checked = check_source(source).expect("a valid program");
     let program = Program::lower(&checked).expect("a program the interpreter runs");
-    let mut output = Vec::new();
-    let result = program.run(&mut output);
+    let (buffer, output) = buffer();
+    let result = program.run(&output);
     (
-        String::from_utf8(output).expect("UTF-8 output"),
+        String::from_utf8(buffer.take()).expect("UTF-8 output"),
         result.err(),
     )
+}
+
+/// A buffer to print to, and the output that writes to it.
+fn buffer() -> (Rc<RefCell<Vec<u8>>>, Output) {
+    let buffer = Rc::new(RefCell::new(Vec::new()));
+    let output: Output = Rc::clone(&buffer) as Output;
+    (buffer, output)
+}
+
+#[test]
+fn clones_share_the_program_and_runs_share_the_output() {
+    let source = "class Main {\n static func main() {\n Debug.print(\"again\")\n }\n}\n";
+    let checked = check_source(source).expect("a valid program");
+    let program = Program::lower(&checked).expect("a program the interpreter runs");
+    let copy = program.clone();
+    let (buffer, output) = buffer();
+    program.run(&output).expect("a run without errors");
+    copy.run(&output).expect("a run without errors");
+    assert_eq!(buffer.take(), b"again\nagain\n");
 }

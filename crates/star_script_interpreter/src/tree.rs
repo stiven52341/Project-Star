@@ -6,6 +6,17 @@ use star_script::semantic::BuiltinMethod;
 
 use crate::value::Value;
 
+/// A whole lowered program: what a [`crate::Program`] shares with the
+/// coroutines it starts.
+#[derive(Debug)]
+pub(crate) struct Code {
+    pub(crate) functions: Vec<Function>,
+    pub(crate) constructors: Vec<Constructor>,
+    pub(crate) classes: Vec<Class>,
+    /// `static func main()`.
+    pub(crate) main: FunctionId,
+}
+
 /// Position of a function in the program.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionId(pub(crate) usize);

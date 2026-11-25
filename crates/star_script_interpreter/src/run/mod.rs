@@ -3,16 +3,15 @@
 mod builtins;
 mod numbers;
 
-use std::io::Write;
 use std::rc::Rc;
 
 use star_script::semantic::BuiltinMethod;
 use star_script_runtime::try_index;
 
-use crate::Program;
+use crate::Output;
 use crate::error::RunError;
 use crate::tree::{
-    Arithmetic, ClassRef, Constructor, ConstructorId, Expression, FunctionId, MethodTarget,
+    Arithmetic, ClassRef, Code, Constructor, ConstructorId, Expression, FunctionId, MethodTarget,
     Statement,
 };
 use crate::value::{Elements, Object, Value, read, write};
@@ -29,29 +28,30 @@ enum Flow {
     Return(Value),
 }
 
-/// Runs the functions of a program.
-pub(crate) struct Machine<'a> {
-    program: &'a Program,
-    output: &'a mut dyn Write,
+/// Runs the functions of a program. It owns what it uses, so the
+/// coroutines it starts can keep it after the call that started them.
+pub(crate) struct Machine {
+    code: Rc<Code>,
+    output: Output,
 }
 
 /// The locals of the function that runs.
 type Frame = [Value];
 
-impl<'a> Machine<'a> {
-    pub(crate) fn new(program: &'a Program, output: &'a mut dyn Write) -> Self {
-        Self { program, output }
+impl Machine {
+    pub(crate) const fn new(code: Rc<Code>, output: Output) -> Self {
+        Self { code, output }
     }
 
     /// Runs `function` with `arguments`, already of its parameters' types,
     /// and gives what it returns ([`Value::Null`] if nothing).
     pub(crate) fn call(
-        &mut self,
+        &self,
         function: FunctionId,
         mut arguments: Vec<Value>,
     ) -> Result<Value, RunError> {
-        let program = self.program;
-        let function = program
+        let function = self
+            .code
             .functions
             .get(function.0)
             .ok_or(RunError::Internal("unknown function"))?;
@@ -62,7 +62,7 @@ impl<'a> Machine<'a> {
         }
     }
 
-    fn block(&mut self, statements: &[Statement], frame: &mut Frame) -> Result<Flow, RunError> {
+    fn block(&self, statements: &[Statement], frame: &mut Frame) -> Result<Flow, RunError> {
         for statement in statements {
             let flow = self.statement(statement, frame)?;
             if !matches!(flow, Flow::Next) {
@@ -72,7 +72,7 @@ impl<'a> Machine<'a> {
         Ok(Flow::Next)
     }
 
-    fn statement(&mut self, statement: &Statement, frame: &mut Frame) -> Result<Flow, RunError> {
+    fn statement(&self, statement: &Statement, frame: &mut Frame) -> Result<Flow, RunError> {
         match statement {
             Statement::Store { slot, value } => {
                 let value = self.evaluate(value, frame)?;
@@ -157,7 +157,7 @@ impl<'a> Machine<'a> {
 
     /// `for slot in start..end`: the ends are read once, as a Rust range.
     fn for_range(
-        &mut self,
+        &self,
         slot: usize,
         start: &Expression,
         end: &Expression,
@@ -179,7 +179,7 @@ impl<'a> Machine<'a> {
 
     /// Builds an object of the constructor's class.
     fn construct(
-        &mut self,
+        &self,
         constructor: ConstructorId,
         arguments: Vec<Value>,
     ) -> Result<Value, RunError> {
@@ -195,7 +195,7 @@ impl<'a> Machine<'a> {
     /// `subclass_fields` from the closest subclass down; and then the rest
     /// of `init` with `self`. So `init`s finish from the root down.
     fn build(
-        &mut self,
+        &self,
         constructor: ConstructorId,
         mut frame: Vec<Value>,
         class: ClassRef,
@@ -237,8 +237,8 @@ impl<'a> Machine<'a> {
         Ok(object)
     }
 
-    fn constructor(&self, constructor: ConstructorId) -> Result<&'a Constructor, RunError> {
-        self.program
+    fn constructor(&self, constructor: ConstructorId) -> Result<&Constructor, RunError> {
+        self.code
             .constructors
             .get(constructor.0)
             .ok_or(RunError::Internal("unknown constructor"))
@@ -247,7 +247,7 @@ impl<'a> Machine<'a> {
     /// The field at `position` of an object; with `?.`, `null` for no
     /// object.
     fn field(
-        &mut self,
+        &self,
         object: &Expression,
         position: usize,
         null_safe: bool,
@@ -264,15 +264,24 @@ impl<'a> Machine<'a> {
         let Value::Object(object) = value else {
             return false;
         };
-        self.program
+        self.code
             .classes
             .get(object.class.0)
             .is_some_and(|own| own.ancestors.contains(&class))
     }
 
+    /// `Debug.print`: a line of the program's output.
+    fn print(&self, message: &str) -> Result<(), RunError> {
+        let mut output = self
+            .output
+            .try_borrow_mut()
+            .map_err(|_| RunError::Internal("output already in use"))?;
+        writeln!(output, "{message}").map_err(RunError::Output)
+    }
+
     /// A method of the object `receiver`, with `self` as its first local.
     fn call_method(
-        &mut self,
+        &self,
         target: MethodTarget,
         receiver: Value,
         arguments: &[Expression],
@@ -282,7 +291,7 @@ impl<'a> Machine<'a> {
             MethodTarget::Direct(function) => function,
             MethodTarget::Overridable(place) => {
                 let class = object_of(&receiver)?.class;
-                self.program
+                self.code
                     .classes
                     .get(class.0)
                     .and_then(|class| class.methods.get(place))
@@ -300,7 +309,7 @@ impl<'a> Machine<'a> {
 
     /// `list[index] = value` or `list[index] op= value`.
     fn set_element(
-        &mut self,
+        &self,
         list: &Expression,
         index: &Expression,
         operator: Option<Arithmetic>,
@@ -327,14 +336,14 @@ impl<'a> Machine<'a> {
         Ok(())
     }
 
-    fn condition(&mut self, condition: &Expression, frame: &Frame) -> Result<bool, RunError> {
+    fn condition(&self, condition: &Expression, frame: &Frame) -> Result<bool, RunError> {
         match self.evaluate(condition, frame)? {
             Value::Bool(value) => Ok(value),
             _ => Err(RunError::Internal("condition that is not a `bool`")),
         }
     }
 
-    fn evaluate(&mut self, expression: &Expression, frame: &Frame) -> Result<Value, RunError> {
+    fn evaluate(&self, expression: &Expression, frame: &Frame) -> Result<Value, RunError> {
         Ok(match expression {
             Expression::Constant(value) => value.clone(),
             Expression::Local(slot) => frame
@@ -415,7 +424,7 @@ impl<'a> Machine<'a> {
             Expression::Now => Value::Float(star_script_runtime::tasks::now()),
             Expression::Print(message) => {
                 let message = self.evaluate(message, frame)?.to_text()?;
-                writeln!(self.output, "{message}").map_err(RunError::Output)?;
+                self.print(&message)?;
                 Value::Null
             }
             Expression::List(elements) => Value::list(self.evaluate_all(elements, frame)?),
@@ -439,7 +448,7 @@ impl<'a> Machine<'a> {
     /// A method of a basic type or list; with `?.`, `null` without
     /// running the argument.
     fn builtin(
-        &mut self,
+        &self,
         method: BuiltinMethod,
         receiver: &Expression,
         argument: Option<&Expression>,
@@ -458,7 +467,7 @@ impl<'a> Machine<'a> {
 
     /// The values of `left` and then `right`.
     fn evaluate_pair(
-        &mut self,
+        &self,
         left: &Expression,
         right: &Expression,
         frame: &Frame,
@@ -469,7 +478,7 @@ impl<'a> Machine<'a> {
 
     /// The values of `expressions`, in order.
     fn evaluate_all(
-        &mut self,
+        &self,
         expressions: &[Expression],
         frame: &Frame,
     ) -> Result<Vec<Value>, RunError> {

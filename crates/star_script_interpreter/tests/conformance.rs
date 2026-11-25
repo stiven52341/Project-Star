@@ -6,11 +6,13 @@
 // Test code: a failed step should stop the test with its explanation.
 #![allow(clippy::expect_used, clippy::panic)]
 
+use std::cell::RefCell;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use star_script::check_source;
-use star_script_interpreter::{Program, RunError};
+use star_script_interpreter::{Output, Program, RunError};
 
 const PROGRAMS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../star_script/tests/programs");
 
@@ -56,9 +58,10 @@ fn check(name: &str) -> Result<(), String> {
     let source = fs::read_to_string(&path).expect("readable program");
     let checked = check_source(&source).map_err(|errors| format!("{name}: {errors:?}"))?;
     let program = Program::lower(&checked).map_err(|error| format!("{name}: {error}"))?;
-    let mut output = Vec::new();
-    let result = program.run(&mut output);
-    let printed = String::from_utf8_lossy(&output);
+    let buffer = Rc::new(RefCell::new(Vec::new()));
+    let output: Output = Rc::clone(&buffer) as Output;
+    let result = program.run(&output);
+    let printed = String::from_utf8_lossy(&buffer.borrow()).into_owned();
     let expected = read_expected(&path, "out").unwrap_or_default();
     if printed != expected {
         return Err(format!(

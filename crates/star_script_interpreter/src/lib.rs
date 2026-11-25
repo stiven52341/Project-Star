@@ -27,19 +27,25 @@ mod run;
 mod tree;
 mod value;
 
+use std::cell::RefCell;
 use std::io::Write;
+use std::rc::Rc;
 
 use star_script::CheckedSource;
 
 pub use error::{LowerError, LowerErrorKind, RunError};
 
-/// A program ready to be interpreted.
-#[derive(Debug)]
+/// Where `Debug.print` writes its lines. It is shared, not borrowed: the
+/// coroutines a program starts go on printing after the call that started
+/// them, and the caller keeps its own handle to read what was written
+/// (a buffer in tests, the console in the player).
+pub type Output = Rc<RefCell<dyn Write>>;
+
+/// A program ready to be interpreted. Cloning it costs nothing: the clones
+/// share the same lowered code.
+#[derive(Debug, Clone)]
 pub struct Program {
-    functions: Vec<tree::Function>,
-    constructors: Vec<tree::Constructor>,
-    classes: Vec<tree::Class>,
-    main: tree::FunctionId,
+    code: Rc<tree::Code>,
 }
 
 impl Program {
@@ -50,7 +56,10 @@ impl Program {
     /// When the program uses something the interpreter cannot run yet, or
     /// has no `static func main()` (or several).
     pub fn lower(checked: &CheckedSource) -> Result<Self, LowerError> {
-        lower::program(&checked.syntax, &checked.analysis)
+        let code = lower::program(&checked.syntax, &checked.analysis)?;
+        Ok(Self {
+            code: Rc::new(code),
+        })
     }
 
     /// Runs `static func main()`. `Debug.print` writes its lines to
@@ -60,9 +69,9 @@ impl Program {
     ///
     /// When the program stops with a runtime error of StarScript, or its
     /// output cannot be written.
-    pub fn run(&self, output: &mut dyn Write) -> Result<(), RunError> {
-        run::Machine::new(self, output)
-            .call(self.main, Vec::new())
+    pub fn run(&self, output: &Output) -> Result<(), RunError> {
+        run::Machine::new(Rc::clone(&self.code), Rc::clone(output))
+            .call(self.code.main, Vec::new())
             .map(drop)
     }
 }

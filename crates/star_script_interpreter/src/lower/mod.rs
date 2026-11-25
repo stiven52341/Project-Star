@@ -13,9 +13,8 @@ use star_script::semantic::{
     Analysis, ClassId, ClassInfo, ClassOrigin, Execution, MemberRef, MethodInfo, Type,
 };
 
-use crate::Program;
 use crate::error::{LowerError, LowerErrorKind};
-use crate::tree::{Class, ClassRef, ConstructorId, Function, FunctionId, Statement};
+use crate::tree::{Class, ClassRef, Code, ConstructorId, Function, FunctionId, Statement};
 use body::Body;
 
 /// A member of a class that lowering turns into a function.
@@ -77,7 +76,7 @@ struct ScriptClass<'a> {
 }
 
 /// Lowers the whole program.
-pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Program, LowerError> {
+pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, LowerError> {
     let mut tables = Tables::default();
     let mut pending = Vec::new();
     let mut classes = Vec::new();
@@ -166,7 +165,7 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Progra
         .zip(tables.ancestors)
         .map(|(methods, ancestors)| Class { methods, ancestors })
         .collect();
-    Ok(Program {
+    Ok(Code {
         functions,
         constructors,
         classes,

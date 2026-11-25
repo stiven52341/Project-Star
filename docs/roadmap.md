@@ -550,7 +550,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         output interpreted and compiled.
   - [ ] 14.4 Coroutines: `async`/`await`, `Time.wait` and
         `Time.next_frame`, run once per frame, and ending with their node.
-        Design proposed to the owner (awaiting approval):
+        Design approved by the owner (2026-11-24, decision 68):
         - An interpreted coroutine is a Rust future, so it can stop at an
           `await` and go on in another frame. The body of an `async`
           method is run by a second, `async` version of the runner; it
@@ -589,7 +589,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           whose frames can be kept and resumed (a large rewrite of what
           works, and a scheduler of its own beside the runtime's, whose
           order would have to be kept identical by hand).
-    - [ ] 14.4a A shared program and output (`Rc`), with no change in
+    - [x] 14.4a A shared program and output (`Rc`), with no change in
           what programs do.
     - [ ] 14.4b `async` methods, `await`, coroutines started by a call
           alone, `Time.wait`, `Time.next_frame`, `async main` and errors
