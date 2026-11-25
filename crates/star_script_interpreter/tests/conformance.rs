@@ -1,7 +1,7 @@
 //! Conformance: the interpreter runs the programs that the compiler's
 //! end-to-end test builds and runs (`star_script/tests/programs`), and
 //! must print the same `.out` and stop with the same `.fault` (rule 3.7 of
-//! `CLAUDE.md`). A program's `.actions`, if it has one, names the input
+//! `CLAUDE.md`), and the crate's example script with the same `main`. A program's `.actions`, if it has one, names the input
 //! actions it may read, one per line.
 
 // Test code: a failed step should stop the test with its explanation.
@@ -16,6 +16,11 @@ use star_script::{GameSettings, InputAction, check_source_with};
 use star_script_interpreter::{Output, Program, RunError};
 
 const PROGRAMS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../star_script/tests/programs");
+/// The compiler crate's example script, and the `main` its end-to-end test
+/// runs it with.
+const EXAMPLE_SCRIPT: &str = include_str!("../../star_script/examples/scripts/player.star");
+const EXAMPLE_MAIN: &str = include_str!("../../star_script/tests/example/player_main.star");
+const EXAMPLE_OUTPUT: &str = include_str!("../../star_script/tests/example/player_main.out");
 
 /// The programs of the compiler's end-to-end test: every one of them must
 /// behave the same interpreted, so a feature cannot reach one side only.
@@ -41,6 +46,30 @@ fn every_program_behaves_as_compiled() {
         .filter_map(|path| check(path).err())
         .collect();
     assert!(failures.is_empty(), "\n{}", failures.join("\n\n"));
+}
+
+#[test]
+fn the_example_script_behaves_as_compiled() {
+    let expected = Expected {
+        output: EXAMPLE_OUTPUT.replace("\r\n", "\n"),
+        fault: None,
+    };
+    let source = format!("{EXAMPLE_SCRIPT}\n{EXAMPLE_MAIN}");
+    if let Err(failure) = run(
+        "example_player",
+        &source,
+        &GameSettings::default(),
+        &expected,
+    ) {
+        panic!("{failure}");
+    }
+}
+
+/// How a program must behave.
+struct Expected {
+    output: String,
+    /// The runtime error it must stop with, if any.
+    fault: Option<String>,
 }
 
 /// The expected output (or fault) of `program`, with `\n` line ends.
@@ -71,21 +100,34 @@ fn check(path: &Path) -> Result<(), String> {
         .file_stem()
         .map_or_else(String::new, |stem| stem.to_string_lossy().into_owned());
     let source = fs::read_to_string(path).expect("readable program");
-    let checked = check_source_with(&source, &settings(path))
-        .map_err(|errors| format!("{name}: {errors:?}"))?;
+    let expected = Expected {
+        output: read_expected(path, "out").unwrap_or_default(),
+        fault: read_expected(path, "fault").map(|fault| fault.trim().to_owned()),
+    };
+    run(&name, &source, &settings(path), &expected)
+}
+
+/// Runs the program `name` interpreted and compares it with `expected`.
+fn run(
+    name: &str,
+    source: &str,
+    settings: &GameSettings,
+    expected: &Expected,
+) -> Result<(), String> {
+    let checked =
+        check_source_with(source, settings).map_err(|errors| format!("{name}: {errors:?}"))?;
     let program = Program::lower(&checked).map_err(|error| format!("{name}: {error}"))?;
     let buffer = Rc::new(RefCell::new(Vec::new()));
     let output: Output = Rc::clone(&buffer) as Output;
     let result = program.run(&output);
     let printed = String::from_utf8_lossy(&buffer.borrow()).into_owned();
-    let expected = read_expected(path, "out").unwrap_or_default();
-    if printed != expected {
+    if printed != expected.output {
         return Err(format!(
-            "{name}: unexpected output\n--- expected\n{expected}--- found\n{printed}"
+            "{name}: unexpected output\n--- expected\n{}--- found\n{printed}",
+            expected.output
         ));
     }
-    let fault = read_expected(path, "fault").map(|fault| fault.trim().to_owned());
-    match (fault, result) {
+    match (&expected.fault, result) {
         (None, Ok(())) => Ok(()),
         (None, Err(error)) => Err(format!("{name}: failed unexpectedly: {error}")),
         (Some(_), Ok(())) => Err(format!("{name}: should have stopped with an error")),

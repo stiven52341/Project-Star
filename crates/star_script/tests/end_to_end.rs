@@ -53,7 +53,7 @@ fn programs_behave_as_expected() {
         .expect("valid program name");
     expectations.push(Expectation {
         name: name.to_owned(),
-        output: output.to_owned(),
+        output: output.replace("\r\n", "\n"),
         fault: None,
     });
     package.write(&directory).expect("package written");
@@ -67,14 +67,14 @@ fn programs_behave_as_expected() {
     assert!(failures.is_empty(), "\n{}", failures.join("\n\n"));
 }
 
-/// The example script of the crate, with a `main` that uses it.
+/// The example script of the crate, with a `main` that uses it, which the
+/// interpreter's conformance test runs too.
 fn example_program() -> (&'static str, String, &'static str) {
-    let main = "\nclass Main {\n static func main() {\n const p = Player(\"Ana\")\n \
-                p.countdown(4)\n Debug.print(p.target_name())\n }\n}\n";
+    let main = include_str!("example/player_main.star");
     (
         "example_player",
-        format!("{EXAMPLE_SCRIPT}{main}"),
-        "Quedan 3\nQuedan 1\nnadie\n",
+        format!("{EXAMPLE_SCRIPT}\n{main}"),
+        include_str!("example/player_main.out"),
     )
 }
 

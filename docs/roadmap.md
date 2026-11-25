@@ -869,7 +869,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           nodes and scenes, 2D and 3D physics, coroutines and a missing
           main scene. `window_scene` folded into it. Both passed on this
           machine with the same output.
-  - [ ] 14.9 Blueprints: they become StarScript, so they need no
+  - [x] 14.9 Blueprints: they become StarScript, so they need no
         interpreter of their own; conformance tests with the blueprint
         templates.
         Design approved by the owner (decision 73, 2026-11-24):
@@ -914,8 +914,18 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           action is held, so their axes give 0. The editor's test
           `every_template_has_its_conformance_program` checks each
           program's start and its `.actions` against the template.
-    - [ ] 14.9b Every kind of node, and the example script in the
+    - [x] 14.9b Every kind of node, and the example script in the
           interpreter's conformance.
+          `star_blueprint/tests/every_node.blueprint` (`Tally`: a “For
+          each” summing a list, a branch on `%` and `==`, calls of
+          `Debug.print`, of its own `parity` and of the engine's
+          `translate`, and returns) is
+          `programs/blueprint_every_node.star` with a `Main`; the test
+          `star_blueprint/tests/conformance.rs` keeps it current. The
+          example script's `Main` and output are
+          `star_script/tests/example/player_main.star` and `.out`, read
+          by the end-to-end test and by the interpreter's new
+          `the_example_script_behaves_as_compiled`.
   - [ ] 14.10 The interpreted player: the scene player of step e grows
         into a player that loads the project's scripts when it starts;
         “Play” uses it for every project, and any project plays in about

@@ -1,0 +1,313 @@
+# Every kind of node of a blueprint, for the conformance program
+# `star_script/tests/programs/blueprint_every_node.star` (decision 73):
+# its translation runs compiled and interpreted, expecting the same output.
+format = 1
+class = "Tally"
+extends = "Node"
+base_arguments = ["Tally"]
+
+[[variable]]
+name = "count"
+default = 0
+
+[[variable]]
+name = "sum"
+default = 0
+
+[[graph]]
+name = "total"
+parameters = [{ name = "values", type = "[int]" }]
+returns = "int"
+
+[[graph.node]]
+id = 1
+kind = "entry"
+
+[[graph.node]]
+id = 2
+kind = "set_variable"
+variable = "sum"
+
+[[graph.node]]
+id = 3
+kind = "literal"
+value = 0
+
+[[graph.node]]
+id = 4
+kind = "for_each"
+
+[[graph.node]]
+id = 5
+kind = "set_variable"
+variable = "sum"
+
+[[graph.node]]
+id = 6
+kind = "operator"
+operator = "add"
+
+[[graph.node]]
+id = 7
+kind = "get_variable"
+variable = "sum"
+
+[[graph.node]]
+id = 8
+kind = "return"
+
+[[graph.node]]
+id = 9
+kind = "get_variable"
+variable = "sum"
+
+[[graph.link]]
+from = { node = 1, pin = "then" }
+to = { node = 2, pin = "in" }
+
+[[graph.link]]
+from = { node = 3, pin = "value" }
+to = { node = 2, pin = "value" }
+
+[[graph.link]]
+from = { node = 2, pin = "then" }
+to = { node = 4, pin = "in" }
+
+[[graph.link]]
+from = { node = 1, pin = "values" }
+to = { node = 4, pin = "list" }
+
+[[graph.link]]
+from = { node = 4, pin = "body" }
+to = { node = 5, pin = "in" }
+
+[[graph.link]]
+from = { node = 7, pin = "value" }
+to = { node = 6, pin = "left" }
+
+[[graph.link]]
+from = { node = 4, pin = "element" }
+to = { node = 6, pin = "right" }
+
+[[graph.link]]
+from = { node = 6, pin = "result" }
+to = { node = 5, pin = "value" }
+
+[[graph.link]]
+from = { node = 4, pin = "done" }
+to = { node = 8, pin = "in" }
+
+[[graph.link]]
+from = { node = 9, pin = "value" }
+to = { node = 8, pin = "value" }
+
+[[graph]]
+name = "parity"
+parameters = [{ name = "value", type = "int" }]
+returns = "string"
+
+[[graph.node]]
+id = 1
+kind = "entry"
+
+[[graph.node]]
+id = 2
+kind = "branch"
+
+[[graph.node]]
+id = 3
+kind = "operator"
+operator = "equal"
+
+[[graph.node]]
+id = 4
+kind = "operator"
+operator = "remainder"
+
+[[graph.node]]
+id = 5
+kind = "literal"
+value = 2
+
+[[graph.node]]
+id = 6
+kind = "literal"
+value = 0
+
+[[graph.node]]
+id = 7
+kind = "return"
+
+[[graph.node]]
+id = 8
+kind = "literal"
+value = "even"
+
+[[graph.node]]
+id = 9
+kind = "return"
+
+[[graph.node]]
+id = 10
+kind = "literal"
+value = "odd"
+
+[[graph.link]]
+from = { node = 1, pin = "then" }
+to = { node = 2, pin = "in" }
+
+[[graph.link]]
+from = { node = 3, pin = "result" }
+to = { node = 2, pin = "condition" }
+
+[[graph.link]]
+from = { node = 4, pin = "result" }
+to = { node = 3, pin = "left" }
+
+[[graph.link]]
+from = { node = 6, pin = "value" }
+to = { node = 3, pin = "right" }
+
+[[graph.link]]
+from = { node = 1, pin = "value" }
+to = { node = 4, pin = "left" }
+
+[[graph.link]]
+from = { node = 5, pin = "value" }
+to = { node = 4, pin = "right" }
+
+[[graph.link]]
+from = { node = 2, pin = "true" }
+to = { node = 7, pin = "in" }
+
+[[graph.link]]
+from = { node = 8, pin = "value" }
+to = { node = 7, pin = "value" }
+
+[[graph.link]]
+from = { node = 2, pin = "false" }
+to = { node = 9, pin = "in" }
+
+[[graph.link]]
+from = { node = 10, pin = "value" }
+to = { node = 9, pin = "value" }
+
+[[graph]]
+name = "update"
+override = true
+parameters = [{ name = "delta", type = "float" }]
+
+[[graph.node]]
+id = 1
+kind = "entry"
+
+[[graph.node]]
+id = 2
+kind = "set_variable"
+variable = "count"
+
+[[graph.node]]
+id = 3
+kind = "operator"
+operator = "add"
+
+[[graph.node]]
+id = 4
+kind = "get_variable"
+variable = "count"
+
+[[graph.node]]
+id = 5
+kind = "literal"
+value = 1
+
+[[graph.node]]
+id = 6
+kind = "call"
+target = { class = "Debug" }
+method = "print"
+arguments = ["text"]
+
+[[graph.node]]
+id = 7
+kind = "call"
+target = "self"
+method = "parity"
+arguments = ["value"]
+returns_value = true
+pure = true
+
+[[graph.node]]
+id = 8
+kind = "get_variable"
+variable = "count"
+
+[[graph.node]]
+id = 9
+kind = "call"
+target = "self"
+method = "translate"
+arguments = ["x", "y"]
+
+[[graph.node]]
+id = 10
+kind = "literal"
+value = 1.0
+
+[[graph.node]]
+id = 11
+kind = "operator"
+operator = "multiply"
+
+[[graph.node]]
+id = 12
+kind = "literal"
+value = 2.0
+
+[[graph.link]]
+from = { node = 1, pin = "then" }
+to = { node = 2, pin = "in" }
+
+[[graph.link]]
+from = { node = 4, pin = "value" }
+to = { node = 3, pin = "left" }
+
+[[graph.link]]
+from = { node = 5, pin = "value" }
+to = { node = 3, pin = "right" }
+
+[[graph.link]]
+from = { node = 3, pin = "result" }
+to = { node = 2, pin = "value" }
+
+[[graph.link]]
+from = { node = 2, pin = "then" }
+to = { node = 6, pin = "in" }
+
+[[graph.link]]
+from = { node = 7, pin = "result" }
+to = { node = 6, pin = "text" }
+
+[[graph.link]]
+from = { node = 8, pin = "value" }
+to = { node = 7, pin = "value" }
+
+[[graph.link]]
+from = { node = 6, pin = "then" }
+to = { node = 9, pin = "in" }
+
+[[graph.link]]
+from = { node = 10, pin = "value" }
+to = { node = 9, pin = "x" }
+
+[[graph.link]]
+from = { node = 1, pin = "delta" }
+to = { node = 11, pin = "left" }
+
+[[graph.link]]
+from = { node = 12, pin = "value" }
+to = { node = 11, pin = "right" }
+
+[[graph.link]]
+from = { node = 11, pin = "result" }
+to = { node = 9, pin = "y" }
