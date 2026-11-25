@@ -402,7 +402,7 @@ mod tests {
     fn bodies_made_by_the_runtime_are_engine_bodies() {
         let body = Interpreted::new_body(BodyFields::circle("static".to_owned(), 2.0));
 
-        assert_eq!(body.class, EngineClass::Body.class());
+        assert_eq!(body.class(), EngineClass::Body.class());
         assert!((Interpreted::body(&body).radius.get() - 2.0).abs() < f32::EPSILON);
     }
 
@@ -410,7 +410,7 @@ mod tests {
     fn colors_made_by_the_runtime_are_engine_colors() {
         let color = Interpreted::color(0.1, 0.2, 0.3, 0.4);
 
-        assert_eq!(color.class, EngineClass::Color.class());
+        assert_eq!(color.class(), EngineClass::Color.class());
         assert_eq!(Interpreted::channels(&color), [0.1, 0.2, 0.3, 0.4]);
     }
 }

@@ -1,7 +1,7 @@
 //! The values a running program works with.
 
 use std::any::Any;
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::fmt;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -66,8 +66,9 @@ pub(crate) enum Value {
 /// `()`; code that only needs the script fields sees any object as an
 /// `Object<dyn Any>`.
 pub struct Object<E: ?Sized = ()> {
-    /// The class it was created as.
-    pub(crate) class: ClassRef,
+    /// Its class: the one it was created as, or the same class of a
+    /// program reloaded since (decision 76).
+    class: Cell<ClassRef>,
     /// The script fields of every class of its hierarchy, the root's first.
     fields: RefCell<Vec<Value>>,
     /// The runtime's fields of its engine class.
@@ -77,7 +78,7 @@ pub struct Object<E: ?Sized = ()> {
 impl<E> Object<E> {
     pub(crate) const fn new(class: ClassRef, fields: Vec<Value>, engine: E) -> Self {
         Self {
-            class,
+            class: Cell::new(class),
             fields: RefCell::new(fields),
             engine,
         }
@@ -85,6 +86,31 @@ impl<E> Object<E> {
 }
 
 impl<E: ?Sized> Object<E> {
+    /// Its class.
+    pub(crate) fn class(&self) -> ClassRef {
+        self.class.get()
+    }
+
+    /// Makes it an object of `class` of a reloaded program, with `fields`
+    /// laid out as that class lays them out.
+    pub(crate) fn reshape(&self, class: ClassRef, fields: Vec<Value>) -> Result<(), RunError> {
+        *self
+            .fields
+            .try_borrow_mut()
+            .map_err(|_| OVERLAPPING_FIELDS)? = fields;
+        self.class.set(class);
+        Ok(())
+    }
+
+    /// The fields it has, by their places.
+    pub(crate) fn fields(&self) -> Result<Vec<Value>, RunError> {
+        Ok(self
+            .fields
+            .try_borrow()
+            .map_err(|_| OVERLAPPING_FIELDS)?
+            .clone())
+    }
+
     /// A copy of the field at `position`. Like the compiled `Field`, it
     /// never keeps the fields borrowed after it returns.
     pub(crate) fn field(&self, position: usize) -> Result<Value, RunError> {
@@ -114,7 +140,7 @@ impl<E: ?Sized> fmt::Debug for Object<E> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Object")
-            .field("class", &self.class)
+            .field("class", &self.class.get())
             .finish_non_exhaustive()
     }
 }

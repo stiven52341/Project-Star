@@ -155,6 +155,11 @@ pub(crate) struct ConstructorId(pub(crate) usize);
 /// empty: its methods are not functions of the program).
 #[derive(Debug)]
 pub(crate) struct Class {
+    /// Its name, by which a reload finds it again (decision 76).
+    pub(crate) name: Arc<str>,
+    /// The script fields it declares itself, in order (none for an engine
+    /// class): an object's row has those of its bases first.
+    pub(crate) fields: Vec<FieldLayout>,
     /// The function of each method that objects run their own version
     /// of, by its place in the table.
     pub(crate) methods: Vec<FunctionId>,
@@ -174,6 +179,20 @@ impl Class {
             .find(|(overridden, _)| *overridden == method)
             .map(|(_, function)| *function)
     }
+}
+
+/// A field a class declares, as a reload sees it.
+#[derive(Debug)]
+pub(crate) struct FieldLayout {
+    pub(crate) name: String,
+    /// Its type, written as StarScript writes it: a reload keeps a value
+    /// only for a field whose type is still the same.
+    pub(crate) ty: String,
+    /// What gives an object that never had the field its value: the value
+    /// written in the class or the type's default value, without the
+    /// object (field values cannot see it). `None` if only `init` gives
+    /// it one.
+    pub(crate) start: Option<Function>,
 }
 
 /// How objects of a class are built, in the two phases of the language.

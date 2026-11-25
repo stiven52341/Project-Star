@@ -120,3 +120,66 @@ impl std::error::Error for RunError {
         }
     }
 }
+
+/// Why a game could not be given a new program ([`crate::reload`]): it
+/// goes on with the code it had.
+#[derive(Debug)]
+pub enum ReloadError {
+    /// No game is playing on this thread.
+    NotPlaying,
+    /// The new program is a console program, not a game.
+    NotAGame,
+    /// Objects of this class exist, but the new program has no class of
+    /// that name.
+    ClassRemoved(String),
+    /// Objects of this class exist, but in the new program it extends
+    /// another engine class (or none, or one now), which their engine part
+    /// cannot become.
+    EngineClassChanged(String),
+    /// Objects of the class exist, and this new field of it gets its
+    /// value only in `init`, which they already ran.
+    FieldNeedsInit {
+        /// The class of the objects.
+        class: String,
+        /// The new field.
+        field: String,
+    },
+    /// Giving the objects their new fields stopped with a runtime error.
+    Run(RunError),
+}
+
+impl fmt::Display for ReloadError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotPlaying => formatter.write_str("no game is playing"),
+            Self::NotAGame => formatter.write_str("the new program is not a game"),
+            Self::ClassRemoved(class) => write!(
+                formatter,
+                "the class `{class}` was removed, but objects of it exist"
+            ),
+            Self::EngineClassChanged(class) => write!(
+                formatter,
+                "the class `{class}` no longer extends the engine class its objects were made as"
+            ),
+            Self::FieldNeedsInit { class, field } => write!(
+                formatter,
+                "the new field `{field}` of `{class}` gets its value only in `init`, \
+                 which its objects already ran"
+            ),
+            Self::Run(error) => {
+                write!(
+                    formatter,
+                    "giving the objects their new fields failed: {error}"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for ReloadError {}
+
+impl From<RunError> for ReloadError {
+    fn from(error: RunError) -> Self {
+        Self::Run(error)
+    }
+}

@@ -24,11 +24,16 @@
 //! games have every engine class: `Input`, `Color`, the 2D and 3D nodes,
 //! scenes, `Body`, `Sound` and `Audio`. Every program of the compiler's
 //! end-to-end test behaves the same interpreted (its conformance test).
+//!
+//! A game playing can go on with a new version of its program, keeping its
+//! objects ([`reload`], decision 76): what “Play” does when a script is
+//! saved.
 
 mod error;
 pub mod host;
 mod lower;
 mod play;
+mod reload;
 mod run;
 mod tree;
 mod value;
@@ -40,7 +45,8 @@ use std::sync::Arc;
 
 use star_script::CheckedSource;
 
-pub use error::{LowerError, LowerErrorKind, RunError};
+pub use error::{LowerError, LowerErrorKind, ReloadError, RunError};
+pub use reload::{Reloaded, reload};
 
 /// What a program is: how it starts, and so how it is run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

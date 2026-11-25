@@ -9,7 +9,7 @@ mod scenes;
 
 use std::any::Any;
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
 use star_script::semantic::BuiltinMethod;
@@ -60,6 +60,32 @@ pub(crate) struct Machine {
     /// The first runtime error of a coroutine, shared by every copy: once
     /// there is one, the program stops and no coroutine goes on.
     failure: Rc<RefCell<Option<RunError>>>,
+    /// The objects of the program's classes, which a reload gives the
+    /// classes of the new program (decision 76), shared by every copy.
+    objects: Rc<RefCell<Objects>>,
+}
+
+/// The objects a program made of its own classes, remembered without
+/// keeping them alive.
+#[derive(Default)]
+struct Objects {
+    known: Vec<Weak<Object<dyn Any>>>,
+    /// How many there can be before the dropped ones are forgotten:
+    /// twice those alive the last time, so remembering costs little.
+    limit: usize,
+}
+
+/// How many objects are remembered before dropped ones are first looked for.
+const FIRST_OBJECT_LIMIT: usize = 64;
+
+impl Objects {
+    fn remember(&mut self, object: Weak<Object<dyn Any>>) {
+        if self.known.len() >= self.limit.max(FIRST_OBJECT_LIMIT) {
+            self.known.retain(|known| known.strong_count() > 0);
+            self.limit = self.known.len() * 2;
+        }
+        self.known.push(object);
+    }
 }
 
 /// The locals of the function that runs.
@@ -71,7 +97,60 @@ impl Machine {
             code,
             output,
             failure: Rc::default(),
+            objects: Rc::default(),
         }
+    }
+
+    /// The same program with `code` instead of its own: its output, its
+    /// failure and its objects are the same.
+    pub(crate) fn with_code(&self, code: Arc<Code>) -> Self {
+        Self {
+            code,
+            ..self.clone()
+        }
+    }
+
+    /// The code it runs.
+    pub(crate) fn code(&self) -> &Code {
+        &self.code
+    }
+
+    /// The objects of the program's classes that are still alive, in the
+    /// order they were made.
+    pub(crate) fn living_objects(&self) -> Result<Vec<Rc<Object<dyn Any>>>, RunError> {
+        let objects = self
+            .objects
+            .try_borrow()
+            .map_err(|_| RunError::Internal("objects already in use"))?;
+        Ok(objects.known.iter().filter_map(Weak::upgrade).collect())
+    }
+
+    /// Runs `function`, which has no parameters, and gives its result.
+    pub(crate) fn run_function(&self, function: &Function) -> Result<Value, RunError> {
+        let mut frame = vec![Value::Null; function.slots];
+        match self.block(&function.body, &mut frame)? {
+            Flow::Return(value) => Ok(value),
+            Flow::Next | Flow::Break | Flow::Continue => Ok(Value::Null),
+        }
+    }
+
+    /// Remembers `object`, just built, for a reload.
+    fn remember(&self, object: &Value) -> Result<(), RunError> {
+        let weak: Weak<Object<dyn Any>> = match object {
+            Value::Object(object) => Rc::downgrade(object) as Weak<Object<dyn Any>>,
+            Value::Node(object) => Rc::downgrade(object) as Weak<Object<dyn Any>>,
+            Value::Game(object) => Rc::downgrade(object) as Weak<Object<dyn Any>>,
+            _ => {
+                return Err(RunError::Internal(
+                    "an object of a class of an unknown kind",
+                ));
+            }
+        };
+        self.objects
+            .try_borrow_mut()
+            .map_err(|_| RunError::Internal("objects already in use"))?
+            .remember(weak);
+        Ok(())
     }
 
     /// Runs the program: `main`, and then its coroutines until none is
@@ -148,7 +227,7 @@ impl Machine {
 
     /// What running needs to know about the class of `object`.
     fn class_of(&self, object: &Value) -> Result<&Class, RunError> {
-        let class = object_of(object)?.class;
+        let class = object_of(object)?.class();
         self.code
             .classes
             .get(class.0)
@@ -346,12 +425,14 @@ impl Machine {
             for fields in subclass_fields.drain(..).rev() {
                 row.extend(fields);
             }
-            match base {
+            let object = match base {
                 Some((ConstructorRef::Engine(engine), arguments)) => {
                     engine::new_object(engine, class, row, &arguments)?
                 }
                 _ => Value::Object(Rc::new(Object::new(class, row, ()))),
-            }
+            };
+            self.remember(&object)?;
+            object
         };
         store(&mut frame, constructor.self_slot, object.clone())?;
         // A `return` in `init` only ends it: the object is built anyway.
@@ -394,7 +475,7 @@ impl Machine {
         };
         self.code
             .classes
-            .get(object.class.0)
+            .get(object.class().0)
             .is_some_and(|own| own.ancestors.contains(&class))
     }
 
@@ -449,7 +530,7 @@ impl Machine {
         match target {
             MethodTarget::Direct(function) => Ok(function),
             MethodTarget::Overridable(place) => {
-                let class = object_of(receiver)?.class;
+                let class = object_of(receiver)?.class();
                 self.code
                     .classes
                     .get(class.0)

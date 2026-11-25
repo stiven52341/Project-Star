@@ -85,6 +85,22 @@ pub(crate) fn begin(machine: Machine, game: Rc<GameObject>) {
     });
 }
 
+/// The program of the game this thread plays, if one plays.
+pub(crate) fn machine() -> Option<Machine> {
+    PLAYING.with(|playing| Some(playing.try_borrow().ok()?.as_ref()?.machine.clone()))
+}
+
+/// Gives the game this thread plays `machine`, its program reloaded.
+pub(crate) fn replace_machine(machine: Machine) {
+    PLAYING.with(|playing| {
+        if let Ok(mut playing) = playing.try_borrow_mut()
+            && let Some(playing) = playing.as_mut()
+        {
+            playing.machine = machine;
+        }
+    });
+}
+
 /// Stops playing; the runtime error that closed the game, if one did.
 pub(crate) fn end() -> Result<(), RunError> {
     let playing = PLAYING.with(|playing| playing.try_borrow_mut().ok()?.take());

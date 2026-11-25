@@ -5,11 +5,14 @@
 use star_script::ast::{
     ClassDecl, ConstructorDecl, Expr, ExprKind, MemberKind, Statement, StatementKind,
 };
-use star_script::semantic::{ClassInfo, FieldInfo, Resolution};
+use star_script::semantic::{Analysis, ClassId, ClassInfo, FieldInfo, Resolution};
 
+use super::Tables;
 use super::body::{Body, Receiver, default_value};
 use crate::error::LowerError;
-use crate::tree::{BaseConstructor, ClassRef, Constructor, Statement as Step};
+use crate::tree::{
+    BaseConstructor, ClassRef, Constructor, FieldLayout, Function, Statement as Step,
+};
 
 impl Body<'_> {
     /// The constructor of `info`, whose objects are of the class `class`.
@@ -161,6 +164,34 @@ impl Body<'_> {
         let fields = &self.analysis.classes().class(self.class).fields;
         Ok(class == self.class && fields.get(index).is_some_and(FieldInfo::needs_constructor))
     }
+}
+
+/// The fields `class` declares, as a reload sees them: their names, their
+/// types and what gives an object that never had them their values.
+pub(super) fn field_layouts(
+    analysis: &Analysis,
+    tables: &Tables,
+    class: ClassId,
+    info: &ClassInfo,
+    declaration: &ClassDecl,
+) -> Result<Vec<FieldLayout>, LowerError> {
+    info.fields
+        .iter()
+        .map(|field| {
+            let body = Body::new(analysis, tables, class, field.ty.clone());
+            let start = body
+                .initial_value(declaration, field)?
+                .map(|value| Function {
+                    slots: body.slot_count(),
+                    body: vec![Step::Return(Some(value))],
+                });
+            Ok(FieldLayout {
+                name: field.name.clone(),
+                ty: analysis.classes().type_name(&field.ty),
+                start,
+            })
+        })
+        .collect()
 }
 
 /// The parts of an `init` body.

@@ -1093,7 +1093,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         after `main`, the same output both ways).
   - [ ] 14.12 Hot reload: changed scripts reload while the game is
         played, keeping the state of the objects that are still valid.
-        Design proposed to the owner (awaiting approval):
+        Design approved by the owner (decision 76, 2026-11-24):
         - What sets it off: saving. While it plays, the player looks
           every half second (as `star_assets`' `FileWatcher` does, by
           modification times: no new dependency) at the `.star` and
@@ -1159,8 +1159,30 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           and saving is the signal); restarting the game when a class
           of a living object goes away (it would lose the state without
           being asked; a new “Play” does that).
-    - [ ] 14.12a The interpreter: objects remembered, `reload`, with its
-          tests.
+    - [x] 14.12a The interpreter: objects remembered, `reload`, with its
+          tests. Every object of a class of the program is remembered
+          when its root constructor makes it (weak references in the
+          `Machine`, shared by its copies; dropped ones are forgotten
+          whenever the list doubles). Each `Class` of the lowered code
+          has its name and the fields it declares (`FieldLayout`: name,
+          type as StarScript writes it, and a function that gives the
+          value written in the class or the type's default, `None` if
+          only `init` gives one); an object's class is a `Cell`, and
+          `Object::reshape` gives it a new class and row.
+          `star_script_interpreter::reload(&Program)` plans every living
+          object first (class by name, same engine class, each field of
+          the new row kept by name and type or started), then runs the
+          values of the new fields, reshapes the objects, ends the
+          coroutines (counted) and swaps the program of the game playing.
+          Added to the design: a new field that only `init` can give a
+          value refuses the reload too (`ReloadError::FieldNeedsInit`),
+          since its objects already ran `init`. Tests (`tests/reload.rs`):
+          changed methods with kept fields; kept, started, reset and
+          dropped fields of a game, a node and a plain object; a removed
+          class and a changed engine class keep the old code; a new
+          field only `init` gives a value; coroutines end and are
+          counted; dropped objects are not remembered; only a game
+          playing is reloaded.
     - [ ] 14.12b The player: watching the files, reloading between
           frames through `star_script_engine`, with its tests and the
           window test.

@@ -181,15 +181,7 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let classes = order
-        .iter()
-        .zip(tables.methods.iter().zip(&tables.ancestors))
-        .map(|(id, (methods, ancestors))| Class {
-            methods: methods.clone(),
-            ancestors: ancestors.clone(),
-            overrides: engine_overrides(analysis, &tables, *id),
-        })
-        .collect();
+    let classes = class_table(analysis, &tables, &classes, &order)?;
     Ok(Code {
         functions,
         constructors,
@@ -197,6 +189,39 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
         entry,
         scene_classes: scene_classes(analysis, &tables)?,
     })
+}
+
+/// What running needs to know about every class, in the order of their
+/// places (`order`).
+fn class_table(
+    analysis: &Analysis,
+    tables: &Tables,
+    classes: &[ScriptClass<'_>],
+    order: &[ClassId],
+) -> Result<Vec<Class>, LowerError> {
+    order
+        .iter()
+        .zip(tables.methods.iter().zip(&tables.ancestors))
+        .map(|(id, (methods, ancestors))| {
+            let fields = match classes.iter().find(|class| class.id == *id) {
+                Some(class) => constructor::field_layouts(
+                    analysis,
+                    tables,
+                    class.id,
+                    class.info,
+                    class.declaration,
+                )?,
+                None => Vec::new(),
+            };
+            Ok(Class {
+                name: Arc::from(analysis.classes().class(*id).name.as_str()),
+                fields,
+                methods: methods.clone(),
+                ancestors: ancestors.clone(),
+                overrides: engine_overrides(analysis, tables, *id),
+            })
+        })
+        .collect()
 }
 
 /// What a scene can build its nodes as: every class but the engine's node

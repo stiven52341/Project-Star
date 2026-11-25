@@ -11,6 +11,7 @@ use star_script_runtime::{game, tasks};
 use crate::host::Interpreted;
 use crate::{LowerErrorKind, Output, Program, ProgramKind, RunError, end_game};
 
+mod reload;
 mod scenes;
 
 /// What `source` prints when interpreted, or why it stopped.
