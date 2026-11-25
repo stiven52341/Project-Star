@@ -489,7 +489,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         inheritance and `override`, static members, null safety, number
         widening and `as`, equality, and the runtime errors of
         `star_script_runtime::fault` with the same messages.
-        Design proposed to the owner (awaiting approval):
+        Design approved by the owner (2026-11-24, decision 67):
         - Objects are a new value, `Object(Rc<Object>)`: the class it
           was created as, and the fields of every class of its hierarchy
           in one row, the root's first. Lowering turns each field
@@ -527,10 +527,12 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           same objects with their `NodeFields` added. Decorators (14.3)
           are fields and methods the compiler writes, so they will only
           need `Time.now`.
-    - [ ] 14.2a Objects of classes without a base: fields with and
+    - [x] 14.2a Objects of classes without a base: fields with and
           without values, `init`, methods of objects and `self`,
           `private` methods, fields of other objects, `?.` on objects,
-          equality by identity; with a new conformance program.
+          equality by identity; with a new conformance program. Done:
+          `classes.star` runs both ways with the same output. Programs
+          with inheritance are refused when lowered, for now.
     - [ ] 14.2b Inheritance: fields of the base, two-phase construction
           with `super.init(…)`, `override` through the tables,
           `super.method()`, `is`, `as` and narrowing: `objects.star`

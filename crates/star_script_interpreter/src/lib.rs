@@ -17,8 +17,9 @@
 //! 2. [`Program::run`] walks that tree. StarScript's runtime errors, such
 //!    as dividing an integer by zero, come back as a [`RunError`].
 //!
-//! For now it runs console programs made of static functions (Phase 14 of
-//! `docs/roadmap.md` brings the rest of the language step by step).
+//! For now it runs console programs: static functions and objects of
+//! classes without a base (Phase 14 of `docs/roadmap.md` brings the rest
+//! of the language step by step).
 
 mod error;
 mod lower;
@@ -36,6 +37,8 @@ pub use error::{LowerError, LowerErrorKind, RunError};
 #[derive(Debug)]
 pub struct Program {
     functions: Vec<tree::Function>,
+    constructors: Vec<tree::Constructor>,
+    classes: Vec<tree::Class>,
     main: tree::FunctionId,
 }
 
@@ -58,7 +61,7 @@ impl Program {
     /// When the program stops with a runtime error of StarScript, or its
     /// output cannot be written.
     pub fn run(&self, output: &mut dyn Write) -> Result<(), RunError> {
-        run::Machine::new(&self.functions, output)
+        run::Machine::new(self, output)
             .call(self.main, Vec::new())
             .map(drop)
     }

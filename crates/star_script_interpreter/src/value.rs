@@ -1,9 +1,11 @@
 //! The values a running program works with.
 
 use std::cell::{Ref, RefCell, RefMut};
+use std::fmt;
 use std::rc::Rc;
 
 use crate::error::RunError;
+use crate::tree::ClassRef;
 
 /// The elements of a list, shared by every value that refers to it.
 pub(crate) type Elements = Rc<RefCell<Vec<Value>>>;
@@ -35,7 +37,73 @@ pub(crate) enum Value {
     /// `[T]`: shared, as in the compiled game, so after `var a = b` a
     /// `push` through `a` is seen through `b`.
     List(Elements),
+    /// An object: shared, and equal only to itself.
+    Object(Rc<Object>),
 }
+
+/// An object of a class of the program.
+pub(crate) struct Object {
+    /// The class it was created as.
+    pub(crate) class: ClassRef,
+    /// The fields of every class of its hierarchy, the root's first.
+    fields: RefCell<Vec<Value>>,
+}
+
+impl Object {
+    pub(crate) const fn new(class: ClassRef, fields: Vec<Value>) -> Self {
+        Self {
+            class,
+            fields: RefCell::new(fields),
+        }
+    }
+
+    /// A copy of the field at `position`. Like the compiled `Field`, it
+    /// never keeps the fields borrowed after it returns.
+    pub(crate) fn field(&self, position: usize) -> Result<Value, RunError> {
+        self.fields
+            .try_borrow()
+            .map_err(|_| OVERLAPPING_FIELDS)?
+            .get(position)
+            .cloned()
+            .ok_or(MISSING_FIELD)
+    }
+
+    /// Replaces the field at `position`.
+    pub(crate) fn set_field(&self, position: usize, value: Value) -> Result<(), RunError> {
+        let mut fields = self
+            .fields
+            .try_borrow_mut()
+            .map_err(|_| OVERLAPPING_FIELDS)?;
+        let field = fields.get_mut(position).ok_or(MISSING_FIELD)?;
+        *field = value;
+        Ok(())
+    }
+}
+
+/// Objects can refer to each other, so they show only their class: showing
+/// their fields could go round forever.
+impl fmt::Debug for Object {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Object")
+            .field("class", &self.class)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Objects are equal only to themselves.
+impl PartialEq for Object {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self, other)
+    }
+}
+
+/// The fields of an object borrowed while another access runs: the
+/// interpreter never runs StarScript code while it holds them.
+const OVERLAPPING_FIELDS: RunError = RunError::Internal("overlapping field access");
+/// A field position outside the object: lowering gives every field of the
+/// hierarchy its place.
+const MISSING_FIELD: RunError = RunError::Internal("field outside its object");
 
 impl Value {
     /// A text value.
@@ -62,6 +130,7 @@ impl Value {
             (Self::Double(left), Self::Double(right)) => left == right,
             (Self::Bool(left), Self::Bool(right)) => left == right,
             (Self::String(left), Self::String(right)) => left == right,
+            (Self::Object(left), Self::Object(right)) => Rc::ptr_eq(left, right),
             (Self::List(left), Self::List(right)) => {
                 if Rc::ptr_eq(left, right) {
                     return Ok(true);
@@ -91,7 +160,7 @@ impl Value {
             Self::Float(value) => Rc::from(star_script_runtime::float_to_string(value)),
             Self::Double(value) => Rc::from(star_script_runtime::float_to_string(value)),
             Self::Bool(value) => Rc::from(value.to_string()),
-            Self::Null | Self::List(_) => {
+            Self::Null | Self::List(_) | Self::Object(_) => {
                 return Err(RunError::Internal("`to_string` of a value without text"));
             }
         })

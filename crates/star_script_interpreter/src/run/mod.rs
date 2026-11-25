@@ -4,12 +4,15 @@ mod builtins;
 mod numbers;
 
 use std::io::Write;
+use std::rc::Rc;
 
+use star_script::semantic::BuiltinMethod;
 use star_script_runtime::try_index;
 
+use crate::Program;
 use crate::error::RunError;
-use crate::tree::{Arithmetic, Expression, Function, FunctionId, Statement};
-use crate::value::{Elements, Value, read, write};
+use crate::tree::{Arithmetic, ConstructorId, Expression, FunctionId, MethodTarget, Statement};
+use crate::value::{Elements, Object, Value, read, write};
 
 /// What a statement leaves the code around it to do.
 enum Flow {
@@ -25,7 +28,7 @@ enum Flow {
 
 /// Runs the functions of a program.
 pub(crate) struct Machine<'a> {
-    functions: &'a [Function],
+    program: &'a Program,
     output: &'a mut dyn Write,
 }
 
@@ -33,8 +36,8 @@ pub(crate) struct Machine<'a> {
 type Frame = [Value];
 
 impl<'a> Machine<'a> {
-    pub(crate) fn new(functions: &'a [Function], output: &'a mut dyn Write) -> Self {
-        Self { functions, output }
+    pub(crate) fn new(program: &'a Program, output: &'a mut dyn Write) -> Self {
+        Self { program, output }
     }
 
     /// Runs `function` with `arguments`, already of its parameters' types,
@@ -44,8 +47,9 @@ impl<'a> Machine<'a> {
         function: FunctionId,
         mut arguments: Vec<Value>,
     ) -> Result<Value, RunError> {
-        let functions = self.functions;
-        let function = functions
+        let program = self.program;
+        let function = program
+            .functions
             .get(function.0)
             .ok_or(RunError::Internal("unknown function"))?;
         arguments.resize(function.slots, Value::Null);
@@ -73,6 +77,24 @@ impl<'a> Machine<'a> {
             }
             Statement::Evaluate(expression) => {
                 self.evaluate(expression, frame)?;
+            }
+            Statement::SetField {
+                object,
+                position,
+                operator,
+                value,
+            } => {
+                let object = self.evaluate(object, frame)?;
+                let object = object_of(&object)?;
+                let new_value = match operator {
+                    None => self.evaluate(value, frame)?,
+                    Some(operator) => {
+                        let current = object.field(*position)?;
+                        let value = self.evaluate(value, frame)?;
+                        numbers::arithmetic(*operator, &current, &value)?
+                    }
+                };
+                object.set_field(*position, new_value)?;
             }
             Statement::SetElement {
                 list,
@@ -152,6 +174,67 @@ impl<'a> Machine<'a> {
         Ok(Flow::Next)
     }
 
+    /// Builds an object: the fields' values and the start of `init` run
+    /// before the object exists, then the rest of `init` with `self`.
+    fn construct(
+        &mut self,
+        constructor: ConstructorId,
+        mut frame: Vec<Value>,
+    ) -> Result<Value, RunError> {
+        let program = self.program;
+        let constructor = program
+            .constructors
+            .get(constructor.0)
+            .ok_or(RunError::Internal("unknown constructor"))?;
+        frame.resize(constructor.slots, Value::Null);
+        if !matches!(self.block(&constructor.setup, &mut frame)?, Flow::Next) {
+            return Err(RunError::Internal("`init` left before its object exists"));
+        }
+        let fields = constructor
+            .fields
+            .iter()
+            .map(|slot| {
+                frame
+                    .get(*slot)
+                    .cloned()
+                    .ok_or(RunError::Internal("field value outside its constructor"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let object = Value::Object(Rc::new(Object::new(constructor.class, fields)));
+        store(&mut frame, constructor.self_slot, object.clone())?;
+        // A `return` in `init` only ends it: the object is built anyway.
+        self.block(&constructor.rest, &mut frame)?;
+        Ok(object)
+    }
+
+    /// A method of the object `receiver`, with `self` as its first local.
+    fn call_method(
+        &mut self,
+        target: MethodTarget,
+        receiver: Value,
+        arguments: &[Expression],
+        frame: &Frame,
+    ) -> Result<Value, RunError> {
+        let function = match target {
+            MethodTarget::Direct(function) => function,
+            MethodTarget::Overridable(place) => {
+                let class = object_of(&receiver)?.class;
+                self.program
+                    .classes
+                    .get(class.0)
+                    .and_then(|class| class.methods.get(place))
+                    .copied()
+                    .ok_or(RunError::Internal("method missing from its class's table"))?
+            }
+        };
+        let mut values = Vec::with_capacity(arguments.len() + 1);
+        values.push(receiver);
+        for argument in arguments {
+            values.push(self.evaluate(argument, frame)?);
+        }
+        self.call(function, values)
+    }
+
     /// `list[index] = value` or `list[index] op= value`.
     fn set_element(
         &mut self,
@@ -205,8 +288,7 @@ impl<'a> Machine<'a> {
                 left,
                 right,
             } => {
-                let left = self.evaluate(left, frame)?;
-                let right = self.evaluate(right, frame)?;
+                let (left, right) = self.evaluate_pair(left, right, frame)?;
                 numbers::arithmetic(*operator, &left, &right)?
             }
             Expression::Compare {
@@ -214,13 +296,12 @@ impl<'a> Machine<'a> {
                 left,
                 right,
             } => {
-                let left = self.evaluate(left, frame)?;
-                let right = self.evaluate(right, frame)?;
+                let (left, right) = self.evaluate_pair(left, right, frame)?;
                 Value::Bool(numbers::compare(*operator, &left, &right)?)
             }
             Expression::Equal(left, right) => {
-                let left = self.evaluate(left, frame)?;
-                Value::Bool(left.star_eq(&self.evaluate(right, frame)?)?)
+                let (left, right) = self.evaluate_pair(left, right, frame)?;
+                Value::Bool(left.star_eq(&right)?)
             }
             Expression::And(left, right) => {
                 Value::Bool(self.condition(left, frame)? && self.condition(right, frame)?)
@@ -232,23 +313,42 @@ impl<'a> Machine<'a> {
                 function,
                 arguments,
             } => {
-                let arguments = arguments
-                    .iter()
-                    .map(|argument| self.evaluate(argument, frame))
-                    .collect::<Result<Vec<_>, _>>()?;
+                let arguments = self.evaluate_all(arguments, frame)?;
                 self.call(*function, arguments)?
             }
+            Expression::CallMethod {
+                target,
+                receiver,
+                arguments,
+                null_safe,
+            } => {
+                let receiver = self.evaluate(receiver, frame)?;
+                if *null_safe && matches!(receiver, Value::Null) {
+                    return Ok(Value::Null);
+                }
+                self.call_method(*target, receiver, arguments, frame)?
+            }
+            Expression::Construct {
+                constructor,
+                arguments,
+            } => {
+                let arguments = self.evaluate_all(arguments, frame)?;
+                self.construct(*constructor, arguments)?
+            }
+            Expression::Field {
+                object,
+                position,
+                null_safe,
+            } => match self.evaluate(object, frame)? {
+                Value::Null if *null_safe => Value::Null,
+                object => object_of(&object)?.field(*position)?,
+            },
             Expression::Print(message) => {
                 let message = self.evaluate(message, frame)?.to_text()?;
                 writeln!(self.output, "{message}").map_err(RunError::Output)?;
                 Value::Null
             }
-            Expression::List(elements) => Value::list(
-                elements
-                    .iter()
-                    .map(|element| self.evaluate(element, frame))
-                    .collect::<Result<_, _>>()?,
-            ),
+            Expression::List(elements) => Value::list(self.evaluate_all(elements, frame)?),
             Expression::Index { list, index } => {
                 let list = self.evaluate(list, frame)?;
                 element(list_elements(&list)?, &self.evaluate(index, frame)?)?
@@ -262,18 +362,51 @@ impl<'a> Machine<'a> {
                 receiver,
                 argument,
                 null_safe,
-            } => {
-                let receiver = self.evaluate(receiver, frame)?;
-                if *null_safe && matches!(receiver, Value::Null) {
-                    return Ok(Value::Null);
-                }
-                let argument = match argument {
-                    Some(argument) => Some(self.evaluate(argument, frame)?),
-                    None => None,
-                };
-                builtins::call(*method, &receiver, argument)?
-            }
+            } => self.builtin(*method, receiver, argument.as_deref(), *null_safe, frame)?,
         })
+    }
+
+    /// A method of a basic type or list; with `?.`, `null` without
+    /// running the argument.
+    fn builtin(
+        &mut self,
+        method: BuiltinMethod,
+        receiver: &Expression,
+        argument: Option<&Expression>,
+        null_safe: bool,
+        frame: &Frame,
+    ) -> Result<Value, RunError> {
+        let receiver = self.evaluate(receiver, frame)?;
+        if null_safe && matches!(receiver, Value::Null) {
+            return Ok(Value::Null);
+        }
+        let argument = argument
+            .map(|argument| self.evaluate(argument, frame))
+            .transpose()?;
+        builtins::call(method, &receiver, argument)
+    }
+
+    /// The values of `left` and then `right`.
+    fn evaluate_pair(
+        &mut self,
+        left: &Expression,
+        right: &Expression,
+        frame: &Frame,
+    ) -> Result<(Value, Value), RunError> {
+        let left = self.evaluate(left, frame)?;
+        Ok((left, self.evaluate(right, frame)?))
+    }
+
+    /// The values of `expressions`, in order.
+    fn evaluate_all(
+        &mut self,
+        expressions: &[Expression],
+        frame: &Frame,
+    ) -> Result<Vec<Value>, RunError> {
+        expressions
+            .iter()
+            .map(|expression| self.evaluate(expression, frame))
+            .collect()
     }
 }
 
@@ -284,6 +417,16 @@ fn leave_loop(flow: Flow) -> Option<Flow> {
         Flow::Next | Flow::Continue => None,
         Flow::Break => Some(Flow::Next),
         Flow::Return(_) => Some(flow),
+    }
+}
+
+/// The object a value refers to.
+fn object_of(value: &Value) -> Result<&Object, RunError> {
+    match value {
+        Value::Object(object) => Ok(object),
+        _ => Err(RunError::Internal(
+            "member of something that is not an object",
+        )),
     }
 }
 

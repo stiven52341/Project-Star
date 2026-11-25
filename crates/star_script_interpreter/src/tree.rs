@@ -10,7 +10,53 @@ use crate::value::Value;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionId(pub(crate) usize);
 
-/// A static function, or the value of a constant.
+/// Position of a class of the program, which its objects carry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ClassRef(pub(crate) usize);
+
+/// Position of a constructor in the program: one per class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ConstructorId(pub(crate) usize);
+
+/// What running needs to know about a class.
+#[derive(Debug)]
+pub(crate) struct Class {
+    /// The function of each method that objects run their own version
+    /// of, by its place in the table.
+    pub(crate) methods: Vec<FunctionId>,
+}
+
+/// How objects of a class are built, in the two phases of the language.
+#[derive(Debug)]
+pub(crate) struct Constructor {
+    /// The class of the objects it builds.
+    pub(crate) class: ClassRef,
+    /// How many locals it has: the parameters of `init` first.
+    pub(crate) slots: usize,
+    /// Before the object exists: the fields' values and the start of
+    /// `init`, which put each field's value in its local.
+    pub(crate) setup: Vec<Statement>,
+    /// The local that holds each field's value when the object is built,
+    /// in the order of the object's fields.
+    pub(crate) fields: Vec<usize>,
+    /// The local that holds the object once it exists: `self`.
+    pub(crate) self_slot: usize,
+    /// The rest of `init`, with `self`.
+    pub(crate) rest: Vec<Statement>,
+}
+
+/// Which function a call of a method of an object runs.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum MethodTarget {
+    /// The version of the object's class: the function at this place of
+    /// its class's table.
+    Overridable(usize),
+    /// Always this function: `private` methods.
+    Direct(FunctionId),
+}
+
+/// A static function, a method of objects (whose first local is `self`),
+/// or the value of a constant.
 #[derive(Debug)]
 pub(crate) struct Function {
     /// How many locals it has: its parameters first, in order.
@@ -32,6 +78,15 @@ pub(crate) enum Statement {
     SetElement {
         list: Expression,
         index: Expression,
+        operator: Option<Arithmetic>,
+        value: Expression,
+    },
+    /// `object.field = value`, or `object.field op= value` with the
+    /// operator: the object, the field (for `op=`) and then the value are
+    /// evaluated, in that order.
+    SetField {
+        object: Expression,
+        position: usize,
         operator: Option<Arithmetic>,
         value: Expression,
     },
@@ -109,6 +164,27 @@ pub(crate) enum Expression {
     Call {
         function: FunctionId,
         arguments: Vec<Expression>,
+    },
+    /// A call of a method of an object, with its arguments already
+    /// converted; with `?.`, a `null` object gives `null` and the
+    /// arguments do not run.
+    CallMethod {
+        target: MethodTarget,
+        receiver: Box<Expression>,
+        arguments: Vec<Expression>,
+        null_safe: bool,
+    },
+    /// `Class(arguments)`: a new object.
+    Construct {
+        constructor: ConstructorId,
+        arguments: Vec<Expression>,
+    },
+    /// The field at `position` of the object's row of fields; with `?.`,
+    /// a `null` object gives `null`.
+    Field {
+        object: Box<Expression>,
+        position: usize,
+        null_safe: bool,
     },
     /// `Debug.print(text)`.
     Print(Box<Expression>),

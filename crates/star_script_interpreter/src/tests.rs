@@ -58,10 +58,10 @@ fn programs_need_one_main() {
 
 #[test]
 fn what_cannot_run_yet_is_refused_before_running() {
-    let objects = "class Main {\n static func main() {\n const main = Main()\n }\n}\n";
+    let inheritance = "class Base {\n}\nclass Main extends Base {\n static func main() {\n }\n}\n";
     assert_eq!(
-        lowering_error(objects),
-        LowerErrorKind::Unsupported("objects")
+        lowering_error(inheritance),
+        LowerErrorKind::Unsupported("inheritance")
     );
 }
 
@@ -75,6 +75,18 @@ fn lists_are_shared_and_nulls_fall_back() {
                   Debug.print(list.is_empty().to_string())\n }\n}\n";
     // The loop goes through the elements the list had when it started.
     assert_eq!(run(source).ok().as_deref(), Some("3\n-1\n1\n2\n6\ntrue\n"));
+}
+
+#[test]
+fn objects_are_built_in_two_phases() {
+    let source = "class Box {\n var label: string\n var size = 1\n \
+                  init(label: string) {\n var upper = label.to_upper()\n \
+                  self.label = upper\n grow()\n Debug.print(upper + \" \" + size.to_string())\n }\n \
+                  private func grow() {\n size *= 3\n }\n}\n\
+                  class Main {\n static func main() {\n const box = Box(\"a\")\n \
+                  box.size += 1\n Debug.print(box.label + box.size.to_string())\n }\n}\n";
+    // `upper`, declared before the object exists, is still read after it.
+    assert_eq!(run(source).ok().as_deref(), Some("A 3\nA4\n"));
 }
 
 #[test]

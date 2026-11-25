@@ -6,7 +6,7 @@ use star_script::semantic::{BuiltinMethod, ClassId, ClassOrigin, Resolution, Typ
 use super::Member;
 use super::body::Body;
 use crate::error::LowerError;
-use crate::tree::{Arithmetic, Comparison, Expression, NumberType};
+use crate::tree::{Arithmetic, Comparison, Expression, MethodTarget, NumberType};
 use crate::value::Value;
 
 /// The engine class whose `print` writes a line.
@@ -37,13 +37,18 @@ impl Body<'_> {
             } => self.binary(expression, *operator, left, right),
             ExprKind::Cast { value, .. } => self.cast(expression, value),
             ExprKind::Call { callee, arguments } => self.call(callee, arguments),
-            ExprKind::Member { object, name, .. } => self.member(expression, object, name),
+            ExprKind::Member {
+                object,
+                name,
+                null_safe,
+            } => self.member(expression, object, name, *null_safe),
             ExprKind::Index { object, index } => Ok(Expression::Index {
                 list: Box::new(self.expression(object)?),
                 index: Box::new(self.expression(index)?),
             }),
             ExprKind::Array(elements) => self.array(expression, elements),
-            ExprKind::SelfValue | ExprKind::Super => Err(LowerError::unsupported("objects", span)),
+            ExprKind::SelfValue => self.self_value(expression),
+            ExprKind::Super => Err(LowerError::unsupported("inheritance", span)),
             ExprKind::TypeTest { .. } => Err(LowerError::unsupported("`is`", span)),
             ExprKind::Await(_) => Err(LowerError::unsupported("`await`", span)),
         }
@@ -100,9 +105,11 @@ impl Body<'_> {
                 Ok(Expression::Local(self.slot(local, expression)?))
             }
             Some(Resolution::Constant { class, index }) => self.constant(class, index, expression),
-            Some(Resolution::Field { .. }) => {
-                Err(LowerError::unsupported("fields", expression.span))
-            }
+            Some(Resolution::Field { class, index }) => Ok(Expression::Field {
+                object: Box::new(self.self_value(expression)?),
+                position: self.field_position(class, index, expression)?,
+                null_safe: false,
+            }),
             _ => Err(LowerError::internal(
                 "name that is not a value",
                 expression.span,
@@ -110,12 +117,13 @@ impl Body<'_> {
         }
     }
 
-    /// `object.name`: only constants, through their class, for now.
+    /// `object.name`: a field, or a constant through its class.
     fn member(
         &self,
         expression: &Expr,
         object: &Expr,
         name: &Name,
+        null_safe: bool,
     ) -> Result<Expression, LowerError> {
         match self.resolution(expression)? {
             Some(Resolution::Constant { class, index }) => {
@@ -124,7 +132,11 @@ impl Body<'_> {
                 }
                 self.constant(class, index, expression)
             }
-            Some(Resolution::Field { .. }) => Err(LowerError::unsupported("fields", name.span)),
+            Some(Resolution::Field { class, index }) => Ok(Expression::Field {
+                object: Box::new(self.expression(object)?),
+                position: self.field_position(class, index, expression)?,
+                null_safe,
+            }),
             _ => Err(LowerError::internal(
                 "member that is not a value",
                 name.span,
@@ -140,6 +152,7 @@ impl Body<'_> {
         expression: &Expr,
     ) -> Result<Expression, LowerError> {
         let function = self
+            .tables
             .functions
             .get(&Member::Constant(class, index))
             .copied()
@@ -234,9 +247,7 @@ impl Body<'_> {
                 self.method_call(callee, class, index, arguments)
             }
             Some(Resolution::Builtin(method)) => self.builtin_call(callee, method, arguments),
-            Some(Resolution::Constructor(_)) => {
-                Err(LowerError::unsupported("objects", callee.span))
-            }
+            Some(Resolution::Constructor(class)) => self.construct(callee, class, arguments),
             _ => Err(LowerError::internal(
                 "call of something that is not callable",
                 callee.span,
@@ -277,12 +288,78 @@ impl Body<'_> {
             };
         }
         let function = self
+            .tables
             .functions
             .get(&Member::Method(class, index))
             .copied()
             .ok_or_else(|| LowerError::internal("method without a function", callee.span))?;
-        Ok(Expression::Call {
-            function,
+        if method.is_static {
+            return Ok(Expression::Call {
+                function,
+                arguments,
+            });
+        }
+        let (receiver, null_safe) = match &callee.kind {
+            ExprKind::Name(_) => (self.self_value(callee)?, false),
+            ExprKind::Member { object, .. } if matches!(object.kind, ExprKind::Super) => {
+                return Err(LowerError::unsupported("inheritance", callee.span));
+            }
+            ExprKind::Member {
+                object, null_safe, ..
+            } => (self.expression(object)?, *null_safe),
+            _ => {
+                return Err(LowerError::internal(
+                    "method called through an expression",
+                    callee.span,
+                ));
+            }
+        };
+        // `private` methods are not overridden: they run their own code.
+        let target = if method.is_private {
+            MethodTarget::Direct(function)
+        } else {
+            let place = self
+                .tables
+                .overridable
+                .get(&(class, index))
+                .copied()
+                .ok_or_else(|| LowerError::internal("method without a place", callee.span))?;
+            MethodTarget::Overridable(place)
+        };
+        Ok(Expression::CallMethod {
+            target,
+            receiver: Box::new(receiver),
+            arguments,
+            null_safe,
+        })
+    }
+
+    /// `Class(arguments)`.
+    fn construct(
+        &self,
+        callee: &Expr,
+        class: ClassId,
+        arguments: &[Expr],
+    ) -> Result<Expression, LowerError> {
+        let info = self.analysis.classes().class(class);
+        if info.origin == ClassOrigin::Native {
+            return Err(LowerError::unsupported(
+                "objects of engine classes",
+                callee.span,
+            ));
+        }
+        let constructor = self
+            .tables
+            .constructor(class)
+            .ok_or_else(|| LowerError::internal("class without a constructor", callee.span))?;
+        let arguments = info
+            .constructor_parameters()
+            .iter()
+            .zip(arguments)
+            .map(|(parameter, argument)| self.value_as(argument, &parameter.ty))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Expression::Construct {
+            constructor,
             arguments,
         })
     }
@@ -380,6 +457,9 @@ fn coerce(
         (Type::Nullable(from), Type::Nullable(to)) => coerce(value, from, to, expression),
         (from, Type::Nullable(to)) => coerce(value, from, to, expression),
         (from, to) if from.widens_to(to) => convert(value, to, expression),
+        // An object of a subclass used as one of its base: objects carry
+        // their class, so nothing changes.
+        (Type::Class(_), Type::Class(_)) => Ok(value),
         _ => Err(LowerError::internal(
             "conversion between unrelated types",
             expression.span,
