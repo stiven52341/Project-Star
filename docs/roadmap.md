@@ -731,8 +731,52 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [ ] 14.7 Nodes and scenes: `Node`, `Sprite`, `Scene.load`, script
         classes named by scenes, `export var` values, tags and
         `find_by_name`/`find_by_tag`, global and local positions.
-  - [ ] 14.8 Physics, sounds, 2D lights and 3D (`Body`, `Sound`,
-        `Audio`, `Light2D`, `Node3D`, `Mesh`, `Light`, `Camera3D`).
+        Design proposed to the owner (awaiting approval):
+        - The methods of `Node` call the runtime's functions of nodes
+          (`star_script_runtime::nodes`) with the interpreter's `Host`, as
+          the compiled ones do: the tree, `find_child`, `find_by_name` and
+          `find_by_tag`, `has_tag`, and the 2D global placement. Lists of
+          nodes they give (`children()`, `find_by_tag`) are new lists, so
+          they become new lists of the interpreter.
+        - `tags` is a list that scripts change and the runtime reads
+          (`has_tag`, scenes), so it must be one list for both. The
+          runtime stops fixing its type: the `Host` says what a list of
+          tags is (`type Tags`, how to make one and whether it has a tag).
+          The compiled `Host` keeps `List<String>`; the interpreter gives
+          its own lists, so `node.tags.push(…)` is seen by `has_tag`.
+          Same output, a small change in the generated `Host`.
+        - `Sprite` and `Light2D` join (the 2D node classes), with their
+          runtime fields beside those of `Node`, like `Camera2D`'s;
+          `Light2D` moves here from 14.8 so `finding.star` can conform.
+        - A coroutine of a node's method goes on only while the node is
+          in the game's tree, as compiled; `Scene.find_by_name` and
+          `Scene.find_by_tag` search the tree of the game being played
+          (nothing in a console program).
+        - Scenes: `Scene.load` is the runtime's; the interpreter's `Host`
+          creates the engine's classes, and the program's classes by the
+          name a scene gives, with the reasons of
+          `check_scene_class` (shared with the compiler) when one cannot
+          be used. Each class keeps its `export` fields by name, and
+          their values are converted with the runtime's `scene_fields`,
+          so the errors are the same. A program with no `Game` class and
+          a main scene plays that scene, as compiled.
+        - Tests: `nodes.star` and `finding.star` in the conformance test
+          (`placement.star` needs `Node3D`, 14.8); unit tests that load
+          scenes from a loader in memory, without files; and the window
+          test plays the node game of `engine_game.rs` with its scene
+          and expects the same output.
+        - Rejected: a second kind of list in the interpreter for `tags`
+          (every list operation would handle both), and copying `tags`
+          when read (a `push` would be lost, unlike compiled).
+    - [ ] 14.7a Nodes: the methods of `Node`, `tags` (the `Host`'s
+          list, compiled too), `Sprite`, `Light2D`, the life of node
+          coroutines and `Scene.find_by_*`: `nodes.star` and
+          `finding.star` conform.
+    - [ ] 14.7b Scenes: `Scene.load` with the program's classes, `export`
+          fields, main-scene programs, unit tests with scenes in memory
+          and the node game in the window test.
+  - [ ] 14.8 Physics, sounds and 3D (`Body`, `Sound`, `Audio`,
+        `Node3D`, `Mesh`, `Light`, `Camera3D`).
   - [ ] 14.9 Blueprints: they become StarScript, so they need no
         interpreter of their own; conformance tests with the blueprint
         templates.
