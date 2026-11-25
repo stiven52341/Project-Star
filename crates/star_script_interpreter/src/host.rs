@@ -7,10 +7,13 @@
 //!
 //! Its types are public only so the engine can name them; what they hold
 //! stays the interpreter's. The engine classes of later steps of Phase 14
-//! (`Node3D`, `Camera3D`) are [`NotYet`] here: no value of them exists, so
+//! (`Node3D`, `Camera3D`, `Mesh` and `Light`) are [`NotYet`] or never
+//! found here: no value of them exists, so
 //! the runtime is never handed one.
 
+use std::cell::RefCell;
 use std::rc::{Rc, Weak};
+use std::sync::Arc;
 
 use star_script_runtime::bodies::BodyFields;
 use star_script_runtime::color::ColorFields;
@@ -25,7 +28,7 @@ use star_script_runtime::scene_tree::NewNode;
 use crate::play;
 use crate::run::Hook;
 use crate::tree::EngineClass;
-use crate::value::Value;
+use crate::value::{Elements, Value};
 
 pub use crate::value::Object;
 
@@ -46,20 +49,58 @@ pub type GameObject = Object<GameFields<Interpreted>>;
 /// class.
 pub struct NodeParts {
     pub(crate) node: NodeFields<Interpreted>,
-    /// The fields of `Camera2D`, if it is one: kept apart, so a camera can
-    /// be handed out with them.
-    pub(crate) camera_2d: Option<Rc<Camera2dFields>>,
+    pub(crate) class: ClassParts,
+}
+
+/// The runtime's fields of the node class a node is, beyond `Node`'s.
+pub(crate) enum ClassParts {
+    /// A plain `Node`.
+    Node,
+    /// A `Camera2D`, whose fields are kept apart so a camera can be handed
+    /// out with them.
+    Camera2D(Rc<Camera2dFields>),
+    Sprite(SpriteFields<Interpreted>),
+    Light2D(LightFields<Interpreted>),
 }
 
 impl NodeParts {
-    /// The fields of a new node of `class` called `name`.
-    pub(crate) fn new(class: EngineClass, name: String) -> Self {
+    /// The fields of a new node called `name`, with those of its class.
+    pub(crate) fn new(name: String, class: ClassParts) -> Self {
         Self {
             node: NodeFields::new(name),
-            camera_2d: (class == EngineClass::Camera2D).then(|| Rc::new(Camera2dFields::new())),
+            class,
+        }
+    }
+
+    /// The fields of `Camera2D`, if it is one.
+    pub(crate) const fn camera_2d(&self) -> Option<&Rc<Camera2dFields>> {
+        match &self.class {
+            ClassParts::Camera2D(fields) => Some(fields),
+            _ => None,
+        }
+    }
+
+    /// The fields of `Sprite`, if it is one.
+    pub(crate) const fn sprite(&self) -> Option<&SpriteFields<Interpreted>> {
+        match &self.class {
+            ClassParts::Sprite(fields) => Some(fields),
+            _ => None,
+        }
+    }
+
+    /// The fields of `Light2D`, if it is one.
+    pub(crate) const fn light_2d(&self) -> Option<&LightFields<Interpreted>> {
+        match &self.class {
+            ClassParts::Light2D(fields) => Some(fields),
+            _ => None,
         }
     }
 }
+
+/// A node's `tags`: a list of the interpreter, so a `push` of a script is
+/// seen by the runtime's `has_tag` and `find_by_tag`.
+#[derive(Clone)]
+pub struct Tags(pub(crate) Elements);
 
 /// A `Camera2D`: the node, and its fields of camera.
 #[derive(Clone)]
@@ -87,6 +128,7 @@ impl Host for Interpreted {
     type Body = Rc<BodyFields<Self>>;
     type Color = Rc<Object<ColorFields>>;
     type Game = Rc<GameObject>;
+    type Tags = Tags;
 
     fn node(node: &Self::Node) -> &NodeFields<Self> {
         &node.engine.node
@@ -113,7 +155,7 @@ impl Host for Interpreted {
     }
 
     fn as_camera_2d(node: &Self::Node) -> Option<Self::Camera2D> {
-        let fields = node.engine.camera_2d.as_ref()?;
+        let fields = node.engine.camera_2d()?;
         Some(CameraRef {
             node: Rc::clone(node),
             fields: Rc::clone(fields),
@@ -140,11 +182,8 @@ impl Host for Interpreted {
         match *camera {}
     }
 
-    fn with_sprite<R>(
-        _node: &Self::Node,
-        _read: impl FnOnce(&SpriteFields<Self>) -> R,
-    ) -> Option<R> {
-        None
+    fn with_sprite<R>(node: &Self::Node, read: impl FnOnce(&SpriteFields<Self>) -> R) -> Option<R> {
+        node.engine.sprite().map(read)
     }
 
     fn with_mesh<R>(_node: &Self::Node, _read: impl FnOnce(&MeshFields<Self>) -> R) -> Option<R> {
@@ -156,10 +195,27 @@ impl Host for Interpreted {
     }
 
     fn with_light_2d<R>(
-        _node: &Self::Node,
-        _read: impl FnOnce(&LightFields<Self>) -> R,
+        node: &Self::Node,
+        read: impl FnOnce(&LightFields<Self>) -> R,
     ) -> Option<R> {
-        None
+        node.engine.light_2d().map(read)
+    }
+
+    fn new_tags(tags: Vec<String>) -> Self::Tags {
+        let elements = tags
+            .into_iter()
+            .map(|tag| Value::String(Arc::from(tag)))
+            .collect();
+        Tags(Rc::new(RefCell::new(elements)))
+    }
+
+    fn has_tag(tags: &Self::Tags, tag: &str) -> bool {
+        // The interpreter never runs the runtime while it holds a list.
+        tags.0.try_borrow().is_ok_and(|elements| {
+            elements
+                .iter()
+                .any(|element| matches!(element, Value::String(own) if &**own == tag))
+        })
     }
 
     fn body(body: &Self::Body) -> &BodyFields<Self> {
@@ -221,19 +277,33 @@ mod tests {
 
     #[test]
     fn only_cameras_are_seen_as_cameras() {
-        let node = |class: EngineClass| {
+        let node = |class: EngineClass, parts: ClassParts| {
             Rc::new(Object::new(
                 class.class(),
                 Vec::new(),
-                NodeParts::new(class, "Seen".to_owned()),
+                NodeParts::new("Seen".to_owned(), parts),
             ))
         };
-        let camera = node(EngineClass::Camera2D);
+        let camera = node(
+            EngineClass::Camera2D,
+            ClassParts::Camera2D(Rc::new(Camera2dFields::new())),
+        );
 
         let seen = Interpreted::as_camera_2d(&camera).expect("a camera");
 
         assert!(Rc::ptr_eq(&Interpreted::camera_2d_node(&seen), &camera));
-        assert!(Interpreted::as_camera_2d(&node(EngineClass::Node)).is_none());
+        assert!(Interpreted::as_camera_2d(&node(EngineClass::Node, ClassParts::Node)).is_none());
+    }
+
+    #[test]
+    fn tags_are_the_interpreter_s_lists() {
+        let tags = Interpreted::new_tags(vec!["enemy".to_owned()]);
+
+        tags.0.borrow_mut().push(Value::text("loud"));
+
+        assert!(Interpreted::has_tag(&tags, "enemy"));
+        assert!(Interpreted::has_tag(&tags, "loud"));
+        assert!(!Interpreted::has_tag(&tags, "quiet"));
     }
 
     #[test]

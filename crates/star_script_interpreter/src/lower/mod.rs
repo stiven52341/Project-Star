@@ -16,8 +16,8 @@ use star_script::semantic::{
 
 use crate::error::{LowerError, LowerErrorKind};
 use crate::tree::{
-    Class, ClassRef, Code, ConstructorId, ConstructorRef, Coroutine, EngineClass, Entry,
-    Expression, Function, FunctionId, Statement,
+    Class, ClassRef, Code, ConstructorId, ConstructorRef, Coroutine, EngineClass, EngineMethod,
+    Entry, Expression, Function, FunctionId, Statement,
 };
 use body::Body;
 
@@ -64,7 +64,13 @@ impl Tables {
 }
 
 /// The engine classes that classes of the program can extend for now.
-const EXTENDABLE: [EngineClass; 3] = [EngineClass::Node, EngineClass::Camera2D, EngineClass::Game];
+const EXTENDABLE: [EngineClass; 5] = [
+    EngineClass::Node,
+    EngineClass::Camera2D,
+    EngineClass::Game,
+    EngineClass::Sprite,
+    EngineClass::Light2D,
+];
 
 /// A member of the program, before its code is lowered.
 enum Pending<'a> {
@@ -175,8 +181,7 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
         .map(|(id, (methods, ancestors))| Class {
             methods: methods.clone(),
             ancestors: ancestors.clone(),
-            start: written_override(analysis, &tables, *id, START),
-            update: written_override(analysis, &tables, *id, UPDATE),
+            overrides: engine_overrides(analysis, &tables, *id),
         })
         .collect();
     Ok(Code {
@@ -232,14 +237,39 @@ fn entry(
     }
 }
 
-/// What the engine calls on nodes and games once.
-const START: &str = "start";
-/// What the engine calls on nodes and games every frame.
-const UPDATE: &str = "update";
+/// The methods of the engine that objects of `class` run a script's
+/// version of: those its engine class declares that a script class of its
+/// hierarchy overrides (none for an engine class).
+fn engine_overrides(
+    analysis: &Analysis,
+    tables: &Tables,
+    class: ClassId,
+) -> Vec<(EngineMethod, FunctionId)> {
+    let table = analysis.classes();
+    let mut overrides: Vec<(EngineMethod, FunctionId)> = Vec::new();
+    for ancestor in table.ancestors(class) {
+        let info = table.class(ancestor);
+        if info.origin != ClassOrigin::Native {
+            continue;
+        }
+        for method in &info.methods {
+            let Some(engine) = expressions::object_method(&info.name, &method.name) else {
+                continue;
+            };
+            if overrides.iter().any(|(known, _)| *known == engine) {
+                continue;
+            }
+            if let Some(function) = written_override(analysis, tables, class, &method.name) {
+                overrides.push((engine, function));
+            }
+        }
+    }
+    overrides
+}
 
 /// The method `name` of objects of `class` that a script wrote, in the
 /// class or its closest base that has one: what the engine runs instead of
-/// its own `start` or `update`.
+/// its own.
 fn written_override(
     analysis: &Analysis,
     tables: &Tables,

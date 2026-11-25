@@ -731,7 +731,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [ ] 14.7 Nodes and scenes: `Node`, `Sprite`, `Scene.load`, script
         classes named by scenes, `export var` values, tags and
         `find_by_name`/`find_by_tag`, global and local positions.
-        Design proposed to the owner (awaiting approval):
+        Design approved by the owner (decision 71, 2026-11-24):
         - The methods of `Node` call the runtime's functions of nodes
           (`star_script_runtime::nodes`) with the interpreter's `Host`, as
           the compiled ones do: the tree, `find_child`, `find_by_name` and
@@ -768,10 +768,14 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         - Rejected: a second kind of list in the interpreter for `tags`
           (every list operation would handle both), and copying `tags`
           when read (a `push` would be lost, unlike compiled).
-    - [ ] 14.7a Nodes: the methods of `Node`, `tags` (the `Host`'s
+    - [x] 14.7a Nodes: the methods of `Node`, `tags` (the `Host`'s
           list, compiled too), `Sprite`, `Light2D`, the life of node
           coroutines and `Scene.find_by_*`: `nodes.star` and
-          `finding.star` conform.
+          `finding.star` conform. Every method of the engine that a
+          script overrides runs the script's version through an object
+          (the engine's `start` and `update` too), and methods of the
+          engine take `?.`. `Scene.load` already calls the runtime, which
+          finds no scene without a game; reading them is 14.7b.
     - [ ] 14.7b Scenes: `Scene.load` with the program's classes, `export`
           fields, main-scene programs, unit tests with scenes in memory
           and the node game in the window test.

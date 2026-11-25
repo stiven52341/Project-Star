@@ -21,7 +21,8 @@
 //! ([`Program::new_game`]): the interpreter is a `Host` of
 //! `star_script_runtime` ([`host::Interpreted`]), so
 //! `star_script_engine` plays its games as it plays compiled ones. For now
-//! games have `Input`, `Color` and `Camera2D` (Phase 14 of
+//! games have `Input`, `Color`, `Node`, `Camera2D`, `Sprite` and `Light2D`
+//! (Phase 14 of
 //! `docs/roadmap.md` brings the rest of the language step by step).
 
 mod error;

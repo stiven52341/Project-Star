@@ -17,8 +17,8 @@ use star_script_runtime::try_index;
 use crate::error::RunError;
 use crate::host::GameObject;
 use crate::tree::{
-    Arithmetic, ClassRef, Code, Constructor, ConstructorId, ConstructorRef, Entry, Expression,
-    FieldRef, Function, FunctionId, MethodTarget, Statement,
+    Arithmetic, Class, ClassRef, Code, Constructor, ConstructorId, ConstructorRef, EngineCall,
+    EngineMethod, Entry, Expression, FieldRef, Function, FunctionId, MethodTarget, Statement,
 };
 use crate::value::{Elements, Object, Value, read, write};
 use crate::{Output, ProgramKind};
@@ -97,24 +97,39 @@ impl Machine {
     /// Runs what `object` (a node or the game) does when the engine calls
     /// `hook`: the override a script wrote, if any.
     pub(crate) fn run_hook(&self, object: Value, hook: Hook) -> Result<(), RunError> {
-        let class = object_of(&object)?.class;
-        let class = self
-            .code
+        let (method, arguments) = match hook {
+            Hook::Start => (EngineMethod::Start, vec![object]),
+            Hook::Update(delta) => (EngineMethod::Update, vec![object, Value::Float(delta)]),
+        };
+        self.engine(method, EngineCall::Object { null_safe: false }, arguments)
+            .map(drop)
+    }
+
+    /// Runs a method of the engine with `arguments` (the object first, for
+    /// a method of objects): the script's version if it is called through
+    /// an object whose class overrides it, else the engine's.
+    fn engine(
+        &self,
+        method: EngineMethod,
+        call: EngineCall,
+        arguments: Vec<Value>,
+    ) -> Result<Value, RunError> {
+        if let EngineCall::Object { .. } = call
+            && let Some(object) = arguments.first()
+            && let Some(function) = self.class_of(object)?.override_of(method)
+        {
+            return self.call(function, arguments);
+        }
+        engine::call(method, &arguments)
+    }
+
+    /// What running needs to know about the class of `object`.
+    fn class_of(&self, object: &Value) -> Result<&Class, RunError> {
+        let class = object_of(object)?.class;
+        self.code
             .classes
             .get(class.0)
-            .ok_or(RunError::Internal("unknown class"))?;
-        let written = match hook {
-            Hook::Start => class.start,
-            Hook::Update(_) => class.update,
-        };
-        let Some(function) = written else {
-            return Ok(());
-        };
-        let arguments = match hook {
-            Hook::Start => vec![object],
-            Hook::Update(delta) => vec![object, Value::Float(delta)],
-        };
-        self.call(function, arguments).map(drop)
+            .ok_or(RunError::Internal("unknown class"))
     }
 
     /// Runs `function` with `arguments`, already of its parameters' types,
@@ -529,9 +544,11 @@ impl Machine {
                 self.print(&self.evaluate(message, frame)?.to_text()?)?;
                 Value::Null
             }
-            Expression::Engine { method, arguments } => {
-                engine::call(*method, &self.evaluate_all(arguments, frame)?)?
-            }
+            Expression::Engine {
+                method,
+                arguments,
+                call,
+            } => self.engine_call(*method, arguments, *call, frame)?,
             Expression::List(elements) => Value::list(self.evaluate_all(elements, frame)?),
             Expression::Index { list, index } => {
                 let list = self.evaluate(list, frame)?;
@@ -586,6 +603,43 @@ impl Machine {
     ) -> Result<(Value, Value), RunError> {
         let left = self.evaluate(left, frame)?;
         Ok((left, self.evaluate(right, frame)?))
+    }
+
+    /// A call of a method of the engine; `null` for a `?.` call on `null`.
+    fn engine_call(
+        &self,
+        method: EngineMethod,
+        arguments: &[Expression],
+        call: EngineCall,
+        frame: &Frame,
+    ) -> Result<Value, RunError> {
+        match self.engine_arguments(arguments, call, frame)? {
+            Some(arguments) => self.engine(method, call, arguments),
+            None => Ok(Value::Null),
+        }
+    }
+
+    /// The arguments of a method of the engine, in order; `None` for a
+    /// `?.` call on `null`, whose other arguments do not run.
+    fn engine_arguments(
+        &self,
+        arguments: &[Expression],
+        call: EngineCall,
+        frame: &Frame,
+    ) -> Result<Option<Vec<Value>>, RunError> {
+        if let EngineCall::Object { null_safe: true } = call
+            && let Some((object, rest)) = arguments.split_first()
+        {
+            let object = self.evaluate(object, frame)?;
+            if matches!(object, Value::Null) {
+                return Ok(None);
+            }
+            let mut values = Vec::with_capacity(arguments.len());
+            values.push(object);
+            values.extend(self.evaluate_all(rest, frame)?);
+            return Ok(Some(values));
+        }
+        self.evaluate_all(arguments, frame).map(Some)
     }
 
     /// The values of `expressions`, in order.

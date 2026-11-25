@@ -108,6 +108,11 @@ impl<T: Clone> List<T> {
         self.read(Vec::clone)
     }
 
+    /// Whether an element passes `test`, without copying the list.
+    pub fn any(&self, test: impl FnMut(&T) -> bool) -> bool {
+        self.read(|elements| elements.iter().any(test))
+    }
+
     pub(crate) fn read<R>(&self, action: impl FnOnce(&Vec<T>) -> R) -> R {
         match self.elements.try_borrow() {
             Ok(elements) => action(&elements),
@@ -177,6 +182,14 @@ mod tests {
 
         assert_eq!(list.length(), 1);
         assert_eq!(list.get(0), 1);
+    }
+
+    #[test]
+    fn elements_can_be_looked_for() {
+        let list = List::from_vec(vec![1_i64, 2]);
+
+        assert!(list.any(|element| *element == 2));
+        assert!(!list.any(|element| *element > 2));
     }
 
     #[test]

@@ -1,7 +1,6 @@
 //! `Scene.load`: the nodes of a scene, built as objects of the classes it
 //! names, with what the scene writes on top of what their `init()` leaves.
 
-use crate::List;
 use crate::bodies::BodyFields;
 use crate::nodes::{self, Host};
 use crate::scenes::{self, SceneNode};
@@ -88,7 +87,7 @@ fn build_node<H: Host>(node: &SceneNode) -> Result<H::Node, String> {
     let fields = H::node(&object);
     fields.name.set(node.name.clone());
     if !node.tags.is_empty() {
-        fields.tags.set(List::from_vec(node.tags.clone()));
+        fields.tags.set(H::new_tags(node.tags.clone()));
     }
     if !node.fields.is_empty() {
         H::set_exported(class, &object, &node.fields)?;

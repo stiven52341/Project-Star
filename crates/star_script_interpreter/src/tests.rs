@@ -65,20 +65,20 @@ fn programs_need_one_main() {
 
 #[test]
 fn what_cannot_run_yet_is_refused_before_running() {
-    let sprite = "class Player extends Sprite {\n init() {\n super.init(\"player\", \"hero.png\")\n }\n}\nclass Main {\n static func main() {\n }\n}\n";
+    let mesh = "class Rock extends Node3D {\n init() {\n super.init(\"rock\")\n }\n}\nclass Main {\n static func main() {\n }\n}\n";
     assert_eq!(
-        lowering_error(sprite),
+        lowering_error(mesh),
         LowerErrorKind::Unsupported("classes that extend this engine class")
     );
     let method =
-        "class Main {\n static func main() {\n Node(\"a\").add_child(Node(\"b\"))\n }\n}\n";
+        "class Main {\n static func main() {\n const body = Body.circle(\"dynamic\", 0.5)\n }\n}\n";
     assert_eq!(
         lowering_error(method),
         LowerErrorKind::Unsupported("this method of the engine")
     );
-    let tags = "class Main {\n static func main() {\n Debug.print(Node(\"a\").tags.length().to_string())\n }\n}\n";
+    let body = "class Main {\n static func main() {\n Debug.print((Node(\"a\").body == null).to_string())\n }\n}\n";
     assert_eq!(
-        lowering_error(tags),
+        lowering_error(body),
         LowerErrorKind::Unsupported("this field of the engine")
     );
 }
@@ -373,4 +373,42 @@ fn games_need_no_arguments_and_one_entry_point() {
     );
     let both = "class Played extends Game {\n}\nclass Main {\n static func main() {\n }\n}\n";
     assert_eq!(lowering_error(both), LowerErrorKind::SeveralEntryPoints);
+}
+
+#[test]
+fn scripts_override_the_methods_of_nodes() {
+    let source = "class Shy extends Node {\n init() {\n super.init(\"shy\")\n }\n \
+                  override func add_child(child: Node) {\n Debug.print(\"adding \" + child.name)\n super.add_child(child)\n }\n}\n\
+                  class Main {\n static func main() {\n const shy: Node = Shy()\n shy.add_child(Node(\"a\"))\n \
+                  Debug.print(shy.children().length().to_string())\n \
+                  const missing = shy.find_child(\"z\")\n missing?.remove()\n \
+                  Debug.print((missing?.find_child(\"y\") == null).to_string())\n \
+                  Debug.print(shy.find_child(\"a\")?.name ?? \"none\")\n }\n}\n";
+
+    assert_eq!(
+        run(source).expect("a program that runs"),
+        "adding a\n1\ntrue\na\n"
+    );
+}
+
+#[test]
+fn coroutines_of_nodes_end_when_they_leave_the_game() {
+    let source = "class Ticker extends Node {\n init() {\n super.init(\"Ticker\")\n tags.push(\"clock\")\n }\n \
+                  override func start() {\n tick()\n }\n \
+                  async func tick() {\n while true {\n Debug.print(\"tick\")\n await Time.next_frame()\n }\n }\n}\n\
+                  class Level extends Game {\n var frames = 0\n init() {\n add_child(Ticker())\n }\n \
+                  override func update(delta: float) {\n frames += 1\n \
+                  Debug.print(\"frame \" + frames.to_string() + \" \" + Scene.find_by_tag(\"clock\").length().to_string())\n \
+                  if frames == 3 {\n Scene.find_by_name(\"Ticker\")?.remove()\n }\n \
+                  if frames == 5 {\n quit()\n }\n }\n}\n";
+
+    let (printed, result) = play(source, 10);
+
+    // Each tick goes on in the next frame, after the game's `update`: once
+    // the node is out of the tree, it never does.
+    assert_eq!(
+        printed,
+        "frame 1 1\ntick\nframe 2 1\ntick\nframe 3 1\nframe 4 0\nframe 5 0\n"
+    );
+    assert!(result.is_ok(), "{result:?}");
 }

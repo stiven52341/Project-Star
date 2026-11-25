@@ -10,8 +10,8 @@ use super::Member;
 use super::body::Body;
 use crate::error::LowerError;
 use crate::tree::{
-    self, Arithmetic, ClassRef, Comparison, Coroutine, EngineMethod, Expression, MethodTarget,
-    NumberType,
+    self, Arithmetic, ClassRef, Comparison, Coroutine, EngineCall, EngineMethod, Expression,
+    MethodTarget, NodeMethod, NumberType,
 };
 
 /// The engine class whose `print` writes a line.
@@ -24,6 +24,8 @@ const INPUT_CLASS: &str = "Input";
 const GAME_CLASS: &str = "Game";
 /// The engine class of nodes.
 const NODE_CLASS: &str = "Node";
+/// The engine class that loads scenes and searches the game's tree.
+const SCENE_CLASS: &str = "Scene";
 
 /// How a method is called on its object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -367,11 +369,15 @@ impl Body<'_> {
                     )))))
                 }
                 (TIME_CLASS, "next_frame") => Ok(Expression::Start(Box::new(Coroutine::NextFrame))),
-                (INPUT_CLASS, name) => {
-                    let method = input_method(name).ok_or_else(|| {
-                        LowerError::internal("unknown method of `Input`", callee.span)
+                (INPUT_CLASS | SCENE_CLASS, name) => {
+                    let method = static_method(&info.name, name).ok_or_else(|| {
+                        LowerError::unsupported("this method of the engine", callee.span)
                     })?;
-                    Ok(Expression::Engine { method, arguments })
+                    Ok(Expression::Engine {
+                        method,
+                        arguments,
+                        call: EngineCall::Static,
+                    })
                 }
                 (class, name) => self.engine_object_method(callee, class, name, arguments),
             };
@@ -450,9 +456,8 @@ impl Body<'_> {
     }
 
     /// A method of an object of an engine class (`class`), with its
-    /// receiver as the first argument: `quit` and `add_child` of `Game`,
-    /// and the engine's own `start` and `update`, reached through `super`,
-    /// which do nothing.
+    /// receiver as the first argument: those of `Node` and `Game`, and
+    /// the engine's own `start` and `update`, which do nothing.
     fn engine_object_method(
         &self,
         callee: &Expr,
@@ -461,18 +466,16 @@ impl Body<'_> {
         arguments: Vec<Expression>,
     ) -> Result<Expression, LowerError> {
         let unsupported = || LowerError::unsupported("this method of the engine", callee.span);
-        let (receiver, call) = self.receiver(callee).map_err(|_| unsupported())?;
-        let method = match (class, name, call) {
-            (GAME_CLASS, "quit", Through::Object { null_safe: false }) => EngineMethod::Quit,
-            (GAME_CLASS, "add_child", Through::Object { null_safe: false }) => {
-                EngineMethod::AddChild
-            }
-            (GAME_CLASS | NODE_CLASS, "start" | "update", Through::Super) => EngineMethod::BaseHook,
-            _ => return Err(unsupported()),
+        let method = object_method(class, name).ok_or_else(unsupported)?;
+        let (receiver, through) = self.receiver(callee).map_err(|_| unsupported())?;
+        let call = match through {
+            Through::Object { null_safe } => EngineCall::Object { null_safe },
+            Through::Super => EngineCall::Base,
         };
         Ok(Expression::Engine {
             method,
             arguments: std::iter::once(receiver).chain(arguments).collect(),
+            call,
         })
     }
 
@@ -536,18 +539,34 @@ impl Body<'_> {
     }
 }
 
-/// `left operator right`, both already of the operation's type.
-/// The method of `Input` called `name`.
-fn input_method(name: &str) -> Option<EngineMethod> {
-    Some(match name {
-        "is_down" => EngineMethod::IsDown,
-        "just_pressed" => EngineMethod::JustPressed,
-        "just_released" => EngineMethod::JustReleased,
-        "strength" => EngineMethod::Strength,
-        "axis" => EngineMethod::Axis,
-        "pointer_x" => EngineMethod::PointerX,
-        "pointer_y" => EngineMethod::PointerY,
-        "has_pointer" => EngineMethod::HasPointer,
+/// The static method `name` of the engine class `class` (`Input` or
+/// `Scene`).
+fn static_method(class: &str, name: &str) -> Option<EngineMethod> {
+    Some(match (class, name) {
+        (INPUT_CLASS, "is_down") => EngineMethod::IsDown,
+        (INPUT_CLASS, "just_pressed") => EngineMethod::JustPressed,
+        (INPUT_CLASS, "just_released") => EngineMethod::JustReleased,
+        (INPUT_CLASS, "strength") => EngineMethod::Strength,
+        (INPUT_CLASS, "axis") => EngineMethod::Axis,
+        (INPUT_CLASS, "pointer_x") => EngineMethod::PointerX,
+        (INPUT_CLASS, "pointer_y") => EngineMethod::PointerY,
+        (INPUT_CLASS, "has_pointer") => EngineMethod::HasPointer,
+        (SCENE_CLASS, "load") => EngineMethod::LoadScene,
+        (SCENE_CLASS, "find_by_name") => EngineMethod::FindInGame,
+        (SCENE_CLASS, "find_by_tag") => EngineMethod::FindTaggedInGame,
+        _ => return None,
+    })
+}
+
+/// The method `name` that the engine class `class` declares for its
+/// objects, if the interpreter runs it.
+pub(super) fn object_method(class: &str, name: &str) -> Option<EngineMethod> {
+    Some(match (class, name) {
+        (GAME_CLASS, "quit") => EngineMethod::Quit,
+        (GAME_CLASS, "add_child") => EngineMethod::AddChild,
+        (GAME_CLASS | NODE_CLASS, "start") => EngineMethod::Start,
+        (GAME_CLASS | NODE_CLASS, "update") => EngineMethod::Update,
+        (NODE_CLASS, name) => EngineMethod::Node(NodeMethod::named(name)?),
         _ => return None,
     })
 }
@@ -596,6 +615,7 @@ fn started(call: Expression, span: Span) -> Result<Expression, LowerError> {
     Ok(Expression::Start(Box::new(coroutine)))
 }
 
+/// `left operator right`, both already of the operation's type.
 fn operation(
     operator: BinaryOperator,
     left: Expression,

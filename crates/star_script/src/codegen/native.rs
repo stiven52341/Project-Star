@@ -470,6 +470,7 @@ impl ::star_script_runtime::nodes::Host for Host_ {
     type Body = crate::classes::Body::Ref;
     type Color = crate::classes::Color::Ref;
     type Game = crate::classes::Game::Ref;
+    type Tags = ::star_script_runtime::List<::std::string::String>;
 
     fn node(node: &Self::Node) -> &crate::classes::Node::Fields {
         crate::classes::Node::HasFields::fields(&**node)
@@ -535,6 +536,14 @@ impl ::star_script_runtime::nodes::Host for Host_ {
 
     fn with_light_2d<R>(node: &Self::Node, read: impl FnOnce(&::star_script_runtime::node_classes::LightFields<Self>) -> R) -> ::std::option::Option<R> {
         crate::AnyObject::Light2D(::std::rc::Rc::clone(node)).map(|light_| read(crate::classes::Light2D::HasFields::fields(&*light_)))
+    }
+
+    fn new_tags(tags: ::std::vec::Vec<::std::string::String>) -> Self::Tags {
+        ::star_script_runtime::List::from_vec(tags)
+    }
+
+    fn has_tag(tags: &Self::Tags, tag: &str) -> bool {
+        tags.any(|own_| own_ == tag)
     }
 
     fn body(body: &Self::Body) -> &::star_script_runtime::bodies::BodyFields<Self> {

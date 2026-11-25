@@ -4,6 +4,7 @@
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
+use crate::List;
 use crate::bodies::BodyFields;
 use crate::game::GameFields;
 use crate::node_classes::{Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields};
@@ -71,6 +72,7 @@ impl Host for TestHost {
     type Body = Rc<BodyFields<Self>>;
     type Color = [f32; 4];
     type Game = Rc<TestGame>;
+    type Tags = List<String>;
 
     fn node(node: &Self::Node) -> &NodeFields<Self> {
         &node.node
@@ -137,6 +139,14 @@ impl Host for TestHost {
         _read: impl FnOnce(&LightFields<Self>) -> R,
     ) -> Option<R> {
         None
+    }
+
+    fn new_tags(tags: Vec<String>) -> Self::Tags {
+        List::from_vec(tags)
+    }
+
+    fn has_tag(tags: &Self::Tags, tag: &str) -> bool {
+        tags.any(|own| own == tag)
     }
 
     fn body(body: &Self::Body) -> &BodyFields<Self> {

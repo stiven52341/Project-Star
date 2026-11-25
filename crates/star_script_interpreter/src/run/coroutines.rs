@@ -18,7 +18,8 @@ use super::{
     store,
 };
 use crate::error::RunError;
-use crate::tree::{Arithmetic, Coroutine, Expression, FunctionId, Statement};
+use crate::play;
+use crate::tree::{Arithmetic, Coroutine, EngineCall, Expression, FunctionId, Statement};
 use crate::value::{Value, read, write};
 
 /// A part of a coroutine that may wait, boxed: the runner calls itself, and
@@ -27,8 +28,10 @@ type Pending<'s, T> = Pin<Box<dyn Future<Output = Result<T, RunError>> + 's>>;
 
 /// A coroutine whose receiver and arguments were evaluated.
 pub(super) enum Ready {
-    /// An `async` method, with its arguments (the object first).
+    /// A static `async` function, with its arguments.
     Function(FunctionId, Vec<Value>),
+    /// An `async` method, with its arguments (the object first).
+    Method(FunctionId, Vec<Value>),
     /// A `parallel` function, with its arguments.
     Parallel(FunctionId, Vec<Value>),
     /// `Time.wait(seconds)`.
@@ -68,7 +71,7 @@ impl Machine {
                 let mut values = Vec::with_capacity(arguments.len() + 1);
                 values.push(receiver);
                 values.extend(self.evaluate_all(arguments, frame)?);
-                Ready::Function(function, values)
+                Ready::Method(function, values)
             }
             Coroutine::Wait(seconds) => Ready::Wait(seconds_of(&self.evaluate(seconds, frame)?)?),
             Coroutine::NextFrame => Ready::NextFrame,
@@ -104,7 +107,7 @@ impl Machine {
                 let mut values = Vec::with_capacity(arguments.len() + 1);
                 values.push(receiver);
                 values.extend(self.values(arguments, frame).await?);
-                Ready::Function(function, values)
+                Ready::Method(function, values)
             }
             Coroutine::Wait(seconds) => {
                 Ready::Wait(seconds_of(&self.value(seconds, frame).await?)?)
@@ -117,12 +120,21 @@ impl Machine {
     /// fails there, the error stops the code that started it, as in the
     /// compiled game.
     pub(super) fn start(&self, ready: Ready) -> Result<(), RunError> {
+        // A node's coroutine goes on only while the node is in the game's
+        // tree, as compiled.
+        let owner = match &ready {
+            Ready::Method(_, arguments) => match arguments.first() {
+                Some(Value::Node(node)) => Some(Rc::clone(node)),
+                _ => None,
+            },
+            _ => None,
+        };
         match ready {
             Ready::Wait(seconds) => tasks::start(tasks::wait(seconds)),
             Ready::NextFrame => tasks::start(tasks::next_frame()),
             // The analysis only lets `parallel` functions be awaited.
             Ready::Parallel(..) => return Err(PARALLEL_NOT_AWAITED),
-            Ready::Function(function, arguments) => {
+            Ready::Function(function, arguments) | Ready::Method(function, arguments) => {
                 let machine = self.clone();
                 let coroutine = async move {
                     if let Err(error) = machine.call_waiting(function, arguments).await {
@@ -131,7 +143,10 @@ impl Machine {
                 };
                 // After a failure the program stops: no coroutine goes on.
                 let failure = Rc::clone(&self.failure);
-                let alive = move || failure.try_borrow().is_ok_and(|failure| failure.is_none());
+                let alive = move || {
+                    failure.try_borrow().is_ok_and(|failure| failure.is_none())
+                        && owner.as_ref().is_none_or(play::in_tree)
+                };
                 tasks::start(Task::owned(coroutine, alive));
             }
         }
@@ -352,6 +367,28 @@ impl Machine {
         }
     }
 
+    /// [`Machine::engine_arguments`], for arguments that wait.
+    async fn engine_values(
+        &self,
+        arguments: &[Expression],
+        call: EngineCall,
+        frame: &Frame,
+    ) -> Result<Option<Vec<Value>>, RunError> {
+        if let EngineCall::Object { null_safe: true } = call
+            && let Some((object, rest)) = arguments.split_first()
+        {
+            let object = self.value(object, frame).await?;
+            if matches!(object, Value::Null) {
+                return Ok(None);
+            }
+            let mut values = Vec::with_capacity(arguments.len());
+            values.push(object);
+            values.extend(self.values(rest, frame).await?);
+            return Ok(Some(values));
+        }
+        self.values(arguments, frame).await.map(Some)
+    }
+
     /// The values of `expressions`, in order.
     async fn values(
         &self,
@@ -472,9 +509,14 @@ impl Machine {
                 Value::Null if *null_safe => Value::Null,
                 object => engine::read_field(&object, *field)?,
             },
-            Expression::Engine { method, arguments } => {
-                engine::call(*method, &self.values(arguments, frame).await?)?
-            }
+            Expression::Engine {
+                method,
+                arguments,
+                call,
+            } => match self.engine_values(arguments, *call, frame).await? {
+                Some(arguments) => self.engine(*method, *call, arguments)?,
+                None => Value::Null,
+            },
             Expression::IsInstance { value, class } => {
                 let value = self.value(value, frame).await?;
                 Value::Bool(self.is_instance(&value, *class))
@@ -521,7 +563,7 @@ impl Machine {
         frame: &Frame,
     ) -> Result<Value, RunError> {
         match self.prepare_waiting(coroutine, frame).await? {
-            Some(Ready::Function(function, arguments)) => {
+            Some(Ready::Function(function, arguments) | Ready::Method(function, arguments)) => {
                 self.call_waiting(function, arguments).await
             }
             Some(Ready::Parallel(function, arguments)) => {

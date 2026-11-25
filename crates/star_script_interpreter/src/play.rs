@@ -4,16 +4,42 @@
 //! coroutines and input.
 
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
+
+use star_script_runtime::nodes;
 
 use crate::error::RunError;
-use crate::host::GameObject;
+use crate::host::{GameObject, Interpreted, NodeObject};
 use crate::run::{Hook, Machine};
 use crate::value::Value;
 
 thread_local! {
     /// The game this thread plays, if any.
     static PLAYING: RefCell<Option<Playing>> = const { RefCell::new(None) };
+    /// The root of the tree of the last game made on this thread, while
+    /// that game lives: as compiled, it exists from the moment the game
+    /// object does, before it is played.
+    static GAME_ROOT: RefCell<Option<Weak<NodeObject>>> = const { RefCell::new(None) };
+}
+
+/// Remembers `root` as the root of the game's tree.
+pub(crate) fn set_game_root(root: &Rc<NodeObject>) {
+    GAME_ROOT.with(|game_root| {
+        if let Ok(mut game_root) = game_root.try_borrow_mut() {
+            *game_root = Some(Rc::downgrade(root));
+        }
+    });
+}
+
+/// The root of the game's tree; `None` without a game (a console program).
+pub(crate) fn game_root() -> Option<Rc<NodeObject>> {
+    GAME_ROOT.with(|game_root| game_root.try_borrow().ok()?.as_ref()?.upgrade())
+}
+
+/// Whether `node` is in the game's tree, so its coroutines go on. Without
+/// a game there is no tree to leave.
+pub(crate) fn in_tree(node: &Rc<NodeObject>) -> bool {
+    game_root().is_none_or(|root| nodes::is_same_or_ancestor::<Interpreted>(&root, node))
 }
 
 /// A game and the program that runs its code.

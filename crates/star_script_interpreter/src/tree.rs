@@ -50,12 +50,21 @@ pub(crate) enum EngineClass {
     Node,
     Camera2D,
     Game,
+    Sprite,
+    Light2D,
 }
 
 impl EngineClass {
     /// Every engine class the interpreter knows, in the order of their
     /// places.
-    pub(crate) const ALL: [Self; 4] = [Self::Color, Self::Node, Self::Camera2D, Self::Game];
+    pub(crate) const ALL: [Self; 6] = [
+        Self::Color,
+        Self::Node,
+        Self::Camera2D,
+        Self::Game,
+        Self::Sprite,
+        Self::Light2D,
+    ];
 
     /// Its place among the classes.
     pub(crate) const fn class(self) -> ClassRef {
@@ -69,6 +78,8 @@ impl EngineClass {
             Self::Node => "Node",
             Self::Camera2D => "Camera2D",
             Self::Game => "Game",
+            Self::Sprite => "Sprite",
+            Self::Light2D => "Light2D",
         }
     }
 }
@@ -86,12 +97,20 @@ pub(crate) struct Class {
     pub(crate) methods: Vec<FunctionId>,
     /// The class itself and its bases: what `is` accepts.
     pub(crate) ancestors: Vec<ClassRef>,
-    /// The `start` its objects run when the engine starts them, if a
-    /// script wrote one (the engine's does nothing). Overrides of the
-    /// engine's methods are never `async`.
-    pub(crate) start: Option<FunctionId>,
-    /// The `update` its objects run every frame, if a script wrote one.
-    pub(crate) update: Option<FunctionId>,
+    /// The methods of the engine its objects run a script's version of
+    /// (written in the class or a base), such as the `start` the engine
+    /// calls once. Overrides of the engine's methods are never `async`.
+    pub(crate) overrides: Vec<(EngineMethod, FunctionId)>,
+}
+
+impl Class {
+    /// The script's version of the engine's `method`, if one was written.
+    pub(crate) fn override_of(&self, method: EngineMethod) -> Option<FunctionId> {
+        self.overrides
+            .iter()
+            .find(|(overridden, _)| *overridden == method)
+            .map(|(_, function)| *function)
+    }
 }
 
 /// How objects of a class are built, in the two phases of the language.
@@ -157,9 +176,25 @@ pub(crate) enum EngineField {
     Rotation,
     ScaleX,
     ScaleY,
+    /// `tags` of `Node`: the interpreter's list, which the runtime reads.
+    Tags,
     /// `view_height` and `main` of `Camera2D`.
     ViewHeight,
     Main,
+    /// `texture`, `width`, `height`, `layer`, `pixelated` and `color` of
+    /// `Sprite` (`color` of `Light2D` too).
+    Texture,
+    Width,
+    Height,
+    Layer,
+    Pixelated,
+    Tint,
+    /// `kind`, `intensity`, `range`, `angle` and `blend` of `Light2D`.
+    Kind,
+    Intensity,
+    Range,
+    Angle,
+    Blend,
     /// `background`, `camera`, `ambient` and `ambient_2d` of `Game`.
     Background,
     Camera,
@@ -190,9 +225,79 @@ pub(crate) enum EngineMethod {
     Quit,
     /// `game.add_child(node)`, with the game and the node as arguments.
     AddChild,
-    /// `super.start()` or `super.update(delta)` of an engine class, which
-    /// do nothing (with their receiver and arguments).
-    BaseHook,
+    /// `start()` of a node or the game, with its receiver: the engine's
+    /// does nothing.
+    Start,
+    /// `update(delta)` of a node or the game, with its receiver: the
+    /// engine's does nothing.
+    Update,
+    /// A method of `Node`, with the node first.
+    Node(NodeMethod),
+    /// `Scene.load(path)`.
+    LoadScene,
+    /// `Scene.find_by_name(name)`, in the tree of the game being played.
+    FindInGame,
+    /// `Scene.find_by_tag(tag)`, in the tree of the game being played.
+    FindTaggedInGame,
+}
+
+/// How a method of the engine is called.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EngineCall {
+    /// A static method, such as `Input.is_down(action)`.
+    Static,
+    /// A method of an object (the first argument): an object whose class
+    /// overrides it runs the script's version, as compiled. With `?.`, a
+    /// `null` object gives `null` and the other arguments do not run.
+    Object { null_safe: bool },
+    /// `super.method(…)`: the engine's version, whatever `self` overrides.
+    Base,
+}
+
+/// A method of `Node` that the runtime's functions of nodes run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NodeMethod {
+    AddChild,
+    Remove,
+    Parent,
+    Children,
+    FindChild,
+    HasTag,
+    FindByName,
+    FindByTag,
+    GlobalX,
+    GlobalY,
+    GlobalRotation,
+    SetGlobalPosition,
+    SetGlobalRotation,
+    Translate,
+    TranslateGlobal,
+    Rotate,
+}
+
+impl NodeMethod {
+    /// The method of `Node` called `name`, if the runtime runs it.
+    pub(crate) fn named(name: &str) -> Option<Self> {
+        Some(match name {
+            "add_child" => Self::AddChild,
+            "remove" => Self::Remove,
+            "parent" => Self::Parent,
+            "children" => Self::Children,
+            "find_child" => Self::FindChild,
+            "has_tag" => Self::HasTag,
+            "find_by_name" => Self::FindByName,
+            "find_by_tag" => Self::FindByTag,
+            "global_x" => Self::GlobalX,
+            "global_y" => Self::GlobalY,
+            "global_rotation" => Self::GlobalRotation,
+            "set_global_position" => Self::SetGlobalPosition,
+            "set_global_rotation" => Self::SetGlobalRotation,
+            "translate" => Self::Translate,
+            "translate_global" => Self::TranslateGlobal,
+            "rotate" => Self::Rotate,
+            _ => return None,
+        })
+    }
 }
 
 /// Which function a call of a method of an object runs.
@@ -354,11 +459,12 @@ pub(crate) enum Expression {
     Now,
     /// `Debug.print(text)`.
     Print(Box<Expression>),
-    /// A static method of the engine, such as `Input.is_down(action)`,
-    /// with its arguments.
+    /// A method of the engine, such as `Input.is_down(action)`, with its
+    /// arguments (the object first, for a method of objects).
     Engine {
         method: EngineMethod,
         arguments: Vec<Expression>,
+        call: EngineCall,
     },
     /// `[a, b, c]`: a new list.
     List(Vec<Expression>),

@@ -38,6 +38,9 @@ pub trait Host: Sized + 'static {
     type Color: Clone;
     /// A reference to the game: a `Game` or a subclass.
     type Game;
+    /// A node's list of tags: one list that scripts change and the runtime
+    /// reads, so it is the way of running StarScript's own list of texts.
+    type Tags: Clone;
 
     /// The fields of `Node` in `node`.
     fn node(node: &Self::Node) -> &NodeFields<Self>;
@@ -72,6 +75,10 @@ pub trait Host: Sized + 'static {
     /// Runs `read` on the fields of `Light2D` in `node`, if it is one.
     fn with_light_2d<R>(node: &Self::Node, read: impl FnOnce(&LightFields<Self>) -> R)
     -> Option<R>;
+    /// A new list of tags holding `tags`.
+    fn new_tags(tags: Vec<String>) -> Self::Tags;
+    /// Whether `tags` holds `tag`.
+    fn has_tag(tags: &Self::Tags, tag: &str) -> bool;
     /// The fields of the body `body`.
     fn body(body: &Self::Body) -> &BodyFields<Self>;
     /// A new color with the channels `r`, `g`, `b` and `a`.
@@ -131,7 +138,7 @@ pub struct NodeFields<H: Host> {
     /// `body`
     pub body: Field<Option<H::Body>>,
     /// `tags`
-    pub tags: Field<List<String>>,
+    pub tags: Field<H::Tags>,
     id: u64,
     parent: RefCell<Option<H::WeakNode>>,
     children: RefCell<Vec<H::Node>>,
@@ -151,7 +158,7 @@ impl<H: Host> NodeFields<H> {
             scale_x: Field::new(1.0),
             scale_y: Field::new(1.0),
             body: Field::new(None),
-            tags: Field::new(List::new()),
+            tags: Field::new(H::new_tags(Vec::new())),
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             parent: RefCell::new(None),
             children: RefCell::new(Vec::new()),
@@ -179,8 +186,7 @@ impl<H: Host> NodeFields<H> {
     }
 
     fn has_tag(&self, tag: &str) -> bool {
-        self.tags
-            .read(|tags| tags.read(|tags| tags.iter().any(|own| own == tag)))
+        self.tags.read(|tags| H::has_tag(tags, tag))
     }
 
     fn is_named(&self, name: &str) -> bool {
