@@ -1,8 +1,10 @@
 //! Running: walks the interpreter's tree with values.
 
 mod builtins;
+mod coroutines;
 mod numbers;
 
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use star_script::semantic::BuiltinMethod;
@@ -11,10 +13,13 @@ use star_script_runtime::try_index;
 use crate::Output;
 use crate::error::RunError;
 use crate::tree::{
-    Arithmetic, ClassRef, Code, Constructor, ConstructorId, Expression, FunctionId, MethodTarget,
-    Statement,
+    Arithmetic, ClassRef, Code, Constructor, ConstructorId, Expression, Function, FunctionId,
+    MethodTarget, Statement,
 };
 use crate::value::{Elements, Object, Value, read, write};
+
+/// What the usual runner says of code that only coroutines can run.
+const WAIT_OUTSIDE_COROUTINE: &str = "`await` outside a coroutine";
 
 /// What a statement leaves the code around it to do.
 enum Flow {
@@ -29,18 +34,34 @@ enum Flow {
 }
 
 /// Runs the functions of a program. It owns what it uses, so the
-/// coroutines it starts can keep it after the call that started them.
+/// coroutines it starts can keep a copy after the call that started them.
+#[derive(Clone)]
 pub(crate) struct Machine {
     code: Rc<Code>,
     output: Output,
+    /// The first runtime error of a coroutine, shared by every copy: once
+    /// there is one, the program stops and no coroutine goes on.
+    failure: Rc<RefCell<Option<RunError>>>,
 }
 
 /// The locals of the function that runs.
 type Frame = [Value];
 
 impl Machine {
-    pub(crate) const fn new(code: Rc<Code>, output: Output) -> Self {
-        Self { code, output }
+    pub(crate) fn new(code: Rc<Code>, output: Output) -> Self {
+        Self {
+            code,
+            output,
+            failure: Rc::default(),
+        }
+    }
+
+    /// Runs the program: `main`, and then its coroutines until none is
+    /// left, or until one fails.
+    pub(crate) fn run(&self) -> Result<(), RunError> {
+        self.statement(&self.code.main, &mut [])?;
+        star_script_runtime::tasks::run_until_finished_or(|| self.has_failed());
+        self.take_failure().map_or(Ok(()), Err)
     }
 
     /// Runs `function` with `arguments`, already of its parameters' types,
@@ -50,11 +71,7 @@ impl Machine {
         function: FunctionId,
         mut arguments: Vec<Value>,
     ) -> Result<Value, RunError> {
-        let function = self
-            .code
-            .functions
-            .get(function.0)
-            .ok_or(RunError::Internal("unknown function"))?;
+        let function = self.function(function)?;
         arguments.resize(function.slots, Value::Null);
         match self.block(&function.body, &mut arguments)? {
             Flow::Return(value) => Ok(value),
@@ -151,6 +168,7 @@ impl Machine {
             }
             Statement::Break => return Ok(Flow::Break),
             Statement::Continue => return Ok(Flow::Continue),
+            Statement::Waits(_) => return Err(RunError::Internal(WAIT_OUTSIDE_COROUTINE)),
         }
         Ok(Flow::Next)
     }
@@ -237,6 +255,13 @@ impl Machine {
         Ok(object)
     }
 
+    fn function(&self, function: FunctionId) -> Result<&Function, RunError> {
+        self.code
+            .functions
+            .get(function.0)
+            .ok_or(RunError::Internal("unknown function"))
+    }
+
     fn constructor(&self, constructor: ConstructorId) -> Result<&Constructor, RunError> {
         self.code
             .constructors
@@ -279,6 +304,15 @@ impl Machine {
         writeln!(output, "{message}").map_err(RunError::Output)
     }
 
+    /// `value as Subclass`: the object if it is one, else `null`.
+    fn downcast(&self, value: Value, class: ClassRef) -> Value {
+        if self.is_instance(&value, class) {
+            value
+        } else {
+            Value::Null
+        }
+    }
+
     /// A method of the object `receiver`, with `self` as its first local.
     fn call_method(
         &self,
@@ -287,24 +321,34 @@ impl Machine {
         arguments: &[Expression],
         frame: &Frame,
     ) -> Result<Value, RunError> {
-        let function = match target {
-            MethodTarget::Direct(function) => function,
-            MethodTarget::Overridable(place) => {
-                let class = object_of(&receiver)?.class;
-                self.code
-                    .classes
-                    .get(class.0)
-                    .and_then(|class| class.methods.get(place))
-                    .copied()
-                    .ok_or(RunError::Internal("method missing from its class's table"))?
-            }
-        };
+        let function = self.method_function(target, &receiver)?;
         let mut values = Vec::with_capacity(arguments.len() + 1);
         values.push(receiver);
         for argument in arguments {
             values.push(self.evaluate(argument, frame)?);
         }
         self.call(function, values)
+    }
+
+    /// The function a method of `receiver` runs: its own version of it, if
+    /// it can be overridden.
+    fn method_function(
+        &self,
+        target: MethodTarget,
+        receiver: &Value,
+    ) -> Result<FunctionId, RunError> {
+        match target {
+            MethodTarget::Direct(function) => Ok(function),
+            MethodTarget::Overridable(place) => {
+                let class = object_of(receiver)?.class;
+                self.code
+                    .classes
+                    .get(class.0)
+                    .and_then(|class| class.methods.get(place))
+                    .copied()
+                    .ok_or(RunError::Internal("method missing from its class's table"))
+            }
+        }
     }
 
     /// `list[index] = value` or `list[index] op= value`.
@@ -403,23 +447,17 @@ impl Machine {
             Expression::Construct {
                 constructor,
                 arguments,
-            } => {
-                let arguments = self.evaluate_all(arguments, frame)?;
-                self.construct(*constructor, arguments)?
-            }
+            } => self.construct(*constructor, self.evaluate_all(arguments, frame)?)?,
             Expression::Field {
                 object,
                 position,
                 null_safe,
             } => self.field(object, *position, *null_safe, frame)?,
             Expression::IsInstance { value, class } => {
-                let value = self.evaluate(value, frame)?;
-                Value::Bool(self.is_instance(&value, *class))
+                Value::Bool(self.is_instance(&self.evaluate(value, frame)?, *class))
             }
             Expression::Downcast { value, class } => {
-                let value = self.evaluate(value, frame)?;
-                let is_instance = self.is_instance(&value, *class);
-                if is_instance { value } else { Value::Null }
+                self.downcast(self.evaluate(value, frame)?, *class)
             }
             Expression::Now => Value::Float(star_script_runtime::tasks::now()),
             Expression::Print(message) => {
@@ -442,6 +480,13 @@ impl Machine {
                 argument,
                 null_safe,
             } => self.builtin(*method, receiver, argument.as_deref(), *null_safe, frame)?,
+            Expression::Start(coroutine) => {
+                self.start_call(coroutine, frame)?;
+                Value::Null
+            }
+            Expression::Await(_) | Expression::Waits(_) => {
+                return Err(RunError::Internal(WAIT_OUTSIDE_COROUTINE));
+            }
         })
     }
 

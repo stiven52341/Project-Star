@@ -13,8 +13,9 @@ pub(crate) struct Code {
     pub(crate) functions: Vec<Function>,
     pub(crate) constructors: Vec<Constructor>,
     pub(crate) classes: Vec<Class>,
-    /// `static func main()`.
-    pub(crate) main: FunctionId,
+    /// What starts the program: a call of `static func main()`, or its
+    /// start as a coroutine if it is `async`.
+    pub(crate) main: Statement,
 }
 
 /// Position of a function in the program.
@@ -145,6 +146,9 @@ pub(crate) enum Statement {
     Break,
     /// `continue`.
     Continue,
+    /// A statement with an `await` inside, which only the runner of
+    /// coroutines can run: it may stop there and go on in another frame.
+    Waits(Box<Statement>),
 }
 
 /// A piece of code that produces a value.
@@ -243,6 +247,37 @@ pub(crate) enum Expression {
         argument: Option<Box<Expression>>,
         null_safe: bool,
     },
+    /// A call of an `async` method written alone: it starts as a
+    /// coroutine, which runs until its first wait, and gives nothing.
+    Start(Box<Coroutine>),
+    /// `await call`: runs the coroutine as part of the one that waits for
+    /// it, and gives its value.
+    Await(Box<Coroutine>),
+    /// An expression with an `await` inside (but not an `await` itself),
+    /// which only the runner of coroutines can evaluate.
+    Waits(Box<Expression>),
+}
+
+/// A call of an `async` method, before it is started or awaited.
+#[derive(Debug)]
+pub(crate) enum Coroutine {
+    /// A static `async` function, with its arguments already converted.
+    Call {
+        function: FunctionId,
+        arguments: Vec<Expression>,
+    },
+    /// An `async` method of an object; with `?.`, a `null` object starts
+    /// nothing and the arguments do not run.
+    Method {
+        target: MethodTarget,
+        receiver: Box<Expression>,
+        arguments: Vec<Expression>,
+        null_safe: bool,
+    },
+    /// `Time.wait(seconds)`.
+    Wait(Box<Expression>),
+    /// `Time.next_frame()`.
+    NextFrame,
 }
 
 /// The number types of StarScript.

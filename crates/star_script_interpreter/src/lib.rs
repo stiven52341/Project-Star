@@ -17,9 +17,9 @@
 //! 2. [`Program::run`] walks that tree. StarScript's runtime errors, such
 //!    as dividing an integer by zero, come back as a [`RunError`].
 //!
-//! For now it runs console programs: static functions, classes and
-//! inheritance (Phase 14 of `docs/roadmap.md` brings the rest of the
-//! language step by step).
+//! For now it runs console programs: static functions, classes,
+//! inheritance, decorators and coroutines (Phase 14 of `docs/roadmap.md`
+//! brings the rest of the language step by step).
 
 mod error;
 mod lower;
@@ -62,7 +62,9 @@ impl Program {
         })
     }
 
-    /// Runs `static func main()`. `Debug.print` writes its lines to
+    /// Runs `static func main()`, and then the coroutines still waiting,
+    /// with the clock moved by real time, until none is left (as a
+    /// compiled console program does). `Debug.print` writes its lines to
     /// `output`.
     ///
     /// # Errors
@@ -70,9 +72,12 @@ impl Program {
     /// When the program stops with a runtime error of StarScript, or its
     /// output cannot be written.
     pub fn run(&self, output: &Output) -> Result<(), RunError> {
-        run::Machine::new(Rc::clone(&self.code), Rc::clone(output))
-            .call(self.code.main, Vec::new())
-            .map(drop)
+        let result = run::Machine::new(Rc::clone(&self.code), Rc::clone(output)).run();
+        if result.is_err() {
+            // The coroutines of a stopped program never go on.
+            star_script_runtime::tasks::clear();
+        }
+        result
     }
 }
 

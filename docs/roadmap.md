@@ -548,7 +548,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `star_script_runtime::tasks`, the one the compiled game reads,
         so both give the same seconds. `decorators.star` gives the same
         output interpreted and compiled.
-  - [ ] 14.4 Coroutines: `async`/`await`, `Time.wait` and
+  - [x] 14.4 Coroutines: `async`/`await`, `Time.wait` and
         `Time.next_frame`, run once per frame, and ending with their node.
         Design approved by the owner (2026-11-24, decision 68):
         - An interpreted coroutine is a Rust future, so it can stop at an
@@ -591,10 +591,19 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           order would have to be kept identical by hand).
     - [x] 14.4a A shared program and output (`Rc`), with no change in
           what programs do.
-    - [ ] 14.4b `async` methods, `await`, coroutines started by a call
+    - [x] 14.4b `async` methods, `await`, coroutines started by a call
           alone, `Time.wait`, `Time.next_frame`, `async main` and errors
           in coroutines: `coroutines.star` gives the same output
-          interpreted and compiled.
+          interpreted and compiled. Done. A failing coroutine stops the
+          program at once, as compiled: an error before its first wait
+          stops the code that started it, and after one no coroutine
+          goes on. The conformance test now also covers `objects.star`
+          and `decorators.star`, which had been left out of its list;
+          `decorators.star` showed that a decorated method and its
+          hidden code shared their parameters' places, so the analysis
+          gave both one local (the compiler names locals by their text
+          and did not notice): the calling method's parameters now get
+          places of their own.
   - [ ] 14.5 Parallel functions: `parallel static func` on threads, with
         values copied in and out.
   - [ ] 14.6 Games: `Game` (`start`, `update`, `quit`) in a window of the

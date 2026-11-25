@@ -148,3 +148,45 @@ fn clones_share_the_program_and_runs_share_the_output() {
     copy.run(&output).expect("a run without errors");
     assert_eq!(buffer.take(), b"again\nagain\n");
 }
+
+#[test]
+fn a_failing_coroutine_stops_the_program_and_the_others() {
+    let source = "class Main {\n static async func fail_later() {\n await Time.next_frame()\n \
+                  var zero = 0\n Debug.print((1 / zero).to_string())\n }\n \
+                  static async func tick() {\n for i in 0..5 {\n \
+                  Debug.print(\"tick \" + i.to_string())\n await Time.next_frame()\n }\n }\n \
+                  static func main() {\n fail_later()\n tick()\n Debug.print(\"main ends\")\n }\n}\n";
+    let (printed, error) = run_with_output(source);
+    // `fail_later` goes on first in the next frame, and `tick` never again.
+    assert_eq!(printed, "tick 0\nmain ends\n");
+    assert_eq!(
+        error.map(|error| error.to_string()),
+        Some("StarScript runtime error: integer division by zero".to_owned())
+    );
+    assert_eq!(star_script_runtime::tasks::waiting(), 0);
+}
+
+#[test]
+fn a_coroutine_failing_before_its_first_wait_stops_who_started_it() {
+    let source = "class Main {\n static async func fail() {\n var list = [1]\n \
+                  Debug.print(list[3].to_string())\n }\n \
+                  static func main() {\n fail()\n Debug.print(\"never\")\n }\n}\n";
+    let (printed, error) = run_with_output(source);
+    assert_eq!(printed, "");
+    assert_eq!(
+        error.map(|error| error.to_string()),
+        Some("StarScript runtime error: index 3 is out of range for a list of length 1".to_owned())
+    );
+}
+
+#[test]
+fn awaits_wait_inside_loops_assignments_and_operators() {
+    let source = "class Main {\n static async func three() -> int {\n \
+                  await Time.next_frame()\n return 3\n }\n \
+                  static async func main() {\n var total = 0\n var list = [1, 2]\n \
+                  while total < await three() {\n total += 1\n }\n \
+                  list[0] += await three()\n \
+                  const lazy = true || await three() > 0\n \
+                  Debug.print(total.to_string() + \" \" + list[0].to_string() + \" \" + lazy.to_string())\n }\n}\n";
+    assert_eq!(run(source).ok().as_deref(), Some("3 4 true\n"));
+}

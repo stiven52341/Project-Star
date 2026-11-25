@@ -125,9 +125,24 @@ pub fn waiting() -> usize {
     WAITING.with(|waiting| waiting.borrow().len())
 }
 
+/// Drops every waiting coroutine without letting it go on: those of a
+/// program that stopped.
+pub fn clear() {
+    let dropped = WAITING.with(|waiting| std::mem::take(&mut *waiting.borrow_mut()));
+    // Dropped outside the borrow: a coroutine may own others' tasks.
+    drop(dropped);
+}
+
 /// For console programs: lets the coroutines go on, with the clock moved
 /// by the real time that passes, until none is left.
 pub fn run_until_finished() {
+    run_until_finished_or(|| false);
+}
+
+/// [`run_until_finished`], but it also returns as soon as `stop` holds
+/// after a turn of coroutines: the interpreter stops there when one of
+/// them failed.
+pub fn run_until_finished_or(stop: impl Fn() -> bool) {
     let mut last = Instant::now();
     while waiting() > 0 {
         std::thread::sleep(CONSOLE_FRAME);
@@ -137,6 +152,9 @@ pub fn run_until_finished() {
         last = now;
         frame_started(delta);
         resume();
+        if stop() {
+            return;
+        }
     }
 }
 
@@ -207,10 +225,6 @@ mod tests {
     fn frame(delta: f32) {
         frame_started(delta);
         resume();
-    }
-
-    fn clear() {
-        WAITING.with(|waiting| waiting.borrow_mut().clear());
     }
 
     #[test]
@@ -321,6 +335,42 @@ mod tests {
         frame(0.1);
 
         assert_eq!(*log.borrow(), ["inner", "end"]);
+    }
+
+    #[test]
+    fn cleared_coroutines_never_go_on() {
+        clear();
+        let log = Rc::new(RefCell::new(Vec::new()));
+        start(logged(&log, &[("first", 0.1)]));
+
+        clear();
+        frame(1.0);
+
+        assert_eq!(*log.borrow(), ["first"]);
+        assert_eq!(waiting(), 0);
+    }
+
+    #[test]
+    fn console_loops_stop_when_asked() {
+        clear();
+        let turns = Rc::new(Cell::new(0));
+        let counted = Rc::clone(&turns);
+        start(Task::new(async move {
+            loop {
+                counted.set(counted.get() + 1);
+                next_frame().await;
+            }
+        }));
+        let checks = Cell::new(0);
+
+        run_until_finished_or(|| {
+            checks.set(checks.get() + 1);
+            checks.get() == 3
+        });
+
+        // Its first turn was the one it was started in.
+        assert_eq!(turns.get(), 3);
+        clear();
     }
 
     #[test]

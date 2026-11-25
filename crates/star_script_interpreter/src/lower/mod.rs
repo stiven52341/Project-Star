@@ -4,6 +4,7 @@
 mod body;
 mod constructor;
 mod expressions;
+mod waits;
 
 use std::collections::HashMap;
 
@@ -14,7 +15,9 @@ use star_script::semantic::{
 };
 
 use crate::error::{LowerError, LowerErrorKind};
-use crate::tree::{Class, ClassRef, Code, ConstructorId, Function, FunctionId, Statement};
+use crate::tree::{
+    Class, ClassRef, Code, ConstructorId, Coroutine, Expression, Function, FunctionId, Statement,
+};
 use body::Body;
 
 /// A member of a class that lowering turns into a function.
@@ -111,7 +114,7 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
                         declaration.name.span,
                     ));
                 }
-                main = Some(function);
+                main = Some(entry_point(function, method));
             }
             if !method.is_static && !method.is_private {
                 overridable.push((index, function));
@@ -266,8 +269,14 @@ fn function(
             class,
             declaration,
             info,
-        } => Body::new(analysis, tables, *class, info.return_type.clone())
-            .function(declaration, info.is_static),
+        } => {
+            let mut function = Body::new(analysis, tables, *class, info.return_type.clone())
+                .function(declaration, info.is_static)?;
+            if info.is_async() {
+                waits::mark_block(&mut function.body);
+            }
+            Ok(function)
+        }
         Pending::Constant { class, value, ty } => {
             let value = Body::new(analysis, tables, *class, (*ty).clone()).value_as(value, ty)?;
             Ok(Function {
@@ -281,8 +290,7 @@ fn function(
 /// Refuses the methods the interpreter cannot run yet.
 fn check_method(info: &MethodInfo, span: Span) -> Result<(), LowerError> {
     match info.execution {
-        Execution::Direct => Ok(()),
-        Execution::Async => Err(LowerError::unsupported("`async` methods", span)),
+        Execution::Direct | Execution::Async => Ok(()),
         Execution::Parallel => Err(LowerError::unsupported("`parallel` functions", span)),
     }
 }
@@ -316,6 +324,23 @@ fn constant_value(declaration: &ClassDecl, name: Span) -> Result<&Expr, LowerErr
             _ => None,
         })
         .ok_or_else(|| LowerError::internal("constant without value", name))
+}
+
+/// What starts the program: a call of `main`, or its start as a coroutine
+/// if it is `async`, as compiled.
+fn entry_point(function: FunctionId, method: &MethodInfo) -> Statement {
+    let arguments = Vec::new();
+    Statement::Evaluate(if method.is_async() {
+        Expression::Start(Box::new(Coroutine::Call {
+            function,
+            arguments,
+        }))
+    } else {
+        Expression::Call {
+            function,
+            arguments,
+        }
+    })
 }
 
 /// `static func main()`, with no parameters and no result.

@@ -1,12 +1,15 @@
 //! Expressions, with the conversions between number types written out.
 
+use star_script::Span;
 use star_script::ast::{BinaryOperator, Expr, ExprKind, Literal, Name, UnaryOperator};
-use star_script::semantic::{BuiltinMethod, ClassId, ClassOrigin, Resolution, Type};
+use star_script::semantic::{BuiltinMethod, ClassId, ClassOrigin, MethodInfo, Resolution, Type};
 
 use super::Member;
 use super::body::Body;
 use crate::error::LowerError;
-use crate::tree::{Arithmetic, ClassRef, Comparison, Expression, MethodTarget, NumberType};
+use crate::tree::{
+    Arithmetic, ClassRef, Comparison, Coroutine, Expression, MethodTarget, NumberType,
+};
 use crate::value::Value;
 
 /// The engine class whose `print` writes a line.
@@ -55,7 +58,13 @@ impl Body<'_> {
                 value: Box::new(self.expression(value)?),
                 class: self.class_named(&type_ref.to_string(), expression)?,
             }),
-            ExprKind::Await(_) => Err(LowerError::unsupported("`await`", span)),
+            ExprKind::Await(value) => match self.expression(value)? {
+                Expression::Start(coroutine) => Ok(Expression::Await(coroutine)),
+                _ => Err(LowerError::internal(
+                    "`await` of a call that is not `async`",
+                    span,
+                )),
+            },
         }
     }
 
@@ -278,7 +287,19 @@ impl Body<'_> {
     fn call(&self, callee: &Expr, arguments: &[Expr]) -> Result<Expression, LowerError> {
         match self.resolution(callee)? {
             Some(Resolution::Method { class, index }) => {
-                self.method_call(callee, class, index, arguments)
+                let call = self.method_call(callee, class, index, arguments)?;
+                let is_async = self
+                    .analysis
+                    .classes()
+                    .class(class)
+                    .methods
+                    .get(index)
+                    .is_some_and(MethodInfo::is_async);
+                if is_async {
+                    started(call, callee.span)
+                } else {
+                    Ok(call)
+                }
             }
             Some(Resolution::Builtin(method)) => self.builtin_call(callee, method, arguments),
             Some(Resolution::Constructor(class)) => self.construct(callee, class, arguments),
@@ -316,6 +337,15 @@ impl Body<'_> {
                     Ok(Expression::Print(Box::new(message)))
                 }
                 (TIME_CLASS, "now") => Ok(Expression::Now),
+                (TIME_CLASS, "wait") => {
+                    let seconds = arguments.into_iter().next().ok_or_else(|| {
+                        LowerError::internal("`wait` without seconds", callee.span)
+                    })?;
+                    Ok(Expression::Start(Box::new(Coroutine::Wait(Box::new(
+                        seconds,
+                    )))))
+                }
+                (TIME_CLASS, "next_frame") => Ok(Expression::Start(Box::new(Coroutine::NextFrame))),
                 _ => Err(LowerError::unsupported(
                     "this method of the engine",
                     callee.span,
@@ -439,6 +469,34 @@ impl Body<'_> {
 }
 
 /// `left operator right`, both already of the operation's type.
+/// A call of an `async` method, as a coroutine that starts there (or that
+/// `await` waits for).
+fn started(call: Expression, span: Span) -> Result<Expression, LowerError> {
+    let coroutine = match call {
+        Expression::Call {
+            function,
+            arguments,
+        } => Coroutine::Call {
+            function,
+            arguments,
+        },
+        Expression::CallMethod {
+            target,
+            receiver,
+            arguments,
+            null_safe,
+        } => Coroutine::Method {
+            target,
+            receiver,
+            arguments,
+            null_safe,
+        },
+        Expression::Start(coroutine) => return Ok(Expression::Start(coroutine)),
+        _ => return Err(LowerError::internal("`async` call of no method", span)),
+    };
+    Ok(Expression::Start(Box::new(coroutine)))
+}
+
 fn operation(
     operator: BinaryOperator,
     left: Expression,
