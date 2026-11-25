@@ -872,7 +872,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [ ] 14.9 Blueprints: they become StarScript, so they need no
         interpreter of their own; conformance tests with the blueprint
         templates.
-        Design proposed to the owner (awaiting approval):
+        Design approved by the owner (decision 73, 2026-11-24):
         - A blueprint runs as the StarScript `star_blueprint::translate`
           writes for it, compiled or interpreted, so neither side needs
           code for blueprints: what must be checked is that their
