@@ -606,6 +606,43 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           places of their own.
   - [ ] 14.5 Parallel functions: `parallel static func` on threads, with
         values copied in and out.
+        Design proposed to the owner (awaiting approval):
+        - Interpreted `parallel` functions run on the same threads as
+          compiled ones: an awaited call goes through
+          `star_script_runtime::parallel::run`, whose pool, copies and
+          timing (the coroutine goes on in the first turn after the work
+          ends) are already there. The work it receives is a plain
+          function of the interpreter, and what it needs travels in its
+          arguments: the lowered program, the function and copies of the
+          values.
+        - The lowered program is shared between threads (`Arc`, so it
+          must be `Send + Sync`): texts become `Arc<str>` (one atomic
+          count per copy, no allocation) and the tree's constants a type
+          of their own without lists or objects. Each thread runs the
+          program with its own values: lists and objects stay `Rc`, on
+          one thread, and a `parallel` function only sees copies, which
+          the analysis already guarantees.
+        - Copies: a value that can cross threads (numbers, `bool`,
+          `string`, `null`, and lists of them, deeply) is copied into a
+          `Send` form when the work starts and back into values when its
+          result arrives, as the compiled `Plain` does; a list changed
+          by the function is its own copy.
+        - Inside a `parallel` function other `parallel` functions and
+          constants are called directly, on the same thread. A runtime
+          error there comes back with the result, and the coroutine that
+          awaits it stops with it (the path of 14.4), as compiled.
+        - Rejected: running them on the game's thread (same output, but
+          heavy work would freeze “Play” and behave unlike the built
+          game), lowering the program again on each thread (slow, and a
+          cache of programs per thread), and lists shared between threads
+          (`Arc<Mutex>`: a cost on every list access of the game).
+    - [ ] 14.5a A program that can be shared between threads (`Arc`,
+          `Arc<str>` texts, constants of their own), with no change in
+          what programs do.
+    - [ ] 14.5b `parallel` functions: awaited calls on the runtime's
+          threads with copies, direct calls between them, and their
+          errors: `parallel.star` and `parallel_fault.star` give the same
+          output interpreted and compiled.
   - [ ] 14.6 Games: `Game` (`start`, `update`, `quit`) in a window of the
         engine, `Input` and its actions, `Color`, `Camera2D`, using the
         engine classes that f1 made shared.
