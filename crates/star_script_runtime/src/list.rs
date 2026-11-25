@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::{StarEq, fault};
+use crate::{RuntimeError, StarEq, fault};
 
 /// A StarScript list.
 ///
@@ -147,11 +147,20 @@ const OVERLAPPING_ACCESS: &str = "internal compiler error: overlapping list acce
 
 #[track_caller]
 fn checked_index(index: i32, length: usize) -> usize {
+    try_index(index, length).unwrap_or_else(|error| error.stop())
+}
+
+/// The position of `list[index]` in a list of `length` elements.
+///
+/// # Errors
+///
+/// When the index is negative or not smaller than the length.
+pub fn try_index(index: i32, length: usize) -> Result<usize, RuntimeError> {
     match usize::try_from(index) {
-        Ok(position) if position < length => position,
-        _ => fault(&format!(
+        Ok(position) if position < length => Ok(position),
+        _ => Err(RuntimeError::new(format!(
             "index {index} is out of range for a list of length {length}"
-        )),
+        ))),
     }
 }
 
@@ -192,6 +201,16 @@ mod tests {
     #[should_panic(expected = "index -1 is out of range")]
     fn negative_indices_are_a_fault() {
         let _ = List::from_vec(vec![1_i64]).get(-1);
+    }
+
+    #[test]
+    fn checked_indices_return_their_error() {
+        assert_eq!(try_index(1, 2), Ok(1));
+        let error = try_index(-1, 2).map_err(|error| error.message().to_owned());
+        assert_eq!(
+            error,
+            Err("index -1 is out of range for a list of length 2".to_owned())
+        );
     }
 
     #[test]

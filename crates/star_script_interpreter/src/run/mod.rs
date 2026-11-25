@@ -1,12 +1,15 @@
 //! Running: walks the interpreter's tree with values.
 
+mod builtins;
 mod numbers;
 
 use std::io::Write;
 
+use star_script_runtime::try_index;
+
 use crate::error::RunError;
-use crate::tree::{Expression, Function, FunctionId, Statement};
-use crate::value::Value;
+use crate::tree::{Arithmetic, Expression, Function, FunctionId, Statement};
+use crate::value::{Elements, Value, read, write};
 
 /// What a statement leaves the code around it to do.
 enum Flow {
@@ -71,6 +74,12 @@ impl<'a> Machine<'a> {
             Statement::Evaluate(expression) => {
                 self.evaluate(expression, frame)?;
             }
+            Statement::SetElement {
+                list,
+                index,
+                operator,
+                value,
+            } => self.set_element(list, index, *operator, value, frame)?,
             Statement::If {
                 condition,
                 then_branch,
@@ -96,6 +105,18 @@ impl<'a> Machine<'a> {
                 end,
                 body,
             } => return self.for_range(*slot, start, end, body, frame),
+            Statement::ForEach { slot, list, body } => {
+                let list = self.evaluate(list, frame)?;
+                // A copy: changing the list inside the loop does not change
+                // what the loop goes through.
+                let elements = read(list_elements(&list)?)?.clone();
+                for element in elements {
+                    store(frame, *slot, element)?;
+                    if let Some(flow) = leave_loop(self.block(body, frame)?) {
+                        return Ok(flow);
+                    }
+                }
+            }
             Statement::Return(value) => {
                 let value = match value {
                     Some(value) => self.evaluate(value, frame)?,
@@ -129,6 +150,35 @@ impl<'a> Machine<'a> {
             current += 1;
         }
         Ok(Flow::Next)
+    }
+
+    /// `list[index] = value` or `list[index] op= value`.
+    fn set_element(
+        &mut self,
+        list: &Expression,
+        index: &Expression,
+        operator: Option<Arithmetic>,
+        value: &Expression,
+        frame: &Frame,
+    ) -> Result<(), RunError> {
+        let list = self.evaluate(list, frame)?;
+        let elements = list_elements(&list)?;
+        let index = self.evaluate(index, frame)?;
+        let new_value = match operator {
+            None => self.evaluate(value, frame)?,
+            Some(operator) => {
+                let current = element(elements, &index)?;
+                let value = self.evaluate(value, frame)?;
+                numbers::arithmetic(operator, &current, &value)?
+            }
+        };
+        let mut elements = write(elements)?;
+        let position = position(&index, elements.len())?;
+        let slot = elements
+            .get_mut(position)
+            .ok_or(RunError::Internal("checked index out of range"))?;
+        *slot = new_value;
+        Ok(())
     }
 
     fn condition(&mut self, condition: &Expression, frame: &Frame) -> Result<bool, RunError> {
@@ -170,7 +220,7 @@ impl<'a> Machine<'a> {
             }
             Expression::Equal(left, right) => {
                 let left = self.evaluate(left, frame)?;
-                Value::Bool(left.star_eq(&self.evaluate(right, frame)?))
+                Value::Bool(left.star_eq(&self.evaluate(right, frame)?)?)
             }
             Expression::And(left, right) => {
                 Value::Bool(self.condition(left, frame)? && self.condition(right, frame)?)
@@ -189,11 +239,40 @@ impl<'a> Machine<'a> {
                 self.call(*function, arguments)?
             }
             Expression::Print(message) => {
-                let message = self.evaluate(message, frame)?.to_text();
+                let message = self.evaluate(message, frame)?.to_text()?;
                 writeln!(self.output, "{message}").map_err(RunError::Output)?;
                 Value::Null
             }
-            Expression::ToText(value) => Value::String(self.evaluate(value, frame)?.to_text()),
+            Expression::List(elements) => Value::list(
+                elements
+                    .iter()
+                    .map(|element| self.evaluate(element, frame))
+                    .collect::<Result<_, _>>()?,
+            ),
+            Expression::Index { list, index } => {
+                let list = self.evaluate(list, frame)?;
+                element(list_elements(&list)?, &self.evaluate(index, frame)?)?
+            }
+            Expression::Coalesce(value, fallback) => match self.evaluate(value, frame)? {
+                Value::Null => self.evaluate(fallback, frame)?,
+                value => value,
+            },
+            Expression::Builtin {
+                method,
+                receiver,
+                argument,
+                null_safe,
+            } => {
+                let receiver = self.evaluate(receiver, frame)?;
+                if *null_safe && matches!(receiver, Value::Null) {
+                    return Ok(Value::Null);
+                }
+                let argument = match argument {
+                    Some(argument) => Some(self.evaluate(argument, frame)?),
+                    None => None,
+                };
+                builtins::call(*method, &receiver, argument)?
+            }
         })
     }
 }
@@ -206,6 +285,33 @@ fn leave_loop(flow: Flow) -> Option<Flow> {
         Flow::Break => Some(Flow::Next),
         Flow::Return(_) => Some(flow),
     }
+}
+
+/// The elements of a list value.
+fn list_elements(value: &Value) -> Result<&Elements, RunError> {
+    match value {
+        Value::List(elements) => Ok(elements),
+        _ => Err(RunError::Internal("index of something that is not a list")),
+    }
+}
+
+/// The position `index` names in a list of `length` elements; outside the
+/// list it is the same runtime error as in the compiled game.
+fn position(index: &Value, length: usize) -> Result<usize, RunError> {
+    match index {
+        Value::Int(index) => Ok(try_index(*index, length)?),
+        _ => Err(RunError::Internal("index that is not an `int`")),
+    }
+}
+
+/// `list[index]`.
+fn element(elements: &Elements, index: &Value) -> Result<Value, RunError> {
+    let elements = read(elements)?;
+    let position = position(index, elements.len())?;
+    elements
+        .get(position)
+        .cloned()
+        .ok_or(RunError::Internal("checked index out of range"))
 }
 
 /// Puts `value` in the local `slot`.

@@ -427,7 +427,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       building the project compiles it. Done part by part; each part comes
       with conformance tests that run the same programs compiled and
       interpreted and expect the same output.
-  - [ ] 14.1 The crate `star_script_interpreter` and the conformance
+  - [x] 14.1 The crate `star_script_interpreter` and the conformance
         harness. Its console part only needs `star_script`; games (14.6)
         also need the engine classes of f1, and its place among the layers
         is settled then, in `CLAUDE.md`. First: values (`short`,
@@ -474,17 +474,24 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           Methods of objects are not lowered (nothing can create an
           object yet), and fields, constants, lists, `null` and the other
           methods are refused where the program uses them.
-    - [ ] 14.1b Lists, `null`, `??`, constants and the methods that
+    - [x] 14.1b Lists, `null`, `??`, constants and the methods that
           `basics.star` uses: `basics`, `division_fault` and
           `index_fault` give the same output interpreted and compiled
-          (the other methods stay in 14.3).
+          (the other methods stay in 14.3). Done, with every method of
+          numbers, strings and lists (they were small, so 14.3 keeps
+          only decorators and `Time.now`): lists are shared as compiled,
+          a nullable value is the value or `null` (nothing wraps it),
+          `?.` on basic types and lists, constants are functions that
+          compute their value each time, as compiled. The runtime's
+          index check got `try_index`, so both stop with the same
+          message.
   - [ ] 14.2 Classes: fields, methods, constructors and `init`,
         inheritance and `override`, static members, null safety, number
         widening and `as`, equality, and the runtime errors of
         `star_script_runtime::fault` with the same messages.
-  - [ ] 14.3 The rest of the console language: methods of strings, lists
-        and numbers, constants, decorators (the user's `Decorator`
-        classes) and `Time.now`.
+  - [ ] 14.3 The rest of the console language: decorators (the user's
+        `Decorator` classes) and `Time.now` (the methods of strings,
+        lists and numbers, and constants, came in 14.1b).
   - [ ] 14.4 Coroutines: `async`/`await`, `Time.wait` and
         `Time.next_frame`, run once per frame, and ending with their node.
   - [ ] 14.5 Parallel functions: `parallel static func` on threads, with

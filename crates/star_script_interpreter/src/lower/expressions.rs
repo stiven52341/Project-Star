@@ -1,8 +1,9 @@
 //! Expressions, with the conversions between number types written out.
 
-use star_script::ast::{BinaryOperator, Expr, ExprKind, Literal, UnaryOperator};
+use star_script::ast::{BinaryOperator, Expr, ExprKind, Literal, Name, UnaryOperator};
 use star_script::semantic::{BuiltinMethod, ClassId, ClassOrigin, Resolution, Type};
 
+use super::Member;
 use super::body::Body;
 use crate::error::LowerError;
 use crate::tree::{Arithmetic, Comparison, Expression, NumberType};
@@ -36,12 +37,14 @@ impl Body<'_> {
             } => self.binary(expression, *operator, left, right),
             ExprKind::Cast { value, .. } => self.cast(expression, value),
             ExprKind::Call { callee, arguments } => self.call(callee, arguments),
+            ExprKind::Member { object, name, .. } => self.member(expression, object, name),
+            ExprKind::Index { object, index } => Ok(Expression::Index {
+                list: Box::new(self.expression(object)?),
+                index: Box::new(self.expression(index)?),
+            }),
+            ExprKind::Array(elements) => self.array(expression, elements),
             ExprKind::SelfValue | ExprKind::Super => Err(LowerError::unsupported("objects", span)),
             ExprKind::TypeTest { .. } => Err(LowerError::unsupported("`is`", span)),
-            ExprKind::Member { .. } => Err(LowerError::unsupported("fields and constants", span)),
-            ExprKind::Index { .. } | ExprKind::Array(_) => {
-                Err(LowerError::unsupported("lists", span))
-            }
             ExprKind::Await(_) => Err(LowerError::unsupported("`await`", span)),
         }
     }
@@ -49,17 +52,7 @@ impl Body<'_> {
     /// `expression` converted to `ty`, where analysis allows that.
     pub(super) fn value_as(&self, expression: &Expr, ty: &Type) -> Result<Expression, LowerError> {
         let value = self.expression(expression)?;
-        let found = self.type_of(expression)?;
-        if found == ty {
-            return Ok(value);
-        }
-        if found.widens_to(ty) {
-            return convert(value, ty, expression);
-        }
-        Err(LowerError::unsupported(
-            "`null` and nullable types",
-            expression.span,
-        ))
+        coerce(value, self.type_of(expression)?, ty, expression)
     }
 
     /// Both sides of an operator, numbers converted to the type they meet
@@ -87,7 +80,8 @@ impl Body<'_> {
             .ok_or_else(|| LowerError::internal("expression without analysis", expression.span))
     }
 
-    fn type_of(&self, expression: &Expr) -> Result<&Type, LowerError> {
+    /// The type analysis gave `expression`.
+    pub(super) fn type_of(&self, expression: &Expr) -> Result<&Type, LowerError> {
         self.analysis
             .type_of(expression)
             .ok_or_else(|| LowerError::internal("expression without a type", expression.span))
@@ -96,25 +90,64 @@ impl Body<'_> {
     fn name(&self, expression: &Expr) -> Result<Expression, LowerError> {
         match self.resolution(expression)? {
             Some(Resolution::Local(local)) => {
-                if self.local_type(local, expression)? != self.type_of(expression)? {
-                    return Err(LowerError::unsupported(
-                        "narrowed types (`null` checks and `is`)",
-                        expression.span,
-                    ));
+                // Read where a check proved it is not `null`: a nullable
+                // value that is not `null` is already the value itself.
+                let declared = self.local_type(local, expression)?;
+                let known = self.type_of(expression)?;
+                if declared != known && declared.non_null() != *known {
+                    return Err(LowerError::unsupported("`is`", expression.span));
                 }
                 Ok(Expression::Local(self.slot(local, expression)?))
             }
+            Some(Resolution::Constant { class, index }) => self.constant(class, index, expression),
             Some(Resolution::Field { .. }) => {
                 Err(LowerError::unsupported("fields", expression.span))
-            }
-            Some(Resolution::Constant { .. }) => {
-                Err(LowerError::unsupported("constants", expression.span))
             }
             _ => Err(LowerError::internal(
                 "name that is not a value",
                 expression.span,
             )),
         }
+    }
+
+    /// `object.name`: only constants, through their class, for now.
+    fn member(
+        &self,
+        expression: &Expr,
+        object: &Expr,
+        name: &Name,
+    ) -> Result<Expression, LowerError> {
+        match self.resolution(expression)? {
+            Some(Resolution::Constant { class, index }) => {
+                if !matches!(self.resolution(object)?, Some(Resolution::Class(_))) {
+                    return Err(LowerError::unsupported("objects", object.span));
+                }
+                self.constant(class, index, expression)
+            }
+            Some(Resolution::Field { .. }) => Err(LowerError::unsupported("fields", name.span)),
+            _ => Err(LowerError::internal(
+                "member that is not a value",
+                name.span,
+            )),
+        }
+    }
+
+    /// The value of a constant: a call of the function that computes it.
+    fn constant(
+        &self,
+        class: ClassId,
+        index: usize,
+        expression: &Expr,
+    ) -> Result<Expression, LowerError> {
+        let function = self
+            .functions
+            .get(&Member::Constant(class, index))
+            .copied()
+            .ok_or_else(|| LowerError::internal("constant without a function", expression.span))?;
+        Ok(Expression::Call {
+            function,
+            arguments: Vec::new(),
+        })
     }
 
     fn binary(
@@ -135,6 +168,12 @@ impl Body<'_> {
             }
             BinaryOperator::Equal | BinaryOperator::NotEqual => {
                 self.equality_operands(left, right)?
+            }
+            BinaryOperator::Coalesce => {
+                // The value is already of the result's type, or the type
+                // without `null`; the fallback is converted to it.
+                let result = self.type_of(expression)?;
+                (self.expression(left)?, self.value_as(right, result)?)
             }
             _ => self.common_operands(left, right)?,
         };
@@ -174,12 +213,27 @@ impl Body<'_> {
         convert(lowered, target, expression)
     }
 
+    /// `[a, b, c]`, each element converted to the list's element type.
+    fn array(&self, expression: &Expr, elements: &[Expr]) -> Result<Expression, LowerError> {
+        let Type::List(element) = self.type_of(expression)? else {
+            return Err(LowerError::internal(
+                "list without a list type",
+                expression.span,
+            ));
+        };
+        let elements = elements
+            .iter()
+            .map(|item| self.value_as(item, element))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Expression::List(elements))
+    }
+
     fn call(&self, callee: &Expr, arguments: &[Expr]) -> Result<Expression, LowerError> {
         match self.resolution(callee)? {
             Some(Resolution::Method { class, index }) => {
                 self.method_call(callee, class, index, arguments)
             }
-            Some(Resolution::Builtin(method)) => self.builtin_call(callee, method),
+            Some(Resolution::Builtin(method)) => self.builtin_call(callee, method, arguments),
             Some(Resolution::Constructor(_)) => {
                 Err(LowerError::unsupported("objects", callee.span))
             }
@@ -209,16 +263,13 @@ impl Body<'_> {
             .map(|(parameter, argument)| self.value_as(argument, &parameter.ty))
             .collect::<Result<Vec<_>, _>>()?;
         if info.origin == ClassOrigin::Native {
-            return match (
-                info.name.as_str(),
-                method.name.as_str(),
-                arguments.as_slice(),
-            ) {
-                (DEBUG_CLASS, "print", [_]) => Ok(Expression::Print(Box::new(
-                    arguments.into_iter().next().ok_or_else(|| {
+            return match (info.name.as_str(), method.name.as_str()) {
+                (DEBUG_CLASS, "print") => {
+                    let message = arguments.into_iter().next().ok_or_else(|| {
                         LowerError::internal("`print` without a message", callee.span)
-                    })?,
-                ))),
+                    })?;
+                    Ok(Expression::Print(Box::new(message)))
+                }
                 _ => Err(LowerError::unsupported(
                     "this method of the engine",
                     callee.span,
@@ -227,7 +278,7 @@ impl Body<'_> {
         }
         let function = self
             .functions
-            .get(&(class, index))
+            .get(&Member::Method(class, index))
             .copied()
             .ok_or_else(|| LowerError::internal("method without a function", callee.span))?;
         Ok(Expression::Call {
@@ -236,7 +287,14 @@ impl Body<'_> {
         })
     }
 
-    fn builtin_call(&self, callee: &Expr, method: BuiltinMethod) -> Result<Expression, LowerError> {
+    /// A method of a basic type or list, its argument converted to the
+    /// type the method takes.
+    fn builtin_call(
+        &self,
+        callee: &Expr,
+        method: BuiltinMethod,
+        arguments: &[Expr],
+    ) -> Result<Expression, LowerError> {
         let ExprKind::Member {
             object, null_safe, ..
         } = &callee.kind
@@ -246,21 +304,24 @@ impl Body<'_> {
                 callee.span,
             ));
         };
-        if *null_safe {
-            return Err(LowerError::unsupported("`?.`", callee.span));
-        }
-        match method {
-            BuiltinMethod::ToString => Ok(Expression::ToText(Box::new(self.expression(object)?))),
-            _ => Err(LowerError::unsupported(
-                "this method of basic types",
-                callee.span,
-            )),
-        }
+        let receiver_type = self.type_of(object)?.non_null();
+        let argument = match (arguments.first(), builtin_parameter(method, &receiver_type)) {
+            (Some(argument), Some(parameter)) => {
+                Some(Box::new(self.value_as(argument, &parameter)?))
+            }
+            _ => None,
+        };
+        Ok(Expression::Builtin {
+            method,
+            receiver: Box::new(self.expression(object)?),
+            argument,
+            null_safe: *null_safe,
+        })
     }
 }
 
 /// `left operator right`, both already of the operation's type.
-pub(super) fn operation(
+fn operation(
     operator: BinaryOperator,
     left: Expression,
     right: Expression,
@@ -281,9 +342,7 @@ pub(super) fn operation(
         BinaryOperator::NotEqual => Expression::Not(Box::new(Expression::Equal(left, right))),
         BinaryOperator::And => Expression::And(left, right),
         BinaryOperator::Or => Expression::Or(left, right),
-        BinaryOperator::Coalesce => {
-            return Err(LowerError::unsupported("`??`", expression.span));
-        }
+        BinaryOperator::Coalesce => Expression::Coalesce(left, right),
         BinaryOperator::Range => {
             return Err(LowerError::internal("range outside `for`", expression.span));
         }
@@ -303,6 +362,28 @@ fn compare(operator: Comparison, left: Box<Expression>, right: Box<Expression>) 
         operator,
         left,
         right,
+    }
+}
+
+/// `value`, of type `from`, as a value of type `to`. Analysis already
+/// checked that it can be; only conversions between number types change
+/// the value, since a nullable value is the value itself or `null`.
+fn coerce(
+    value: Expression,
+    from: &Type,
+    to: &Type,
+    expression: &Expr,
+) -> Result<Expression, LowerError> {
+    match (from, to) {
+        _ if from == to => Ok(value),
+        (Type::Null, Type::Nullable(_)) => Ok(value),
+        (Type::Nullable(from), Type::Nullable(to)) => coerce(value, from, to, expression),
+        (from, Type::Nullable(to)) => coerce(value, from, to, expression),
+        (from, to) if from.widens_to(to) => convert(value, to, expression),
+        _ => Err(LowerError::internal(
+            "conversion between unrelated types",
+            expression.span,
+        )),
     }
 }
 
@@ -329,13 +410,25 @@ const fn number_type(ty: &Type) -> Option<NumberType> {
     }
 }
 
+/// The type of the argument of a builtin method, if it takes one.
+fn builtin_parameter(method: BuiltinMethod, receiver: &Type) -> Option<Type> {
+    match (method, receiver) {
+        (BuiltinMethod::Min | BuiltinMethod::Max, _) => Some(receiver.clone()),
+        (BuiltinMethod::Contains | BuiltinMethod::Push, Type::List(element)) => {
+            Some((**element).clone())
+        }
+        (BuiltinMethod::Contains, Type::String) => Some(Type::String),
+        _ => None,
+    }
+}
+
 /// The value of a literal of type `ty`. Integers written where a decimal is
 /// needed become one; integers of a smaller type keep their lowest bits,
 /// so `-32768` negates `32768` as a `short` to the same value the compiled
 /// game writes whole.
 #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 fn literal_value(literal: &Literal, ty: &Type, expression: &Expr) -> Result<Value, LowerError> {
-    Ok(match (literal, ty) {
+    Ok(match (literal, ty.non_null()) {
         (Literal::Integer(value), Type::Short) => Value::Short(*value as i16),
         (Literal::Integer(value), Type::Int) => Value::Int(*value as i32),
         (Literal::Integer(value), Type::BigInt) => Value::BigInt(*value),
@@ -345,9 +438,7 @@ fn literal_value(literal: &Literal, ty: &Type, expression: &Expr) -> Result<Valu
         (Literal::Float(value), Type::Double) => Value::Double(*value),
         (Literal::String(text), _) => Value::text(text),
         (Literal::Bool(value), _) => Value::Bool(*value),
-        (Literal::Null, _) => {
-            return Err(LowerError::unsupported("`null`", expression.span));
-        }
+        (Literal::Null, _) => Value::Null,
         _ => {
             return Err(LowerError::internal(
                 "literal of an unexpected type",

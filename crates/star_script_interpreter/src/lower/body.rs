@@ -9,9 +9,8 @@ use star_script::ast::{
 use star_script::semantic::{Analysis, LocalId, Resolution, Type};
 
 use super::FunctionTable;
-use super::expressions::operation;
 use crate::error::LowerError;
-use crate::tree::{Expression, Function, Statement};
+use crate::tree::{Arithmetic, Expression, Function, Statement};
 use crate::value::Value;
 
 /// Lowers the body of one function.
@@ -134,9 +133,8 @@ impl<'a> Body<'a> {
         // Its value is lowered before the local exists: it cannot read it.
         let value = match &variable.initializer {
             Some(value) => self.value_as(value, &local.ty)?,
-            None => Expression::Constant(default_value(&local.ty).ok_or_else(|| {
-                LowerError::unsupported("variables of this type without a value", span)
-            })?),
+            None => default_value(&local.ty)
+                .ok_or_else(|| LowerError::internal("type without a default value", span))?,
         };
         let slot = self.declare(&variable.name)?;
         Ok(Statement::Store { slot, value })
@@ -148,18 +146,27 @@ impl<'a> Body<'a> {
         operator: AssignOperator,
         value: &Expr,
     ) -> Result<Statement, LowerError> {
+        if let ExprKind::Index { object, index } = &target.kind {
+            return Ok(Statement::SetElement {
+                list: self.expression(object)?,
+                index: self.expression(index)?,
+                operator: compound_operator(operator),
+                value: self.value_as(value, self.type_of(target)?)?,
+            });
+        }
         let Some(Resolution::Local(local)) = self.resolution(target)? else {
-            return Err(LowerError::unsupported(
-                "assignments to fields and list elements",
-                target.span,
-            ));
+            return Err(LowerError::unsupported("fields", target.span));
         };
         let slot = self.slot(local, target)?;
         let ty = self.local_type(local, target)?.clone();
         let value = self.value_as(value, &ty)?;
         let value = match compound_operator(operator) {
             None => value,
-            Some(operator) => operation(operator, Expression::Local(slot), value, target)?,
+            Some(operator) => Expression::Arithmetic {
+                operator,
+                left: Box::new(Expression::Local(slot)),
+                right: Box::new(value),
+            },
         };
         Ok(Statement::Store { slot, value })
     }
@@ -189,7 +196,13 @@ impl<'a> Body<'a> {
             right,
         } = &iterable.kind
         else {
-            return Err(LowerError::unsupported("`for` over a list", iterable.span));
+            let list = self.expression(iterable)?;
+            let slot = self.declare(variable)?;
+            return Ok(Statement::ForEach {
+                slot,
+                list,
+                body: self.block(body)?,
+            });
         };
         let (start, end) = self.common_operands(left, right)?;
         let slot = self.declare(variable)?;
@@ -202,9 +215,10 @@ impl<'a> Body<'a> {
     }
 }
 
-/// The value a variable of `ty` starts with when none is given.
-fn default_value(ty: &Type) -> Option<Value> {
-    Some(match ty {
+/// The value a variable of `ty` starts with when none is given: an
+/// expression, so each run of the declaration gets a list of its own.
+fn default_value(ty: &Type) -> Option<Expression> {
+    let value = match ty {
         Type::Short => Value::Short(0),
         Type::Int => Value::Int(0),
         Type::BigInt => Value::BigInt(0),
@@ -212,18 +226,21 @@ fn default_value(ty: &Type) -> Option<Value> {
         Type::Double => Value::Double(0.0),
         Type::Bool => Value::Bool(false),
         Type::String => Value::text(""),
+        Type::Nullable(_) => Value::Null,
+        Type::List(_) => return Some(Expression::List(Vec::new())),
         _ => return None,
-    })
+    };
+    Some(Expression::Constant(value))
 }
 
 /// The operator of `a op= b`, or `None` for plain `=`.
-const fn compound_operator(operator: AssignOperator) -> Option<BinaryOperator> {
+const fn compound_operator(operator: AssignOperator) -> Option<Arithmetic> {
     match operator {
         AssignOperator::Assign => None,
-        AssignOperator::Add => Some(BinaryOperator::Add),
-        AssignOperator::Subtract => Some(BinaryOperator::Subtract),
-        AssignOperator::Multiply => Some(BinaryOperator::Multiply),
-        AssignOperator::Divide => Some(BinaryOperator::Divide),
-        AssignOperator::Remainder => Some(BinaryOperator::Remainder),
+        AssignOperator::Add => Some(Arithmetic::Add),
+        AssignOperator::Subtract => Some(Arithmetic::Subtract),
+        AssignOperator::Multiply => Some(Arithmetic::Multiply),
+        AssignOperator::Divide => Some(Arithmetic::Divide),
+        AssignOperator::Remainder => Some(Arithmetic::Remainder),
     }
 }

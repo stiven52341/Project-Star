@@ -128,9 +128,12 @@ pub(super) fn negate(value: &Value) -> Result<Value, RunError> {
 }
 
 /// `value` as the number type `to`, as Rust's `as` converts it: integers
-/// keep their lowest bits, decimals lose their fraction and saturate.
+/// keep their lowest bits, decimals lose their fraction and saturate;
+/// `null` stays `null`.
 pub(super) fn convert(value: &Value, to: NumberType) -> Result<Value, RunError> {
     Ok(match value {
+        // A nullable number read as a wider nullable one.
+        Value::Null => Value::Null,
         Value::Short(value) => convert_number!(*value, to),
         Value::Int(value) => convert_number!(*value, to),
         Value::BigInt(value) => convert_number!(*value, to),

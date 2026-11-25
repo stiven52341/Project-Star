@@ -7,22 +7,37 @@ mod expressions;
 use std::collections::HashMap;
 
 use star_script::Span;
-use star_script::ast::{ClassDecl, MemberKind, MethodDecl, SourceFile};
+use star_script::ast::{ClassDecl, Expr, MemberKind, MethodDecl, SourceFile, VariableKind};
 use star_script::semantic::{Analysis, ClassId, ClassOrigin, Execution, MethodInfo, Type};
 
 use crate::Program;
 use crate::error::{LowerError, LowerErrorKind};
-use crate::tree::{Function, FunctionId};
+use crate::tree::{Function, FunctionId, Statement};
 use body::Body;
 
-/// Where each method of the program went: `(class, index of the method)`
-/// to its function.
-type FunctionTable = HashMap<(ClassId, usize), FunctionId>;
+/// A member of a class that lowering turns into a function.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Member {
+    /// The method at this index of the class's methods.
+    Method(ClassId, usize),
+    /// The constant at this index of the class's constants: a function
+    /// without parameters that computes its value, as compiled.
+    Constant(ClassId, usize),
+}
 
-/// A method of the program, before its body is lowered.
-struct Pending<'a> {
-    declaration: &'a MethodDecl,
-    info: &'a MethodInfo,
+/// The function each member of the program became.
+type FunctionTable = HashMap<Member, FunctionId>;
+
+/// A member of the program, before its code is lowered.
+enum Pending<'a> {
+    Method {
+        declaration: &'a MethodDecl,
+        info: &'a MethodInfo,
+    },
+    Constant {
+        value: &'a Expr,
+        ty: &'a Type,
+    },
 }
 
 /// Lowers the whole program.
@@ -58,10 +73,18 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Progra
                 }
                 main = Some(function);
             }
-            table.insert((id, index), function);
-            pending.push(Pending {
+            table.insert(Member::Method(id, index), function);
+            pending.push(Pending::Method {
                 declaration: method,
                 info,
+            });
+        }
+        for (index, constant) in class.constants.iter().enumerate() {
+            let value = constant_value(declaration, constant.span)?;
+            table.insert(Member::Constant(id, index), FunctionId(pending.len()));
+            pending.push(Pending::Constant {
+                value,
+                ty: &constant.ty,
             });
         }
     }
@@ -69,9 +92,17 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Progra
         main.ok_or_else(|| LowerError::new(LowerErrorKind::NoEntryPoint, Span::new(0, 0)))?;
     let functions = pending
         .iter()
-        .map(|method| {
-            Body::new(analysis, &table, method.info.return_type.clone())
-                .function(method.declaration)
+        .map(|member| match member {
+            Pending::Method { declaration, info } => {
+                Body::new(analysis, &table, info.return_type.clone()).function(declaration)
+            }
+            Pending::Constant { value, ty } => {
+                let value = Body::new(analysis, &table, (*ty).clone()).value_as(value, ty)?;
+                Ok(Function {
+                    slots: 0,
+                    body: vec![Statement::Return(Some(value))],
+                })
+            }
         })
         .collect::<Result<Vec<Function>, LowerError>>()?;
     Ok(Program { functions, main })
@@ -99,6 +130,22 @@ fn method_declaration<'a>(
             _ => None,
         })
         .ok_or_else(|| LowerError::internal("method without declaration", declaration.name.span))
+}
+
+/// The value of the constant whose name is written at `name`.
+fn constant_value(declaration: &ClassDecl, name: Span) -> Result<&Expr, LowerError> {
+    declaration
+        .members
+        .iter()
+        .find_map(|member| match &member.kind {
+            MemberKind::Variable(variable)
+                if variable.kind == VariableKind::Const && variable.name.span == name =>
+            {
+                variable.initializer.as_ref()
+            }
+            _ => None,
+        })
+        .ok_or_else(|| LowerError::internal("constant without value", name))
 }
 
 /// `static func main()`, with no parameters and no result.

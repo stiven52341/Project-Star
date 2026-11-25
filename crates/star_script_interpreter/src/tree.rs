@@ -2,13 +2,15 @@
 //! running walks. Names are resolved, and conversions are written out, so
 //! the two operands of an operation always hold values of the same type.
 
+use star_script::semantic::BuiltinMethod;
+
 use crate::value::Value;
 
 /// Position of a function in the program.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionId(pub(crate) usize);
 
-/// A static function.
+/// A static function, or the value of a constant.
 #[derive(Debug)]
 pub(crate) struct Function {
     /// How many locals it has: its parameters first, in order.
@@ -24,6 +26,15 @@ pub(crate) enum Statement {
     Store { slot: usize, value: Expression },
     /// Evaluates an expression for its effects, such as a call.
     Evaluate(Expression),
+    /// `list[index] = value`, or `list[index] op= value` with the
+    /// operator: the list, the index, the element (for `op=`) and then the
+    /// value are evaluated, in that order.
+    SetElement {
+        list: Expression,
+        index: Expression,
+        operator: Option<Arithmetic>,
+        value: Expression,
+    },
     /// `if`; `else if` is an `if` alone in the else branch.
     If {
         condition: Expression,
@@ -43,6 +54,13 @@ pub(crate) enum Statement {
         end: Expression,
         body: Vec<Statement>,
     },
+    /// `for slot in list`: goes through the elements the list has when
+    /// the loop starts.
+    ForEach {
+        slot: usize,
+        list: Expression,
+        body: Vec<Statement>,
+    },
     /// `return`, with its value already converted to the function's type.
     Return(Option<Expression>),
     /// `break`.
@@ -58,7 +76,8 @@ pub(crate) enum Expression {
     Constant(Value),
     /// The value of a local.
     Local(usize),
-    /// A number converted to another number type, as Rust's `as` does.
+    /// A number converted to another number type, as Rust's `as` does;
+    /// `null` stays `null` (an `int?` read as a `bigint?`).
     Convert {
         value: Box<Expression>,
         to: NumberType,
@@ -93,8 +112,24 @@ pub(crate) enum Expression {
     },
     /// `Debug.print(text)`.
     Print(Box<Expression>),
-    /// `value.to_string()`.
-    ToText(Box<Expression>),
+    /// `[a, b, c]`: a new list.
+    List(Vec<Expression>),
+    /// `list[index]`.
+    Index {
+        list: Box<Expression>,
+        index: Box<Expression>,
+    },
+    /// `value ?? fallback`: the fallback only runs if the value is `null`.
+    Coalesce(Box<Expression>, Box<Expression>),
+    /// A method of a basic type or list, such as `abs()` or `push(value)`;
+    /// with `?.`, a `null` receiver gives `null` and the argument does not
+    /// run.
+    Builtin {
+        method: BuiltinMethod,
+        receiver: Box<Expression>,
+        argument: Option<Box<Expression>>,
+        null_safe: bool,
+    },
 }
 
 /// The number types of StarScript.

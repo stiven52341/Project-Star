@@ -1,9 +1,19 @@
 //! The values a running program works with.
 
+use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
+use crate::error::RunError;
+
+/// The elements of a list, shared by every value that refers to it.
+pub(crate) type Elements = Rc<RefCell<Vec<Value>>>;
+
 /// A value of StarScript while the interpreter runs.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// A value of a nullable type (`int?`) is the value itself or
+/// [`Value::Null`]: nothing wraps it.
+#[derive(Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 pub(crate) enum Value {
     /// `null`; also what a function without a result gives, and what a
     /// local holds before its declaration runs.
@@ -22,6 +32,9 @@ pub(crate) enum Value {
     Bool(bool),
     /// `string`. Texts never change, so copies share them.
     String(Rc<str>),
+    /// `[T]`: shared, as in the compiled game, so after `var a = b` a
+    /// `push` through `a` is seen through `b`.
+    List(Elements),
 }
 
 impl Value {
@@ -30,12 +43,17 @@ impl Value {
         Self::String(Rc::from(text))
     }
 
-    /// `self == other` in StarScript: values by content. Lowering converts
-    /// both sides to one type first, so values of different types are
-    /// never compared.
+    /// A new list with these elements.
+    pub(crate) fn list(elements: Vec<Self>) -> Self {
+        Self::List(Rc::new(RefCell::new(elements)))
+    }
+
+    /// `self == other` in StarScript: values by content, lists by their
+    /// elements in order. Lowering converts both sides to one type first,
+    /// so values of different types only meet `null`.
     #[allow(clippy::float_cmp)] // StarScript's `==` is exact, like Rust's.
-    pub(crate) fn star_eq(&self, other: &Self) -> bool {
-        match (self, other) {
+    pub(crate) fn star_eq(&self, other: &Self) -> Result<bool, RunError> {
+        Ok(match (self, other) {
             (Self::Null, Self::Null) => true,
             (Self::Short(left), Self::Short(right)) => left == right,
             (Self::Int(left), Self::Int(right)) => left == right,
@@ -44,42 +62,89 @@ impl Value {
             (Self::Double(left), Self::Double(right)) => left == right,
             (Self::Bool(left), Self::Bool(right)) => left == right,
             (Self::String(left), Self::String(right)) => left == right,
+            (Self::List(left), Self::List(right)) => {
+                if Rc::ptr_eq(left, right) {
+                    return Ok(true);
+                }
+                let (left, right) = (read(left)?, read(right)?);
+                if left.len() != right.len() {
+                    return Ok(false);
+                }
+                for (left, right) in left.iter().zip(right.iter()) {
+                    if !left.star_eq(right)? {
+                        return Ok(false);
+                    }
+                }
+                true
+            }
             _ => false,
-        }
+        })
     }
 
     /// `self.to_string()`, written as the generated Rust writes it.
-    pub(crate) fn to_text(&self) -> Rc<str> {
-        match self {
+    pub(crate) fn to_text(&self) -> Result<Rc<str>, RunError> {
+        Ok(match self {
             Self::String(text) => Rc::clone(text),
-            Self::Null => Rc::from("null"),
             Self::Short(value) => Rc::from(value.to_string()),
             Self::Int(value) => Rc::from(value.to_string()),
             Self::BigInt(value) => Rc::from(value.to_string()),
             Self::Float(value) => Rc::from(star_script_runtime::float_to_string(value)),
             Self::Double(value) => Rc::from(star_script_runtime::float_to_string(value)),
             Self::Bool(value) => Rc::from(value.to_string()),
-        }
+            Self::Null | Self::List(_) => {
+                return Err(RunError::Internal("`to_string` of a value without text"));
+            }
+        })
     }
+}
+
+/// The elements of a list, to read them. The interpreter never runs
+/// StarScript code while it holds them, so this cannot fail unless the
+/// interpreter itself is wrong.
+pub(crate) fn read(elements: &Elements) -> Result<Ref<'_, Vec<Value>>, RunError> {
+    elements
+        .try_borrow()
+        .map_err(|_| RunError::Internal("overlapping list access"))
+}
+
+/// The elements of a list, to change them (see [`read`]).
+pub(crate) fn write(elements: &Elements) -> Result<RefMut<'_, Vec<Value>>, RunError> {
+    elements
+        .try_borrow_mut()
+        .map_err(|_| RunError::Internal("overlapping list access"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn equal(left: &Value, right: &Value) -> bool {
+        left.star_eq(right).expect("comparable values")
+    }
+
     #[test]
     fn values_compare_by_content() {
-        assert!(Value::text("a").star_eq(&Value::text("a")));
-        assert!(!Value::Int(1).star_eq(&Value::Int(2)));
-        assert!(!Value::Double(f64::NAN).star_eq(&Value::Double(f64::NAN)));
-        assert!(Value::Null.star_eq(&Value::Null));
+        assert!(equal(&Value::text("a"), &Value::text("a")));
+        assert!(!equal(&Value::Int(1), &Value::Int(2)));
+        assert!(!equal(&Value::Double(f64::NAN), &Value::Double(f64::NAN)));
+        assert!(equal(&Value::Null, &Value::Null));
+        assert!(!equal(&Value::Int(0), &Value::Null));
+    }
+
+    #[test]
+    fn lists_compare_by_elements() {
+        let list = Value::list(vec![Value::Int(1), Value::Null]);
+        assert!(equal(&list, &list.clone()));
+        assert!(equal(&list, &Value::list(vec![Value::Int(1), Value::Null])));
+        assert!(!equal(&list, &Value::list(vec![Value::Int(1)])));
     }
 
     #[test]
     fn numbers_read_as_the_compiled_ones() {
-        assert_eq!(&*Value::Float(2.0).to_text(), "2.0");
-        assert_eq!(&*Value::Double(0.1 + 0.2).to_text(), "0.30000000000000004");
-        assert_eq!(&*Value::Short(-3).to_text(), "-3");
-        assert_eq!(&*Value::Bool(true).to_text(), "true");
+        let text = |value: Value| value.to_text().expect("a value with text");
+        assert_eq!(&*text(Value::Float(2.0)), "2.0");
+        assert_eq!(&*text(Value::Double(0.1 + 0.2)), "0.30000000000000004");
+        assert_eq!(&*text(Value::Short(-3)), "-3");
+        assert_eq!(&*text(Value::Bool(true)), "true");
     }
 }
