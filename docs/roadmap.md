@@ -434,6 +434,42 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `int`, `bigint`, `float`, `double`, `bool`, `string`, lists,
         objects, `null`), console programs (`static func main`,
         `Debug.print`), expressions, statements and control flow.
+        Design proposed to the owner (awaiting approval):
+        - No external dependencies: `star_script` (lexer, parser,
+          analysis) and `star_script_runtime` (the shared rules, such as
+          integer division or the text of numbers).
+        - Two stages. *Lowering* turns the syntax tree and its `Analysis`
+          into the interpreter's own resolved tree: locals are numbered
+          slots, every operation knows its type (`int + int` wrapping
+          around), conversions such as `short` to `int` are explicit and
+          calls point at their function, so running needs no table
+          lookups or type decisions. *Running* walks that tree with
+          values: `Null`, `Short`, `Int`, `BigInt`, `Float`, `Double`,
+          `Bool`, `String` (`Rc<str>`), `List` (shared, as compiled) and,
+          from 14.2, objects.
+        - Runtime errors without panics: the interpreter returns a
+          `Result`. The checks of `star_script_runtime` (division by
+          zero, index out of range) become functions that return a
+          `Result`, which generated code still turns into a `fault`, so
+          both give the same messages.
+        - `Debug.print` writes to a `Write` given to the interpreter: the
+          console in the player, a buffer in tests.
+        - Conformance: the interpreter runs the programs of
+          `star_script/tests/programs` (compiled by its end-to-end test)
+          and expects the same `.out` and `.fault`, from a list of the
+          programs it covers that every step grows. What it cannot run
+          yet is reported when the program is lowered, not halfway
+          through running it.
+    - [ ] 14.1a The crate, values and console programs with static
+          functions: `main` and calls between static functions,
+          literals, variables, arithmetic of the five number types, `as`
+          between numbers, comparisons and logic, `if`, `while`, `for`
+          over a range, `break`, `continue`, `return`, `Debug.print` and
+          `to_string`; with a new conformance program.
+    - [ ] 14.1b Lists, `null`, `??`, constants and the methods that
+          `basics.star` uses: `basics`, `division_fault` and
+          `index_fault` give the same output interpreted and compiled
+          (the other methods stay in 14.3).
   - [ ] 14.2 Classes: fields, methods, constructors and `init`,
         inheritance and `override`, static members, null safety, number
         widening and `as`, equality, and the runtime errors of
