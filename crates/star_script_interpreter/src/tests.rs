@@ -61,10 +61,21 @@ fn programs_need_one_main() {
 
 #[test]
 fn what_cannot_run_yet_is_refused_before_running() {
-    let node = "class Player extends Node {\n init() {\n super.init(\"player\")\n }\n}\nclass Main {\n static func main() {\n }\n}\n";
+    let sprite = "class Player extends Sprite {\n init() {\n super.init(\"player\", \"hero.png\")\n }\n}\nclass Main {\n static func main() {\n }\n}\n";
     assert_eq!(
-        lowering_error(node),
-        LowerErrorKind::Unsupported("classes that extend engine classes")
+        lowering_error(sprite),
+        LowerErrorKind::Unsupported("classes that extend this engine class")
+    );
+    let method =
+        "class Main {\n static func main() {\n Node(\"a\").add_child(Node(\"b\"))\n }\n}\n";
+    assert_eq!(
+        lowering_error(method),
+        LowerErrorKind::Unsupported("this method of the engine")
+    );
+    let tags = "class Main {\n static func main() {\n Debug.print(Node(\"a\").tags.length().to_string())\n }\n}\n";
+    assert_eq!(
+        lowering_error(tags),
+        LowerErrorKind::Unsupported("this field of the engine")
     );
 }
 
@@ -217,5 +228,15 @@ fn parallel_functions_fail_through_the_functions_they_call() {
         error.message().contains("out of range"),
         "{}",
         error.message()
+    );
+}
+
+#[test]
+fn engine_objects_keep_their_fields_and_classes() {
+    let source = "class Eye extends Camera2D {\n var seen = 0\n init(name: string) {\n super.init(name)\n main = true\n }\n                   override func update(delta: float) {\n seen += 1\n x += delta\n }\n}\n\
+                  class Main {\n static func main() {\n const eye = Eye(\"eye\")\n eye.update(0.5)\n                   const node: Node = eye\n Debug.print(node.x.to_string() + \" \" + eye.seen.to_string() + \" \" + eye.main.to_string())\n                   Debug.print((node is Eye).to_string() + \" \" + (Node(\"n\") is Camera2D).to_string())\n                   const colors = [Color(0.5, 0.5, 0.5, 1.0)]\n colors[0].a -= 0.25\n Debug.print(colors[0].a.to_string())\n }\n}\n";
+    assert_eq!(
+        run(source).expect("a program that runs"),
+        "0.5 1 true\ntrue false\n0.75\n"
     );
 }

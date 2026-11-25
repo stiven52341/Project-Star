@@ -18,10 +18,12 @@
 //!    as dividing an integer by zero, come back as a [`RunError`].
 //!
 //! For now it runs console programs: static functions, classes,
-//! inheritance, decorators, coroutines and `parallel` functions (Phase 14
-//! of `docs/roadmap.md` brings the rest of the language step by step).
+//! inheritance, decorators, coroutines and `parallel` functions, and the
+//! engine's `Input`, `Color` and `Camera2D` (Phase 14 of `docs/roadmap.md`
+//! brings the rest of the language step by step).
 
 mod error;
+mod host;
 mod lower;
 mod run;
 mod tree;

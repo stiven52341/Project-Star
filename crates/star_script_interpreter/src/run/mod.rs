@@ -2,9 +2,11 @@
 
 mod builtins;
 mod coroutines;
+mod engine;
 mod numbers;
 mod parallel;
 
+use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -15,8 +17,8 @@ use star_script_runtime::try_index;
 use crate::Output;
 use crate::error::RunError;
 use crate::tree::{
-    Arithmetic, ClassRef, Code, Constructor, ConstructorId, Expression, Function, FunctionId,
-    MethodTarget, Statement,
+    Arithmetic, ClassRef, Code, Constructor, ConstructorId, ConstructorRef, Expression, FieldRef,
+    Function, FunctionId, MethodTarget, Statement,
 };
 use crate::value::{Elements, Object, Value, read, write};
 
@@ -102,21 +104,20 @@ impl Machine {
             }
             Statement::SetField {
                 object,
-                position,
+                field,
                 operator,
                 value,
             } => {
                 let object = self.evaluate(object, frame)?;
-                let object = object_of(&object)?;
                 let new_value = match operator {
                     None => self.evaluate(value, frame)?,
                     Some(operator) => {
-                        let current = object.field(*position)?;
+                        let current = engine::read_field(&object, *field)?;
                         let value = self.evaluate(value, frame)?;
                         numbers::arithmetic(*operator, &current, &value)?
                     }
                 };
-                object.set_field(*position, new_value)?;
+                engine::write_field(&object, *field, new_value)?;
             }
             Statement::SetElement {
                 list,
@@ -200,27 +201,34 @@ impl Machine {
     /// Builds an object of the constructor's class.
     fn construct(
         &self,
-        constructor: ConstructorId,
+        constructor: ConstructorRef,
         arguments: Vec<Value>,
     ) -> Result<Value, RunError> {
-        let class = self.constructor(constructor)?.class;
-        let object = self.build(constructor, arguments, class, &mut Vec::new())?;
-        Ok(Value::Object(object))
+        match constructor {
+            ConstructorRef::Script(constructor) => {
+                let class = self.constructor(constructor)?.class;
+                self.build(constructor, arguments, class, &mut Vec::new())
+            }
+            ConstructorRef::Engine(engine) => {
+                engine::new_object(engine, engine.class(), Vec::new(), &arguments)
+            }
+        }
     }
 
     /// Runs a constructor for an object of `class`: its fields' values and
     /// the start of its `init` before the object exists; then its base's
     /// constructor (which builds the object), or, in the root class, the
     /// object itself, with the fields of its own class first and then
-    /// `subclass_fields` from the closest subclass down; and then the rest
-    /// of `init` with `self`. So `init`s finish from the root down.
+    /// `subclass_fields` from the closest subclass down (and the runtime's
+    /// fields, if the root extends an engine class); and then the rest of
+    /// `init` with `self`. So `init`s finish from the root down.
     fn build(
         &self,
         constructor: ConstructorId,
         mut frame: Vec<Value>,
         class: ClassRef,
         subclass_fields: &mut Vec<Vec<Value>>,
-    ) -> Result<Rc<Object>, RunError> {
+    ) -> Result<Value, RunError> {
         let constructor = self.constructor(constructor)?;
         frame.resize(constructor.slots, Value::Null);
         if !matches!(self.block(&constructor.setup, &mut frame)?, Flow::Next) {
@@ -236,22 +244,29 @@ impl Machine {
                     .ok_or(RunError::Internal("field value outside its constructor"))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let object = if let Some(base) = &constructor.base {
-            let arguments = self.evaluate_all(&base.arguments, &frame)?;
+        let base = match &constructor.base {
+            Some(base) => Some((
+                base.constructor,
+                self.evaluate_all(&base.arguments, &frame)?,
+            )),
+            None => None,
+        };
+        let object = if let Some((ConstructorRef::Script(base), arguments)) = base {
             subclass_fields.push(fields);
-            self.build(base.constructor, arguments, class, subclass_fields)?
+            self.build(base, arguments, class, subclass_fields)?
         } else {
             let mut row = fields;
             for fields in subclass_fields.drain(..).rev() {
                 row.extend(fields);
             }
-            Rc::new(Object::new(class, row))
+            match base {
+                Some((ConstructorRef::Engine(engine), arguments)) => {
+                    engine::new_object(engine, class, row, &arguments)?
+                }
+                _ => Value::Object(Rc::new(Object::new(class, row, ()))),
+            }
         };
-        store(
-            &mut frame,
-            constructor.self_slot,
-            Value::Object(Rc::clone(&object)),
-        )?;
+        store(&mut frame, constructor.self_slot, object.clone())?;
         // A `return` in `init` only ends it: the object is built anyway.
         self.block(&constructor.rest, &mut frame)?;
         Ok(object)
@@ -271,24 +286,23 @@ impl Machine {
             .ok_or(RunError::Internal("unknown constructor"))
     }
 
-    /// The field at `position` of an object; with `?.`, `null` for no
-    /// object.
+    /// A field of an object; with `?.`, `null` for no object.
     fn field(
         &self,
         object: &Expression,
-        position: usize,
+        field: FieldRef,
         null_safe: bool,
         frame: &Frame,
     ) -> Result<Value, RunError> {
         match self.evaluate(object, frame)? {
             Value::Null if null_safe => Ok(Value::Null),
-            object => object_of(&object)?.field(position),
+            object => engine::read_field(&object, field),
         }
     }
 
     /// Whether `value` is an object of `class` or of a subclass.
     fn is_instance(&self, value: &Value, class: ClassRef) -> bool {
-        let Value::Object(object) = value else {
+        let Some(object) = value.object() else {
             return false;
         };
         self.code
@@ -315,14 +329,20 @@ impl Machine {
         }
     }
 
-    /// A method of the object `receiver`, with `self` as its first local.
+    /// A method of the object `receiver`, with `self` as its first local;
+    /// with `?.`, `null` for no object, without running the arguments.
     fn call_method(
         &self,
         target: MethodTarget,
-        receiver: Value,
+        receiver: &Expression,
         arguments: &[Expression],
+        null_safe: bool,
         frame: &Frame,
     ) -> Result<Value, RunError> {
+        let receiver = self.evaluate(receiver, frame)?;
+        if null_safe && matches!(receiver, Value::Null) {
+            return Ok(Value::Null);
+        }
         let function = self.method_function(target, &receiver)?;
         let mut values = Vec::with_capacity(arguments.len() + 1);
         values.push(receiver);
@@ -439,22 +459,16 @@ impl Machine {
                 receiver,
                 arguments,
                 null_safe,
-            } => {
-                let receiver = self.evaluate(receiver, frame)?;
-                if *null_safe && matches!(receiver, Value::Null) {
-                    return Ok(Value::Null);
-                }
-                self.call_method(*target, receiver, arguments, frame)?
-            }
+            } => self.call_method(*target, receiver, arguments, *null_safe, frame)?,
             Expression::Construct {
                 constructor,
                 arguments,
             } => self.construct(*constructor, self.evaluate_all(arguments, frame)?)?,
             Expression::Field {
                 object,
-                position,
+                field,
                 null_safe,
-            } => self.field(object, *position, *null_safe, frame)?,
+            } => self.field(object, *field, *null_safe, frame)?,
             Expression::IsInstance { value, class } => {
                 Value::Bool(self.is_instance(&self.evaluate(value, frame)?, *class))
             }
@@ -463,9 +477,11 @@ impl Machine {
             }
             Expression::Now => Value::Float(star_script_runtime::tasks::now()),
             Expression::Print(message) => {
-                let message = self.evaluate(message, frame)?.to_text()?;
-                self.print(&message)?;
+                self.print(&self.evaluate(message, frame)?.to_text()?)?;
                 Value::Null
+            }
+            Expression::Engine { method, arguments } => {
+                engine::call(*method, &self.evaluate_all(arguments, frame)?)?
             }
             Expression::List(elements) => Value::list(self.evaluate_all(elements, frame)?),
             Expression::Index { list, index } => {
@@ -547,13 +563,10 @@ fn leave_loop(flow: Flow) -> Option<Flow> {
 }
 
 /// The object a value refers to.
-fn object_of(value: &Value) -> Result<&Object, RunError> {
-    match value {
-        Value::Object(object) => Ok(object),
-        _ => Err(RunError::Internal(
-            "member of something that is not an object",
-        )),
-    }
+fn object_of(value: &Value) -> Result<&Object<dyn Any>, RunError> {
+    value.object().ok_or(RunError::Internal(
+        "member of something that is not an object",
+    ))
 }
 
 /// The elements of a list value.

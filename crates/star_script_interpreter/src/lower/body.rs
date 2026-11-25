@@ -11,7 +11,7 @@ use star_script::semantic::{Analysis, ClassId, ClassOrigin, LocalId, Resolution,
 
 use super::Tables;
 use crate::error::LowerError;
-use crate::tree::{Arithmetic, Expression, Function, Literal, Statement};
+use crate::tree::{Arithmetic, EngineField, Expression, FieldRef, Function, Literal, Statement};
 
 /// What `self` is in the code being lowered.
 pub(super) enum Receiver {
@@ -119,28 +119,36 @@ impl<'a> Body<'a> {
         }
     }
 
-    /// The position of the field (`class`, `index`) in the row of fields
-    /// of the objects of `class` and its subclasses: after the fields of
+    /// Where the field (`class`, `index`) is in the objects of `class`
+    /// and its subclasses: among the runtime's fields if `class` is an
+    /// engine class, or else in the row of script fields, after those of
     /// its bases.
-    pub(super) fn field_position(
+    pub(super) fn field_ref(
         &self,
         class: ClassId,
         index: usize,
         expression: &Expr,
-    ) -> Result<usize, LowerError> {
+    ) -> Result<FieldRef, LowerError> {
         let classes = self.analysis.classes();
-        if classes.class(class).origin == ClassOrigin::Native {
-            return Err(LowerError::unsupported(
-                "fields of engine classes",
-                expression.span,
-            ));
+        let info = classes.class(class);
+        if info.origin == ClassOrigin::Native {
+            let field = info
+                .fields
+                .get(index)
+                .ok_or_else(|| LowerError::internal("unknown field", expression.span))?;
+            return engine_field(&info.name, &field.name)
+                .map(FieldRef::Engine)
+                .ok_or_else(|| {
+                    LowerError::unsupported("this field of the engine", expression.span)
+                });
         }
         let before: usize = classes
             .ancestors(class)
             .skip(1)
+            .filter(|base| classes.class(*base).origin != ClassOrigin::Native)
             .map(|base| classes.class(base).fields.len())
             .sum();
-        Ok(before + index)
+        Ok(FieldRef::Script(before + index))
     }
 
     /// The type of the field (`class`, `index`).
@@ -311,7 +319,7 @@ impl<'a> Body<'a> {
         };
         Ok(Statement::SetField {
             object,
-            position: self.field_position(class, index, target)?,
+            field: self.field_ref(class, index, target)?,
             operator: compound_operator(operator),
             value,
         })
@@ -377,6 +385,26 @@ pub(super) fn default_value(ty: &Type) -> Option<Expression> {
         _ => return None,
     };
     Some(Expression::Constant(value))
+}
+
+/// The field `field` of the engine class `class`, if the interpreter
+/// knows it.
+fn engine_field(class: &str, field: &str) -> Option<EngineField> {
+    Some(match (class, field) {
+        ("Color", "r") => EngineField::Red,
+        ("Color", "g") => EngineField::Green,
+        ("Color", "b") => EngineField::Blue,
+        ("Color", "a") => EngineField::Alpha,
+        ("Node", "name") => EngineField::Name,
+        ("Node", "x") => EngineField::X,
+        ("Node", "y") => EngineField::Y,
+        ("Node", "rotation") => EngineField::Rotation,
+        ("Node", "scale_x") => EngineField::ScaleX,
+        ("Node", "scale_y") => EngineField::ScaleY,
+        ("Camera2D", "view_height") => EngineField::ViewHeight,
+        ("Camera2D", "main") => EngineField::Main,
+        _ => return None,
+    })
 }
 
 /// The operator of `a op= b`, or `None` for plain `=`.

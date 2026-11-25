@@ -64,6 +64,7 @@ fn mark(expression: &mut Expression) -> bool {
         } => mark(left) | mark(right),
         Expression::Call { arguments, .. }
         | Expression::Construct { arguments, .. }
+        | Expression::Engine { arguments, .. }
         | Expression::List(arguments) => mark_all(arguments),
         Expression::CallMethod {
             receiver,

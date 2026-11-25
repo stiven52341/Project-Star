@@ -14,8 +14,8 @@ use std::rc::Rc;
 use star_script_runtime::{Task, tasks};
 
 use super::{
-    Flow, Frame, Machine, builtins, element, leave_loop, list_elements, numbers, object_of,
-    position, store,
+    Flow, Frame, Machine, builtins, element, engine, leave_loop, list_elements, numbers, position,
+    store,
 };
 use crate::error::RunError;
 use crate::tree::{Arithmetic, Coroutine, Expression, FunctionId, Statement};
@@ -223,21 +223,20 @@ impl Machine {
                 }
                 Statement::SetField {
                     object,
-                    position,
+                    field,
                     operator,
                     value,
                 } => {
                     let object = self.value(object, frame).await?;
-                    let object = object_of(&object)?;
                     let new_value = match operator {
                         None => self.value(value, frame).await?,
                         Some(operator) => {
-                            let current = object.field(*position)?;
+                            let current = engine::read_field(&object, *field)?;
                             let value = self.value(value, frame).await?;
                             numbers::arithmetic(*operator, &current, &value)?
                         }
                     };
-                    object.set_field(*position, new_value)?;
+                    engine::write_field(&object, *field, new_value)?;
                 }
                 Statement::If {
                     condition,
@@ -467,12 +466,15 @@ impl Machine {
             }
             Expression::Field {
                 object,
-                position,
+                field,
                 null_safe,
             } => match self.value(object, frame).await? {
                 Value::Null if *null_safe => Value::Null,
-                object => object_of(&object)?.field(*position)?,
+                object => engine::read_field(&object, *field)?,
             },
+            Expression::Engine { method, arguments } => {
+                engine::call(*method, &self.values(arguments, frame).await?)?
+            }
             Expression::IsInstance { value, class } => {
                 let value = self.value(value, frame).await?;
                 Value::Bool(self.is_instance(&value, *class))

@@ -1,11 +1,15 @@
 //! The values a running program works with.
 
+use std::any::Any;
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use star_script_runtime::color::ColorFields;
+
 use crate::error::RunError;
+use crate::host::NodeParts;
 use crate::tree::ClassRef;
 
 /// The elements of a list, shared by every value that refers to it.
@@ -38,26 +42,41 @@ pub(crate) enum Value {
     /// `[T]`: shared, as in the compiled game, so after `var a = b` a
     /// `push` through `a` is seen through `b`.
     List(Elements),
-    /// An object: shared, and equal only to itself.
+    /// An object of a class of the program: shared, and equal only to
+    /// itself.
     Object(Rc<Object>),
+    /// A `Color`, with the runtime's fields of colors.
+    Color(Rc<Object<ColorFields>>),
+    /// A `Node`, a `Camera2D` or an object of a class that extends one,
+    /// with the runtime's fields of nodes.
+    Node(Rc<Object<NodeParts>>),
 }
 
-/// An object of a class of the program.
-pub(crate) struct Object {
+/// An object: its class, the fields its script classes declare, and the
+/// runtime's fields of the engine class it is (`E`), which the runtime
+/// reads by reference (decision 70). Without an engine class, `E` is
+/// `()`; code that only needs the script fields sees any object as an
+/// `Object<dyn Any>`.
+pub(crate) struct Object<E: ?Sized = ()> {
     /// The class it was created as.
     pub(crate) class: ClassRef,
-    /// The fields of every class of its hierarchy, the root's first.
+    /// The script fields of every class of its hierarchy, the root's first.
     fields: RefCell<Vec<Value>>,
+    /// The runtime's fields of its engine class.
+    pub(crate) engine: E,
 }
 
-impl Object {
-    pub(crate) const fn new(class: ClassRef, fields: Vec<Value>) -> Self {
+impl<E> Object<E> {
+    pub(crate) const fn new(class: ClassRef, fields: Vec<Value>, engine: E) -> Self {
         Self {
             class,
             fields: RefCell::new(fields),
+            engine,
         }
     }
+}
 
+impl<E: ?Sized> Object<E> {
     /// A copy of the field at `position`. Like the compiled `Field`, it
     /// never keeps the fields borrowed after it returns.
     pub(crate) fn field(&self, position: usize) -> Result<Value, RunError> {
@@ -83,7 +102,7 @@ impl Object {
 
 /// Objects can refer to each other, so they show only their class: showing
 /// their fields could go round forever.
-impl fmt::Debug for Object {
+impl<E: ?Sized> fmt::Debug for Object<E> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Object")
@@ -93,9 +112,9 @@ impl fmt::Debug for Object {
 }
 
 /// Objects are equal only to themselves.
-impl PartialEq for Object {
+impl<E: ?Sized> PartialEq for Object<E> {
     fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self, other)
+        std::ptr::addr_eq(self, other)
     }
 }
 
@@ -118,6 +137,17 @@ impl Value {
         Self::List(Rc::new(RefCell::new(elements)))
     }
 
+    /// The object the value refers to, whatever its engine class, for
+    /// what only needs its class and script fields.
+    pub(crate) fn object(&self) -> Option<&Object<dyn Any>> {
+        match self {
+            Self::Object(object) => Some(&**object),
+            Self::Color(object) => Some(&**object),
+            Self::Node(object) => Some(&**object),
+            _ => None,
+        }
+    }
+
     /// `self == other` in StarScript: values by content, lists by their
     /// elements in order. Lowering converts both sides to one type first,
     /// so values of different types only meet `null`.
@@ -133,6 +163,8 @@ impl Value {
             (Self::Bool(left), Self::Bool(right)) => left == right,
             (Self::String(left), Self::String(right)) => left == right,
             (Self::Object(left), Self::Object(right)) => Rc::ptr_eq(left, right),
+            (Self::Color(left), Self::Color(right)) => Rc::ptr_eq(left, right),
+            (Self::Node(left), Self::Node(right)) => Rc::ptr_eq(left, right),
             (Self::List(left), Self::List(right)) => {
                 if Rc::ptr_eq(left, right) {
                     return Ok(true);
@@ -162,7 +194,7 @@ impl Value {
             Self::Float(value) => Arc::from(star_script_runtime::float_to_string(value)),
             Self::Double(value) => Arc::from(star_script_runtime::float_to_string(value)),
             Self::Bool(value) => Arc::from(value.to_string()),
-            Self::Null | Self::List(_) | Self::Object(_) => {
+            Self::Null | Self::List(_) | Self::Object(_) | Self::Color(_) | Self::Node(_) => {
                 return Err(RunError::Internal("`to_string` of a value without text"));
             }
         })

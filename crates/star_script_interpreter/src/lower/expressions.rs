@@ -10,13 +10,16 @@ use super::Member;
 use super::body::Body;
 use crate::error::LowerError;
 use crate::tree::{
-    self, Arithmetic, ClassRef, Comparison, Coroutine, Expression, MethodTarget, NumberType,
+    self, Arithmetic, ClassRef, Comparison, Coroutine, EngineMethod, Expression, MethodTarget,
+    NumberType,
 };
 
 /// The engine class whose `print` writes a line.
 const DEBUG_CLASS: &str = "Debug";
 /// The engine class with the game's clock.
 const TIME_CLASS: &str = "Time";
+/// The engine class that reads the game's input.
+const INPUT_CLASS: &str = "Input";
 
 impl Body<'_> {
     /// The interpreter's version of `expression`.
@@ -115,7 +118,7 @@ impl Body<'_> {
             Some(Resolution::Constant { class, index }) => self.constant(class, index, expression),
             Some(Resolution::Field { class, index }) => Ok(Expression::Field {
                 object: Box::new(self.self_value(expression)?),
-                position: self.field_position(class, index, expression)?,
+                field: self.field_ref(class, index, expression)?,
                 null_safe: false,
             }),
             _ => Err(LowerError::internal(
@@ -142,7 +145,7 @@ impl Body<'_> {
             }
             Some(Resolution::Field { class, index }) => Ok(Expression::Field {
                 object: Box::new(self.expression(object)?),
-                position: self.field_position(class, index, expression)?,
+                field: self.field_ref(class, index, expression)?,
                 null_safe,
             }),
             _ => Err(LowerError::internal(
@@ -254,20 +257,22 @@ impl Body<'_> {
         self.class_ref(class, expression)
     }
 
-    /// The position of `class`, a class of the program; engine classes
-    /// are refused.
+    /// The position of `class`: a class of the program, or an engine
+    /// class the interpreter knows.
     fn class_ref(&self, class: ClassId, expression: &Expr) -> Result<ClassRef, LowerError> {
+        if let Some(position) = self.tables.classes.get(&class) {
+            return Ok(*position);
+        }
         if self.analysis.classes().class(class).origin == ClassOrigin::Native {
             return Err(LowerError::unsupported(
-                "`is` and `as` with engine classes",
+                "`is` and `as` with this engine class",
                 expression.span,
             ));
         }
-        self.tables
-            .classes
-            .get(&class)
-            .copied()
-            .ok_or_else(|| LowerError::internal("class without a position", expression.span))
+        Err(LowerError::internal(
+            "class without a position",
+            expression.span,
+        ))
     }
 
     /// `[a, b, c]`, each element converted to the list's element type.
@@ -349,6 +354,12 @@ impl Body<'_> {
                     )))))
                 }
                 (TIME_CLASS, "next_frame") => Ok(Expression::Start(Box::new(Coroutine::NextFrame))),
+                (INPUT_CLASS, name) => {
+                    let method = input_method(name).ok_or_else(|| {
+                        LowerError::internal("unknown method of `Input`", callee.span)
+                    })?;
+                    Ok(Expression::Engine { method, arguments })
+                }
                 _ => Err(LowerError::unsupported(
                     "this method of the engine",
                     callee.span,
@@ -416,16 +427,13 @@ impl Body<'_> {
         arguments: &[Expr],
     ) -> Result<Expression, LowerError> {
         let info = self.analysis.classes().class(class);
-        if info.origin == ClassOrigin::Native {
-            return Err(LowerError::unsupported(
-                "objects of engine classes",
-                callee.span,
-            ));
-        }
-        let constructor = self
-            .tables
-            .constructor(class)
-            .ok_or_else(|| LowerError::internal("class without a constructor", callee.span))?;
+        let constructor = self.tables.constructor(class).ok_or_else(|| {
+            if info.origin == ClassOrigin::Native {
+                LowerError::unsupported("objects of this engine class", callee.span)
+            } else {
+                LowerError::internal("class without a constructor", callee.span)
+            }
+        })?;
         let arguments = info
             .constructor_parameters()
             .iter()
@@ -472,6 +480,21 @@ impl Body<'_> {
 }
 
 /// `left operator right`, both already of the operation's type.
+/// The method of `Input` called `name`.
+fn input_method(name: &str) -> Option<EngineMethod> {
+    Some(match name {
+        "is_down" => EngineMethod::IsDown,
+        "just_pressed" => EngineMethod::JustPressed,
+        "just_released" => EngineMethod::JustReleased,
+        "strength" => EngineMethod::Strength,
+        "axis" => EngineMethod::Axis,
+        "pointer_x" => EngineMethod::PointerX,
+        "pointer_y" => EngineMethod::PointerY,
+        "has_pointer" => EngineMethod::HasPointer,
+        _ => return None,
+    })
+}
+
 /// A call of a `parallel` function from a coroutine, as work that runs on
 /// another thread (and that `await` waits for).
 fn on_another_thread(call: Expression, span: Span) -> Result<Expression, LowerError> {

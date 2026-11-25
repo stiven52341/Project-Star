@@ -18,9 +18,10 @@ const PROGRAMS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../star_script/test
 
 /// The programs the interpreter covers so far: each step of Phase 14 of
 /// `docs/roadmap.md` adds the ones its part of the language completes.
-const COVERED: [&str; 10] = [
+const COVERED: [&str; 12] = [
     "basics",
     "classes",
+    "colors",
     "coroutines",
     "decorators",
     "division_fault",
@@ -29,6 +30,7 @@ const COVERED: [&str; 10] = [
     "objects",
     "parallel",
     "parallel_fault",
+    "pointer",
 ];
 
 #[test]

@@ -652,7 +652,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [ ] 14.6 Games: `Game` (`start`, `update`, `quit`) in a window of the
         engine, `Input` and its actions, `Color`, `Camera2D`, using the
         engine classes that f1 made shared.
-        Design proposed to the owner (awaiting approval):
+        Design approved by the owner (decision 70, 2026-11-24):
         - The interpreter is one more `Host` of `star_script_runtime`,
           as the generated Rust is: the game loop, the input, the frame
           of the nodes and the window stay in `star_script_runtime` and
@@ -704,9 +704,17 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           hand), and one object type with an optional engine part (the
           `Host` must give fields by reference, and a missing part would
           need a panic or a made-up value).
-    - [ ] 14.6a Engine objects: `Color`, `Camera2D` (with the fields of
+    - [x] 14.6a Engine objects: `Color`, `Camera2D` (with the fields of
           `Node`), classes that extend them, `is`/`as` with engine
           classes, and `Input`: `pointer.star` and `colors.star` conform.
+          The interpreter's `Host` (`host.rs`) gives the runtime its
+          nodes, cameras and colors; the game and the 3D classes are
+          still types without values, and nodes run no code of their own
+          until 14.6b. Fields of engine classes and script fields share
+          one tree node (`Field` with a `FieldRef`), so coroutines needed
+          no new code for them. `Color` cannot be extended (as compiled),
+          so `colors.star` keeps colors in an object of its own instead;
+          `Node`'s methods, `tags` and `body` stay for 14.7 and 14.8.
     - [ ] 14.6b Games: the interpreter as a `Host`, a class that extends
           `Game` as the entry point, owned action names, errors that close
           the game, frames without a window in unit tests and the ignored

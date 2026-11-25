@@ -25,15 +25,48 @@ pub(crate) struct Code {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionId(pub(crate) usize);
 
-/// Position of a class of the program, which its objects carry.
+/// Position of a class of the program, which its objects carry: the
+/// engine classes the interpreter knows first, in the order of
+/// [`EngineClass`], and then the program's own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ClassRef(pub(crate) usize);
 
-/// Position of a constructor in the program: one per class.
+/// The engine classes whose objects the interpreter can make, with their
+/// fixed places among the classes: the runtime makes some of their objects
+/// (a game's colors) without knowing the program.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EngineClass {
+    Color,
+    Node,
+    Camera2D,
+}
+
+impl EngineClass {
+    /// Every engine class the interpreter knows, in the order of their
+    /// places.
+    pub(crate) const ALL: [Self; 3] = [Self::Color, Self::Node, Self::Camera2D];
+
+    /// Its place among the classes.
+    pub(crate) const fn class(self) -> ClassRef {
+        ClassRef(self as usize)
+    }
+
+    /// The name StarScript gives it.
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            Self::Color => "Color",
+            Self::Node => "Node",
+            Self::Camera2D => "Camera2D",
+        }
+    }
+}
+
+/// Position of a constructor of a class of the program.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ConstructorId(pub(crate) usize);
 
-/// What running needs to know about a class.
+/// What running needs to know about a class (an engine class's table is
+/// empty: its methods are not functions of the program).
 #[derive(Debug)]
 pub(crate) struct Class {
     /// The function of each method that objects run their own version
@@ -68,8 +101,68 @@ pub(crate) struct Constructor {
 /// The call of a base's constructor: `super.init(…)`, written or not.
 #[derive(Debug)]
 pub(crate) struct BaseConstructor {
-    pub(crate) constructor: ConstructorId,
+    pub(crate) constructor: ConstructorRef,
     pub(crate) arguments: Vec<Expression>,
+}
+
+/// What builds an object.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ConstructorRef {
+    /// The constructor of a class of the program.
+    Script(ConstructorId),
+    /// An engine class's: it gives the object the runtime's fields of the
+    /// class, and builds it.
+    Engine(EngineClass),
+}
+
+/// Where a field of an object is.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum FieldRef {
+    /// At this position of the object's row of script fields.
+    Script(usize),
+    /// Among the runtime's fields of its engine class.
+    Engine(EngineField),
+}
+
+/// A field of an engine class, which the runtime keeps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EngineField {
+    /// `r`, `g`, `b` and `a` of `Color`.
+    Red,
+    Green,
+    Blue,
+    Alpha,
+    /// `name`, `x`, `y`, `rotation`, `scale_x` and `scale_y` of `Node`.
+    Name,
+    X,
+    Y,
+    Rotation,
+    ScaleX,
+    ScaleY,
+    /// `view_height` and `main` of `Camera2D`.
+    ViewHeight,
+    Main,
+}
+
+/// A static method of the engine that reads the runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EngineMethod {
+    /// `Input.is_down(action)`.
+    IsDown,
+    /// `Input.just_pressed(action)`.
+    JustPressed,
+    /// `Input.just_released(action)`.
+    JustReleased,
+    /// `Input.strength(action)`.
+    Strength,
+    /// `Input.axis(negative, positive)`.
+    Axis,
+    /// `Input.pointer_x()`.
+    PointerX,
+    /// `Input.pointer_y()`.
+    PointerY,
+    /// `Input.has_pointer()`.
+    HasPointer,
 }
 
 /// Which function a call of a method of an object runs.
@@ -113,7 +206,7 @@ pub(crate) enum Statement {
     /// evaluated, in that order.
     SetField {
         object: Expression,
-        position: usize,
+        field: FieldRef,
         operator: Option<Arithmetic>,
         value: Expression,
     },
@@ -206,14 +299,13 @@ pub(crate) enum Expression {
     },
     /// `Class(arguments)`: a new object.
     Construct {
-        constructor: ConstructorId,
+        constructor: ConstructorRef,
         arguments: Vec<Expression>,
     },
-    /// The field at `position` of the object's row of fields; with `?.`,
-    /// a `null` object gives `null`.
+    /// A field of the object; with `?.`, a `null` object gives `null`.
     Field {
         object: Box<Expression>,
-        position: usize,
+        field: FieldRef,
         null_safe: bool,
     },
     /// `value is Class`: whether the value is an object of the class or
@@ -232,6 +324,12 @@ pub(crate) enum Expression {
     Now,
     /// `Debug.print(text)`.
     Print(Box<Expression>),
+    /// A static method of the engine, such as `Input.is_down(action)`,
+    /// with its arguments.
+    Engine {
+        method: EngineMethod,
+        arguments: Vec<Expression>,
+    },
     /// `[a, b, c]`: a new list.
     List(Vec<Expression>),
     /// `list[index]`.

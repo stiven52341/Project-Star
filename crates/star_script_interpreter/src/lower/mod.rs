@@ -16,7 +16,8 @@ use star_script::semantic::{
 
 use crate::error::{LowerError, LowerErrorKind};
 use crate::tree::{
-    Class, ClassRef, Code, ConstructorId, Coroutine, Expression, Function, FunctionId, Statement,
+    Class, ClassRef, Code, ConstructorId, ConstructorRef, Coroutine, EngineClass, Expression,
+    Function, FunctionId, Statement,
 };
 use body::Body;
 
@@ -35,9 +36,13 @@ enum Member {
 struct Tables {
     /// The function each method and constant became.
     functions: HashMap<Member, FunctionId>,
-    /// The position of each class of the program; its constructor has
-    /// the same position.
+    /// The position of each class of the program, the engine classes the
+    /// interpreter knows included.
     classes: HashMap<ClassId, ClassRef>,
+    /// The constructor of each class of the program.
+    constructors: HashMap<ClassId, ConstructorId>,
+    /// The engine classes the interpreter can make objects of.
+    engine: HashMap<ClassId, EngineClass>,
     /// The place of each overridable method (class, index) in the table
     /// of its class.
     overridable: HashMap<(ClassId, usize), usize>,
@@ -48,11 +53,18 @@ struct Tables {
 }
 
 impl Tables {
-    /// The constructor of `class`.
-    fn constructor(&self, class: ClassId) -> Option<ConstructorId> {
-        self.classes.get(&class).map(|class| ConstructorId(class.0))
+    /// What builds the objects of `class`.
+    fn constructor(&self, class: ClassId) -> Option<ConstructorRef> {
+        self.constructors
+            .get(&class)
+            .copied()
+            .map(ConstructorRef::Script)
+            .or_else(|| self.engine.get(&class).copied().map(ConstructorRef::Engine))
     }
 }
+
+/// The engine classes that classes of the program can extend for now.
+const EXTENDABLE: [EngineClass; 2] = [EngineClass::Node, EngineClass::Camera2D];
 
 /// A member of the program, before its code is lowered.
 enum Pending<'a> {
@@ -81,6 +93,7 @@ struct ScriptClass<'a> {
 /// Lowers the whole program.
 pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, LowerError> {
     let mut tables = Tables::default();
+    let mut order = engine_classes(analysis, &mut tables)?;
     let mut pending = Vec::new();
     let mut classes = Vec::new();
     let mut main = None;
@@ -92,16 +105,10 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
             .classes
             .get(declaration)
             .ok_or_else(|| LowerError::internal("class without declaration", name))?;
-        let extends_engine = info
-            .base
-            .is_some_and(|base| analysis.classes().class(base).origin == ClassOrigin::Native);
-        if extends_engine {
-            return Err(LowerError::unsupported(
-                "classes that extend engine classes",
-                name,
-            ));
-        }
-        tables.classes.insert(id, ClassRef(classes.len()));
+        check_base(analysis, &tables, info, name)?;
+        tables.classes.insert(id, ClassRef(order.len()));
+        tables.constructors.insert(id, ConstructorId(classes.len()));
+        order.push(id);
         let mut overridable = Vec::new();
         for (index, method) in info.methods.iter().enumerate() {
             let declaration = method_declaration(declaration, method)?;
@@ -143,7 +150,7 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
             overridable,
         });
     }
-    method_tables(analysis, &mut tables, &classes)?;
+    method_tables(analysis, &mut tables, &classes, &order)?;
     let main =
         main.ok_or_else(|| LowerError::new(LowerErrorKind::NoEntryPoint, Span::new(0, 0)))?;
     let functions = pending
@@ -152,10 +159,12 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
         .collect::<Result<Vec<_>, _>>()?;
     let constructors = classes
         .iter()
-        .enumerate()
-        .map(|(position, class)| {
+        .map(|class| {
+            let position = tables.classes.get(&class.id).copied().ok_or_else(|| {
+                LowerError::internal("class without a position", class.declaration.name.span)
+            })?;
             Body::new(analysis, &tables, class.id, Type::Void).constructor(
-                ClassRef(position),
+                position,
                 class.info,
                 class.declaration,
             )
@@ -175,21 +184,67 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
     })
 }
 
+/// Refuses classes that extend an engine class the interpreter cannot
+/// extend yet.
+fn check_base(
+    analysis: &Analysis,
+    tables: &Tables,
+    info: &ClassInfo,
+    name: Span,
+) -> Result<(), LowerError> {
+    let refused = info.base.is_some_and(|base| {
+        analysis.classes().class(base).origin == ClassOrigin::Native
+            && !tables
+                .engine
+                .get(&base)
+                .is_some_and(|base| EXTENDABLE.contains(base))
+    });
+    if refused {
+        return Err(LowerError::unsupported(
+            "classes that extend this engine class",
+            name,
+        ));
+    }
+    Ok(())
+}
+
+/// Gives the engine classes the interpreter knows their fixed places
+/// (see [`EngineClass`]); the classes in the order of their places.
+fn engine_classes(analysis: &Analysis, tables: &mut Tables) -> Result<Vec<ClassId>, LowerError> {
+    EngineClass::ALL
+        .iter()
+        .map(|engine| {
+            let id = analysis
+                .classes()
+                .find(engine.name())
+                .ok_or_else(|| LowerError::internal("engine class missing", Span::new(0, 0)))?;
+            tables.classes.insert(id, engine.class());
+            tables.engine.insert(id, *engine);
+            Ok(id)
+        })
+        .collect()
+}
+
 /// The table of overridable methods of every class: a subclass starts
 /// from its base's table, puts its overrides in the places of the methods
 /// they replace and adds its new methods at the end. Bases are filled in
-/// first, wherever they are written.
+/// first, wherever they are written; engine classes have empty tables.
+/// `order` has every class in the order of their places.
 fn method_tables(
     analysis: &Analysis,
     tables: &mut Tables,
     classes: &[ScriptClass<'_>],
+    order: &[ClassId],
 ) -> Result<(), LowerError> {
     let table_classes = analysis.classes();
     let depth = |class: &ScriptClass<'_>| table_classes.ancestors(class.id).count();
-    let mut order: Vec<&ScriptClass<'_>> = classes.iter().collect();
-    order.sort_by_key(|class| depth(class));
-    let mut methods: Vec<Option<Vec<FunctionId>>> = vec![None; classes.len()];
-    for class in order {
+    let mut by_depth: Vec<&ScriptClass<'_>> = classes.iter().collect();
+    by_depth.sort_by_key(|class| depth(class));
+    let mut methods: Vec<Option<Vec<FunctionId>>> = order
+        .iter()
+        .map(|id| tables.engine.contains_key(id).then(Vec::new))
+        .collect();
+    for class in by_depth {
         let span = class.declaration.name.span;
         let base = class.info.base;
         let mut table = match base.and_then(|base| tables.classes.get(&base)) {
@@ -230,11 +285,11 @@ fn method_tables(
         }
     }
     tables.methods = methods.into_iter().map(Option::unwrap_or_default).collect();
-    tables.ancestors = classes
+    tables.ancestors = order
         .iter()
         .map(|class| {
             table_classes
-                .ancestors(class.id)
+                .ancestors(*class)
                 .filter_map(|id| tables.classes.get(&id).copied())
                 .collect()
         })
