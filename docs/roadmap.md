@@ -1093,4 +1093,75 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         after `main`, the same output both ways).
   - [ ] 14.12 Hot reload: changed scripts reload while the game is
         played, keeping the state of the objects that are still valid.
+        Design proposed to the owner (awaiting approval):
+        - What sets it off: saving. While it plays, the player looks
+          every half second (as `star_assets`' `FileWatcher` does, by
+          modification times: no new dependency) at the `.star` and
+          `.blueprint` files of `assets/`, new and removed ones included.
+          When they changed, it reads, checks and lowers the program
+          again, between two frames. Changes to `project.toml` (actions,
+          main scene) and to scenes are not reloaded: they need a new
+          “Play”.
+        - A program with mistakes is not loaded: the player prints them,
+          as at the start (`file:line:column: message`), saying the game
+          goes on with the code it had, and the next save tries again.
+          They reach the editor's Output panel as the game's error
+          output does now.
+        - Which objects stay: every object the program created (the
+          game, its nodes, every object of a script class) keeps
+          existing, with its engine part (position, body, sound…) and
+          its place in the tree. Its class is found again by name in the
+          new program, and its fields by name: a field that is still
+          there with the same type keeps its value; a new field, or one
+          whose type changed, gets its initial value as when an object
+          is created (field initializers cannot see the object, so they
+          can run for it); a removed field is dropped. Methods, new
+          classes and constants simply are the new code's from then on;
+          `start` does not run again.
+        - When it cannot: if an object that exists belongs to a class
+          that was removed, or that no longer extends the same engine
+          class (its engine part could not change), nothing is reloaded,
+          and the player says which class and that a new “Play” is
+          needed.
+        - Coroutines started before the reload end: they run the old
+          code, which knows the old places of the fields. The message of
+          the reload says how many ended, so a game whose `start`
+          started one knows to play again. (Keeping them would need
+          every class and field to keep its place across reloads, with
+          old and new code mixed: a later step, if it is missed.)
+        - In code: the interpreter remembers the objects of the game it
+          plays (weak references, added when an object is created, so a
+          dropped object is not kept alive), and an object's class can
+          change (`Cell<ClassRef>`). `star_script_interpreter::reload`
+          gives the game playing on this thread a new `Program`: it
+          checks every object first, then moves classes and fields and
+          swaps the code, and says how many objects it kept and how many
+          coroutines ended, or why it could not. `star_script_engine`'s
+          game loop gains a version of `run` with a step between frames,
+          where the player looks at the files and reloads; compiled games
+          keep `run`. Hot reload is part of playing in the editor, not of
+          the language, so the compiled side has nothing to match (rule
+          3.7 is about the language).
+        - Tests: the interpreter's (headless, as its game tests are): a
+          changed method takes effect while fields keep their values; a
+          new field gets its initial value; a field whose type changed is
+          reset; a removed field is dropped; a removed class of a living
+          object refuses the reload and keeps the old code; coroutines
+          end and are counted. The player's: noticing changed, new and
+          removed files; a program with mistakes is reported and not
+          loaded. A window test (ignored) whose game prints its frames,
+          while the test rewrites a script and expects the new output.
+        - Rejected: restarting the game on every change (the state is
+          what hot reload is for); keeping coroutines on the old code
+          (field places differ); a file-watching dependency (polling
+          already works on every platform); the editor sending the
+          program through a pipe (the player already reads the files,
+          and saving is the signal); restarting the game when a class
+          of a living object goes away (it would lose the state without
+          being asked; a new “Play” does that).
+    - [ ] 14.12a The interpreter: objects remembered, `reload`, with its
+          tests.
+    - [ ] 14.12b The player: watching the files, reloading between
+          frames through `star_script_engine`, with its tests and the
+          window test.
 - [ ] **Future — Consoles** (PlayStation, Xbox).
