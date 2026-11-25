@@ -791,6 +791,52 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           machine with the same output.
   - [ ] 14.8 Physics, sounds and 3D (`Body`, `Sound`, `Audio`,
         `Node3D`, `Mesh`, `Light`, `Camera3D`).
+        Design proposed to the owner (awaiting approval):
+        - Bodies and sounds become objects of the interpreter with the
+          runtime's fields, as colors are: a value of kind `Body` holds
+          `BodyFields` (the `Host`'s body becomes that object), and one of
+          kind `Sound` holds `SoundFields`. `Body.circle`, `rectangle`,
+          `capsule`, `sphere` and `box`, `apply_impulse(_3d)`, the
+          contact lists (new lists of the interpreter, as `children()`),
+          `Sound.load`/`play`/`stop`/`is_playing` and `Audio.volume`/
+          `set_volume` call the runtime, so they need no engine: without
+          a game nothing simulates bodies and no sound loads, as
+          compiled. A node's `body` field is the runtime's.
+        - The game loop of `star_script_engine` already moves bodies,
+          reads contacts and plays sounds through the `Host`, so an
+          interpreted game gets physics and audio with no code of its own.
+        - 3D: a node's parts gain the fields of `Node3D` (kept apart, like
+          a camera's, so the `Host` can hand out a `Node3D`), and its
+          class parts `Mesh`, `Light` and `Camera3D`. Their methods
+          (`look_at`, `global_z`, `set_global_position_3d`,
+          `translate_3d`, `translate_global_3d`) join those of `Node` as
+          runtime calls that scripts may override; `Game.camera_3d`
+          joins `camera`; scenes create 3D nodes too. Classes may extend
+          all of them.
+        - With this, every program of the conformance test runs
+          interpreted, so its list of covered programs goes: every
+          program in `programs/` must behave the same both ways, and a
+          new feature cannot be added to one side only (rule 3.7).
+        - Window tests: the window opens once per process, so the
+          `window` test becomes one binary that plays each game in a
+          child process of itself (`window -- --ignored` starts them all,
+          one after another). The games of `engine_game.rs` (counting,
+          node, physics, physics 3D, coroutine and the scene-only game)
+          move to `star_script/tests/games/` with their scenes, and each
+          one is played interpreted expecting the output the compiled
+          test expects; `window_scene` folds into it.
+        - Rejected: a body or sound held directly in a value without an
+          object (it would need a second path for `is`, `==` and fields,
+          which objects already have), and simulating bodies outside the
+          engine (the compiled console program does not either).
+    - [ ] 14.8a Bodies and sounds: `Body`, `Sound`, `Audio` and a node's
+          `body`; `bodies.star` and `sounds.star` conform.
+    - [ ] 14.8b 3D: `Node3D`, `Mesh`, `Light`, `Camera3D`, their methods,
+          `Game.camera_3d` and 3D nodes in scenes; `nodes_3d.star` and
+          `placement.star` conform, and the conformance test covers every
+          program.
+    - [ ] 14.8c Games in windows: the window test plays every game of
+          `engine_game.rs` interpreted, each in its own process.
   - [ ] 14.9 Blueprints: they become StarScript, so they need no
         interpreter of their own; conformance tests with the blueprint
         templates.
