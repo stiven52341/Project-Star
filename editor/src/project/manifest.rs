@@ -7,8 +7,9 @@ use star_engine::prelude::{ENGINE_VERSION, TargetPlatform};
 
 use super::{ProjectDimension, ProjectSettings, ProjectSettingsError};
 
-/// File name of the project manifest, at the root of the project folder.
-pub(crate) const MANIFEST_FILE_NAME: &str = "project.toml";
+/// File name of the project manifest, at the root of the project folder:
+/// the one the player reads.
+pub(crate) use star_player::project::MANIFEST_FILE_NAME;
 
 const MANIFEST_HEADER: &str = "# ProjectStar project file.\n";
 

@@ -88,8 +88,8 @@ impl Machine {
     /// Creates the game: the object of the class that extends `Game`.
     pub(crate) fn new_game(&self) -> Result<Rc<GameObject>, RunError> {
         let constructor = match &self.code.entry {
-            Entry::Game(constructor) => *constructor,
-            Entry::Scene(path) => return self.main_scene_game(path),
+            Entry::Game { constructor, .. } => *constructor,
+            Entry::Scene { path, .. } => return self.main_scene_game(path),
             Entry::Main(_) => return Err(RunError::WrongKind(ProgramKind::Console)),
         };
         match self.construct(ConstructorRef::Script(constructor), Vec::new())? {

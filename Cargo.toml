@@ -29,6 +29,8 @@ star_script = { path = "crates/star_script" }
 star_blueprint = { path = "crates/star_blueprint" }
 star_script_runtime = { path = "crates/star_script_runtime" }
 star_script_engine = { path = "crates/star_script_engine" }
+star_script_interpreter = { path = "crates/star_script_interpreter" }
+star_player = { path = "crates/star_player" }
 
 # External dependencies. Each one is wrapped by an engine crate (see CLAUDE.md 3.5).
 wgpu = "30.0"              # GPU abstraction: DX12, Vulkan, Metal, OpenGL

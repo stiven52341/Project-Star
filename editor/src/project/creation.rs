@@ -10,8 +10,9 @@ use star_engine::star_platform::user_directories::home_directory;
 use super::ProjectSettings;
 use super::manifest::{MANIFEST_FILE_NAME, render_manifest};
 
-/// Folder, inside the project, where games keep their resources.
-pub(crate) const ASSETS_DIRECTORY: &str = "assets";
+/// Folder, inside the project, where games keep their resources: the one
+/// the player reads.
+pub(crate) use star_player::project::ASSETS_DIRECTORY;
 /// Folder, inside the user's home, offered by default to store projects.
 const DEFAULT_PROJECTS_DIRECTORY: &str = "ProjectStar Projects";
 

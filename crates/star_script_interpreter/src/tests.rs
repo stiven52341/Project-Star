@@ -282,6 +282,30 @@ fn play_program(program: &Program, frames: usize) -> (String, Result<(), RunErro
 }
 
 #[test]
+fn games_are_titled_as_compiled() {
+    let lower = |source: &str, settings: &star_script::GameSettings| {
+        let checked = star_script::check_source_with(source, settings).expect("a valid program");
+        Program::lower(&checked).expect("a program the interpreter runs")
+    };
+    let none = star_script::GameSettings::default();
+    let scene = star_script::GameSettings {
+        main_scene: Some(star_script::MainScene {
+            path: "levels/one.scene".to_owned(),
+            title: "Demo".to_owned(),
+        }),
+        ..star_script::GameSettings::default()
+    };
+
+    let game = lower("class Space extends Game {}\n", &none);
+    let scene_only = lower("", &scene);
+    let console = lower("class Main {\n static func main() {}\n}\n", &none);
+
+    assert_eq!(game.title(), Some("Space"));
+    assert_eq!(scene_only.title(), Some("Demo"));
+    assert_eq!(console.title(), None);
+}
+
+#[test]
 fn games_start_update_and_quit() {
     let source = "class Counter extends Game {\n var frames = 0\n \
                   override func start() {\n Debug.print(\"start \" + background.r.to_string())\n background = Color(0.5, 0.0, 0.0, 1.0)\n }\n \

@@ -64,11 +64,16 @@ pub(crate) enum Entry {
     /// a coroutine if it is `async`.
     Main(Statement),
     /// A game: the constructor of the class that extends `Game`, whose
-    /// object the engine plays.
-    Game(ConstructorId),
+    /// object the engine plays, and the class's name, the title of its
+    /// window (as compiled).
+    Game {
+        constructor: ConstructorId,
+        title: Arc<str>,
+    },
     /// A game without a `Game` class: a plain `Game` with the project's
-    /// main scene, at this path, as compiled.
-    Scene(Arc<str>),
+    /// main scene, at `path`, in a window called `title` (the project's
+    /// name), as compiled.
+    Scene { path: Arc<str>, title: Arc<str> },
 }
 
 /// Position of a function in the program.

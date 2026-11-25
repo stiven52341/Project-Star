@@ -84,7 +84,18 @@ impl Program {
     pub fn kind(&self) -> ProgramKind {
         match self.code.entry {
             tree::Entry::Main(_) => ProgramKind::Console,
-            tree::Entry::Game(_) | tree::Entry::Scene(_) => ProgramKind::Game,
+            tree::Entry::Game { .. } | tree::Entry::Scene { .. } => ProgramKind::Game,
+        }
+    }
+
+    /// The title of a game's window, as compiled: the name of the class
+    /// that extends `Game`, or the project's name for a game that only
+    /// plays its main scene. `None` for a console program.
+    #[must_use]
+    pub fn title(&self) -> Option<&str> {
+        match &self.code.entry {
+            tree::Entry::Main(_) => None,
+            tree::Entry::Game { title, .. } | tree::Entry::Scene { title, .. } => Some(title),
         }
     }
 

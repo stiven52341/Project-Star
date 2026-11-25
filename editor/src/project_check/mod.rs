@@ -5,7 +5,6 @@
 //! before Cargo builds the generated Rust. When it finds nothing wrong, it
 //! keeps that Rust, for “Play” to build.
 
-mod input_actions;
 mod job;
 mod problem;
 mod program;
@@ -207,7 +206,7 @@ pub(crate) fn check_project_with(
 fn read_game_settings(directory: &Path, problems: &mut Vec<Problem>) -> GameSettings {
     fs::read_to_string(directory.join(MANIFEST_FILE_NAME))
         .map_err(|error| error.to_string())
-        .and_then(|text| input_actions::read_game_settings(&text))
+        .and_then(|text| star_player::project::read_game_settings(&text))
         .unwrap_or_else(|message| {
             problems.push(Problem::in_file(MANIFEST_FILE_NAME, message));
             GameSettings::default()

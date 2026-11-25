@@ -306,10 +306,16 @@ fn entry(
                 .get(&game.id)
                 .copied()
                 .ok_or_else(|| LowerError::internal("game without a constructor", span))?;
-            Ok(Entry::Game(constructor))
+            Ok(Entry::Game {
+                constructor,
+                title: Arc::from(game.info.name.as_str()),
+            })
         }
         (None, None) => match &analysis.settings().main_scene {
-            Some(scene) => Ok(Entry::Scene(Arc::from(scene.path.as_str()))),
+            Some(scene) => Ok(Entry::Scene {
+                path: Arc::from(scene.path.as_str()),
+                title: Arc::from(scene.title.as_str()),
+            }),
             None => Err(LowerError::new(
                 LowerErrorKind::NoEntryPoint,
                 Span::new(0, 0),

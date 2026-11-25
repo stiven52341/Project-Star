@@ -3199,6 +3199,7 @@ dependencies = [
  "serde",
  "star_blueprint",
  "star_engine",
+ "star_player",
  "star_render",
  "star_script",
  "toml",
@@ -3254,6 +3255,20 @@ dependencies = [
  "raw-window-handle",
  "star_core",
  "winit",
+]
+
+[[package]]
+name = "star_player"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "star_blueprint",
+ "star_engine",
+ "star_script",
+ "star_script_engine",
+ "star_script_interpreter",
+ "star_script_runtime",
+ "toml",
 ]
 
 [[package]]

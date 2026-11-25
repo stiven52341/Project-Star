@@ -1,6 +1,6 @@
-//! The parts of `project.toml` that change how scripts are compiled: the
-//! input actions scripts name, and the scene a game without a `Game` class
-//! plays.
+//! The parts of `project.toml` that change how scripts are compiled and
+//! played: the input actions scripts name, and the scene a game without a
+//! `Game` class plays. The editor's check reads them here too.
 
 use std::collections::BTreeMap;
 
@@ -43,7 +43,7 @@ struct InputSection {
 ///
 /// Returns why the text is not valid TOML, or why `[input.actions]` is not
 /// a table of lists of binding names.
-pub(super) fn read_game_settings(text: &str) -> Result<GameSettings, String> {
+pub fn read_game_settings(text: &str) -> Result<GameSettings, String> {
     let file: ScriptSettingsFile =
         toml::from_str(text).map_err(|error| error.message().to_owned())?;
     let actions = file

@@ -933,7 +933,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         into a player that loads the project's scripts when it starts;
         “Play” uses it for every project, and any project plays in about
         a second.
-        Design proposed to the owner (awaiting approval):
+        Design approved by the owner (decision 74, 2026-11-24):
         - A new crate, `star_player` (Tools), joins the interpreter with
           the engine: `star_player::play(directory)` reads the project in
           `directory` and plays it interpreted through
@@ -995,8 +995,26 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           already saves first), and keeping compiled builds in “Play”
           until 14.11 (two ways to play, when the interpreter covers the
           whole language).
-    - [ ] 14.10a The crate `star_player`: reading a project (the settings
+    - [x] 14.10a The crate `star_player`: reading a project (the settings
           moved from the editor) and playing it, with its tests.
+          `star_player::project::Project::read` reads `project.toml`
+          (`read_game_settings`, moved from the editor's
+          `project_check/input_actions.rs`; the editor also takes
+          `MANIFEST_FILE_NAME` and `ASSETS_DIRECTORY` from there) and the
+          `.star` and `.blueprint` files of `assets/` (sorted, hidden ones
+          left out), and `Project::program` checks and lowers them; its
+          `Problems` name each file, line and column, or a blueprint's
+          graph and node. `star_player::play` plays a game in a window
+          (or runs a console program), and `star_player::main` plays the
+          current folder. The interpreter gained `Program::title`, the
+          window's title as compiled (the `Game` class's name, or the
+          project's for a main scene). Tests: 8 unit tests of reading
+          projects (with the 4 of the settings, moved), and
+          `tests/window.rs` (ignored), which plays 5 project folders in
+          child processes: a game with the blueprint of every node, a
+          scene-only project with a missing scene, a script mistake, a
+          misspelled binding and a runtime error while the game is
+          created.
     - [ ] 14.10b The editor plays every project with it: the warm-up
           builds it, “Play” runs it, and the compiled scene player is
           removed.
