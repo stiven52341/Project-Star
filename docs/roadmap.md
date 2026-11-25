@@ -933,6 +933,73 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         into a player that loads the project's scripts when it starts;
         “Play” uses it for every project, and any project plays in about
         a second.
+        Design proposed to the owner (awaiting approval):
+        - A new crate, `star_player` (Tools), joins the interpreter with
+          the engine: `star_player::play(directory)` reads the project in
+          `directory` and plays it interpreted through
+          `star_script_engine::game::run::<Interpreted>`, as the window
+          test of 14.8c does. It depends only on crates of the workspace
+          (`star_engine`, `star_script`, `star_script_interpreter`,
+          `star_script_engine`, `star_blueprint`) and on `serde` and
+          `toml`, which the workspace already uses: no new external
+          dependency.
+        - Reading a project, written once: the settings of `project.toml`
+          (input actions, main scene, title), now read by the editor's
+          `project_check/input_actions.rs`, move to `star_player::project`,
+          and the editor uses them from there. The player gathers the
+          `.star` files of `assets/` and the translations of its
+          `.blueprint` files into one `SourceSet`, as the editor's check
+          does (that one keeps its own code, which places mistakes on
+          blueprint nodes for the Problems panel).
+        - What it does when it starts: a project that does not check or
+          lower prints the compiler's reports (file, line and column) to
+          the error output and ends with failure; the editor already
+          refuses to play a project with problems, so this only guards
+          files changed outside it. Then it builds the action map from
+          the bindings (a wrong binding stops it, as compiled), sets the
+          assets folder and the window's title, and plays. `Debug.print`
+          writes to the standard output and a runtime error is printed
+          as a compiled game prints it, `StarScript runtime error: …`,
+          ending with failure, so the editor's console shows both the
+          same way as today.
+        - How the editor runs it: the player is built outside the
+          editor's workspace, as the scene player is (decision 63: the
+          workspace's features differ from games'): the editor writes a
+          package of one `main` that calls `star_player::main()`, in its
+          folder of games, which the warm-up builds. “Play” saves (as
+          now), checks the project, lets Cargo confirm the player is up
+          to date (about 0.3 s) and runs it in the project's folder with
+          no arguments. That is the same path for every project, with or
+          without scripts, so any project plays in about a second.
+        - What goes away: “Play” no longer builds a game per project, so
+          the compiled scene player of decision 63 has no use and is
+          removed (`star_script::player_program`, `generate_player`,
+          `star_script_engine::player`, and its part of
+          `engine_game.rs`), as is the editor's package per project.
+          The check keeps translating to Rust, for the mistakes only the
+          compiler finds and for “Build” (14.11), which builds the game
+          with Cargo again. A project without scripts or main scene (a
+          game written in Rust) still has nothing to play.
+        - Tests: unit tests of `star_player::project` (settings, scripts
+          and blueprints read from a folder, reports of a broken
+          project); a window test of `star_player`, ignored like the
+          others, that plays small project folders in child processes
+          (a game with a blueprint, a scene-only project, a project with
+          a mistake and one with a wrong binding); the editor's tests of
+          “Play” and the warm-up run the player instead of the scene
+          player.
+        - Rejected: the player as a binary of the editor's workspace
+          (the features of decision 63), the editor sending the program
+          to the player instead of the player reading the project (14.12
+          needs the player to read the files again anyway, and “Play”
+          already saves first), and keeping compiled builds in “Play”
+          until 14.11 (two ways to play, when the interpreter covers the
+          whole language).
+    - [ ] 14.10a The crate `star_player`: reading a project (the settings
+          moved from the editor) and playing it, with its tests.
+    - [ ] 14.10b The editor plays every project with it: the warm-up
+          builds it, “Play” runs it, and the compiled scene player is
+          removed.
   - [ ] 14.11 Building with the compiler from the editor: a “Build”
         command (and later the export of games) that compiles the project
         with Cargo, and a way to play that compiled build to check it.
