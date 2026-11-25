@@ -422,7 +422,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           game's optimization level, not the user's code. So games stay
           at `opt-level = 1` for now. The interpreter (Phase 14) removes
           this cost from “Play” altogether.
-- [ ] **Phase 14 — StarScript interpreter** (decision 64, rule 3.7 of
+- [x] **Phase 14 — StarScript interpreter** (decision 64, rule 3.7 of
       `CLAUDE.md`): “Play” in the editor interprets StarScript, and
       building the project compiles it. Done part by part; each part comes
       with conformance tests that run the same programs compiled and
