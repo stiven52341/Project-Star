@@ -202,3 +202,20 @@ fn literals_give_their_values() {
     let source = "class Main {\n static func main() {\n var text: string\n Debug.print(\"[\" + text + \"]\")\n Debug.print((\"a\" + \"b\").to_upper())\n Debug.print((2.5).to_string())\n }\n}\n";
     assert_eq!(run(source).expect("a program that runs"), "[]\nAB\n2.5\n");
 }
+
+#[test]
+fn parallel_functions_fail_through_the_functions_they_call() {
+    let source = "class Work {\n const LIMIT = 2\n parallel static func at(values: [int], index: int) -> int {\n return values[index]\n }\n parallel static func last(values: [[int]]) -> int {\n return at(values[0], LIMIT)\n }\n}\nclass Main {\n static async func main() {\n Debug.print((await Work.at([4, 5], 1)).to_string())\n Debug.print((await Work.last([[1, 2]])).to_string())\n Debug.print(\"never printed\")\n }\n}\n";
+
+    let (printed, error) = run_with_output(source);
+
+    assert_eq!(printed, "5\n");
+    let Some(RunError::Fault(error)) = error else {
+        panic!("a runtime error, found {error:?}");
+    };
+    assert!(
+        error.message().contains("out of range"),
+        "{}",
+        error.message()
+    );
+}

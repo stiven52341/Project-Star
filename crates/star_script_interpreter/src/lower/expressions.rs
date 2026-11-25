@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use star_script::Span;
 use star_script::ast::{BinaryOperator, Expr, ExprKind, Literal, Name, UnaryOperator};
-use star_script::semantic::{BuiltinMethod, ClassId, ClassOrigin, MethodInfo, Resolution, Type};
+use star_script::semantic::{BuiltinMethod, ClassId, ClassOrigin, Execution, Resolution, Type};
 
 use super::Member;
 use super::body::Body;
@@ -289,17 +289,19 @@ impl Body<'_> {
         match self.resolution(callee)? {
             Some(Resolution::Method { class, index }) => {
                 let call = self.method_call(callee, class, index, arguments)?;
-                let is_async = self
+                let execution = self
                     .analysis
                     .classes()
                     .class(class)
                     .methods
                     .get(index)
-                    .is_some_and(MethodInfo::is_async);
-                if is_async {
-                    started(call, callee.span)
-                } else {
-                    Ok(call)
+                    .map(|method| method.execution);
+                match execution {
+                    Some(Execution::Async) => started(call, callee.span),
+                    Some(Execution::Parallel) if !self.in_parallel => {
+                        on_another_thread(call, callee.span)
+                    }
+                    _ => Ok(call),
                 }
             }
             Some(Resolution::Builtin(method)) => self.builtin_call(callee, method, arguments),
@@ -470,6 +472,22 @@ impl Body<'_> {
 }
 
 /// `left operator right`, both already of the operation's type.
+/// A call of a `parallel` function from a coroutine, as work that runs on
+/// another thread (and that `await` waits for).
+fn on_another_thread(call: Expression, span: Span) -> Result<Expression, LowerError> {
+    let Expression::Call {
+        function,
+        arguments,
+    } = call
+    else {
+        return Err(LowerError::internal("`parallel` call of no function", span));
+    };
+    Ok(Expression::Start(Box::new(Coroutine::Parallel {
+        function,
+        arguments,
+    })))
+}
+
 /// A call of an `async` method, as a coroutine that starts there (or that
 /// `await` waits for).
 fn started(call: Expression, span: Span) -> Result<Expression, LowerError> {

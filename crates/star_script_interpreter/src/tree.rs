@@ -292,7 +292,8 @@ impl Literal {
     }
 }
 
-/// A call of an `async` method, before it is started or awaited.
+/// A call of an `async` method or a `parallel` function, before it is
+/// started or awaited.
 #[derive(Debug)]
 pub(crate) enum Coroutine {
     /// A static `async` function, with its arguments already converted.
@@ -307,6 +308,12 @@ pub(crate) enum Coroutine {
         receiver: Box<Expression>,
         arguments: Vec<Expression>,
         null_safe: bool,
+    },
+    /// A `parallel` function, with its arguments already converted: it
+    /// runs on another thread, with copies of them.
+    Parallel {
+        function: FunctionId,
+        arguments: Vec<Expression>,
     },
     /// `Time.wait(seconds)`.
     Wait(Box<Expression>),

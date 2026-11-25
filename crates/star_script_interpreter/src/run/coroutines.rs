@@ -29,6 +29,8 @@ type Pending<'s, T> = Pin<Box<dyn Future<Output = Result<T, RunError>> + 's>>;
 pub(super) enum Ready {
     /// An `async` method, with its arguments (the object first).
     Function(FunctionId, Vec<Value>),
+    /// A `parallel` function, with its arguments.
+    Parallel(FunctionId, Vec<Value>),
     /// `Time.wait(seconds)`.
     Wait(f32),
     /// `Time.next_frame()`.
@@ -48,6 +50,10 @@ impl Machine {
                 function,
                 arguments,
             } => Ready::Function(*function, self.evaluate_all(arguments, frame)?),
+            Coroutine::Parallel {
+                function,
+                arguments,
+            } => Ready::Parallel(*function, self.evaluate_all(arguments, frame)?),
             Coroutine::Method {
                 target,
                 receiver,
@@ -80,6 +86,10 @@ impl Machine {
                 function,
                 arguments,
             } => Ready::Function(*function, self.values(arguments, frame).await?),
+            Coroutine::Parallel {
+                function,
+                arguments,
+            } => Ready::Parallel(*function, self.values(arguments, frame).await?),
             Coroutine::Method {
                 target,
                 receiver,
@@ -110,6 +120,8 @@ impl Machine {
         match ready {
             Ready::Wait(seconds) => tasks::start(tasks::wait(seconds)),
             Ready::NextFrame => tasks::start(tasks::next_frame()),
+            // The analysis only lets `parallel` functions be awaited.
+            Ready::Parallel(..) => return Err(PARALLEL_NOT_AWAITED),
             Ready::Function(function, arguments) => {
                 let machine = self.clone();
                 let coroutine = async move {
@@ -510,6 +522,9 @@ impl Machine {
             Some(Ready::Function(function, arguments)) => {
                 self.call_waiting(function, arguments).await
             }
+            Some(Ready::Parallel(function, arguments)) => {
+                self.run_parallel(function, &arguments).await
+            }
             Some(Ready::Wait(seconds)) => {
                 tasks::wait(seconds).await;
                 Ok(Value::Null)
@@ -522,6 +537,10 @@ impl Machine {
         }
     }
 }
+
+/// A `parallel` function called without `await`, which the analysis
+/// refuses.
+const PARALLEL_NOT_AWAITED: RunError = RunError::Internal("a `parallel` call not awaited");
 
 /// The seconds of `Time.wait`.
 fn seconds_of(value: &Value) -> Result<f32, RunError> {

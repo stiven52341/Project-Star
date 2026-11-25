@@ -96,7 +96,9 @@ fn mark_all(expressions: &mut [Expression]) -> bool {
 /// Marks the receiver and arguments of a coroutine; whether one waits.
 fn mark_coroutine(coroutine: &mut Coroutine) -> bool {
     match coroutine {
-        Coroutine::Call { arguments, .. } => mark_all(arguments),
+        Coroutine::Call { arguments, .. } | Coroutine::Parallel { arguments, .. } => {
+            mark_all(arguments)
+        }
         Coroutine::Method {
             receiver,
             arguments,

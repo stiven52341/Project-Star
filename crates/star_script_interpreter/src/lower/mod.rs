@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use star_script::Span;
 use star_script::ast::{ClassDecl, Expr, MemberKind, MethodDecl, SourceFile, VariableKind};
 use star_script::semantic::{
-    Analysis, ClassId, ClassInfo, ClassOrigin, Execution, MemberRef, MethodInfo, Type,
+    Analysis, ClassId, ClassInfo, ClassOrigin, MemberRef, MethodInfo, Type,
 };
 
 use crate::error::{LowerError, LowerErrorKind};
@@ -105,7 +105,6 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
         let mut overridable = Vec::new();
         for (index, method) in info.methods.iter().enumerate() {
             let declaration = method_declaration(declaration, method)?;
-            check_method(method, declaration.name.span)?;
             let function = FunctionId(pending.len());
             if is_entry_point(method) {
                 if main.is_some() {
@@ -270,8 +269,9 @@ fn function(
             declaration,
             info,
         } => {
-            let mut function = Body::new(analysis, tables, *class, info.return_type.clone())
-                .function(declaration, info.is_static)?;
+            let mut body = Body::new(analysis, tables, *class, info.return_type.clone());
+            body.in_parallel = info.is_parallel();
+            let mut function = body.function(declaration, info.is_static)?;
             if info.is_async() {
                 waits::mark_block(&mut function.body);
             }
@@ -284,14 +284,6 @@ fn function(
                 body: vec![Statement::Return(Some(value))],
             })
         }
-    }
-}
-
-/// Refuses the methods the interpreter cannot run yet.
-fn check_method(info: &MethodInfo, span: Span) -> Result<(), LowerError> {
-    match info.execution {
-        Execution::Direct | Execution::Async => Ok(()),
-        Execution::Parallel => Err(LowerError::unsupported("`parallel` functions", span)),
     }
 }
 

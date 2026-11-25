@@ -38,6 +38,9 @@ pub(super) struct Body<'a> {
     slot_count: usize,
     /// What `return` gives back.
     return_type: Type,
+    /// Whether the code is a `parallel` function's, where calls of other
+    /// `parallel` functions run directly, on the same thread.
+    pub(super) in_parallel: bool,
 }
 
 impl<'a> Body<'a> {
@@ -55,6 +58,7 @@ impl<'a> Body<'a> {
             slots: HashMap::new(),
             slot_count: 0,
             return_type,
+            in_parallel: false,
         }
     }
 

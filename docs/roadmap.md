@@ -604,7 +604,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           gave both one local (the compiler names locals by their text
           and did not notice): the calling method's parameters now get
           places of their own.
-  - [ ] 14.5 Parallel functions: `parallel static func` on threads, with
+  - [x] 14.5 Parallel functions: `parallel static func` on threads, with
         values copied in and out.
         Design approved by the owner (decision 69, 2026-11-24):
         - Interpreted `parallel` functions run on the same threads as
@@ -641,10 +641,14 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           what programs do. The tree's constants are `Literal`s, which
           give their value when run (a text shares the literal's), and a
           test checks that the lowered program is `Send + Sync`.
-    - [ ] 14.5b `parallel` functions: awaited calls on the runtime's
+    - [x] 14.5b `parallel` functions: awaited calls on the runtime's
           threads with copies, direct calls between them, and their
           errors: `parallel.star` and `parallel_fault.star` give the same
-          output interpreted and compiled.
+          output interpreted and compiled. Lowering turns an awaited call
+          into a coroutine of its own kind (`Coroutine::Parallel`), and
+          inside a `parallel` function the same call stays a plain call.
+          The thread runs the shared program with a `Machine` of its own,
+          whose output goes nowhere, since such a function cannot print.
   - [ ] 14.6 Games: `Game` (`start`, `update`, `quit`) in a window of the
         engine, `Input` and its actions, `Color`, `Camera2D`, using the
         engine classes that f1 made shared.
