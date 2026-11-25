@@ -27,7 +27,7 @@ use crate::mirror::{engine_color, mirror_nodes, script_camera, script_camera_3d,
 /// The error creating the game, or the engine's running it.
 pub fn run<H: Host>(
     app: App,
-    actions: &'static [&'static str],
+    actions: &[&str],
     new_game: impl FnOnce() -> EngineResult<H::Game>,
 ) -> EngineResult<()> {
     let audio = crate::connect_runtime(app.asset_folder());
@@ -35,7 +35,7 @@ pub fn run<H: Host>(
     app.run_game(EngineGame::<H> {
         audio,
         game,
-        actions,
+        actions: actions.iter().map(|name| (*name).to_owned()).collect(),
         nodes: Vec::new(),
         pending: Vec::new(),
         known: HashMap::new(),
@@ -48,7 +48,7 @@ struct EngineGame<H: Host> {
     /// Where `Sound`s play: silent until the engine gives the game its audio.
     audio: Rc<RefCell<Audio>>,
     game: H::Game,
-    actions: &'static [&'static str],
+    actions: Vec<String>,
     /// Reused list of the nodes whose code runs in a frame.
     nodes: Vec<H::Node>,
     /// Reused list of the nodes still to mirror, with their parent's number.
@@ -69,7 +69,7 @@ impl<H: Host> Game for EngineGame<H> {
 
     fn update(&mut self, world: &mut World) {
         if let Some(input) = world.input() {
-            share_actions(&input, self.actions);
+            share_actions(&input, &self.actions);
             share_pointer(&input, &self.view(world), world.window_size());
         }
         let delta = world.time().delta_seconds();

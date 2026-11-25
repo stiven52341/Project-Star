@@ -14,13 +14,23 @@ use std::sync::Arc;
 use star_script::semantic::BuiltinMethod;
 use star_script_runtime::try_index;
 
-use crate::Output;
 use crate::error::RunError;
+use crate::host::GameObject;
 use crate::tree::{
-    Arithmetic, ClassRef, Code, Constructor, ConstructorId, ConstructorRef, Expression, FieldRef,
-    Function, FunctionId, MethodTarget, Statement,
+    Arithmetic, ClassRef, Code, Constructor, ConstructorId, ConstructorRef, Entry, Expression,
+    FieldRef, Function, FunctionId, MethodTarget, Statement,
 };
 use crate::value::{Elements, Object, Value, read, write};
+use crate::{Output, ProgramKind};
+
+/// What the engine calls on a node or the game.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Hook {
+    /// `start`, once.
+    Start,
+    /// `update`, every frame, with the seconds since the last one.
+    Update(f32),
+}
 
 /// What the usual runner says of code that only coroutines can run.
 const WAIT_OUTSIDE_COROUTINE: &str = "`await` outside a coroutine";
@@ -63,9 +73,48 @@ impl Machine {
     /// Runs the program: `main`, and then its coroutines until none is
     /// left, or until one fails.
     pub(crate) fn run(&self) -> Result<(), RunError> {
-        self.statement(&self.code.main, &mut [])?;
+        let Entry::Main(main) = &self.code.entry else {
+            return Err(RunError::WrongKind(ProgramKind::Game));
+        };
+        self.statement(main, &mut [])?;
         star_script_runtime::tasks::run_until_finished_or(|| self.has_failed());
         self.take_failure().map_or(Ok(()), Err)
+    }
+
+    /// Creates the game: the object of the class that extends `Game`.
+    pub(crate) fn new_game(&self) -> Result<Rc<GameObject>, RunError> {
+        let Entry::Game(constructor) = self.code.entry else {
+            return Err(RunError::WrongKind(ProgramKind::Console));
+        };
+        match self.construct(ConstructorRef::Script(constructor), Vec::new())? {
+            Value::Game(game) => Ok(game),
+            _ => Err(RunError::Internal(
+                "a game class whose objects are not games",
+            )),
+        }
+    }
+
+    /// Runs what `object` (a node or the game) does when the engine calls
+    /// `hook`: the override a script wrote, if any.
+    pub(crate) fn run_hook(&self, object: Value, hook: Hook) -> Result<(), RunError> {
+        let class = object_of(&object)?.class;
+        let class = self
+            .code
+            .classes
+            .get(class.0)
+            .ok_or(RunError::Internal("unknown class"))?;
+        let written = match hook {
+            Hook::Start => class.start,
+            Hook::Update(_) => class.update,
+        };
+        let Some(function) = written else {
+            return Ok(());
+        };
+        let arguments = match hook {
+            Hook::Start => vec![object],
+            Hook::Update(delta) => vec![object, Value::Float(delta)],
+        };
+        self.call(function, arguments).map(drop)
     }
 
     /// Runs `function` with `arguments`, already of its parameters' types,

@@ -143,7 +143,9 @@ Layer 0  star_core, star_math                (no dependencies on other layers)
 Tools    star_script                         (StarScript compiler; no dependencies)
          star_script_runtime                 (support for the generated Rust; no dependencies)
          star_script_engine                  (connects star_script_runtime with star_engine)
-         star_script_interpreter             (runs StarScript without building it, for “Play”)
+         star_script_interpreter             (runs StarScript without building it, for “Play”;
+                                              only star_script and star_script_runtime: the
+                                              player joins it with star_script_engine)
          star_blueprint                      (blueprints: node graphs translated to StarScript)
 ```
 
@@ -162,8 +164,8 @@ Tools    star_script                         (StarScript compiler; no dependenci
 | `star_engine` | Public entry point that integrates everything |
 | `star_script` | StarScript compiler (`.star` → Rust). Specification in `docs/starscript.md` |
 | `star_script_runtime` | Support for the generated Rust (and the interpreter): shared lists, fields, equality, input actions, coroutines, parallel functions, runtime errors, the node tree and the fields of the engine node classes (generic over a `Host`) |
-| `star_script_engine` | What every StarScript game does with the engine, as real Rust built once: the game loop, mirroring the game's nodes in the engine's world and syncing their bodies, reading scenes, playing sounds, sharing input with the runtime, the scene player's arguments. Generic over the runtime's `Host`; generated games use it, the interpreter will too |
-| `star_script_interpreter` | Interpreter of StarScript (decisions 64, 66, 68, 69 and 70): lowers a checked program to its own tree and runs it, with the same output and runtime errors as the compiled program. It runs console programs (static functions, numbers, texts, lists, `null`, constants, classes, inheritance, decorators, coroutines and `parallel` functions: the whole console language; and of the engine `Input`, `Color` and `Camera2D`, with the fields of `Node`, as a `Host` of `star_script_runtime`) for now; Phase 14 of `docs/roadmap.md` brings the rest |
+| `star_script_engine` | What every StarScript game does with the engine, as real Rust built once: the game loop, mirroring the game's nodes in the engine's world and syncing their bodies, reading scenes, playing sounds, sharing input with the runtime, the scene player's arguments. Generic over the runtime's `Host`; generated games use it, and interpreted games through the interpreter's `Host` |
+| `star_script_interpreter` | Interpreter of StarScript (decisions 64, 66, 68, 69 and 70): lowers a checked program to its own tree and runs it, with the same output and runtime errors as the compiled program. It runs console programs (static functions, numbers, texts, lists, `null`, constants, classes, inheritance, decorators, coroutines and `parallel` functions: the whole console language) and games: it is a `Host` of `star_script_runtime`, so `star_script_engine` plays a class that extends `Game` in a window, with `Input`, `Color` and `Camera2D` (and the fields of `Node`) for now; Phase 14 of `docs/roadmap.md` brings the rest. It depends only on `star_script` and `star_script_runtime` (the engine is a dev-dependency of its window test) |
 | `star_blueprint` | Blueprints: classes as node graphs, their `.blueprint` files (TOML) and their translation to StarScript |
 | `editor` | Visual editor (egui, in English or Spanish): project manager, main window, scene editor (node tree, inspector, scene drawn in the view), log console, blueprint editor (node graphs on a canvas), code editor (StarScript scripts, colored), “Compile” (checks a project's StarScript and blueprints with `star_script` and `star_blueprint`) and “Play” (builds the game with Cargo and runs it) |
 

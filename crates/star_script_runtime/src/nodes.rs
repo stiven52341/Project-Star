@@ -3,7 +3,7 @@
 //!
 //! It is written once for every way of running StarScript. Each one says
 //! what a node is with a [`Host`] — the generated Rust gives its `Rc`s of
-//! classes, the interpreter will give its own objects — and these functions
+//! classes, the interpreter its own objects — and these functions
 //! do the rest. It needs no engine, so console programs use it too.
 
 use std::cell::{Cell, Ref, RefCell};

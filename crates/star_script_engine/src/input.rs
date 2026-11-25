@@ -16,9 +16,10 @@ pub fn share_pointer(input: &Input, view: &Camera, window: WindowSize) {
 
 /// Copies the state of each action, in the order of `names` (the order
 /// they were declared to the runtime), where `Input` reads it.
-pub fn share_actions(input: &Input, names: &[&str]) {
+pub fn share_actions<Name: AsRef<str>>(input: &Input, names: &[Name]) {
     let actions = input.actions();
     for (index, name) in names.iter().enumerate() {
+        let name = name.as_ref();
         let state = ActionState {
             is_down: actions.is_down(name),
             just_pressed: actions.just_pressed(name),

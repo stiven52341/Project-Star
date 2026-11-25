@@ -7,9 +7,10 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use star_script_runtime::color::ColorFields;
+use star_script_runtime::game::GameFields;
 
 use crate::error::RunError;
-use crate::host::NodeParts;
+use crate::host::{Interpreted, NodeParts};
 use crate::tree::ClassRef;
 
 /// The elements of a list, shared by every value that refers to it.
@@ -50,6 +51,9 @@ pub(crate) enum Value {
     /// A `Node`, a `Camera2D` or an object of a class that extends one,
     /// with the runtime's fields of nodes.
     Node(Rc<Object<NodeParts>>),
+    /// The game: an object of the class that extends `Game`, with the
+    /// runtime's fields of games.
+    Game(Rc<Object<GameFields<Interpreted>>>),
 }
 
 /// An object: its class, the fields its script classes declare, and the
@@ -57,7 +61,7 @@ pub(crate) enum Value {
 /// reads by reference (decision 70). Without an engine class, `E` is
 /// `()`; code that only needs the script fields sees any object as an
 /// `Object<dyn Any>`.
-pub(crate) struct Object<E: ?Sized = ()> {
+pub struct Object<E: ?Sized = ()> {
     /// The class it was created as.
     pub(crate) class: ClassRef,
     /// The script fields of every class of its hierarchy, the root's first.
@@ -144,6 +148,7 @@ impl Value {
             Self::Object(object) => Some(&**object),
             Self::Color(object) => Some(&**object),
             Self::Node(object) => Some(&**object),
+            Self::Game(object) => Some(&**object),
             _ => None,
         }
     }
@@ -165,6 +170,7 @@ impl Value {
             (Self::Object(left), Self::Object(right)) => Rc::ptr_eq(left, right),
             (Self::Color(left), Self::Color(right)) => Rc::ptr_eq(left, right),
             (Self::Node(left), Self::Node(right)) => Rc::ptr_eq(left, right),
+            (Self::Game(left), Self::Game(right)) => Rc::ptr_eq(left, right),
             (Self::List(left), Self::List(right)) => {
                 if Rc::ptr_eq(left, right) {
                     return Ok(true);
@@ -194,7 +200,12 @@ impl Value {
             Self::Float(value) => Arc::from(star_script_runtime::float_to_string(value)),
             Self::Double(value) => Arc::from(star_script_runtime::float_to_string(value)),
             Self::Bool(value) => Arc::from(value.to_string()),
-            Self::Null | Self::List(_) | Self::Object(_) | Self::Color(_) | Self::Node(_) => {
+            Self::Null
+            | Self::List(_)
+            | Self::Object(_)
+            | Self::Color(_)
+            | Self::Node(_)
+            | Self::Game(_) => {
                 return Err(RunError::Internal("`to_string` of a value without text"));
             }
         })

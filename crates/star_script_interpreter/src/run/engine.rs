@@ -7,11 +7,13 @@ use std::sync::Arc;
 
 use star_script_runtime::Field;
 use star_script_runtime::color::ColorFields;
+use star_script_runtime::game::GameFields;
 use star_script_runtime::input::{action_state, axis, pointer};
+use star_script_runtime::nodes::Host as _;
 
 use super::object_of;
 use crate::error::RunError;
-use crate::host::NodeParts;
+use crate::host::{GameObject, Interpreted, NodeParts};
 use crate::tree::{ClassRef, EngineClass, EngineField, EngineMethod, FieldRef};
 use crate::value::{Object, Value};
 
@@ -32,11 +34,23 @@ pub(super) fn read_field(object: &Value, field: FieldRef) -> Result<Value, RunEr
     if let Some(number) = float_field(object, field) {
         return Ok(Value::Float(number.get()));
     }
+    if let Some(color) = color_field(object, field) {
+        return Ok(Value::Color(color.get()));
+    }
     match (object, field) {
         (Value::Node(node), EngineField::Name) => Ok(Value::String(
             node.engine.node.name.read(|name| Arc::from(name.as_str())),
         )),
         (Value::Node(node), EngineField::Main) => Ok(Value::Bool(camera_fields(node)?.main.get())),
+        (Value::Game(game), EngineField::Camera) => Ok(game
+            .engine
+            .camera
+            .read(|camera| {
+                camera
+                    .as_ref()
+                    .map(|camera| Value::Node(Rc::clone(camera.node())))
+            })
+            .unwrap_or(Value::Null)),
         _ => Err(MISSING_ENGINE_FIELD),
     }
 }
@@ -54,14 +68,27 @@ pub(super) fn write_field(object: &Value, field: FieldRef, value: Value) -> Resu
         number.set(value);
         return Ok(());
     }
+    if let Some(color) = color_field(object, field) {
+        let Value::Color(value) = value else {
+            return Err(WRONG_FIELD_VALUE);
+        };
+        color.set(value);
+        return Ok(());
+    }
     match (object, field, value) {
+        (Value::Game(game), EngineField::Camera, Value::Null) => game.engine.camera.set(None),
+        (Value::Game(game), EngineField::Camera, Value::Node(node)) => {
+            let camera = Interpreted::as_camera_2d(&node).ok_or(WRONG_FIELD_VALUE)?;
+            game.engine.camera.set(Some(camera));
+        }
         (Value::Node(node), EngineField::Name, Value::String(name)) => {
             node.engine.node.name.set(name.to_string());
         }
         (Value::Node(node), EngineField::Main, Value::Bool(main)) => {
             camera_fields(node)?.main.set(main);
         }
-        (Value::Node(_), EngineField::Name | EngineField::Main, _) => {
+        (Value::Node(_), EngineField::Name | EngineField::Main, _)
+        | (Value::Game(_), EngineField::Camera, _) => {
             return Err(WRONG_FIELD_VALUE);
         }
         _ => return Err(MISSING_ENGINE_FIELD),
@@ -86,6 +113,19 @@ fn float_field(object: &Value, field: EngineField) -> Option<&Field<f32>> {
             .camera_2d
             .as_deref()
             .map(|camera| &camera.view_height),
+        _ => None,
+    }
+}
+
+/// The runtime's field `field` of `object`, if it holds a color.
+fn color_field(object: &Value, field: EngineField) -> Option<&Field<Rc<Object<ColorFields>>>> {
+    let Value::Game(game) = object else {
+        return None;
+    };
+    match field {
+        EngineField::Background => Some(&game.engine.background),
+        EngineField::Ambient => Some(&game.engine.ambient),
+        EngineField::Ambient2D => Some(&game.engine.ambient_2d),
         _ => None,
     }
 }
@@ -121,7 +161,21 @@ pub(super) fn new_object(
             let parts = NodeParts::new(engine, name.to_string());
             Value::Node(Rc::new(Object::new(class, fields, parts)))
         }
+        EngineClass::Game => {
+            let game: GameObject = Object::new(class, fields, GameFields::new(game_root()));
+            Value::Game(Rc::new(game))
+        }
     })
+}
+
+/// The root of a game's tree: a `Node` called `Game`, as compiled.
+fn game_root() -> Rc<Object<NodeParts>> {
+    let name = EngineClass::Game.name().to_owned();
+    Rc::new(Object::new(
+        EngineClass::Node.class(),
+        Vec::new(),
+        NodeParts::new(EngineClass::Node, name),
+    ))
 }
 
 /// Runs a static method of the engine.
@@ -141,6 +195,15 @@ pub(super) fn call(method: EngineMethod, arguments: &[Value]) -> Result<Value, R
         (EngineMethod::PointerX, []) => Value::Float(pointer().x),
         (EngineMethod::PointerY, []) => Value::Float(pointer().y),
         (EngineMethod::HasPointer, []) => Value::Bool(pointer().is_present),
+        (EngineMethod::Quit, [Value::Game(game)]) => {
+            game.engine.quit();
+            Value::Null
+        }
+        (EngineMethod::AddChild, [Value::Game(game), Value::Node(node)]) => {
+            game.engine.add_child(Rc::clone(node));
+            Value::Null
+        }
+        (EngineMethod::BaseHook, _) => Value::Null,
         _ => return Err(RunError::Internal("engine method with other arguments")),
     })
 }

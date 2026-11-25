@@ -20,6 +20,19 @@ const DEBUG_CLASS: &str = "Debug";
 const TIME_CLASS: &str = "Time";
 /// The engine class that reads the game's input.
 const INPUT_CLASS: &str = "Input";
+/// The engine class of games.
+const GAME_CLASS: &str = "Game";
+/// The engine class of nodes.
+const NODE_CLASS: &str = "Node";
+
+/// How a method is called on its object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Through {
+    /// On an object (`self` included), with `?.` or not.
+    Object { null_safe: bool },
+    /// `super.method(…)`: the base's version, on `self`.
+    Super,
+}
 
 impl Body<'_> {
     /// The interpreter's version of `expression`.
@@ -360,10 +373,7 @@ impl Body<'_> {
                     })?;
                     Ok(Expression::Engine { method, arguments })
                 }
-                _ => Err(LowerError::unsupported(
-                    "this method of the engine",
-                    callee.span,
-                )),
+                (class, name) => self.engine_object_method(callee, class, name, arguments),
             };
         }
         let function = self
@@ -378,26 +388,18 @@ impl Body<'_> {
                 arguments,
             });
         }
-        let (receiver, null_safe) = match &callee.kind {
-            ExprKind::Name(_) => (self.self_value(callee)?, false),
-            ExprKind::Member { object, .. } if matches!(object.kind, ExprKind::Super) => {
+        let (receiver, call) = self.receiver(callee)?;
+        let null_safe = match call {
+            Through::Super => {
                 // The base's version, whatever the object overrides.
                 return Ok(Expression::CallMethod {
                     target: MethodTarget::Direct(function),
-                    receiver: Box::new(self.self_value(callee)?),
+                    receiver: Box::new(receiver),
                     arguments,
                     null_safe: false,
                 });
             }
-            ExprKind::Member {
-                object, null_safe, ..
-            } => (self.expression(object)?, *null_safe),
-            _ => {
-                return Err(LowerError::internal(
-                    "method called through an expression",
-                    callee.span,
-                ));
-            }
+            Through::Object { null_safe } => null_safe,
         };
         // `private` methods are not overridden: they run their own code.
         let target = if method.is_private {
@@ -416,6 +418,61 @@ impl Body<'_> {
             receiver: Box::new(receiver),
             arguments,
             null_safe,
+        })
+    }
+
+    /// The object a method is called on, and how it is written: `self`
+    /// for a bare name or `super`, else the object written.
+    fn receiver(&self, callee: &Expr) -> Result<(Expression, Through), LowerError> {
+        Ok(match &callee.kind {
+            ExprKind::Name(_) => (
+                self.self_value(callee)?,
+                Through::Object { null_safe: false },
+            ),
+            ExprKind::Member { object, .. } if matches!(object.kind, ExprKind::Super) => {
+                (self.self_value(callee)?, Through::Super)
+            }
+            ExprKind::Member {
+                object, null_safe, ..
+            } => (
+                self.expression(object)?,
+                Through::Object {
+                    null_safe: *null_safe,
+                },
+            ),
+            _ => {
+                return Err(LowerError::internal(
+                    "method called through an expression",
+                    callee.span,
+                ));
+            }
+        })
+    }
+
+    /// A method of an object of an engine class (`class`), with its
+    /// receiver as the first argument: `quit` and `add_child` of `Game`,
+    /// and the engine's own `start` and `update`, reached through `super`,
+    /// which do nothing.
+    fn engine_object_method(
+        &self,
+        callee: &Expr,
+        class: &str,
+        name: &str,
+        arguments: Vec<Expression>,
+    ) -> Result<Expression, LowerError> {
+        let unsupported = || LowerError::unsupported("this method of the engine", callee.span);
+        let (receiver, call) = self.receiver(callee).map_err(|_| unsupported())?;
+        let method = match (class, name, call) {
+            (GAME_CLASS, "quit", Through::Object { null_safe: false }) => EngineMethod::Quit,
+            (GAME_CLASS, "add_child", Through::Object { null_safe: false }) => {
+                EngineMethod::AddChild
+            }
+            (GAME_CLASS | NODE_CLASS, "start" | "update", Through::Super) => EngineMethod::BaseHook,
+            _ => return Err(unsupported()),
+        };
+        Ok(Expression::Engine {
+            method,
+            arguments: std::iter::once(receiver).chain(arguments).collect(),
         })
     }
 

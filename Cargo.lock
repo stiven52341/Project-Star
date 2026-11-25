@@ -3300,7 +3300,9 @@ dependencies = [
 name = "star_script_interpreter"
 version = "0.1.0"
 dependencies = [
+ "star_engine",
  "star_script",
+ "star_script_engine",
  "star_script_runtime",
 ]
 

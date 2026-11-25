@@ -5,7 +5,11 @@ use std::rc::Rc;
 
 use star_script::check_source;
 
-use crate::{LowerErrorKind, Output, Program, RunError};
+use star_script_runtime::nodes::Host as _;
+use star_script_runtime::{game, tasks};
+
+use crate::host::Interpreted;
+use crate::{LowerErrorKind, Output, Program, ProgramKind, RunError, end_game};
 
 /// What `source` prints when interpreted, or why it stopped.
 fn run(source: &str) -> Result<String, RunError> {
@@ -239,4 +243,134 @@ fn engine_objects_keep_their_fields_and_classes() {
         run(source).expect("a program that runs"),
         "0.5 1 true\ntrue false\n0.75\n"
     );
+}
+
+/// The seconds of each frame of [`play`].
+const DELTA: f32 = 0.5;
+
+/// Plays the game `source` without a window, as `star_script_engine`
+/// does, for at most `frames` frames of [`DELTA`] seconds: what it
+/// printed, and how it ended.
+fn play(source: &str, frames: usize) -> (String, Result<(), RunError>) {
+    let checked = check_source(source).expect("a valid program");
+    let program = Program::lower(&checked).expect("a program the interpreter runs");
+    assert_eq!(program.kind(), ProgramKind::Game);
+    let (buffer, output) = buffer();
+    let game = program
+        .new_game(&output)
+        .expect("a game that can be created");
+    Interpreted::start_game(&game);
+    let mut nodes = Vec::new();
+    for _ in 0..frames {
+        if Interpreted::game(&game).is_quit_requested() {
+            break;
+        }
+        tasks::frame_started(DELTA);
+        game::run_frame::<Interpreted>(&game, DELTA, &mut nodes);
+        tasks::resume();
+    }
+    let result = end_game();
+    let printed = String::from_utf8(buffer.take()).expect("UTF-8 output");
+    (printed, result)
+}
+
+#[test]
+fn games_start_update_and_quit() {
+    let source = "class Counter extends Game {\n var frames = 0\n \
+                  override func start() {\n Debug.print(\"start \" + background.r.to_string())\n background = Color(0.5, 0.0, 0.0, 1.0)\n }\n \
+                  override func update(delta: float) {\n frames += 1\n \
+                  Debug.print(\"frame \" + frames.to_string() + \" \" + delta.to_string() + \" \" + background.r.to_string())\n \
+                  if frames == 3 {\n quit()\n }\n }\n}\n";
+
+    let (printed, result) = play(source, 10);
+
+    assert_eq!(
+        printed,
+        "start 0.0\nframe 1 0.5 0.5\nframe 2 0.5 0.5\nframe 3 0.5 0.5\n"
+    );
+    assert!(result.is_ok(), "{result:?}");
+}
+
+#[test]
+fn nodes_of_the_game_run_and_main_cameras_are_seen_from() {
+    let source = "class Eye extends Camera2D {\n init() {\n super.init(\"Eye\")\n main = true\n }\n \
+                  override func start() {\n super.start()\n Debug.print(\"eye start\")\n }\n \
+                  override func update(delta: float) {\n x += delta\n Debug.print(\"eye \" + x.to_string())\n }\n}\n\
+                  class Level extends Game {\n init() {\n add_child(Eye())\n }\n \
+                  override func update(delta: float) {\n Debug.print(\"camera \" + (camera?.name ?? \"none\"))\n \
+                  if (camera?.x ?? 0.0) >= 1.0 {\n quit()\n }\n }\n}\n";
+
+    let (printed, result) = play(source, 10);
+
+    assert_eq!(
+        printed,
+        "camera none\neye start\neye 0.5\ncamera Eye\neye 1.0\ncamera Eye\neye 1.5\n"
+    );
+    assert!(result.is_ok(), "{result:?}");
+}
+
+#[test]
+fn runtime_errors_close_the_game_and_stop_its_code() {
+    let source = "class Broken extends Game {\n var values = [1]\n var frames = 0\n \
+                  override func update(delta: float) {\n frames += 1\n Debug.print(\"frame \" + frames.to_string())\n \
+                  if frames == 2 {\n Debug.print(values[3].to_string())\n }\n }\n}\n";
+
+    let (printed, result) = play(source, 10);
+
+    assert_eq!(printed, "frame 1\nframe 2\n");
+    let Err(RunError::Fault(error)) = result else {
+        panic!("a runtime error, found {result:?}");
+    };
+    assert!(
+        error.message().contains("out of range"),
+        "{}",
+        error.message()
+    );
+}
+
+#[test]
+fn errors_of_coroutines_close_the_game_too() {
+    let source = "class Waiting extends Game {\n override func start() {\n fail_later()\n }\n \
+                  async func fail_later() {\n await Time.next_frame()\n \
+                  Debug.print(\"later\")\n Debug.print([1][2].to_string())\n }\n \
+                  override func update(delta: float) {\n Debug.print(\"frame\")\n }\n}\n";
+
+    let (printed, result) = play(source, 10);
+
+    // `next_frame` before the first frame goes on in the second, as compiled:
+    // both use the runtime's scheduler.
+    assert_eq!(printed, "frame\nframe\nlater\n");
+    assert!(matches!(result, Err(RunError::Fault(_))), "{result:?}");
+}
+
+#[test]
+fn games_and_console_programs_are_run_their_own_way() {
+    let game = "class Empty extends Game {\n}\n";
+    let program = Program::lower(&check_source(game).expect("a valid program"))
+        .expect("a program the interpreter runs");
+    let (_, output) = buffer();
+    assert!(matches!(
+        program.run(&output),
+        Err(RunError::WrongKind(ProgramKind::Game))
+    ));
+
+    let console = "class Main {\n static func main() {\n }\n}\n";
+    let program = Program::lower(&check_source(console).expect("a valid program"))
+        .expect("a program the interpreter runs");
+    assert_eq!(program.kind(), ProgramKind::Console);
+    assert!(matches!(
+        program.new_game(&output),
+        Err(RunError::WrongKind(ProgramKind::Console))
+    ));
+}
+
+#[test]
+fn games_need_no_arguments_and_one_entry_point() {
+    let arguments = "class Sized extends Game {\n var size: int\n init(size: int) {\n self.size = size\n }\n}\n";
+    assert_eq!(
+        lowering_error(arguments),
+        LowerErrorKind::GameNeedsArguments
+    );
+    let both = "class Played extends Game {\n}\nclass Main {\n static func main() {\n }\n}\n";
+    assert_eq!(lowering_error(both), LowerErrorKind::SeveralEntryPoints);
 }

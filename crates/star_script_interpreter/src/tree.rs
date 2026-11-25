@@ -16,9 +16,19 @@ pub(crate) struct Code {
     pub(crate) functions: Vec<Function>,
     pub(crate) constructors: Vec<Constructor>,
     pub(crate) classes: Vec<Class>,
-    /// What starts the program: a call of `static func main()`, or its
-    /// start as a coroutine if it is `async`.
-    pub(crate) main: Statement,
+    /// What starts the program.
+    pub(crate) entry: Entry,
+}
+
+/// What starts a program.
+#[derive(Debug)]
+pub(crate) enum Entry {
+    /// A console program: a call of `static func main()`, or its start as
+    /// a coroutine if it is `async`.
+    Main(Statement),
+    /// A game: the constructor of the class that extends `Game`, whose
+    /// object the engine plays.
+    Game(ConstructorId),
 }
 
 /// Position of a function in the program.
@@ -39,12 +49,13 @@ pub(crate) enum EngineClass {
     Color,
     Node,
     Camera2D,
+    Game,
 }
 
 impl EngineClass {
     /// Every engine class the interpreter knows, in the order of their
     /// places.
-    pub(crate) const ALL: [Self; 3] = [Self::Color, Self::Node, Self::Camera2D];
+    pub(crate) const ALL: [Self; 4] = [Self::Color, Self::Node, Self::Camera2D, Self::Game];
 
     /// Its place among the classes.
     pub(crate) const fn class(self) -> ClassRef {
@@ -57,6 +68,7 @@ impl EngineClass {
             Self::Color => "Color",
             Self::Node => "Node",
             Self::Camera2D => "Camera2D",
+            Self::Game => "Game",
         }
     }
 }
@@ -74,6 +86,12 @@ pub(crate) struct Class {
     pub(crate) methods: Vec<FunctionId>,
     /// The class itself and its bases: what `is` accepts.
     pub(crate) ancestors: Vec<ClassRef>,
+    /// The `start` its objects run when the engine starts them, if a
+    /// script wrote one (the engine's does nothing). Overrides of the
+    /// engine's methods are never `async`.
+    pub(crate) start: Option<FunctionId>,
+    /// The `update` its objects run every frame, if a script wrote one.
+    pub(crate) update: Option<FunctionId>,
 }
 
 /// How objects of a class are built, in the two phases of the language.
@@ -142,6 +160,11 @@ pub(crate) enum EngineField {
     /// `view_height` and `main` of `Camera2D`.
     ViewHeight,
     Main,
+    /// `background`, `camera`, `ambient` and `ambient_2d` of `Game`.
+    Background,
+    Camera,
+    Ambient,
+    Ambient2D,
 }
 
 /// A static method of the engine that reads the runtime.
@@ -163,6 +186,13 @@ pub(crate) enum EngineMethod {
     PointerY,
     /// `Input.has_pointer()`.
     HasPointer,
+    /// `game.quit()`, with the game as its argument.
+    Quit,
+    /// `game.add_child(node)`, with the game and the node as arguments.
+    AddChild,
+    /// `super.start()` or `super.update(delta)` of an engine class, which
+    /// do nothing (with their receiver and arguments).
+    BaseHook,
 }
 
 /// Which function a call of a method of an object runs.

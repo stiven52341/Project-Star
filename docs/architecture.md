@@ -31,10 +31,12 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
                         dependencies; games use it)
          star_script_engine ── connects the runtime with star_engine:
                         scenes, sounds, input, the scene player's
-                        arguments (games use it; the interpreter will)
+                        arguments (compiled games use it, and
+                        interpreted ones through the interpreter's Host)
          star_script_interpreter ── runs checked StarScript without
                         building it, for “Play” (star_script and
-                        star_script_runtime only, for now)
+                        star_script_runtime only: the player joins it
+                        with star_script_engine)
          star_blueprint ── blueprints: node graphs, `.blueprint` files
                         (serde + toml) and their translation to StarScript
 ```

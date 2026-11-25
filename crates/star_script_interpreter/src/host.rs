@@ -1,10 +1,14 @@
 //! The interpreter as a [`Host`] of `star_script_runtime` (decision 70):
-//! what its nodes, colors and bodies are, so the runtime's fields and its
-//! code of nodes work on them as on the compiled game's.
+//! what its nodes, colors, bodies and game are, so the runtime's fields,
+//! its code of nodes and `star_script_engine`'s game loop work on them as
+//! on the compiled game's. A game is played with
+//! `star_script_engine::game::run::<Interpreted>` and a game from
+//! [`crate::Program::new_game`].
 //!
-//! The engine classes of later steps of Phase 14 (`Node3D`, `Camera3D`,
-//! the game) are [`NotYet`] here: no value of them exists, so the runtime
-//! is never handed one.
+//! Its types are public only so the engine can name them; what they hold
+//! stays the interpreter's. The engine classes of later steps of Phase 14
+//! (`Node3D`, `Camera3D`) are [`NotYet`] here: no value of them exists, so
+//! the runtime is never handed one.
 
 use std::rc::{Rc, Weak};
 
@@ -18,22 +22,29 @@ use star_script_runtime::nodes::{Host, Node3dFields, NodeFields};
 use star_script_runtime::scene_fields::SceneValue;
 use star_script_runtime::scene_tree::NewNode;
 
+use crate::play;
+use crate::run::Hook;
 use crate::tree::EngineClass;
-use crate::value::Object;
+use crate::value::Value;
+
+pub use crate::value::Object;
 
 /// The interpreter's objects, as the runtime sees them.
-pub(crate) enum Interpreted {}
+pub enum Interpreted {}
 
 /// An engine class the interpreter cannot make objects of yet.
 #[derive(Clone, Copy)]
-pub(crate) enum NotYet {}
+pub enum NotYet {}
 
 /// An object of `Node`, `Camera2D` or a class that extends one.
-pub(crate) type NodeObject = Object<NodeParts>;
+pub type NodeObject = Object<NodeParts>;
+
+/// The game: an object of the class that extends `Game`.
+pub type GameObject = Object<GameFields<Interpreted>>;
 
 /// The runtime's fields of a node: those of `Node`, and those of its node
 /// class.
-pub(crate) struct NodeParts {
+pub struct NodeParts {
     pub(crate) node: NodeFields<Interpreted>,
     /// The fields of `Camera2D`, if it is one: kept apart, so a camera can
     /// be handed out with them.
@@ -52,9 +63,16 @@ impl NodeParts {
 
 /// A `Camera2D`: the node, and its fields of camera.
 #[derive(Clone)]
-pub(crate) struct CameraRef {
+pub struct CameraRef {
     node: Rc<NodeObject>,
     fields: Rc<Camera2dFields>,
+}
+
+impl CameraRef {
+    /// The camera as a node.
+    pub(crate) const fn node(&self) -> &Rc<NodeObject> {
+        &self.node
+    }
 }
 
 /// Why the interpreter cannot make the nodes of scenes yet.
@@ -68,7 +86,7 @@ impl Host for Interpreted {
     type Camera3D = NotYet;
     type Body = Rc<BodyFields<Self>>;
     type Color = Rc<Object<ColorFields>>;
-    type Game = NotYet;
+    type Game = Rc<GameObject>;
 
     fn node(node: &Self::Node) -> &NodeFields<Self> {
         &node.engine.node
@@ -176,22 +194,24 @@ impl Host for Interpreted {
         Rc::new(fields)
     }
 
-    // Nodes only run code of their own in a game's tree, and the
-    // interpreter runs no game yet (Phase 14.6b).
-    fn start(_node: &Self::Node) {}
+    fn start(node: &Self::Node) {
+        play::run_hook(Value::Node(Rc::clone(node)), Hook::Start);
+    }
 
-    fn update(_node: &Self::Node, _delta: f32) {}
+    fn update(node: &Self::Node, delta: f32) {
+        play::run_hook(Value::Node(Rc::clone(node)), Hook::Update(delta));
+    }
 
     fn game(game: &Self::Game) -> &GameFields<Self> {
-        match *game {}
+        &game.engine
     }
 
     fn start_game(game: &Self::Game) {
-        match *game {}
+        play::run_hook(Value::Game(Rc::clone(game)), Hook::Start);
     }
 
-    fn update_game(game: &Self::Game, _delta: f32) {
-        match *game {}
+    fn update_game(game: &Self::Game, delta: f32) {
+        play::run_hook(Value::Game(Rc::clone(game)), Hook::Update(delta));
     }
 }
 

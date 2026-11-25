@@ -403,6 +403,10 @@ fn engine_field(class: &str, field: &str) -> Option<EngineField> {
         ("Node", "scale_y") => EngineField::ScaleY,
         ("Camera2D", "view_height") => EngineField::ViewHeight,
         ("Camera2D", "main") => EngineField::Main,
+        ("Game", "background") => EngineField::Background,
+        ("Game", "camera") => EngineField::Camera,
+        ("Game", "ambient") => EngineField::Ambient,
+        ("Game", "ambient_2d") => EngineField::Ambient2D,
         _ => return None,
     })
 }

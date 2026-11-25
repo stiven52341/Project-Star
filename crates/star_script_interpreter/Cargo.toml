@@ -12,5 +12,17 @@ repository.workspace = true
 star_script.workspace = true
 star_script_runtime.workspace = true
 
+# Only the window test joins the interpreter with the engine (decision 70):
+# the interpreter itself stays a tool without it.
+[dev-dependencies]
+star_engine.workspace = true
+star_script_engine.workspace = true
+
+# Opens a window, which needs the main thread: run it with
+# `cargo test -p star_script_interpreter --test window -- --ignored`.
+[[test]]
+name = "window"
+harness = false
+
 [lints]
 workspace = true

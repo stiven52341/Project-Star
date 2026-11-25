@@ -16,8 +16,8 @@ use star_script::semantic::{
 
 use crate::error::{LowerError, LowerErrorKind};
 use crate::tree::{
-    Class, ClassRef, Code, ConstructorId, ConstructorRef, Coroutine, EngineClass, Expression,
-    Function, FunctionId, Statement,
+    Class, ClassRef, Code, ConstructorId, ConstructorRef, Coroutine, EngineClass, Entry,
+    Expression, Function, FunctionId, Statement,
 };
 use body::Body;
 
@@ -64,7 +64,7 @@ impl Tables {
 }
 
 /// The engine classes that classes of the program can extend for now.
-const EXTENDABLE: [EngineClass; 2] = [EngineClass::Node, EngineClass::Camera2D];
+const EXTENDABLE: [EngineClass; 3] = [EngineClass::Node, EngineClass::Camera2D, EngineClass::Game];
 
 /// A member of the program, before its code is lowered.
 enum Pending<'a> {
@@ -120,7 +120,7 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
                         declaration.name.span,
                     ));
                 }
-                main = Some(entry_point(function, method));
+                main = Some((entry_point(function, method), declaration.name.span));
             }
             if !method.is_static && !method.is_private {
                 overridable.push((index, function));
@@ -151,8 +151,7 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
         });
     }
     method_tables(analysis, &mut tables, &classes, &order)?;
-    let main =
-        main.ok_or_else(|| LowerError::new(LowerErrorKind::NoEntryPoint, Span::new(0, 0)))?;
+    let entry = entry(analysis, &tables, &classes, main)?;
     let functions = pending
         .iter()
         .map(|member| function(analysis, &tables, member))
@@ -170,17 +169,97 @@ pub(crate) fn program(syntax: &SourceFile, analysis: &Analysis) -> Result<Code, 
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let classes = tables
-        .methods
-        .into_iter()
-        .zip(tables.ancestors)
-        .map(|(methods, ancestors)| Class { methods, ancestors })
+    let classes = order
+        .iter()
+        .zip(tables.methods.iter().zip(&tables.ancestors))
+        .map(|(id, (methods, ancestors))| Class {
+            methods: methods.clone(),
+            ancestors: ancestors.clone(),
+            start: written_override(analysis, &tables, *id, START),
+            update: written_override(analysis, &tables, *id, UPDATE),
+        })
         .collect();
     Ok(Code {
         functions,
         constructors,
         classes,
-        main,
+        entry,
+    })
+}
+
+/// What starts the program: `main`, or the class that extends `Game`
+/// without being extended, as compiled; never both, nor two of them.
+fn entry(
+    analysis: &Analysis,
+    tables: &Tables,
+    classes: &[ScriptClass<'_>],
+    main: Option<(Statement, Span)>,
+) -> Result<Entry, LowerError> {
+    let table = analysis.classes();
+    let game = table
+        .find(EngineClass::Game.name())
+        .ok_or_else(|| LowerError::internal("engine class missing", Span::new(0, 0)))?;
+    let mut games = classes.iter().filter(|class| {
+        table.is_subclass(class.id, game)
+            && !classes
+                .iter()
+                .any(|other| other.info.base == Some(class.id))
+    });
+    let first = games.next();
+    let several = |span| Err(LowerError::new(LowerErrorKind::SeveralEntryPoints, span));
+    if let Some(other) = games.next() {
+        return several(other.declaration.name.span);
+    }
+    match (main, first) {
+        (Some(_), Some(game)) => several(game.declaration.name.span),
+        (Some((main, _)), None) => Ok(Entry::Main(main)),
+        (None, Some(game)) => {
+            let span = game.declaration.name.span;
+            if !game.info.constructor_parameters().is_empty() {
+                return Err(LowerError::new(LowerErrorKind::GameNeedsArguments, span));
+            }
+            let constructor = tables
+                .constructors
+                .get(&game.id)
+                .copied()
+                .ok_or_else(|| LowerError::internal("game without a constructor", span))?;
+            Ok(Entry::Game(constructor))
+        }
+        (None, None) => Err(LowerError::new(
+            LowerErrorKind::NoEntryPoint,
+            Span::new(0, 0),
+        )),
+    }
+}
+
+/// What the engine calls on nodes and games once.
+const START: &str = "start";
+/// What the engine calls on nodes and games every frame.
+const UPDATE: &str = "update";
+
+/// The method `name` of objects of `class` that a script wrote, in the
+/// class or its closest base that has one: what the engine runs instead of
+/// its own `start` or `update`.
+fn written_override(
+    analysis: &Analysis,
+    tables: &Tables,
+    class: ClassId,
+    name: &str,
+) -> Option<FunctionId> {
+    let table = analysis.classes();
+    table.ancestors(class).find_map(|ancestor| {
+        let info = table.class(ancestor);
+        if info.origin == ClassOrigin::Native {
+            return None;
+        }
+        let index = info
+            .methods
+            .iter()
+            .position(|method| method.name == name && !method.is_static)?;
+        tables
+            .functions
+            .get(&Member::Method(ancestor, index))
+            .copied()
     })
 }
 

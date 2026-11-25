@@ -19,10 +19,13 @@ pub struct LowerError {
 pub enum LowerErrorKind {
     /// A part of StarScript the interpreter cannot run yet.
     Unsupported(&'static str),
-    /// No class has a `static func main()`.
+    /// No class has a `static func main()` or extends `Game`.
     NoEntryPoint,
-    /// More than one class has a `static func main()`.
+    /// More than one class has a `static func main()`, or extends `Game`
+    /// without being extended, or both.
     SeveralEntryPoints,
+    /// The game's class needs arguments to be created.
+    GameNeedsArguments,
     /// The analysis does not describe the program as expected: a bug of
     /// the interpreter or of the analysis, not of the program.
     Internal(&'static str),
@@ -49,11 +52,13 @@ impl fmt::Display for LowerError {
                 write!(formatter, "the interpreter cannot run {what} yet")
             }
             LowerErrorKind::NoEntryPoint => {
-                formatter.write_str("the program has no `static func main()`")
+                formatter.write_str("the program has no `static func main()` and no game class")
             }
-            LowerErrorKind::SeveralEntryPoints => {
-                formatter.write_str("the program has more than one `static func main()`")
-            }
+            LowerErrorKind::SeveralEntryPoints => formatter
+                .write_str("the program has more than one `static func main()` or game class"),
+            LowerErrorKind::GameNeedsArguments => formatter.write_str(
+                "the game must be creatable without arguments: its `init` cannot have parameters",
+            ),
             LowerErrorKind::Internal(what) => {
                 write!(formatter, "internal interpreter error: {what}")
             }
@@ -70,6 +75,9 @@ pub enum RunError {
     Fault(RuntimeError),
     /// What the program printed could not be written.
     Output(io::Error),
+    /// The program was run as what it is not: a game as a console
+    /// program, or the other way round. It holds what the program is.
+    WrongKind(crate::ProgramKind),
     /// The interpreter's tree did not hold what running expected: a bug of
     /// the interpreter, not of the program.
     Internal(&'static str),
@@ -86,6 +94,12 @@ impl fmt::Display for RunError {
         match self {
             Self::Fault(error) => error.fmt(formatter),
             Self::Output(error) => write!(formatter, "cannot write the program's output: {error}"),
+            Self::WrongKind(crate::ProgramKind::Game) => {
+                formatter.write_str("the program is a game: play it in a window")
+            }
+            Self::WrongKind(crate::ProgramKind::Console) => {
+                formatter.write_str("the program is a console program, not a game")
+            }
             Self::Internal(what) => write!(formatter, "internal interpreter error: {what}"),
         }
     }
@@ -96,7 +110,7 @@ impl std::error::Error for RunError {
         match self {
             Self::Fault(error) => Some(error),
             Self::Output(error) => Some(error),
-            Self::Internal(_) => None,
+            Self::WrongKind(_) | Self::Internal(_) => None,
         }
     }
 }

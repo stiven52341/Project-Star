@@ -146,22 +146,22 @@ impl Machine {
         }
     }
 
-    /// Keeps the first error of a coroutine.
-    fn fail(&self, error: RunError) {
+    /// Keeps the first error of a coroutine (or of a game's code).
+    pub(crate) fn fail(&self, error: RunError) {
         if let Ok(mut failure) = self.failure.try_borrow_mut() {
             failure.get_or_insert(error);
         }
     }
 
     /// Whether a coroutine failed.
-    pub(super) fn has_failed(&self) -> bool {
+    pub(crate) fn has_failed(&self) -> bool {
         self.failure
             .try_borrow()
             .is_ok_and(|failure| failure.is_some())
     }
 
     /// The error of the coroutine that failed, if one did.
-    pub(super) fn take_failure(&self) -> Option<RunError> {
+    pub(crate) fn take_failure(&self) -> Option<RunError> {
         self.failure.try_borrow_mut().ok()?.take()
     }
 

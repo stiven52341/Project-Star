@@ -649,7 +649,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           inside a `parallel` function the same call stays a plain call.
           The thread runs the shared program with a `Machine` of its own,
           whose output goes nowhere, since such a function cannot print.
-  - [ ] 14.6 Games: `Game` (`start`, `update`, `quit`) in a window of the
+  - [x] 14.6 Games: `Game` (`start`, `update`, `quit`) in a window of the
         engine, `Input` and its actions, `Color`, `Camera2D`, using the
         engine classes that f1 made shared.
         Design approved by the owner (decision 70, 2026-11-24):
@@ -715,10 +715,19 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           no new code for them. `Color` cannot be extended (as compiled),
           so `colors.star` keeps colors in an object of its own instead;
           `Node`'s methods, `tags` and `body` stay for 14.7 and 14.8.
-    - [ ] 14.6b Games: the interpreter as a `Host`, a class that extends
+    - [x] 14.6b Games: the interpreter as a `Host`, a class that extends
           `Game` as the entry point, owned action names, errors that close
           the game, frames without a window in unit tests and the ignored
-          window test.
+          window test. `Program::new_game` creates the game and keeps it
+          per thread (`play.rs`) until `end_game`, which gives the error
+          that closed it. Each class knows the `start` and `update` a
+          script wrote, so the engine's calls need no lookup by name;
+          `super.start()` and `super.update(delta)` of the engine do
+          nothing. `Game.add_child` came too, since nodes in the game's
+          tree is what makes a `main` camera the game's (the methods of
+          `Node` stay for 14.7). The window test has no test harness (a
+          window needs the main thread) and plays only with
+          `-- --ignored`; it passed on this machine.
   - [ ] 14.7 Nodes and scenes: `Node`, `Sprite`, `Scene.load`, script
         classes named by scenes, `export var` values, tags and
         `find_by_name`/`find_by_tag`, global and local positions.

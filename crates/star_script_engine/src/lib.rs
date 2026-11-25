@@ -5,7 +5,8 @@
 //! for every program — reading scenes, playing sounds, sharing the input
 //! with the runtime, the scene player's arguments — as ordinary Rust, built
 //! once with the engine instead of being generated again into every game.
-//! The StarScript interpreter will use it too (decision 64).
+//! The StarScript interpreter uses it too, as one more `Host` of the
+//! runtime (decisions 64 and 70).
 
 pub mod audio;
 pub mod game;

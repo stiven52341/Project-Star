@@ -35,7 +35,9 @@ pub struct PointerState {
 }
 
 struct Action {
-    name: &'static str,
+    /// Its own copy of the name: an interpreted game reads its actions
+    /// when it starts, so they are not part of the program.
+    name: Box<str>,
     state: ActionState,
 }
 
@@ -47,13 +49,13 @@ thread_local! {
 }
 
 /// Sets the actions of the game, all released. Called once, when it starts.
-pub fn declare_actions(names: &[&'static str]) {
+pub fn declare_actions(names: &[&str]) {
     ACTIONS.with(|actions| {
         if let Ok(mut actions) = actions.try_borrow_mut() {
             *actions = names
                 .iter()
                 .map(|name| Action {
-                    name,
+                    name: Box::from(*name),
                     state: ActionState::default(),
                 })
                 .collect();
@@ -83,7 +85,7 @@ pub fn action_state(name: &str) -> ActionState {
             .and_then(|actions| {
                 actions
                     .iter()
-                    .find(|action| action.name == name)
+                    .find(|action| &*action.name == name)
                     .map(|action| action.state)
             })
             .unwrap_or_default()
