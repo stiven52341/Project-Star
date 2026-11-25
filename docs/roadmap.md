@@ -550,6 +550,51 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         output interpreted and compiled.
   - [ ] 14.4 Coroutines: `async`/`await`, `Time.wait` and
         `Time.next_frame`, run once per frame, and ending with their node.
+        Design proposed to the owner (awaiting approval):
+        - An interpreted coroutine is a Rust future, so it can stop at an
+          `await` and go on in another frame. The body of an `async`
+          method is run by a second, `async` version of the runner; it
+          becomes a `star_script_runtime::Task` like a compiled `async`
+          method, and goes through the same functions: `tasks::start`
+          for a call written alone, `.await` for `await`, and
+          `tasks::wait`, `tasks::next_frame` and the game's clock for
+          `Time`. So interpreted and compiled coroutines share one
+          scheduler, and they start, wait and go on in the same order.
+          The coroutines of a node will use `Task::owned`, as compiled,
+          when nodes come (14.6).
+        - Only what can wait is run as a future: lowering marks the
+          statements and expressions that contain an `await`, and the
+          `async` runner hands everything else to the usual runner. A
+          future boxed per step only exists along the way to an
+          `await`; methods that are not `async` (`update` and the rest)
+          run as now, without allocations.
+        - A coroutine outlives the call that started it, so the program
+          and its output are shared (`Rc`) instead of borrowed:
+          `Program::lower` gives a program that can be cloned at no
+          cost, and `Debug.print` writes to an output that the caller
+          gives once and can read back (a buffer in tests, the console
+          in the player).
+        - Runtime errors in a coroutine: the compiled game stops with a
+          fault from wherever it happens. The interpreter keeps the first
+          error of a coroutine; the console loop (and later the game
+          loop) checks it after each turn of coroutines and stops the
+          program with it, as it does for errors of `main`. The runtime
+          gets `tasks::clear`, so the waiting coroutines of a stopped
+          program do not run later.
+        - Console programs: `main` (which can be `async`) runs, and then
+          the coroutines still waiting go on with the clock moved by
+          real time, as `tasks::run_until_finished` does, until none is
+          left or one fails.
+        - Rejected: rewriting the runner as an explicit stack machine
+          whose frames can be kept and resumed (a large rewrite of what
+          works, and a scheduler of its own beside the runtime's, whose
+          order would have to be kept identical by hand).
+    - [ ] 14.4a A shared program and output (`Rc`), with no change in
+          what programs do.
+    - [ ] 14.4b `async` methods, `await`, coroutines started by a call
+          alone, `Time.wait`, `Time.next_frame`, `async main` and errors
+          in coroutines: `coroutines.star` gives the same output
+          interpreted and compiled.
   - [ ] 14.5 Parallel functions: `parallel static func` on threads, with
         values copied in and out.
   - [ ] 14.6 Games: `Game` (`start`, `update`, `quit`) in a window of the
