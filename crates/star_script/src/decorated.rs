@@ -229,6 +229,13 @@ fn wrap(member: &mut Member, ids: &mut Ids) -> Vec<Member> {
             },
         ),
     };
+    // Locals are told apart by where their names are written: the hidden
+    // method, with the code, keeps the parameters as written, and those of
+    // the method that calls it get empty places of their own.
+    for parameter in &mut method.parameters {
+        let start = parameter.name.span.start();
+        parameter.name.span = Span::new(start, start);
+    }
     let arguments = method
         .parameters
         .iter()
@@ -382,6 +389,38 @@ mod tests {
         );
         assert!(body.contains("(call open@body force)"), "{body}");
         assert_eq!(open.parameters.len(), 1);
+        let MemberKind::Method(code) = &door.members[3].kind else {
+            panic!("a method");
+        };
+        assert_ne!(open.parameters[0].name.span, code.parameters[0].name.span);
+    }
+
+    #[test]
+    fn the_parameters_of_decorated_methods_are_locals_of_their_own() {
+        let source = "class Once extends Decorator {}
+class A {
+  @Once
+  \
+                      func go(times: int) {
+    Debug.print(times.to_string())
+  }
+}
+";
+        let checked = crate::check_source(source).expect("valid");
+        let class = &checked.syntax.classes[1];
+        let locals: Vec<_> = class
+            .members
+            .iter()
+            .filter_map(|member| match &member.kind {
+                MemberKind::Method(method) => method.parameters.first(),
+                _ => None,
+            })
+            .map(|parameter| checked.analysis.declared_local(&parameter.name))
+            .collect();
+
+        assert_eq!(locals.len(), 2);
+        assert!(locals.iter().all(Option::is_some));
+        assert_ne!(locals[0], locals[1]);
     }
 
     #[test]
