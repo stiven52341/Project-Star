@@ -872,6 +872,41 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [ ] 14.9 Blueprints: they become StarScript, so they need no
         interpreter of their own; conformance tests with the blueprint
         templates.
+        Design proposed to the owner (awaiting approval):
+        - A blueprint runs as the StarScript `star_blueprint::translate`
+          writes for it, compiled or interpreted, so neither side needs
+          code for blueprints: what must be checked is that their
+          translations behave the same both ways.
+        - Programs from blueprints: for each template of the editor,
+          `star_script/tests/programs/blueprint_<template>.star` holds the
+          template's translation followed by a `Main` that puts it under a
+          parent, runs its `update` for a few frames with a fixed `delta`
+          and prints its fields, with its `.out`. The compiled end-to-end
+          test and the interpreter's conformance test already run every
+          program there, so they compare them with no change.
+        - Those programs must not go stale: a test of the editor (where
+          the templates live) checks that each one starts with the
+          current translation of its template and that every template has
+          one; when a template or the translator changes, it fails with
+          the new translation in its message.
+        - One more blueprint, kept with `star_blueprint`'s tests, uses
+          every kind of node (literals, variables, calls of the engine and
+          of its own methods, operators, branches, “For each” and
+          returns), and `programs/blueprint_every_node.star` is its
+          translation with a `Main`, checked the same way by a test of
+          `star_blueprint`: the templates only use a few kinds of node.
+        - The compiled end-to-end test also runs the crate's example
+          script with a `Main` of its own, which the interpreter's
+          conformance test does not: that `Main` and its output move to
+          files that both tests read.
+        - Rejected: translating blueprints inside `star_script`'s tests (a
+          cycle of dependencies between `star_script` and
+          `star_blueprint`), and a runner of its own for blueprints (the
+          runners of programs already compare both ways).
+    - [ ] 14.9a The templates: one program per template, and the editor's
+          test that keeps them up to date.
+    - [ ] 14.9b Every kind of node, and the example script in the
+          interpreter's conformance.
   - [ ] 14.10 The interpreted player: the scene player of step e grows
         into a player that loads the project's scripts when it starts;
         “Play” uses it for every project, and any project plays in about
