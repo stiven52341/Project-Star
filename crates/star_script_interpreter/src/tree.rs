@@ -209,6 +209,9 @@ pub(crate) enum Expression {
         value: Box<Expression>,
         class: ClassRef,
     },
+    /// `Time.now()`: the seconds of the game so far, from the clock of
+    /// `star_script_runtime` that the compiled game reads too.
+    Now,
     /// `Debug.print(text)`.
     Print(Box<Expression>),
     /// `[a, b, c]`: a new list.

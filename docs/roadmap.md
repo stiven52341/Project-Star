@@ -540,9 +540,14 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           tables are built bases first, wherever classes are written.
           Classes that extend engine classes are refused until 14.6.
           `decorators.star` only lacks `Time.now` (14.3).
-  - [ ] 14.3 The rest of the console language: decorators (the user's
+  - [x] 14.3 The rest of the console language: decorators (the user's
         `Decorator` classes) and `Time.now` (the methods of strings,
-        lists and numbers, and constants, came in 14.1b).
+        lists and numbers, and constants, came in 14.1b). Done:
+        decorators are fields and methods the compiler writes, so they
+        ran once classes did; `Time.now` reads the game's clock in
+        `star_script_runtime::tasks`, the one the compiled game reads,
+        so both give the same seconds. `decorators.star` gives the same
+        output interpreted and compiled.
   - [ ] 14.4 Coroutines: `async`/`await`, `Time.wait` and
         `Time.next_frame`, run once per frame, and ending with their node.
   - [ ] 14.5 Parallel functions: `parallel static func` on threads, with

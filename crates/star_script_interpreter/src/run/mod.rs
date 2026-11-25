@@ -412,6 +412,7 @@ impl<'a> Machine<'a> {
                 let is_instance = self.is_instance(&value, *class);
                 if is_instance { value } else { Value::Null }
             }
+            Expression::Now => Value::Float(star_script_runtime::tasks::now()),
             Expression::Print(message) => {
                 let message = self.evaluate(message, frame)?.to_text()?;
                 writeln!(self.output, "{message}").map_err(RunError::Output)?;

@@ -11,6 +11,8 @@ use crate::value::Value;
 
 /// The engine class whose `print` writes a line.
 const DEBUG_CLASS: &str = "Debug";
+/// The engine class with the game's clock.
+const TIME_CLASS: &str = "Time";
 
 impl Body<'_> {
     /// The interpreter's version of `expression`.
@@ -313,6 +315,7 @@ impl Body<'_> {
                     })?;
                     Ok(Expression::Print(Box::new(message)))
                 }
+                (TIME_CLASS, "now") => Ok(Expression::Now),
                 _ => Err(LowerError::unsupported(
                     "this method of the engine",
                     callee.span,
