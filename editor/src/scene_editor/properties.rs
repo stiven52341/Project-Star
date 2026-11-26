@@ -156,7 +156,8 @@ fn edit_identity(ui: &mut egui::Ui, node: &mut NodeOutline) -> bool {
         node.class = Some(class).filter(|class| !class.trim().is_empty());
         changed = true;
     }
-    changed | tags_row(ui, texts.tags, &mut node.tags, texts.new_tag_hint)
+    changed |= tags_row(ui, texts.tags, &mut node.tags, texts.new_tag_hint);
+    changed | checkbox_hint_row(ui, texts.visible, &mut node.visible, texts.visible_hint)
 }
 
 fn edit_transform(ui: &mut egui::Ui, transform: &mut Transform2D) -> bool {

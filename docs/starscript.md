@@ -461,7 +461,7 @@ The engine provides them; their names cannot be used for other classes.
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. It also takes a number of any type and writes it as its `to_string` does (`Debug.print(2.0)` writes `2.0`); anything else (a `bool`, a list, an object, a nullable number) is converted first with `.to_string()` if it has one. |
 | `Game` | fields `background: Color` (black), `camera: Camera2D?` (`null`), `camera_3d: Camera3D?` (`null`), `ambient: Color` (black: no ambient light), `ambient_2d: Color` (white: sprites show their own colors); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
-| `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `body: Body?` (`null`), `tags: [string]` (`[]`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?`, `has_tag(tag: string) -> bool`, `find_by_name(name: string) -> Node?`, `find_by_tag(tag: string) -> [Node]`, `global_x() -> float`, `global_y() -> float`, `global_rotation() -> float`, `set_global_position(x: float, y: float)`, `set_global_rotation(angle: float)`, `translate(x: float, y: float)`, `translate_global(x: float, y: float)`, `rotate(angle: float)` |
+| `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `visible: bool` (`true`), `body: Body?` (`null`), `tags: [string]` (`[]`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?`, `has_tag(tag: string) -> bool`, `find_by_name(name: string) -> Node?`, `find_by_tag(tag: string) -> [Node]`, `global_x() -> float`, `global_y() -> float`, `global_rotation() -> float`, `set_global_position(x: float, y: float)`, `set_global_rotation(angle: float)`, `translate(x: float, y: float)`, `translate_global(x: float, y: float)`, `rotate(angle: float)` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors), `columns`, `rows: int` (1), `frame: int` (0): its sprite sheet; `frames: string` (`""`): its `.frames` file; `play(name: string)`, `stop()`, `is_playing() -> bool`, `animation() -> string`; the event `animation_finished(name: string)` |
 | `Light2D` (extends `Node`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (3.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
 | `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `main: bool` (`false`) |
@@ -536,6 +536,10 @@ class Space extends Game {
   every frame, after the game's `update` and parents before children.
 - `remove()` takes the node, with its children, out of the tree: they stop
   running and are no longer shown. The object can be added again later.
+- `visible = false` hides a node and every node under it: they are not
+  drawn and their lights do not shine, but they stay in the tree, move,
+  collide and run their code. Scenes save it (`visible = false` in a
+  `[[node]]`).
 - `x`, `y`, `width` and `height` are in world units; `rotation` in radians,
   counterclockwise.
 - A node's `x`, `y`, `rotation` and scales are **local**: relative to its

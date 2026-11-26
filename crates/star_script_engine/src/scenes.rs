@@ -28,6 +28,7 @@ pub fn read_scene(folder: &AssetFolder, path: &str) -> Result<Vec<SceneNode>, St
 /// A node of a scene file, with the words of StarScript's classes.
 fn scene_node(node: NodeOutline) -> SceneNode {
     SceneNode {
+        visible: node.visible,
         transform: node.transform.map(|place| SceneTransform {
             x: place.position.x,
             y: place.position.y,

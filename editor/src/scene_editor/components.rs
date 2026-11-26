@@ -306,6 +306,7 @@ pub(super) fn new_node(name: String, dimension: ProjectDimension) -> NodeOutline
         name,
         class: None,
         tags: Vec::new(),
+        visible: true,
         parent: None,
         transform,
         sprite: None,

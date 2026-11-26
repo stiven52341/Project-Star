@@ -11,8 +11,8 @@ use star_render::{Material, Mesh3dId, MeshShape, TextureFilter, TextureId};
 use crate::node_3d_data::MeshOutline;
 use crate::scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
 use crate::{
-    Body2D, Body3D, Camera2dNode, Camera3dNode, Children, FieldValue, Hierarchy, Light2dNode,
-    LightNode, MeshNode, Name, SpriteNode, Tags, Transform2D, Transform3D,
+    Body2D, Body3D, Camera2dNode, Camera3dNode, Children, FieldValue, Hidden, Hierarchy,
+    Light2dNode, LightNode, MeshNode, Name, SpriteNode, Tags, Transform2D, Transform3D,
 };
 
 /// A tree of nodes that can be added to a world as many times as needed:
@@ -37,6 +37,7 @@ struct SceneNode {
     /// have no use for it.
     class: Option<String>,
     tags: Vec<String>,
+    visible: bool,
     parent: Option<usize>,
     transform: Option<Transform2D>,
     sprite: Option<SpriteNode>,
@@ -185,6 +186,9 @@ impl Scene {
             if !node.tags.is_empty() {
                 world.insert(entity, Tags(node.tags.clone()))?;
             }
+            if !node.visible {
+                world.insert(entity, Hidden)?;
+            }
             if let Some(transform) = node.transform {
                 world.insert(entity, transform)?;
             }
@@ -257,6 +261,7 @@ fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResul
         name: outline.name,
         class: outline.class,
         tags: outline.tags,
+        visible: outline.visible,
         parent: outline.parent,
         transform: outline.transform,
         sprite,
@@ -304,6 +309,7 @@ fn outline_node(node: &SceneNode, sources: &impl SceneSources) -> EngineResult<N
         name: node.name.clone(),
         class: node.class.clone(),
         tags: node.tags.clone(),
+        visible: node.visible,
         parent: node.parent,
         transform: node.transform,
         sprite,
@@ -376,6 +382,7 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
             .get::<Tags>(entity)
             .map(|tags| tags.0.clone())
             .unwrap_or_default(),
+        visible: !world.has::<Hidden>(entity),
         parent,
         transform: world.get::<Transform2D>(entity).map(|transform| *transform),
         sprite: world.get::<SpriteNode>(entity).map(|sprite| *sprite),
@@ -566,6 +573,18 @@ mod tests {
         assert!(text.contains("texture = \"sprites/hero.png\""), "{text}");
         assert!(!text.contains("region"), "{text}");
         assert!(text.contains("[node.body]"), "{text}");
+    }
+
+    #[test]
+    fn hidden_nodes_are_instanced_and_captured_hidden() {
+        let text = "format = 1\n[[node]]\nname = \"Ghost\"\nvisible = false\n";
+        let scene = read(text, &Textures::default()).unwrap();
+        let mut world = World::new();
+
+        let ghost = scene.instantiate(&mut world, None).unwrap();
+
+        assert!(world.has::<Hidden>(ghost));
+        assert_eq!(Scene::capture(&world, ghost).unwrap(), scene);
     }
 
     #[test]

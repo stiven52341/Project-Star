@@ -1255,7 +1255,39 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [ ] 15b Keyframe tracks: any property of a node and its children
         (position, rotation, scale, color, visibility, exported fields) over
         time, with interpolation (step, linear, eased) and calls to methods
-        at given times; one animation file read by the scene's node.
+        at given times; one animation file read by the scene's node. Agreed
+        with the owner: a new node class, `Animator` (a child that animates
+        its parent and the nodes under it, by path), plays them; they live
+        in their own `.anim` file of the assets (several named animations,
+        each with its length, loop, property tracks and call tracks); calls
+        take no arguments; and `Node` gains `visible` first, so it can be
+        animated.
+    - [x] 15b.1 `visible` everywhere: a hidden node and the nodes under it
+          are not drawn nor light the scene, but still move, collide and run
+          their code; in the engine (`Hidden`, kept down the tree by the
+          transform propagation as `HiddenInTree`), scene files (`visible =
+          false`), the inspector and the scene view (hidden nodes are not
+          drawn nor picked), and StarScript's `Node` (compiled and
+          interpreted).
+    - [ ] 15b.2 The `.anim` file: animations with a length and a loop,
+          property tracks (a node's path, a property, an interpolation:
+          step, linear, ease in, out or in-out; keys of time and value:
+          numbers, `bool`, `int`, text and colors) and call tracks (a
+          node's path, times and a method without arguments), validated
+          when read.
+    - [ ] 15b.3 The `Animator` node: its file, `play(name)`, `stop()`,
+          `is_playing()`, `animation()` and the event
+          `animation_finished(name)`, the starting animation of a scene's
+          animator, and the property tracks applied after each `update`
+          (the engine nodes' fields and the classes' `export` fields;
+          compiled and interpreted).
+    - [ ] 15b.4 Call tracks: the methods called as the playhead passes
+          their times (also when a frame jumps over several, and when an
+          animation loops), with a game of each `engine_game` and `window`
+          play.
+    - [ ] 15b.5 The editor: `Animator` among the nodes to add, its file and
+          starting animation in the inspector, `.anim` among the assets
+          (editing them is 15c's timeline).
   - [ ] 15c The editor's timeline: a panel with tracks and keys, the
         playhead, playing in the scene view, adding a key from the
         inspector's value, moving and deleting keys, curves for easing.

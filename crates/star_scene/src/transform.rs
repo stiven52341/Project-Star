@@ -4,6 +4,7 @@ use star_core::EngineResult;
 use star_ecs::{Entity, World};
 use star_math::{Affine2, Mat4, Quat, Vec2, Vec3};
 
+use crate::visibility::update_hidden;
 use crate::{Children, Parent};
 
 /// Where a 2D node is relative to its parent: moved by `position`, rotated
@@ -192,12 +193,15 @@ impl GlobalTransform3D {
 struct Parents {
     flat: Affine2,
     solid: Mat4,
+    /// Whether the parent, or a node above it, is hidden.
+    hidden: bool,
 }
 
 impl Parents {
     const WORLD: Self = Self {
         flat: Affine2::IDENTITY,
         solid: Mat4::IDENTITY,
+        hidden: false,
     };
 }
 
@@ -205,7 +209,8 @@ impl Parents {
 /// and the [`GlobalTransform3D`] of every node with a [`Transform3D`],
 /// root first. A node without one passes its parent's on to its children
 /// unchanged, so 2D and 3D nodes can share a tree without affecting each
-/// other.
+/// other. It also marks the nodes that are [`Hidden`](crate::Hidden), or
+/// under one, with [`HiddenInTree`](crate::HiddenInTree).
 ///
 /// Keeps its work list between frames, so it allocates nothing once warm.
 #[derive(Debug, Default)]
@@ -250,6 +255,7 @@ impl TransformPropagation {
             let globals = Parents {
                 flat: update_global_2d(world, entity, parents.flat)?,
                 solid: update_global_3d(world, entity, parents.solid)?,
+                hidden: update_hidden(world, entity, parents.hidden)?,
             };
             if let Some(children) = world.get::<Children>(entity) {
                 self.pending

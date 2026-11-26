@@ -63,13 +63,15 @@ impl Ray {
     }
 }
 
-/// The node `ray` meets first in `outline`, if any.
+/// The node `ray` meets first in `outline`, if any. Hidden nodes are not
+/// drawn, so they are not hit either: the tree still selects them.
 pub(crate) fn node_at(outline: &SceneOutline, ray: Ray) -> Option<usize> {
     let nodes = outline.nodes();
     nodes
         .iter()
         .zip(places(nodes))
         .enumerate()
+        .filter(|(_, (_, place))| place.shown)
         .flat_map(|(index, (node, place))| hits(node, place, ray, index))
         .max_by(Hit::compare)
         .map(|hit| hit.index)
@@ -246,6 +248,16 @@ mod tests {
         assert_eq!(node_at(&scene, down_at(-1.5, 1.5)), Some(1));
         assert_eq!(node_at(&scene, down_at(2.8, 0.2)), None);
         assert_eq!(node_at(&scene, down_at(3.5, 0.0)), None, "outside both");
+    }
+
+    #[test]
+    fn hidden_nodes_are_not_hit() {
+        let scene = outline(
+            "[[node]]\nname = \"Ghost\"\nposition = [0.0, 0.0]\nvisible = false\n\
+             [node.sprite]\ntexture = \"ghost.png\"\nsize = [2.0, 2.0]\n",
+        );
+
+        assert_eq!(node_at(&scene, down_at(0.0, 0.0)), None);
     }
 
     #[test]

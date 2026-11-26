@@ -25,6 +25,8 @@ pub struct SceneNode {
     pub class: Option<String>,
     /// Its tags, which `find_by_tag` looks for.
     pub tags: Vec<String>,
+    /// Whether it, and its children, are drawn.
+    pub visible: bool,
     /// Position of its parent in the scene's list; only the root, the first
     /// node, has none.
     pub parent: Option<usize>,
@@ -295,6 +297,7 @@ mod tests {
             name: name.to_owned(),
             class: None,
             tags: Vec::new(),
+            visible: true,
             parent,
             transform: None,
             sprite: None,

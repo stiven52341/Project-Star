@@ -274,6 +274,7 @@ fn add_node_class(classes: &mut ClassTable, body: ClassId) -> ClassId {
         native_field("rotation", Type::Float),
         native_field("scale_x", Type::Float),
         native_field("scale_y", Type::Float),
+        native_field("visible", Type::Bool),
         native_field("body", Type::Class(body).nullable()),
         native_field("tags", Type::list(Type::String)),
     ];

@@ -124,7 +124,7 @@ pub(crate) fn draw_game_view(outline: &SceneOutline, gpu: &mut impl SceneGpu, fr
     frame.set_ambient_light(AmbientLight::new(Color::BLACK, 0.0));
     frame.set_ambient_light_2d(AmbientLight::FULL);
     draw_shown(nodes, &places, gpu, frame);
-    for (node, place) in nodes.iter().zip(&places) {
+    for (node, place) in nodes.iter().zip(&places).filter(|(_, place)| place.shown) {
         if let (Some(light), Some(global)) = (node.light_2d, place.flat)
             && frame.lights_2d().len() < MAX_LIGHTS
         {
@@ -133,8 +133,8 @@ pub(crate) fn draw_game_view(outline: &SceneOutline, gpu: &mut impl SceneGpu, fr
     }
 }
 
-/// Adds to `frame` the sprites and meshes of `nodes`, placed at `places`,
-/// and the lights of their 3D nodes. Returns whether any light was added.
+/// Adds to `frame` the sprites and meshes of `nodes` that are shown,
+/// placed at `places`, and the lights of their 3D nodes. Returns whether any light was added.
 fn draw_shown(
     nodes: &[NodeOutline],
     places: &[Place],
@@ -142,7 +142,7 @@ fn draw_shown(
     frame: &mut Frame,
 ) -> bool {
     let mut lit = false;
-    for (node, place) in nodes.iter().zip(places) {
+    for (node, place) in nodes.iter().zip(places).filter(|(_, place)| place.shown) {
         if let (Some(sprite), Some(global)) = (&node.sprite, place.flat) {
             draw_sprite(sprite, global, gpu, frame);
         }
@@ -193,25 +193,32 @@ pub(crate) fn preview_camera(
 pub(super) struct Place {
     pub(super) flat: Option<Affine2>,
     pub(super) solid: Option<Mat4>,
+    /// Whether the game draws it: neither it nor its ancestors are hidden.
+    pub(super) shown: bool,
 }
 
 /// The place of every node.
 pub(super) fn places(nodes: &[NodeOutline]) -> Vec<Place> {
     let handed = handed_down(nodes);
-    nodes
-        .iter()
-        .map(|node| {
-            let (parent_flat, parent_solid) = parent_place(node, &handed);
-            Place {
-                flat: node
-                    .transform
-                    .map(|transform| parent_flat * transform.to_affine()),
-                solid: node
-                    .transform_3d
-                    .map(|transform| parent_solid * transform.to_mat4()),
-            }
-        })
-        .collect()
+    let mut places: Vec<Place> = Vec::with_capacity(nodes.len());
+    for node in nodes {
+        let (parent_flat, parent_solid) = parent_place(node, &handed);
+        // Parents come first in a scene, so theirs is already known.
+        let parent_shown = node
+            .parent
+            .and_then(|parent| places.get(parent))
+            .is_none_or(|parent| parent.shown);
+        places.push(Place {
+            flat: node
+                .transform
+                .map(|transform| parent_flat * transform.to_affine()),
+            solid: node
+                .transform_3d
+                .map(|transform| parent_solid * transform.to_mat4()),
+            shown: parent_shown && node.visible,
+        });
+    }
+    places
 }
 
 /// Where every node places its children, in 2D and in 3D. Parents come
@@ -620,6 +627,29 @@ mod tests {
         };
         assert!((planet.position - Vec2::new(7.0, 0.0)).length() < EPSILON);
         assert!((planet.size - Vec2::new(2.0, 2.0)).length() < EPSILON);
+    }
+
+    #[test]
+    fn hidden_nodes_and_their_children_are_not_drawn() {
+        let scene = outline(
+            "[[node]]\nname = \"Root\"\nposition = [0.0, 0.0]\n\
+             [[node]]\nname = \"Ghost\"\nparent = 0\nposition = [0.0, 0.0]\nvisible = false\n\
+             [node.sprite]\ntexture = \"ghost.png\"\nsize = [1.0, 1.0]\n\
+             [[node]]\nname = \"Chain\"\nparent = 1\nposition = [0.0, 0.0]\n\
+             [node.sprite]\ntexture = \"chain.png\"\nsize = [1.0, 1.0]\n\
+             [[node]]\nname = \"Hero\"\nparent = 0\nposition = [0.0, 0.0]\n\
+             [node.sprite]\ntexture = \"hero.png\"\nsize = [1.0, 1.0]\n",
+        );
+
+        let (frame, gpu) = draw(&scene, None);
+
+        assert_eq!(frame.sprites().len(), 1);
+        assert_eq!(gpu.textures, 1);
+        let shown: Vec<bool> = places(scene.nodes())
+            .iter()
+            .map(|place| place.shown)
+            .collect();
+        assert_eq!(shown, [true, false, false, true]);
     }
 
     #[test]

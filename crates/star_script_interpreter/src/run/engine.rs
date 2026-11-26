@@ -141,6 +141,7 @@ fn node_slot(parts: &NodeParts, field: EngineField) -> Option<Slot<'_>> {
         EngineField::ScaleX => Slot::Float(&node.scale_x),
         EngineField::ScaleY => Slot::Float(&node.scale_y),
         EngineField::Tags => Slot::Tags(&node.tags),
+        EngineField::Visible => Slot::Bool(&node.visible),
         EngineField::Body => Slot::Body(&node.body),
         _ => match (field, &parts.node_3d) {
             (

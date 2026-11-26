@@ -7,7 +7,7 @@ use star_render::{
     Color, DirectionalLight, Frame, Light, MAX_LIGHTS, Material, Mesh3dId, PointLight, SpotLight,
 };
 
-use crate::GlobalTransform3D;
+use crate::{GlobalTransform3D, is_shown};
 
 /// Shows a 3D mesh at a 3D node: the engine draws it every frame where the
 /// node's [`GlobalTransform3D`] places it.
@@ -108,7 +108,7 @@ impl LightNode {
 
 /// Adds to `frame` the mesh of every node with a [`MeshNode`] and a
 /// [`GlobalTransform3D`], and the light of every node with a
-/// [`LightNode`] and a [`GlobalTransform3D`]. A frame takes at most
+/// [`LightNode`] and a [`GlobalTransform3D`], unless they are hidden. A frame takes at most
 /// [`MAX_LIGHTS`]: light nodes beyond them are left out.
 ///
 /// # Errors
@@ -116,11 +116,13 @@ impl LightNode {
 /// Returns [`EngineError::Ecs`](star_core::EngineError::Ecs) if a running
 /// query holds the components it reads.
 pub fn draw_3d_nodes(world: &World, frame: &mut Frame) -> EngineResult<()> {
-    world.each::<(&MeshNode, &GlobalTransform3D)>(|_, (node, global)| {
-        frame.draw_mesh_3d(node.mesh, node.material, global.matrix());
+    world.each::<(&MeshNode, &GlobalTransform3D)>(|entity, (node, global)| {
+        if is_shown(world, entity) {
+            frame.draw_mesh_3d(node.mesh, node.material, global.matrix());
+        }
     })?;
-    world.each::<(&LightNode, &GlobalTransform3D)>(|_, (node, global)| {
-        if frame.lights().len() < MAX_LIGHTS {
+    world.each::<(&LightNode, &GlobalTransform3D)>(|entity, (node, global)| {
+        if is_shown(world, entity) && frame.lights().len() < MAX_LIGHTS {
             frame.add_light(node.to_light(*global));
         }
     })

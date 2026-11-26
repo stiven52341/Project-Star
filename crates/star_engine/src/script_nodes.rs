@@ -27,8 +27,8 @@ use star_math::{Mat4, Vec2, Vec3};
 use star_physics::{BodySettings, ContactPhase};
 use star_render::{Camera, Color, SpriteSheet, TextureFilter};
 use star_scene::{
-    Body2D, Body3D, GlobalTransform2D, GlobalTransform3D, Hierarchy, Light2dNode, LightNode, Name,
-    NodeBody, NodeContact, PhysicsNodes, PhysicsNodes3d, Transform2D, Transform3D,
+    Body2D, Body3D, GlobalTransform2D, GlobalTransform3D, Hidden, Hierarchy, Light2dNode,
+    LightNode, Name, NodeBody, NodeContact, PhysicsNodes, PhysicsNodes3d, Transform2D, Transform3D,
 };
 
 pub use crate::script_3d::{
@@ -49,6 +49,8 @@ pub struct ScriptNode<'a> {
     pub parent: Option<u64>,
     /// Its name.
     pub name: &'a str,
+    /// Whether it is drawn; a hidden node hides its children too.
+    pub visible: bool,
     /// Where it is, relative to its parent.
     pub transform: Transform2D,
     /// For `Node3D` objects, where it is in 3D, relative to its parent:
@@ -355,6 +357,7 @@ impl ScriptNodes {
             world.set_parent(entity, parent)?;
         }
         update_name(world, entity, node.name)?;
+        update_visible(world, entity, node.visible)?;
         if let Some(transform) = node.transform_3d {
             world.remove::<Transform2D>(entity);
             replace(world, entity, transform)?;
@@ -657,6 +660,16 @@ fn update_name(world: &mut World, entity: Entity, name: &str) -> EngineResult<()
 }
 
 /// Gives `entity` the component `value`, in place if it has one.
+/// Marks `entity` [`Hidden`] unless it is `visible`.
+fn update_visible(world: &mut World, entity: Entity, visible: bool) -> EngineResult<()> {
+    if visible {
+        world.remove::<Hidden>(entity);
+    } else if !world.has::<Hidden>(entity) {
+        world.insert(entity, Hidden)?;
+    }
+    Ok(())
+}
+
 fn replace<T: 'static>(world: &mut World, entity: Entity, value: T) -> EngineResult<()> {
     if let Some(mut current) = world.get_mut::<T>(entity) {
         *current = value;
@@ -684,6 +697,7 @@ mod tests {
             id,
             parent,
             name,
+            visible: true,
             transform: Transform2D::IDENTITY,
             transform_3d: None,
             sprite: None,
@@ -748,6 +762,23 @@ mod tests {
         assert_eq!(world.get::<Name>(entity).unwrap().as_str(), "Knight");
         assert_eq!(world.get::<Transform2D>(entity).unwrap().rotation, 1.0);
         assert_eq!(world.entity_count(), 1);
+    }
+
+    #[test]
+    fn hidden_script_nodes_hide_their_world_node() {
+        let mut world = World::new();
+        let mut mirror = ScriptNodes::new();
+        let hidden = ScriptNode {
+            visible: false,
+            ..node(1, None, "Ghost")
+        };
+        frame(&mut mirror, &mut world, &[hidden]);
+        let entity = mirror.entity(1).unwrap();
+        assert!(world.has::<Hidden>(entity));
+
+        frame(&mut mirror, &mut world, &[node(1, None, "Ghost")]);
+
+        assert!(!world.has::<Hidden>(entity));
     }
 
     #[test]

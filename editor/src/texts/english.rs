@@ -81,6 +81,8 @@ pub(super) static ENGLISH: Texts = Texts {
     camera_2d: "2D camera",
     tags: "Tags",
     new_tag_hint: "New tag (Enter)",
+    visible: "Visible",
+    visible_hint: "Whether the node is drawn. A hidden node hides its children too; it still moves, collides and runs its script.",
     physics: "Physics",
     static_body: "Static body",
     rigid_body: "Rigid body",

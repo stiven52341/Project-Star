@@ -11,6 +11,7 @@ fn node(name: &str, class: Option<&str>, parent: Option<usize>) -> SceneNode {
         name: name.to_owned(),
         class: class.map(str::to_owned),
         tags: Vec::new(),
+        visible: true,
         parent,
         transform: None,
         sprite: None,
@@ -63,6 +64,21 @@ fn nodes_are_added_to_their_parents_and_the_root_is_given() {
     assert_eq!(names(&nodes::children::<TestHost>(&root)), ["Floor"]);
     let floor = nodes::find_child::<TestHost>(&root, "Floor").expect("floor");
     assert_eq!(names(&nodes::children::<TestHost>(&floor)), ["Lamp"]);
+}
+
+#[test]
+fn hidden_scene_nodes_are_built_hidden() {
+    let ghost = SceneNode {
+        visible: false,
+        ..node("Ghost", None, Some(0))
+    };
+    let nodes = [node("Level", None, None), ghost];
+
+    let root = build::<TestHost>(&nodes).expect("built");
+
+    assert!(root.node.visible.get());
+    let ghost = nodes::find_child::<TestHost>(&root, "Ghost").expect("ghost");
+    assert!(!ghost.node.visible.get());
 }
 
 #[test]

@@ -8,7 +8,7 @@ use star_core::{EngineResult, Sound};
 use star_ecs::World;
 use star_math::Mat4;
 use star_render::{Frame, Mesh3dId, MeshShape, Renderer, TextureFilter, TextureId};
-use star_scene::{GlobalTransform2D, GlobalTransform3D, Scene, SceneAssets, SpriteNode};
+use star_scene::{GlobalTransform2D, GlobalTransform3D, Scene, SceneAssets, SpriteNode, is_shown};
 
 use crate::mesh_file::MeshFile;
 use crate::sound_library::SoundLibrary;
@@ -90,7 +90,7 @@ impl GameAssets {
     }
 
     /// Adds to `frame` the sprite of every node with a [`SpriteFile`] and a
-    /// global transform, loading the images it needs. An image that cannot
+    /// global transform that is not hidden, loading the images it needs. An image that cannot
     /// be loaded logs a warning once, and its sprite is not drawn.
     pub(crate) fn draw_sprite_files(
         &mut self,
@@ -98,7 +98,10 @@ impl GameAssets {
         renderer: &mut Renderer,
         frame: &mut Frame,
     ) -> EngineResult<()> {
-        world.each::<(&GlobalTransform2D, &mut SpriteFile)>(|_, (global, file)| {
+        world.each::<(&GlobalTransform2D, &mut SpriteFile)>(|entity, (global, file)| {
+            if !is_shown(world, entity) {
+                return;
+            }
             let texture = file.texture(
                 |path, filter| self.load_texture(renderer, path.clone(), filter),
                 |error| log::warn!("{error}"),
@@ -114,7 +117,7 @@ impl GameAssets {
     }
 
     /// Adds to `frame` the mesh of every node with a [`MeshFile`] and a
-    /// global 3D transform, building the meshes and loading the images it
+    /// global 3D transform that is not hidden, building the meshes and loading the images it
     /// needs. A mesh that cannot be built logs a warning once, and is not
     /// drawn; an image that cannot be loaded logs one, and the mesh is
     /// drawn without it.
@@ -124,7 +127,10 @@ impl GameAssets {
         renderer: &mut Renderer,
         frame: &mut Frame,
     ) -> EngineResult<()> {
-        world.each::<(&GlobalTransform3D, &mut MeshFile)>(|_, (global, file)| {
+        world.each::<(&GlobalTransform3D, &mut MeshFile)>(|entity, (global, file)| {
+            if !is_shown(world, entity) {
+                return;
+            }
             let built = file
                 .unit_shape()
                 .and_then(|(unit, scale)| Ok((self.mesh(renderer, unit)?, scale)));

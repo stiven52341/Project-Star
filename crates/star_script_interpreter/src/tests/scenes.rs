@@ -14,6 +14,7 @@ fn scene_node(name: &str, class: Option<&str>, parent: Option<usize>) -> SceneNo
         name: name.to_owned(),
         class: class.map(str::to_owned),
         tags: Vec::new(),
+        visible: true,
         parent,
         transform: None,
         sprite: None,

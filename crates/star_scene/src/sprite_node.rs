@@ -5,7 +5,7 @@ use star_ecs::World;
 use star_math::Vec2;
 use star_render::{Color, Frame, MAX_LIGHTS, Sprite, SpriteSheet, TextureId, TextureRegion};
 
-use crate::{GlobalTransform2D, Light2dNode};
+use crate::{GlobalTransform2D, Light2dNode, is_shown};
 
 /// Shows a texture at a 2D node: the engine draws it every frame where the
 /// node's [`GlobalTransform2D`] places it, rotated and scaled with it.
@@ -95,7 +95,7 @@ impl SpriteNode {
 
 /// Adds to `frame` the sprite of every node with a [`SpriteNode`] and a
 /// [`GlobalTransform2D`], and the light of every one with a
-/// [`Light2dNode`]. A frame takes at most [`MAX_LIGHTS`] 2D lights: light
+/// [`Light2dNode`], unless they are hidden. A frame takes at most [`MAX_LIGHTS`] 2D lights: light
 /// nodes beyond them are left out.
 ///
 /// # Errors
@@ -103,11 +103,13 @@ impl SpriteNode {
 /// Returns [`EngineError::Ecs`](star_core::EngineError::Ecs) if their
 /// components are being changed by a running query.
 pub fn draw_sprite_nodes(world: &World, frame: &mut Frame) -> EngineResult<()> {
-    world.each::<(&GlobalTransform2D, &SpriteNode)>(|_, (global, sprite)| {
-        frame.draw_sprite(sprite.to_sprite(*global));
+    world.each::<(&GlobalTransform2D, &SpriteNode)>(|entity, (global, sprite)| {
+        if is_shown(world, entity) {
+            frame.draw_sprite(sprite.to_sprite(*global));
+        }
     })?;
-    world.each::<(&GlobalTransform2D, &Light2dNode)>(|_, (global, light)| {
-        if frame.lights_2d().len() < MAX_LIGHTS {
+    world.each::<(&GlobalTransform2D, &Light2dNode)>(|entity, (global, light)| {
+        if is_shown(world, entity) && frame.lights_2d().len() < MAX_LIGHTS {
             frame.add_light_2d(light.to_light(*global));
         }
     })

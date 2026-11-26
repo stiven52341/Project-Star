@@ -68,6 +68,7 @@ fn describe<H: Host>(node: &H::Node, parent: Option<u64>, then: impl FnOnce(&Scr
                                 id: fields.id(),
                                 parent,
                                 name,
+                                visible: fields.visible.get(),
                                 transform,
                                 transform_3d,
                                 sprite,

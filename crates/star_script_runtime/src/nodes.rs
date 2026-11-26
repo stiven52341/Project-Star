@@ -138,6 +138,8 @@ pub struct NodeFields<H: Host> {
     pub scale_x: Field<f32>,
     /// `scale_y`
     pub scale_y: Field<f32>,
+    /// `visible`: whether it, and its children, are drawn.
+    pub visible: Field<bool>,
     /// `body`
     pub body: Field<Option<H::Body>>,
     /// `tags`
@@ -160,6 +162,7 @@ impl<H: Host> NodeFields<H> {
             rotation: Field::new(0.0),
             scale_x: Field::new(1.0),
             scale_y: Field::new(1.0),
+            visible: Field::new(true),
             body: Field::new(None),
             tags: Field::new(H::new_tags(Vec::new())),
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),

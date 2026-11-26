@@ -50,6 +50,9 @@ class Main {
         player.x += 1.5
         player.scale_x = 2.0
         Debug.print(player.x.to_string() + " " + player.scale_x.to_string() + " " + player.y.to_string())
+        const shown = player.visible
+        player.visible = false
+        Debug.print("visible: " + shown.to_string() + " " + player.visible.to_string())
 
         // Colors are objects: sprites that share one change together.
         const shade = Color(1.0, 0.5, 0.25, 1.0)

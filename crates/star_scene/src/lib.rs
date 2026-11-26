@@ -9,7 +9,8 @@
 //! [`SpriteNode`] is drawn and its [`Light2dNode`] lights the sprites. A 3D node is placed by its [`Transform3D`]
 //! ([`GlobalTransform3D`] in the world) and can show a [`MeshNode`] or shine
 //! a [`LightNode`]. A [`Camera2dNode`] or a [`Camera3dNode`] makes a node a
-//! point of view of the game. A [`Body2D`] makes a 2D node a body of the 2D physics,
+//! point of view of the game. A [`Hidden`] node is not drawn, nor are its
+//! children. A [`Body2D`] makes a 2D node a body of the 2D physics,
 //! which [`step_node_physics`] moves it with, and a [`Body3D`] a 3D node a
 //! body of the 3D physics ([`step_node_physics_3d`]). A [`Scene`] is a tree
 //! of nodes saved in a `.scene` file (TOML) and instanced into a world as
@@ -32,6 +33,7 @@ mod scene_outline;
 mod sprite_frames;
 mod sprite_node;
 mod transform;
+mod visibility;
 
 pub use body_node::{Body2D, Body3D, NodeBody};
 pub use camera_node::{Camera2dNode, Camera3dNode};
@@ -49,3 +51,4 @@ pub use sprite_node::{SpriteNode, draw_sprite_nodes};
 pub use transform::{
     GlobalTransform2D, GlobalTransform3D, Transform2D, Transform3D, TransformPropagation,
 };
+pub use visibility::{Hidden, HiddenInTree, is_shown};

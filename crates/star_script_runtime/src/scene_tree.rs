@@ -89,6 +89,7 @@ fn build_node<H: Host>(node: &SceneNode) -> Result<H::Node, String> {
     if !node.tags.is_empty() {
         fields.tags.set(H::new_tags(node.tags.clone()));
     }
+    fields.visible.set(node.visible);
     if !node.fields.is_empty() {
         H::set_exported(class, &object, &node.fields)?;
     }

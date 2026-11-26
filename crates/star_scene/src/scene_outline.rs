@@ -39,6 +39,8 @@ pub struct NodeOutline {
     /// Words that groups of nodes share, such as `enemy`, to find them all
     /// at once.
     pub tags: Vec<String>,
+    /// Whether it is drawn; a hidden node hides its children too.
+    pub visible: bool,
     /// Position of its parent in [`SceneOutline::nodes`]; only the root,
     /// the first node, has none.
     pub parent: Option<usize>,
@@ -422,6 +424,7 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         name: node.name,
         class: node.class,
         tags: node.tags,
+        visible: node.visible.unwrap_or(true),
         parent: node.parent,
         transform,
         sprite,
@@ -471,6 +474,7 @@ fn write_node(node: &NodeOutline) -> NodeData {
         name: node.name.clone(),
         class: node.class.clone(),
         tags: node.tags.clone(),
+        visible: (!node.visible).then_some(false),
         parent: node.parent,
         position: node.transform.map(|transform| array(transform.position)),
         rotation: node.transform.map(|transform| transform.rotation),
@@ -568,6 +572,20 @@ mod tests {
 
         assert_eq!(outline.nodes()[0].tags, ["enemy", "loud"]);
         assert_eq!(written, outline);
+    }
+
+    #[test]
+    fn hidden_nodes_are_read_and_written_and_shown_ones_say_nothing() {
+        let text = "format = 1\n[[node]]\nname = \"Ghost\"\nvisible = false\n\
+                    [[node]]\nname = \"Hero\"\nparent = 0\n";
+
+        let outline = SceneOutline::from_text(text).unwrap();
+        let written = outline.to_text().unwrap();
+
+        assert!(!outline.nodes()[0].visible);
+        assert!(outline.nodes()[1].visible);
+        assert_eq!(written.matches("visible").count(), 1);
+        assert_eq!(SceneOutline::from_text(&written).unwrap(), outline);
     }
 
     #[test]

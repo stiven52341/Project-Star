@@ -260,6 +260,8 @@ pub(crate) enum EngineField {
     ScaleY,
     /// `tags` of `Node`: the interpreter's list, which the runtime reads.
     Tags,
+    /// `visible` of `Node`.
+    Visible,
     /// `body` of `Node`.
     Body,
     /// `view_height` and `main` of `Camera2D` (`main` of `Camera3D` too).
