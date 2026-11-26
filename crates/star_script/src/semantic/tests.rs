@@ -620,7 +620,10 @@ fn arguments_match_parameters() {
             found: 2
         }]
     );
-    assert_eq!(body_errors("Debug.print(n)"), [mismatch("string", "int")]);
+    assert_eq!(
+        body_errors("Debug.print(n > 0)"),
+        [Kind::NotPrintable("bool".into())]
+    );
 }
 
 #[test]
@@ -1588,5 +1591,32 @@ fn decorators_must_fit_what_they_decorate() {
             Kind::DuplicateDecorator("tooltip".to_owned()),
             Kind::UnknownDecorator("shiny".to_owned()),
         ]
+    );
+}
+
+#[test]
+fn debug_print_takes_texts_and_numbers() {
+    assert_valid_body(
+        "Debug.print(\"hi\")\nDebug.print(n)\nDebug.print(speed)\nDebug.print(n * 2 + 1)\n\
+         Debug.print(3 as short)\nDebug.print(3 as bigint)\nDebug.print(speed as double)",
+    );
+}
+
+#[test]
+fn debug_print_takes_nothing_else() {
+    assert_eq!(
+        body_errors("Debug.print(true)"),
+        [Kind::NotPrintable("bool".into())]
+    );
+    assert_eq!(
+        body_errors("Debug.print(e)"),
+        [Kind::NotPrintable("Enemy?".into())]
+    );
+    assert_eq!(
+        body_errors("Debug.print(n, n)"),
+        [Kind::WrongArgumentCount {
+            expected: 1,
+            found: 2
+        }]
     );
 }

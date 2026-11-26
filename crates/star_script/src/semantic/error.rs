@@ -207,6 +207,9 @@ pub enum SemanticErrorKind {
     NotIndexable(String),
     /// `(…)` on something that is not a method or class.
     NotCallable,
+    /// `Debug.print` given something that is neither a `string` nor a
+    /// number.
+    NotPrintable(String),
     /// A call with too many or too few arguments.
     WrongArgumentCount {
         /// Parameters of the method.
@@ -437,6 +440,10 @@ impl fmt::Display for SemanticErrorKind {
             }
             Self::NotIndexable(found) => write!(formatter, "`{found}` is not a list"),
             Self::NotCallable => formatter.write_str("only methods and classes can be called"),
+            Self::NotPrintable(found) => write!(
+                formatter,
+                "`Debug.print` takes a `string` or a number, not `{found}`; convert it with `.to_string()` if it has one"
+            ),
             Self::WrongArgumentCount { expected, found } => {
                 write!(formatter, "expected {expected} arguments, found {found}")
             }

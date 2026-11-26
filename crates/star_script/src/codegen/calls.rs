@@ -6,9 +6,11 @@ use super::expressions::self_reference;
 use super::names::ident;
 use super::statements::{Body, BodyKind};
 use super::{Result, internal};
+use crate::Span;
 use crate::ast::{Expr, ExprKind, Literal};
 use crate::semantic::{
     BuiltinMethod, ClassId, ClassOrigin, INPUT_CLASS, ParameterInfo, Resolution, Type,
+    is_debug_print,
 };
 
 impl Body<'_> {
@@ -48,6 +50,20 @@ impl Body<'_> {
         Ok(codes.join(", "))
     }
 
+    /// The text `Debug.print` writes: its `string`, or its number as the
+    /// number's `to_string` writes it.
+    fn print_argument(&self, arguments: &[Expr], span: Span) -> Result<String> {
+        let [message] = arguments else {
+            return Err(internal("`print` without one message", span));
+        };
+        let found = self.context.type_of(message)?;
+        if found.is_numeric() {
+            let number = self.expression(message)?;
+            return Ok(builtin_code(BuiltinMethod::ToString, found, &number, ""));
+        }
+        self.value_as(message, &Type::String)
+    }
+
     fn method_call(
         &self,
         callee: &Expr,
@@ -66,7 +82,11 @@ impl Body<'_> {
         if method.is_parallel() && self.kind != BodyKind::Parallel {
             return self.parallel_call(class, &method.name, &method.parameters, arguments);
         }
-        let arguments = self.arguments(&method.parameters, arguments)?;
+        let arguments = if is_debug_print(&info.name, &method.name) {
+            self.print_argument(arguments, callee.span)?
+        } else {
+            self.arguments(&method.parameters, arguments)?
+        };
         // Static methods of the engine are functions of the runtime; the
         // others belong to an engine class with a generated module.
         if info.origin == ClassOrigin::Native && method.is_static {

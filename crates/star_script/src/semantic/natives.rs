@@ -106,11 +106,31 @@ pub(super) const INPUT_POINTER_METHODS: [(&str, Type); 3] = [
     ("has_pointer", Type::Bool),
 ];
 
+/// The class whose `print` writes to the output.
+pub const DEBUG_CLASS: &str = "Debug";
+/// `Debug.print`, which takes a `string` or a number.
+pub const PRINT_METHOD: &str = "print";
+
+/// Whether `method` of the class `class` is `Debug.print`.
+#[must_use]
+pub fn is_debug_print(class: &str, method: &str) -> bool {
+    class == DEBUG_CLASS && method == PRINT_METHOD
+}
+
+/// Whether `Debug.print` takes a value of type `ty`: a `string`, or a
+/// number, which it writes as its `to_string` does.
+#[must_use]
+pub const fn is_printable(ty: &Type) -> bool {
+    matches!(ty, Type::String | Type::Error) || ty.is_numeric()
+}
+
 /// Adds the classes implemented by the engine.
 pub(super) fn add_native_classes(classes: &mut ClassTable) {
-    let mut debug = ClassInfo::new("Debug".to_owned(), ClassOrigin::Native);
+    let mut debug = ClassInfo::new(DEBUG_CLASS.to_owned(), ClassOrigin::Native);
+    // Its parameter is a `string`, but numbers are taken too (see
+    // `is_printable`), checked apart from the usual arguments.
     debug.methods.push(native_method(
-        "print",
+        PRINT_METHOD,
         &[("message", Type::String)],
         Type::Void,
         true,

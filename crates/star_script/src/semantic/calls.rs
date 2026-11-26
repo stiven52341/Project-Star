@@ -2,7 +2,7 @@
 
 use super::checker::{Checker, ContextKind, NameTarget};
 use super::expressions::{Receiver, wrap_null_safe};
-use super::natives::{INPUT_CLASS, builtin_method};
+use super::natives::{INPUT_CLASS, builtin_method, is_debug_print, is_printable};
 use super::{
     ClassId, ClassOrigin, Execution, MemberRef, MethodInfo, Resolution, SemanticErrorKind, Type,
 };
@@ -327,7 +327,11 @@ impl Checker<'_> {
             .iter()
             .map(|parameter| parameter.ty.clone())
             .collect();
-        self.arguments(&parameters, arguments, span);
+        if is_debug_print(&self.analysis.classes.class(class).name, &method.name) {
+            self.print_arguments(arguments, span);
+        } else {
+            self.arguments(&parameters, arguments, span);
+        }
         result
     }
 
@@ -373,6 +377,24 @@ impl Checker<'_> {
             let found = self.expression(argument, parameter);
             if let Some(parameter) = parameter {
                 self.require_assignable(&found, parameter, argument.span);
+            }
+        }
+    }
+
+    /// Checks the one argument of `Debug.print`: a `string` or a number.
+    fn print_arguments(&mut self, arguments: &[Expr], span: Span) {
+        if arguments.len() != 1 {
+            let kind = SemanticErrorKind::WrongArgumentCount {
+                expected: 1,
+                found: arguments.len(),
+            };
+            self.error(kind, span);
+        }
+        for argument in arguments {
+            let found = self.expression(argument, None);
+            if !is_printable(&found) {
+                let kind = SemanticErrorKind::NotPrintable(self.type_name(&found));
+                self.error(kind, argument.span);
             }
         }
     }

@@ -34,9 +34,9 @@ pub use error::{SemanticError, SemanticErrorKind};
 pub use field_defaults::FieldDefault;
 pub use natives::{
     AUDIO_CLASS, BASIC_TYPE_NAMES, BODY_CLASS, BuiltinMethod, BuiltinSignature, CAMERA_3D_CLASS,
-    CAMERA_CLASS, COLOR_CLASS, GAME_CLASS, INPUT_CLASS, LIGHT_2D_CLASS, LIGHT_CLASS, MESH_CLASS,
-    NODE_3D_CLASS, NODE_CLASS, SCENE_CLASS, SOUND_CLASS, SPRITE_CLASS, basic_type, builtin_method,
-    builtin_methods,
+    CAMERA_CLASS, COLOR_CLASS, DEBUG_CLASS, GAME_CLASS, INPUT_CLASS, LIGHT_2D_CLASS, LIGHT_CLASS,
+    MESH_CLASS, NODE_3D_CLASS, NODE_CLASS, PRINT_METHOD, SCENE_CLASS, SOUND_CLASS, SPRITE_CLASS,
+    basic_type, builtin_method, builtin_methods, is_debug_print, is_printable,
 };
 pub use scene_classes::SceneClassError;
 pub use types::Type;

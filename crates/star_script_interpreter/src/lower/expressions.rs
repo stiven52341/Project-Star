@@ -4,7 +4,9 @@ use std::sync::Arc;
 
 use star_script::Span;
 use star_script::ast::{BinaryOperator, Expr, ExprKind, Literal, Name, UnaryOperator};
-use star_script::semantic::{BuiltinMethod, ClassId, ClassOrigin, Execution, Resolution, Type};
+use star_script::semantic::{
+    BuiltinMethod, ClassId, ClassOrigin, Execution, Resolution, Type, is_debug_print,
+};
 
 use super::Member;
 use super::body::Body;
@@ -14,8 +16,6 @@ use crate::tree::{
     EngineMethod, Expression, MethodTarget, NodeMethod, NumberType, SoundMethod,
 };
 
-/// The engine class whose `print` writes a line.
-const DEBUG_CLASS: &str = "Debug";
 /// The engine class with the game's clock.
 const TIME_CLASS: &str = "Time";
 /// The engine class that reads the game's input.
@@ -346,6 +346,15 @@ impl Body<'_> {
         }
     }
 
+    /// `Debug.print(message)`: its `string`, or its number, which running
+    /// writes as the number's `to_string` does.
+    fn print(&self, arguments: &[Expr], span: Span) -> Result<Expression, LowerError> {
+        let [message] = arguments else {
+            return Err(LowerError::internal("`print` without one message", span));
+        };
+        Ok(Expression::Print(Box::new(self.expression(message)?)))
+    }
+
     fn method_call(
         &self,
         callee: &Expr,
@@ -358,6 +367,9 @@ impl Body<'_> {
             .methods
             .get(index)
             .ok_or_else(|| LowerError::internal("unknown method", callee.span))?;
+        if is_debug_print(&info.name, &method.name) {
+            return self.print(arguments, callee.span);
+        }
         let arguments = method
             .parameters
             .iter()
@@ -366,12 +378,6 @@ impl Body<'_> {
             .collect::<Result<Vec<_>, _>>()?;
         if info.origin == ClassOrigin::Native {
             return match (info.name.as_str(), method.name.as_str()) {
-                (DEBUG_CLASS, "print") => {
-                    let message = arguments.into_iter().next().ok_or_else(|| {
-                        LowerError::internal("`print` without a message", callee.span)
-                    })?;
-                    Ok(Expression::Print(Box::new(message)))
-                }
                 (TIME_CLASS, "now") => Ok(Expression::Now),
                 (TIME_CLASS, "delta") => Ok(Expression::Delta),
                 (TIME_CLASS, "wait") => {
