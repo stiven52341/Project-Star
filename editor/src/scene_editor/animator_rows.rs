@@ -21,6 +21,7 @@ pub(super) fn new_animator(files: AnimationFiles<'_>) -> Option<AnimatorOutline>
     Some(AnimatorOutline {
         animations,
         animation: None,
+        states: None,
     })
 }
 

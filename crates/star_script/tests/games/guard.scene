@@ -1,0 +1,28 @@
+format = 1
+
+[[node]]
+name = "Guard"
+class = "Guard"
+position = [0.0, 0.0]
+
+[node.sprite]
+texture = "levels/none.png"
+size = [1.0, 1.0]
+
+[[node]]
+name = "Arm"
+parent = 0
+position = [0.5, 0.0]
+
+[node.sprite]
+texture = "levels/none.png"
+size = [0.5, 0.2]
+
+[[node]]
+name = "Animator"
+class = "GuardAnimator"
+parent = 0
+
+[node.animator]
+animations = "levels/guard.anim"
+states = "levels/guard.states"

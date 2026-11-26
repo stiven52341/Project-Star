@@ -282,6 +282,8 @@ pub(crate) enum EngineField {
     Visible,
     /// `animations` of `Animator`: the file of its animations.
     Animations,
+    /// `states` of `Animator`: the file of its state machine.
+    States,
     /// `body` of `Node`.
     Body,
     /// `view_height` and `main` of `Camera2D` (`main` of `Camera3D` too).
@@ -480,6 +482,12 @@ pub(crate) enum NodeMethod {
     AnimatorStop,
     AnimatorIsPlaying,
     AnimatorAnimation,
+    /// `set_value`, `set_flag`, `trigger` and `state` of `Animator`: its
+    /// state machine.
+    SetValue,
+    SetFlag,
+    Trigger,
+    State,
 }
 
 impl NodeMethod {
@@ -532,6 +540,10 @@ impl NodeMethod {
             "is_playing" => Self::AnimatorIsPlaying,
             "animation" => Self::AnimatorAnimation,
             "animation_finished" => Self::AnimationFinished,
+            "set_value" => Self::SetValue,
+            "set_flag" => Self::SetFlag,
+            "trigger" => Self::Trigger,
+            "state" => Self::State,
             _ => return None,
         })
     }

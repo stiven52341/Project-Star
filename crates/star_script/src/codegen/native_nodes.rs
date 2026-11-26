@@ -15,6 +15,7 @@ const CLASSES: &str = "crate::classes";
 /// A method of an engine node class, as Rust: the name, the parameters
 /// after the receiver, the arguments that pass them on and the return type
 /// (with its arrow, or empty).
+#[derive(Clone, Copy)]
 struct Method {
     name: &'static str,
     parameters: &'static str,
@@ -287,6 +288,63 @@ node_.map(|node_| ::star_script_runtime::animations::animation::<crate::classes:
 /// animation ends, unless its script says: nothing.
 const ANIMATION_FINISHED_BODY: &str = "";
 
+/// The methods of `Animator`: those that play animations, and those of
+/// its state machine.
+const ANIMATOR_METHODS: [Method; 9] = [
+    PLAYING_METHODS[0],
+    PLAYING_METHODS[1],
+    PLAYING_METHODS[2],
+    PLAYING_METHODS[3],
+    PLAYING_METHODS[4],
+    Method {
+        name: "set_value",
+        parameters: "name: ::std::string::String, value: f32",
+        arguments: "name, value",
+        returns: "",
+    },
+    Method {
+        name: "set_flag",
+        parameters: "name: ::std::string::String, value: bool",
+        arguments: "name, value",
+        returns: "",
+    },
+    Method {
+        name: "trigger",
+        parameters: "name: ::std::string::String",
+        arguments: "name",
+        returns: "",
+    },
+    Method {
+        name: "state",
+        parameters: "",
+        arguments: "",
+        returns: " -> ::std::string::String",
+    },
+];
+
+/// `func set_value` of `Animator`: sets a number of its state machine.
+const SET_VALUE_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+if let ::std::option::Option::Some(node_) = node_ {
+    ::star_script_runtime::machines::set_value::<crate::classes::Host_>(&node_, &name, value);
+}";
+
+/// `func set_flag` of `Animator`: sets a flag of its state machine.
+const SET_FLAG_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+if let ::std::option::Option::Some(node_) = node_ {
+    ::star_script_runtime::machines::set_flag::<crate::classes::Host_>(&node_, &name, value);
+}";
+
+/// `func trigger` of `Animator`: sets a trigger of its state machine for
+/// this frame.
+const TRIGGER_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+if let ::std::option::Option::Some(node_) = node_ {
+    ::star_script_runtime::machines::trigger::<crate::classes::Host_>(&node_, &name);
+}";
+
+/// `func state` of `Animator`: the state its machine is in.
+const STATE_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+node_.map(|node_| ::star_script_runtime::machines::state::<crate::classes::Host_>(&node_)).unwrap_or_default()";
+
 /// `func play` of `Animator`: plays an animation of its `animations`.
 const ANIMATOR_PLAY_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
 if let ::std::option::Option::Some(node_) = node_ {
@@ -372,18 +430,22 @@ const LIGHT_2D: NodeClass = NodeClass {
 
 const ANIMATOR: NodeClass = NodeClass {
     name: "Animator",
-    about: "the `.anim` file of the animations it plays on its parent and the nodes under it, and the one it plays",
+    about: "the `.anim` file of the animations it plays on its parent and the nodes under it, the `.states` file of the machine that chooses them, and the one it plays",
     ancestors: &["Node"],
     fields: "::star_script_runtime::node_classes::AnimatorFields",
     new_fields: "Fields::new()",
     parameters: &[],
-    methods: &PLAYING_METHODS,
+    methods: &ANIMATOR_METHODS,
     bodies: &[
         ANIMATOR_PLAY_BODY,
         ANIMATOR_STOP_BODY,
         ANIMATOR_IS_PLAYING_BODY,
         ANIMATOR_ANIMATION_BODY,
         ANIMATION_FINISHED_BODY,
+        SET_VALUE_BODY,
+        SET_FLAG_BODY,
+        TRIGGER_BODY,
+        STATE_BODY,
     ],
 };
 
@@ -453,7 +515,8 @@ fn methods_of(class: &str) -> &'static [Method] {
     match class {
         "Node" => &NODE_METHODS,
         "Node3D" => &NODE_3D_METHODS,
-        "Sprite" | "Animator" => &PLAYING_METHODS,
+        "Sprite" => &PLAYING_METHODS,
+        "Animator" => &ANIMATOR_METHODS,
         _ => &[],
     }
 }

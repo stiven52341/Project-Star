@@ -13,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::Write as _;
 use std::rc::Rc;
 
+use crate::machines;
 use crate::node_classes::{AnimatorFields, BEFORE_START};
 use crate::nodes::{self, Host};
 use crate::properties::set_property;
@@ -94,7 +95,7 @@ pub struct TrackCall {
 }
 
 impl Tracks {
-    fn position(&self, name: &str) -> Option<usize> {
+    pub(crate) fn position(&self, name: &str) -> Option<usize> {
         self.animations
             .iter()
             .position(|animation| animation.name == name)
@@ -245,6 +246,10 @@ pub fn set_loader(loader: impl Fn(&str) -> Result<Tracks, String> + 'static) {
 /// `func play`: plays the animation `name` of the animator's `animations`
 /// from its start, unless it is already playing it.
 pub fn play<H: Host>(node: &H::Node, name: &str) {
+    if machines::runs_machine::<H>(node) {
+        machines::jump::<H>(node, name);
+        return;
+    }
     H::with_animator(node, |animator| {
         let same = animator.playing.get() && animator.animation.read(|current| current == name);
         if !same {
@@ -258,21 +263,40 @@ pub fn play<H: Host>(node: &H::Node, name: &str) {
 
 /// `func stop`: stops the animation, leaving every property as it is.
 pub fn stop<H: Host>(node: &H::Node) {
-    H::with_animator(node, |animator| animator.playing.set(false));
+    H::with_animator(node, |animator| {
+        animator.playing.set(false);
+        animator.machine.borrow_mut().stop();
+    });
 }
 
 /// `func is_playing`: whether the animation is playing; one that does not
 /// loop stops at its end.
 #[must_use]
 pub fn is_playing<H: Host>(node: &H::Node) -> bool {
-    H::with_animator(node, |animator| animator.playing.get()).unwrap_or(false)
+    let machine = machines::runs_machine::<H>(node);
+    H::with_animator(node, |animator| {
+        if machine {
+            animator.machine.borrow().is_playing()
+        } else {
+            animator.playing.get()
+        }
+    })
+    .unwrap_or(false)
 }
 
 /// `func animation`: the animation the animator plays, or played last;
 /// empty before any.
 #[must_use]
 pub fn animation<H: Host>(node: &H::Node) -> String {
-    H::with_animator(node, |animator| animator.animation.get()).unwrap_or_default()
+    let machine = machines::runs_machine::<H>(node);
+    H::with_animator(node, |animator| {
+        if machine {
+            animator.machine.borrow().animation().to_owned()
+        } else {
+            animator.animation.get()
+        }
+    })
+    .unwrap_or_default()
 }
 
 /// What an animator plays this frame.
@@ -293,6 +317,9 @@ struct Playing {
 /// played there shows its start in the same frame. When an animation that
 /// does not loop ends, the node's `animation_finished` runs with its name.
 pub fn advance<H: Host>(node: &H::Node, delta: f32) {
+    if machines::advance::<H>(node, delta) {
+        return;
+    }
     let Some(playing) = H::with_animator(node, playing).flatten() else {
         return;
     };
@@ -369,7 +396,7 @@ fn playing(animator: &AnimatorFields) -> Option<Playing> {
 
 /// Runs the methods `clip` calls after `shown` and up to `time`: past its
 /// end and from its start when it went round.
-fn call<H: Host>(root: &H::Node, clip: &TrackClip, shown: f32, time: f32) {
+pub(crate) fn call<H: Host>(root: &H::Node, clip: &TrackClip, shown: f32, time: f32) {
     let passed = |at: f32| {
         if time >= shown {
             shown < at && at <= time
@@ -392,7 +419,7 @@ fn call<H: Host>(root: &H::Node, clip: &TrackClip, shown: f32, time: f32) {
 
 /// Gives the properties `clip` changes, on `root` and the nodes under it,
 /// their values `time` seconds into it.
-fn apply<H: Host>(root: &H::Node, clip: &TrackClip, time: f32) {
+pub(crate) fn apply<H: Host>(root: &H::Node, clip: &TrackClip, time: f32) {
     for track in &clip.tracks {
         if let Some(value) = track.sample(time) {
             set_track_value::<H>(root, &clip.name, &track.node, &track.property, &value);
@@ -435,7 +462,7 @@ fn find<H: Host>(root: &H::Node, path: &str) -> Option<H::Node> {
 
 /// The `.anim` file at `path`, read the first time it is needed. `None` if
 /// it cannot be read: the reason is written once.
-fn load(path: &str) -> Loaded {
+pub(crate) fn load(path: &str) -> Loaded {
     if let Some(loaded) = LOADED.with(|loaded| loaded.borrow().get(path).cloned()) {
         return loaded;
     }
@@ -457,7 +484,7 @@ fn load(path: &str) -> Loaded {
 }
 
 /// Writes `message` as a warning, once.
-fn warn(message: &str) {
+pub(crate) fn warn(message: &str) {
     let first = WARNED.with(|warned| warned.borrow_mut().insert(message.to_owned()));
     if first {
         // Nothing can be reported if the error output itself fails.

@@ -270,6 +270,7 @@ fn animate<H: Host>(object: &H::Node, node: &SceneNode, class: &str) -> Result<(
     };
     H::with_animator(object, |fields| {
         fields.animations.set(animator.animations.clone());
+        fields.states.set(animator.states.clone());
     })
     .ok_or_else(|| format!("it plays animations, but `{class}` is not an `Animator`"))?;
     if !animator.animation.is_empty() {

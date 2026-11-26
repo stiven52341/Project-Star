@@ -1337,9 +1337,15 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           together by weights (decimals and colors blended, the rest
           jumping halfway; a property only one changes keeps its value),
           `star_script_runtime::poses`.
-    - [ ] 15e.3 The machine in the runtime and StarScript's API, compiled
-          and interpreted, with a conformance program and a game.
-    - [ ] 15e.4 Blends by a value (walk/run by speed), synced by phase.
+    - [x] 15e.3 The machine in the runtime (`star_script_runtime::machines`)
+          and StarScript's API (`states`, `set_value`, `set_flag`,
+          `trigger`, `state()`; `play` jumps to a state), compiled and
+          interpreted, read from scenes (`[node.animator]` `states`), with
+          the conformance program `animator_states` and the game
+          `states_game` of `engine_game` and `window`.
+    - [x] 15e.4 Blends by a value (walk/run by speed), synced by phase
+          (done with 15e.3: a blend state mixes the two animations around
+          its value, their rounds lasting the lengths by their weights).
     - [ ] 15e.5 The editor: a graph tab for `.states` files, states as
           boxes and transitions as arrows, edited in the inspector.
   - [ ] 15f Skeletons (agreed with the owner, 2026-11-26: cut-out 2D

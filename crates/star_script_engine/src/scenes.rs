@@ -83,6 +83,10 @@ fn scene_node(node: NodeOutline) -> SceneNode {
         animator: node.animator.map(|animator| SceneAnimator {
             animations: animator.animations.as_str().to_owned(),
             animation: animator.animation.unwrap_or_default(),
+            states: animator
+                .states
+                .map(|states| states.as_str().to_owned())
+                .unwrap_or_default(),
         }),
         camera: node.camera.map(|view| SceneCamera {
             view_height: view.view_height,

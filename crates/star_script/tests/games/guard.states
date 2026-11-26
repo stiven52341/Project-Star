@@ -1,0 +1,31 @@
+format = 1
+start = "idle"
+
+[[value]]
+name = "ready"
+kind = "flag"
+
+[[value]]
+name = "attack"
+kind = "trigger"
+
+[[state]]
+name = "idle"
+animation = "idle"
+
+[[state]]
+name = "attack"
+animation = "attack"
+
+# Attacks once triggered, only when ready; back to rest, fading, once the
+# swing has ended.
+[[transition]]
+from = "idle"
+to = "attack"
+conditions = [{ value = "attack" }, { value = "ready", is = true }]
+
+[[transition]]
+from = "attack"
+to = "idle"
+fade = 0.05
+at_end = true

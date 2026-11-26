@@ -1,0 +1,26 @@
+format = 1
+
+# The guard's arm at rest, and swinging once: the game prints what the
+# swing ends on, which does not depend on the frames.
+[[animation]]
+name = "idle"
+length = 0.2
+looping = true
+
+[[animation.track]]
+node = "Arm"
+property = "rotation"
+keys = [[0.0, 0.0]]
+
+[[animation]]
+name = "attack"
+length = 0.2
+
+[[animation.track]]
+node = "Arm"
+property = "rotation"
+keys = [[0.0, 0.0], [0.2, 1.5]]
+
+[[animation.call]]
+time = 0.2
+method = "strike"

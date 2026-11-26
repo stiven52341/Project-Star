@@ -589,13 +589,18 @@ mod tests {
     fn animators_are_read_and_written() {
         let text = "format = 1\n[[node]]\nname = \"Knight\"\n\
                     [[node]]\nname = \"Animator\"\nparent = 0\n\
-                    [node.animator]\nanimations = \"knight.anim\"\nanimation = \"idle\"\n";
+                    [node.animator]\nanimations = \"knight.anim\"\nanimation = \"idle\"\n\
+                    states = \"knight.states\"\n";
 
         let outline = SceneOutline::from_text(text).unwrap();
 
         let animator = outline.nodes()[1].animator.as_ref().unwrap();
         assert_eq!(animator.animations.as_str(), "knight.anim");
         assert_eq!(animator.animation.as_deref(), Some("idle"));
+        assert_eq!(
+            animator.states.as_ref().map(AssetPath::as_str),
+            Some("knight.states")
+        );
         assert_eq!(
             SceneOutline::from_text(&outline.to_text().unwrap()).unwrap(),
             outline

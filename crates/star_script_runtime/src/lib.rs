@@ -21,6 +21,7 @@ mod field;
 pub mod game;
 pub mod input;
 mod list;
+pub mod machines;
 pub mod node_classes;
 pub mod nodes;
 mod operations;

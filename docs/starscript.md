@@ -464,7 +464,7 @@ The engine provides them; their names cannot be used for other classes.
 | `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `visible: bool` (`true`), `body: Body?` (`null`), `tags: [string]` (`[]`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?`, `has_tag(tag: string) -> bool`, `find_by_name(name: string) -> Node?`, `find_by_tag(tag: string) -> [Node]`, `global_x() -> float`, `global_y() -> float`, `global_rotation() -> float`, `set_global_position(x: float, y: float)`, `set_global_rotation(angle: float)`, `translate(x: float, y: float)`, `translate_global(x: float, y: float)`, `rotate(angle: float)`; tweens (see below): `async tween(property: string, to: float, seconds: float, ease: string)`, `async tween_by(property: string, by: float, seconds: float, ease: string)`, `async tween_color(property: string, to: Color, seconds: float, ease: string)`, `async tween_with(property: string, to: float, seconds: float, ease: string, options: TweenOptions)`, `stop_tweens()` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors), `columns`, `rows: int` (1), `frame: int` (0): its sprite sheet; `frames: string` (`""`): its `.frames` file; `play(name: string)`, `stop()`, `is_playing() -> bool`, `animation() -> string`; the event `animation_finished(name: string)` |
 | `Light2D` (extends `Node`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (3.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
-| `Animator` (extends `Node`) | `init(name: string)`; field `animations: string` (`""`): its `.anim` file; `play(name: string)`, `stop()`, `is_playing() -> bool`, `animation() -> string`; the event `animation_finished(name: string)` |
+| `Animator` (extends `Node`) | `init(name: string)`; fields `animations: string` (`""`): its `.anim` file, and `states: string` (`""`): the `.states` file of its state machine; `play(name: string)`, `stop()`, `is_playing() -> bool`, `animation() -> string`; the event `animation_finished(name: string)`; its machine's `set_value(name: string, value: float)`, `set_flag(name: string, value: bool)`, `trigger(name: string)` and `state() -> string` |
 | `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `main: bool` (`false`) |
 | `Node3D` (extends `Node`) | `init(name: string)`; fields `z`, `pitch`, `yaw: float` (0.0), `scale_z: float` (1.0); `look_at(x: float, y: float, z: float)`, `global_z() -> float`, `set_global_position_3d(x: float, y: float, z: float)`, `translate_3d(x: float, y: float, z: float)`, `translate_global_3d(x: float, y: float, z: float)` |
 | `Mesh` (extends `Node3D`) | `init(name: string, shape: string)`; fields `shape: string`, `width`, `height`, `depth` (1.0), `radius` (0.5), `color: Color` (white), `metallic` (0.0), `roughness: float` (0.5), `texture: string` (`""`: none), `pixelated: bool` (`false`) |
@@ -693,6 +693,59 @@ class Space extends Game {
   play from the start). A file that cannot be read, an animation it does
   not have, a node that is not there or a value that does not fit its
   property is a warning on the error output (once), and the rest goes on.
+- An animator whose `states` names a `.states` file runs a **state
+  machine** that chooses its animations (decision 81):
+
+  ```toml
+  format = 1
+  start = "idle"
+
+  [[value]]
+  name = "speed"
+  kind = "number"              # number, flag or trigger
+
+  [[state]]
+  name = "idle"
+  animation = "idle"           # an animation of the animator's `.anim`
+  position = [0.0, 0.0]        # where the editor draws it
+
+  [[state]]
+  name = "move"
+  blend = "speed"              # a number value that blends animations
+  points = [{ animation = "walk", at = 1.0 }, { animation = "run", at = 4.0 }]
+
+  [[transition]]
+  from = "idle"                # left out: from any other state
+  to = "move"
+  fade = 0.2                   # seconds; 0 (if left out) cuts
+  at_end = false               # wait for the state to have played once
+  conditions = [{ value = "speed", above = 0.1 }]
+  # also `below = 1.0` for numbers, `is = true` for flags, and only
+  # `value` for a trigger
+  ```
+
+  Numbers start at zero and flags at `false`; scripts set them with
+  `set_value` and `set_flag`, and `trigger(name)` sets a trigger for the
+  frame it is set in. Every frame, right after the animator's `update`,
+  the machine takes the first transition, in the file's order, that
+  leaves its state (or any other, without `from`) and whose conditions all
+  hold, waiting, with `at_end`, until the state's last frame of a round was
+  shown; then it gives the properties the values of its state's
+  animations. A state that blends plays the two animations around its
+  value (the first or the last one alone outside them), mixed by how near
+  the value is to each, and keeps them in step. While a transition fades,
+  the state left keeps playing, and its values give way to the new one's:
+  decimals and colors blend, and whole numbers, `bool`s and texts jump
+  halfway; a property only one of them changes keeps its value. The calls
+  of the animation of the state that weighs the most run, and when it is
+  one that does not loop and ends, `animation_finished(name)` runs once
+  with its name. `state()` is the state the machine is in (empty before
+  its first frame), and `animation()` that animation. `play(name)` goes to
+  the state `name` at once, and `stop()` holds the machine until a state
+  is played. A scene's animator names the file in its `[node.animator]`
+  (`states = "knight.states"`). A file that cannot be read, a value it
+  does not have or of another kind, and a state or animation that is not
+  there are warnings on the error output (once).
 - A **tween** takes one property of a node, named as a track names it
   (above), from where it is to a value over some seconds, with an ease
   (decision 80):

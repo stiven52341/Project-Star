@@ -1,0 +1,7 @@
+states levels/guard.states, starting in ''
+state idle
+state idle, not ready
+state attack, playing attack
+strike
+finished attack in attack at 1.5
+back to idle

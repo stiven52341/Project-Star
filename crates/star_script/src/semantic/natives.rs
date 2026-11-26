@@ -512,9 +512,13 @@ fn add_scene_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
 fn add_animator_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
     let mut animator = ClassInfo::new(ANIMATOR_CLASS.to_owned(), ClassOrigin::Native);
     animator.base = Some(node);
-    animator.fields = vec![native_field("animations", Type::String)];
+    animator.fields = vec![
+        native_field("animations", Type::String),
+        native_field("states", Type::String),
+    ];
     animator.constructor = Some(native_constructor(&[("name", Type::String)]));
     animator.methods = playing_methods();
+    animator.methods.extend(machine_methods());
     classes.add(animator)
 }
 
@@ -531,6 +535,26 @@ fn playing_methods() -> Vec<MethodInfo> {
             Type::Void,
             false,
         ),
+    ]
+}
+
+/// The methods of an `Animator`'s state machine (decision 81).
+fn machine_methods() -> [MethodInfo; 4] {
+    [
+        native_method(
+            "set_value",
+            &[("name", Type::String), ("value", Type::Float)],
+            Type::Void,
+            false,
+        ),
+        native_method(
+            "set_flag",
+            &[("name", Type::String), ("value", Type::Bool)],
+            Type::Void,
+            false,
+        ),
+        native_method("trigger", &[("name", Type::String)], Type::Void, false),
+        native_method("state", &[], Type::String, false),
     ]
 }
 

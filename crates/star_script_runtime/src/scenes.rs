@@ -63,6 +63,8 @@ pub struct SceneAnimator {
     pub animations: String,
     /// The animation it plays from the start; empty for none.
     pub animation: String,
+    /// Asset path of the `.states` file of its machine; empty for none.
+    pub states: String,
 }
 
 /// The 2D camera a [`SceneNode`] is.

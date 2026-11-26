@@ -29,6 +29,10 @@ const HERO_FRAMES: &str = include_str!("games/hero.frames");
 const ANIMATOR_GAME: &str = include_str!("games/animator_game.star");
 const KNIGHT_SCENE: &str = include_str!("games/knight.scene");
 const TWEEN_GAME: &str = include_str!("games/tween_game.star");
+const STATES_GAME: &str = include_str!("games/states_game.star");
+const GUARD_SCENE: &str = include_str!("games/guard.scene");
+const GUARD_ANIMATIONS: &str = include_str!("games/guard.anim");
+const GUARD_STATES: &str = include_str!("games/guard.states");
 const KNIGHT_ANIMATIONS: &str = include_str!("games/knight.anim");
 const FLOOR_SCENE: &str = include_str!("games/floor.scene");
 const FLOOR_3D_SCENE: &str = include_str!("games/floor_3d.scene");
@@ -73,42 +77,20 @@ fn games_run_in_the_engine_until_they_quit() {
             compile_with("misspelled_game", GAME, &misspelled),
         )
         .expect("valid name");
-    package
-        .add_program("node_game", compile_with("node_game", NODE_GAME, &valid))
-        .expect("valid name");
-    package
-        .add_program(
-            "physics_game",
-            compile_with("physics_game", PHYSICS_GAME, &valid),
-        )
-        .expect("valid name");
-    package
-        .add_program(
-            "physics_3d_game",
-            compile_with("physics_3d_game", PHYSICS_3D_GAME, &valid),
-        )
-        .expect("valid name");
-    package
-        .add_program(
-            "coroutine_game",
-            compile_with("coroutine_game", COROUTINE_GAME, &valid),
-        )
-        .expect("valid name");
-    package
-        .add_program(
-            "animation_game",
-            compile_with("animation_game", ANIMATION_GAME, &valid),
-        )
-        .expect("valid name");
-    package
-        .add_program(
-            "animator_game",
-            compile_with("animator_game", ANIMATOR_GAME, &valid),
-        )
-        .expect("valid name");
-    package
-        .add_program("tween_game", compile_with("tween_game", TWEEN_GAME, &valid))
-        .expect("valid name");
+    for (name, source) in [
+        ("node_game", NODE_GAME),
+        ("physics_game", PHYSICS_GAME),
+        ("physics_3d_game", PHYSICS_3D_GAME),
+        ("coroutine_game", COROUTINE_GAME),
+        ("animation_game", ANIMATION_GAME),
+        ("animator_game", ANIMATOR_GAME),
+        ("tween_game", TWEEN_GAME),
+        ("states_game", STATES_GAME),
+    ] {
+        package
+            .add_program(name, compile_with(name, source, &valid))
+            .expect("valid name");
+    }
     // Never quits by itself: played only with a scene it cannot load.
     let scene_only = GameSettings {
         main_scene: Some(MainScene {
@@ -161,6 +143,8 @@ fn games_run_in_the_engine_until_they_quit() {
     let (stdout, _) = play(&directory, "tween_game");
     assert_eq!(stdout, include_str!("games/tween_game.out"));
 
+    state_machines_choose_the_animations(&directory, &levels);
+
     scene_only_games_need_their_scene(&directory);
 
     let output = Command::new(binary(&directory, "misspelled_game"))
@@ -171,6 +155,16 @@ fn games_run_in_the_engine_until_they_quit() {
         String::from_utf8_lossy(&output.stderr).contains("unknown input binding \"Spcae\""),
         "the error names the binding"
     );
+}
+
+/// Plays the game whose animator runs the state machine of
+/// `guard.states`, with its scene and animations in `levels`.
+fn state_machines_choose_the_animations(directory: &Path, levels: &Path) {
+    std::fs::write(levels.join("guard.scene"), GUARD_SCENE).expect("scene written");
+    std::fs::write(levels.join("guard.anim"), GUARD_ANIMATIONS).expect("animations written");
+    std::fs::write(levels.join("guard.states"), GUARD_STATES).expect("states written");
+    let (stdout, _) = play(directory, "states_game");
+    assert_eq!(stdout, include_str!("games/states_game.out"));
 }
 
 /// The scene-only game stops, saying which scene it could not load (a

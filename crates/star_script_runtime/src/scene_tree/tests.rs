@@ -90,6 +90,7 @@ fn animators_take_their_file_and_play_their_first_animation() {
         animator: Some(SceneAnimator {
             animations: "knight.anim".to_owned(),
             animation: "idle".to_owned(),
+            states: "knight.states".to_owned(),
         }),
         ..node("Animator", None, Some(0))
     };
@@ -100,6 +101,8 @@ fn animators_take_their_file_and_play_their_first_animation() {
     let animator = nodes::find_child::<TestHost>(&root, "Animator").expect("animator");
     let file = TestHost::with_animator(&animator, |fields| fields.animations.get());
     assert_eq!(file.as_deref(), Some("knight.anim"));
+    let states = TestHost::with_animator(&animator, |fields| fields.states.get());
+    assert_eq!(states.as_deref(), Some("knight.states"));
     assert_eq!(crate::tracks::animation::<TestHost>(&animator), "idle");
     assert!(crate::tracks::is_playing::<TestHost>(&animator));
 }

@@ -2,10 +2,11 @@
 //! (those are in [`crate::nodes`]), with their first values, shared by
 //! every way of running StarScript.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::f32::consts::{FRAC_PI_3, FRAC_PI_6};
 
 use crate::Field;
+use crate::machines::MachineRun;
 use crate::nodes::Host;
 
 /// The fields of a `Sprite`: the image it shows and how.
@@ -218,6 +219,11 @@ pub(crate) const BEFORE_START: f32 = -1.0;
 pub struct AnimatorFields {
     /// `animations`: the asset path of the `.anim` file; empty for none.
     pub animations: Field<String>,
+    /// `states`: the asset path of the `.states` file of the machine that
+    /// chooses its animations; empty for none.
+    pub states: Field<String>,
+    /// What its state machine is doing.
+    pub(crate) machine: RefCell<MachineRun>,
     /// The animation playing, or the last one played; empty before any.
     pub(crate) animation: Field<String>,
     /// Whether `animation` is playing.
@@ -235,6 +241,8 @@ impl AnimatorFields {
     pub const fn new() -> Self {
         Self {
             animations: Field::new(String::new()),
+            states: Field::new(String::new()),
+            machine: RefCell::new(MachineRun::new()),
             animation: Field::new(String::new()),
             playing: Cell::new(false),
             time: Cell::new(0.0),

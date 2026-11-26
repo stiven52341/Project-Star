@@ -19,7 +19,7 @@ use star_script_runtime::node_classes::{
 use star_script_runtime::nodes::{self, Host as _, Node3dFields};
 use star_script_runtime::tweens::{self, Goal, Tween, TweenOptionsFields};
 use star_script_runtime::{Field, List};
-use star_script_runtime::{animations, tracks};
+use star_script_runtime::{animations, machines, tracks};
 
 use super::object_of;
 use crate::error::RunError;
@@ -177,6 +177,7 @@ fn class_slot(class: &ClassParts, field: EngineField) -> Option<Slot<'_>> {
         ClassParts::Camera3D(camera) => camera_3d_slot(camera, field),
         ClassParts::Animator(animator) => match field {
             EngineField::Animations => Some(Slot::Text(&animator.animations)),
+            EngineField::States => Some(Slot::Text(&animator.states)),
             _ => None,
         },
     }
@@ -599,6 +600,29 @@ fn node_method(
         (NodeMethod::Animation, []) => {
             Value::String(Arc::from(animations::animation::<Runtime>(node)))
         }
+        (
+            NodeMethod::AnimatorPlay
+            | NodeMethod::AnimatorStop
+            | NodeMethod::AnimatorIsPlaying
+            | NodeMethod::AnimatorAnimation
+            | NodeMethod::SetValue
+            | NodeMethod::SetFlag
+            | NodeMethod::Trigger
+            | NodeMethod::State,
+            _,
+        ) => animator_method(method, node, arguments)?,
+        _ => return Err(RunError::Internal("method of `Node` with other arguments")),
+    })
+}
+
+/// A method of `Animator`: playing its animations and its state machine.
+fn animator_method(
+    method: NodeMethod,
+    node: &Rc<NodeObject>,
+    arguments: &[Value],
+) -> Result<Value, RunError> {
+    type Runtime = Interpreted;
+    Ok(match (method, arguments) {
         (NodeMethod::AnimatorPlay, [name]) => {
             tracks::play::<Runtime>(node, text(name)?);
             Value::Null
@@ -611,7 +635,24 @@ fn node_method(
         (NodeMethod::AnimatorAnimation, []) => {
             Value::String(Arc::from(tracks::animation::<Runtime>(node)))
         }
-        _ => return Err(RunError::Internal("method of `Node` with other arguments")),
+        (NodeMethod::SetValue, [name, value]) => {
+            machines::set_value::<Runtime>(node, text(name)?, float(value)?);
+            Value::Null
+        }
+        (NodeMethod::SetFlag, [name, value]) => {
+            machines::set_flag::<Runtime>(node, text(name)?, flag(value)?);
+            Value::Null
+        }
+        (NodeMethod::Trigger, [name]) => {
+            machines::trigger::<Runtime>(node, text(name)?);
+            Value::Null
+        }
+        (NodeMethod::State, []) => Value::String(Arc::from(machines::state::<Runtime>(node))),
+        _ => {
+            return Err(RunError::Internal(
+                "method of `Animator` with other arguments",
+            ));
+        }
     })
 }
 
@@ -673,6 +714,13 @@ fn float(value: &Value) -> Result<f32, RunError> {
     match value {
         Value::Float(value) => Ok(*value),
         _ => Err(RunError::Internal("a `float` argument that is not one")),
+    }
+}
+
+fn flag(value: &Value) -> Result<bool, RunError> {
+    match value {
+        Value::Bool(value) => Ok(*value),
+        _ => Err(RunError::Internal("a `bool` argument that is not one")),
     }
 }
 

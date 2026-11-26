@@ -13,6 +13,9 @@ pub struct AnimatorOutline {
     pub animations: AssetPath,
     /// The animation it plays from the start, if any.
     pub animation: Option<String>,
+    /// The `.states` file of the machine that chooses its animations, if
+    /// any (decision 81).
+    pub states: Option<AssetPath>,
 }
 
 /// A `[node.animator]` table.
@@ -22,6 +25,8 @@ pub(crate) struct AnimatorData {
     animations: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     animation: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    states: Option<String>,
 }
 
 impl AnimatorData {
@@ -29,6 +34,7 @@ impl AnimatorData {
         Ok(AnimatorOutline {
             animations: AssetPath::new(&self.animations)?,
             animation: self.animation.clone(),
+            states: self.states.as_deref().map(AssetPath::new).transpose()?,
         })
     }
 
@@ -36,6 +42,10 @@ impl AnimatorData {
         Self {
             animations: animator.animations.as_str().to_owned(),
             animation: animator.animation.clone(),
+            states: animator
+                .states
+                .as_ref()
+                .map(|states| states.as_str().to_owned()),
         }
     }
 }
