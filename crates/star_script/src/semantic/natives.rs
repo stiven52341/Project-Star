@@ -420,6 +420,9 @@ fn add_sprite_class(classes: &mut ClassTable, node: ClassId, color: ClassId) -> 
         native_field("layer", Type::Int),
         native_field("pixelated", Type::Bool),
         native_field("color", Type::Class(color)),
+        native_field("columns", Type::Int),
+        native_field("rows", Type::Int),
+        native_field("frame", Type::Int),
     ];
     sprite.constructor = Some(native_constructor(&[
         ("name", Type::String),

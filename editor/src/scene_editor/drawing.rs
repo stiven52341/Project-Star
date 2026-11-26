@@ -251,7 +251,8 @@ fn draw_sprite(
         .with_region(sprite.region)
         .with_anchor(sprite.anchor)
         .with_color(sprite.color)
-        .with_layer(sprite.layer);
+        .with_layer(sprite.layer)
+        .with_sheet(sprite.sheet);
     frame.draw_sprite(node.to_sprite(GlobalTransform2D::from_affine(global)));
 }
 

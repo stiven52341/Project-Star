@@ -89,6 +89,13 @@ pub(crate) struct SpriteData {
     pub(crate) color: Option<[f32; 4]>,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub(crate) layer: i32,
+    /// The image cut into `columns` x `rows` cells, showing `frame`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) columns: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) rows: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) frame: Option<u32>,
 }
 
 /// How a texture is sampled, as written in files.
@@ -201,6 +208,9 @@ mod tests {
                     anchor: None,
                     color: None,
                     layer: 3,
+                    columns: Some(4),
+                    rows: None,
+                    frame: Some(2),
                 }),
                 body: None,
                 transform_3d: None,

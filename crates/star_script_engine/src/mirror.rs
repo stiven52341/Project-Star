@@ -10,7 +10,7 @@ use star_engine::script_nodes::{
 };
 use star_engine::star_ecs::World;
 use star_engine::star_math::{Quat, Vec2, Vec3};
-use star_engine::star_render::Color;
+use star_engine::star_render::{Color, SpriteSheet};
 use star_engine::star_scene::{Transform2D, Transform3D};
 use star_script_runtime::bodies::Contact;
 use star_script_runtime::nodes::{Host, NodeFields};
@@ -96,6 +96,7 @@ fn with_sprite<H: Host>(node: &H::Node, then: impl FnOnce(Option<ScriptSprite<'_
                     layer: look.layer.get(),
                     pixelated: look.pixelated.get(),
                     color: look.color.read(engine_color::<H>),
+                    sheet: sheet(look.columns.get(), look.rows.get(), look.frame.get()),
                 }));
             }
         });
@@ -103,6 +104,18 @@ fn with_sprite<H: Host>(node: &H::Node, then: impl FnOnce(Option<ScriptSprite<'_
     if let Some(then) = then {
         then(None);
     }
+}
+
+/// The sprite sheet of a `Sprite`'s `columns`, `rows` and `frame`, whatever
+/// the script set them to: fewer than one column or row is one, and frames
+/// before the first or past the last go round the sheet, so `frame += 1`
+/// and `frame -= 1` loop over its cells.
+fn sheet(columns: i32, rows: i32, frame: i32) -> SpriteSheet {
+    let cells = |count: i32| u16::try_from(count.clamp(1, i32::from(u16::MAX))).unwrap_or(1);
+    let (columns, rows) = (cells(columns), cells(rows));
+    let frames = i64::from(columns) * i64::from(rows);
+    let frame = u32::try_from(i64::from(frame).rem_euclid(frames)).unwrap_or(0);
+    SpriteSheet::new(columns, rows, frame)
 }
 
 /// Runs `then` with the body of the node of `fields`, if it has one, and
@@ -276,5 +289,24 @@ pub(crate) fn script_camera_3d<H: Host>(camera: &H::Camera3D) -> ScriptCamera3D 
         position: Vec3::new(fields.x.get(), fields.y.get(), depth),
         angles: Vec3::new(pitch, yaw, fields.rotation.get()),
         field_of_view: H::camera_3d(camera).fov.get(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn script_sheets_always_show_a_cell() {
+        assert_eq!(sheet(4, 2, 5), SpriteSheet::new(4, 2, 5));
+        assert_eq!(sheet(0, -3, 9), SpriteSheet::SINGLE);
+        assert_eq!(sheet(100_000, 1, 1), SpriteSheet::new(u16::MAX, 1, 1));
+    }
+
+    #[test]
+    fn script_frames_go_round_the_sheet_both_ways() {
+        assert_eq!(sheet(4, 1, 4).frame(), 0);
+        assert_eq!(sheet(4, 1, -1).frame(), 3);
+        assert_eq!(sheet(2, 2, i32::MIN).frame(), 0);
     }
 }

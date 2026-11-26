@@ -60,6 +60,14 @@ class Main {
         Debug.print(player.color.g.to_string() + " " + bat.color.a.to_string())
         Debug.print(Sprite("Rock", "rock.png").color.r.to_string())
 
+        // A sprite sheet: the image cut into cells, one of them shown.
+        const runner = Sprite("Runner", "sprites/run.png")
+        Debug.print(runner.columns.to_string() + " " + runner.rows.to_string() + " " + runner.frame.to_string())
+        runner.columns = 4
+        runner.rows = 2
+        runner.frame += 5
+        Debug.print(runner.columns.to_string() + " " + runner.rows.to_string() + " " + runner.frame.to_string())
+
         // Scenes are read by the engine: a program without a game has none.
         Debug.print((Scene.load("levels/one.scene") == null).to_string())
 

@@ -285,6 +285,10 @@ pub(crate) enum EngineField {
     Layer,
     Pixelated,
     Tint,
+    /// `columns`, `rows` and `frame` of `Sprite`: its sprite sheet.
+    Columns,
+    Rows,
+    Frame,
     /// `kind`, `intensity`, `range`, `angle` and `blend` of `Light2D`
     /// (`kind` of `Body` too).
     Kind,

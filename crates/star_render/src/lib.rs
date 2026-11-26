@@ -51,7 +51,7 @@ pub use mesh_data::{
     MIN_SPHERE_SEGMENTS, MeshData, MeshShape, MeshVertex,
 };
 pub use renderer::{Renderer, RendererConfig};
-pub use sprite::{Sprite, TextureRegion};
+pub use sprite::{Sprite, SpriteSheet, TextureRegion};
 pub use star_core::Image;
 pub use texture::{TextureFilter, TextureId};
 pub use vertex::Vertex;

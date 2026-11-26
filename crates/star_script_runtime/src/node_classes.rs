@@ -21,10 +21,16 @@ pub struct SpriteFields<H: Host> {
     pub pixelated: Field<bool>,
     /// `color`: what the image is tinted with.
     pub color: Field<H::Color>,
+    /// `columns`: how many cells wide the image is, as a sprite sheet.
+    pub columns: Field<i32>,
+    /// `rows`: how many cells tall the image is, as a sprite sheet.
+    pub rows: Field<i32>,
+    /// `frame`: the cell shown, counted from the top-left one, row by row.
+    pub frame: Field<i32>,
 }
 
 impl<H: Host> SpriteFields<H> {
-    /// A sprite of 1 by 1 showing `texture` as it is, in layer 0.
+    /// A sprite of 1 by 1 showing the whole `texture` as it is, in layer 0.
     #[must_use]
     pub fn new(texture: String) -> Self {
         Self {
@@ -34,6 +40,9 @@ impl<H: Host> SpriteFields<H> {
             layer: Field::new(0),
             pixelated: Field::new(false),
             color: Field::new(white::<H>()),
+            columns: Field::new(1),
+            rows: Field::new(1),
+            frame: Field::new(0),
         }
     }
 }

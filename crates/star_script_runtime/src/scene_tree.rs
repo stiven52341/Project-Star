@@ -211,6 +211,9 @@ fn show<H: Host>(object: &H::Node, node: &SceneNode, class: &str) -> Result<(), 
             look.layer.set(image.layer);
             look.pixelated.set(image.pixelated);
             look.color.set(color(image.color));
+            look.columns.set(image.columns);
+            look.rows.set(image.rows);
+            look.frame.set(image.frame);
         })
         .ok_or_else(|| not_a("shows an image", "Sprite"))?;
     }

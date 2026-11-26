@@ -213,6 +213,9 @@ fn sprite_slot(sprite: &SpriteFields<Interpreted>, field: EngineField) -> Option
         EngineField::Layer => Slot::Int(&sprite.layer),
         EngineField::Pixelated => Slot::Bool(&sprite.pixelated),
         EngineField::Tint => Slot::Color(&sprite.color),
+        EngineField::Columns => Slot::Int(&sprite.columns),
+        EngineField::Rows => Slot::Int(&sprite.rows),
+        EngineField::Frame => Slot::Int(&sprite.frame),
         _ => return None,
     })
 }

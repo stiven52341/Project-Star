@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use star_assets::{AssetFolder, AssetPath};
 use star_core::{EngineError, EngineResult};
 use star_math::Vec2;
-use star_render::{Color, Sprite, TextureFilter, TextureRegion};
+use star_render::{Color, Sprite, SpriteSheet, TextureFilter, TextureRegion};
 
 use star_physics::{BodySettings, Shape3d};
 
@@ -93,6 +93,8 @@ pub struct SpriteOutline {
     pub color: Color,
     /// Sprites in higher layers are drawn on top of lower ones.
     pub layer: i32,
+    /// How `region` is cut into cells, and the one shown.
+    pub sheet: SpriteSheet,
 }
 
 impl SceneOutline {
@@ -450,6 +452,11 @@ fn read_sprite(sprite: &SpriteData) -> EngineResult<SpriteOutline> {
             .color
             .map_or(Color::WHITE, |[r, g, b, a]| Color::rgba(r, g, b, a)),
         layer: sprite.layer,
+        sheet: SpriteSheet::new(
+            sprite.columns.unwrap_or(1),
+            sprite.rows.unwrap_or(1),
+            sprite.frame.unwrap_or(0),
+        ),
     })
 }
 
@@ -479,8 +486,7 @@ fn write_node(node: &NodeOutline) -> NodeData {
 }
 
 fn write_sprite(sprite: &SpriteOutline) -> SpriteData {
-    let region = sprite.region;
-    let color = sprite.color;
+    let (region, color, sheet) = (sprite.region, sprite.color, sprite.sheet);
     SpriteData {
         texture: sprite.texture.as_str().to_owned(),
         filter: sprite.filter.into(),
@@ -494,6 +500,9 @@ fn write_sprite(sprite: &SpriteOutline) -> SpriteData {
         anchor: (sprite.anchor != Sprite::CENTER).then(|| array(sprite.anchor)),
         color: (color != Color::WHITE).then_some([color.r, color.g, color.b, color.a]),
         layer: sprite.layer,
+        columns: (sheet.columns() != 1).then_some(sheet.columns()),
+        rows: (sheet.rows() != 1).then_some(sheet.rows()),
+        frame: (sheet.frame() != 0).then_some(sheet.frame()),
     }
 }
 
@@ -637,6 +646,28 @@ mod tests {
         assert_eq!(sprite.region, TextureRegion::FULL);
         assert_eq!(sprite.anchor, Sprite::CENTER);
         assert_eq!(sprite.color, Color::rgba(1.0, 0.5, 0.5, 1.0));
+        assert_eq!(sprite.sheet, SpriteSheet::SINGLE);
+        assert!(!hero_text(&outline).contains("columns"));
+    }
+
+    fn hero_text(outline: &SceneOutline) -> String {
+        outline.to_text().unwrap()
+    }
+
+    #[test]
+    fn sprite_sheets_are_read_and_written() {
+        let text = "format = 1\n[[node]]\nname = \"Hero\"\n[node.sprite]\n\
+                    texture = \"hero.png\"\nsize = [1.0, 1.0]\ncolumns = 4\nrows = 2\nframe = 5\n";
+
+        let outline = SceneOutline::from_text(text).unwrap();
+
+        let sprite = outline.nodes()[0].sprite.as_ref().unwrap();
+        assert_eq!(sprite.sheet, SpriteSheet::new(4, 2, 5));
+        let written = hero_text(&outline);
+        assert!(
+            written.contains("columns = 4\nrows = 2\nframe = 5"),
+            "{written}"
+        );
     }
 
     #[test]

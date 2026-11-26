@@ -33,6 +33,9 @@ fn sprite() -> SceneSprite {
         layer: 4,
         pixelated: true,
         color: [0.5, 0.5, 0.5, 1.0],
+        columns: 4,
+        rows: 2,
+        frame: 5,
     }
 }
 
@@ -87,6 +90,8 @@ fn nodes_without_a_class_are_what_their_parts_show() {
     assert_eq!(look.texture.get(), "ship.png");
     assert_eq!(look.layer.get(), 4);
     assert_eq!(look.color.get(), [0.5, 0.5, 0.5, 1.0]);
+    let sheet = (look.columns.get(), look.rows.get(), look.frame.get());
+    assert_eq!(sheet, (4, 2, 5));
     assert!(nodes::has_tag::<TestHost>(&built, "player"));
     assert!((built.node.y.get() - 2.0).abs() < f32::EPSILON);
 }

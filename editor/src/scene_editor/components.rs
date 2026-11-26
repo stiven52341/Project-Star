@@ -9,7 +9,7 @@ use star_engine::prelude::{
 use star_engine::star_assets::AssetPath;
 use star_engine::star_render::{
     DEFAULT_ROUGHNESS, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, DEFAULT_SPOT_ANGLE,
-    DEFAULT_SPOT_BLEND,
+    DEFAULT_SPOT_BLEND, SpriteSheet,
 };
 use star_engine::star_scene::{
     Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
@@ -337,6 +337,7 @@ pub(super) const fn sprite_of(texture: AssetPath, size: Vec2) -> SpriteOutline {
         anchor: Sprite::CENTER,
         color: Color::WHITE,
         layer: 0,
+        sheet: SpriteSheet::SINGLE,
     }
 }
 

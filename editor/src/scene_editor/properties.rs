@@ -9,7 +9,7 @@ use star_engine::prelude::{
 use star_engine::star_assets::AssetPath;
 use star_engine::star_render::{
     DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MAX_SPHERE_DIVISIONS, MIN_SPHERE_RINGS,
-    MIN_SPHERE_SEGMENTS,
+    MIN_SPHERE_SEGMENTS, SpriteSheet,
 };
 use star_engine::star_scene::{
     Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
@@ -186,8 +186,23 @@ fn edit_sprite(ui: &mut egui::Ui, sprite: &mut SpriteOutline, images: &[String])
     changed |= vec2_row(ui, texts.anchor, &mut sprite.anchor);
     changed |= vec2_row(ui, texts.region, &mut sprite.region.min);
     changed |= vec2_row(ui, "", &mut sprite.region.max);
+    changed |= sheet_rows(ui, &mut sprite.sheet);
     changed |= color_row(ui, texts.color, &mut sprite.color);
     changed | whole_row(ui, texts.layer, &mut sprite.layer, i32::MIN..=i32::MAX)
+}
+
+/// How a sprite's region is cut into cells, and the one it shows.
+fn sheet_rows(ui: &mut egui::Ui, sheet: &mut SpriteSheet) -> bool {
+    let texts = texts::current();
+    let (mut columns, mut rows, mut frame) = (sheet.columns(), sheet.rows(), sheet.frame());
+    let mut changed = whole_row(ui, texts.sheet_columns, &mut columns, 1..=u16::MAX);
+    changed |= whole_row(ui, texts.sheet_rows, &mut rows, 1..=u16::MAX);
+    let last = u32::from(columns) * u32::from(rows) - 1;
+    changed |= whole_row(ui, texts.sheet_frame, &mut frame, 0..=last);
+    if changed {
+        *sheet = SpriteSheet::new(columns, rows, frame);
+    }
+    changed
 }
 
 /// The image of a sprite or a mesh, among those of the assets folder;

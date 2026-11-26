@@ -25,7 +25,7 @@ use star_core::EngineResult;
 use star_ecs::{Entity, World};
 use star_math::{Mat4, Vec2, Vec3};
 use star_physics::{BodySettings, ContactPhase};
-use star_render::{Camera, Color, TextureFilter};
+use star_render::{Camera, Color, SpriteSheet, TextureFilter};
 use star_scene::{
     Body2D, Body3D, GlobalTransform2D, GlobalTransform3D, Hierarchy, Light2dNode, LightNode, Name,
     NodeBody, NodeContact, PhysicsNodes, PhysicsNodes3d, Transform2D, Transform3D,
@@ -79,6 +79,8 @@ pub struct ScriptSprite<'a> {
     pub pixelated: bool,
     /// Multiplied by the image's colors.
     pub color: Color,
+    /// How the image is cut into cells, and the one shown.
+    pub sheet: SpriteSheet,
 }
 
 /// A StarScript `Camera2D`, as the generated game describes it.
@@ -566,6 +568,7 @@ impl ScriptNodes {
                 file.size = sprite.size;
                 file.layer = sprite.layer;
                 file.color = sprite.color;
+                file.sheet = sprite.sheet;
             }
             same_image
         });
@@ -577,7 +580,8 @@ impl ScriptNodes {
                 let file = SpriteFile::new(path, sprite.size)
                     .with_filter(filter)
                     .with_layer(sprite.layer)
-                    .with_color(sprite.color);
+                    .with_color(sprite.color)
+                    .with_sheet(sprite.sheet);
                 world.insert(entity, file)?;
             }
             Err(error) => {
@@ -697,6 +701,7 @@ mod tests {
             layer: 3,
             pixelated: true,
             color: Color::rgb(1.0, 0.5, 0.0),
+            sheet: SpriteSheet::new(4, 1, 2),
         }
     }
 
@@ -1131,12 +1136,15 @@ mod tests {
         assert_eq!(file.filter, TextureFilter::Pixelated);
         assert_eq!((file.size, file.layer), (Vec2::new(2.0, 1.0), 3));
         assert_eq!(file.color, Color::rgb(1.0, 0.5, 0.0));
+        assert_eq!(file.sheet, SpriteSheet::new(4, 1, 2));
 
         let mut faded = sprite("sprites/hero.png");
         faded.color = Color::rgba(1.0, 1.0, 1.0, 0.5);
+        faded.sheet = SpriteSheet::new(4, 1, 3);
         hero.sprite = Some(faded);
         frame(&mut mirror, &mut world, &[hero]);
-        assert_eq!(world.get::<SpriteFile>(entity).unwrap().color, faded.color);
+        let file = world.get::<SpriteFile>(entity).unwrap().clone();
+        assert_eq!((file.color, file.sheet), (faded.color, faded.sheet));
 
         hero.sprite = Some(sprite("sprites/knight.png"));
         frame(&mut mirror, &mut world, &[hero]);

@@ -106,7 +106,8 @@ impl GameAssets {
             if let Some(texture) = texture {
                 let sprite = SpriteNode::new(texture, file.size)
                     .with_layer(file.layer)
-                    .with_color(file.color);
+                    .with_color(file.color)
+                    .with_sheet(file.sheet);
                 frame.draw_sprite(sprite.to_sprite(*global));
             }
         })

@@ -1222,7 +1222,27 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       `AnimationTree`, and Unity's Animator, without copying them:
   - [ ] 15a Frame animations for 2D: named clips of sprite sheet cells
         (frames per second, loop), played by a node from StarScript
-        (`play`, `stop`, the clip that ends), saved in the project.
+        (`play`, `stop`, the clip that ends), saved in the project. Agreed
+        with the owner: the clips live in their own `.frames` file of the
+        assets (reused by any scene and node), the existing `Sprite` plays
+        them (no new class), and a script learns that a clip ended through
+        an event it overrides, `animation_finished(name)`, like `update`.
+    - [x] 15a.1 Sprite sheet cells everywhere: a sprite's image is cut into
+          `columns` x `rows` cells and shows one, its `frame` (counted from
+          the top-left, row by row); in the engine's sprites
+          (`SpriteSheet`), the scene files, the inspector, and StarScript's
+          `Sprite` (compiled and interpreted). In scenes the cells cut the
+          sprite's `region`; any value shows a cell (frames go round the
+          sheet), so scripts can step `frame` without checks.
+    - [ ] 15a.2 The `.frames` file (image, cells, clips with their frames,
+          speed and loop) and playing it: `Sprite` fields `frames` and
+          `animation`, `play(name)`, `stop()`, the frame advanced by the
+          engine every frame, and the clip a scene's sprite starts with.
+    - [ ] 15a.3 The `animation_finished(name)` event, also as a blueprint
+          graph.
+    - [ ] 15a.4 The editor's frames panel: cutting the sheet, picking each
+          clip's cells by clicking them, speed, loop and a preview; the
+          inspector chooses a sprite's `.frames` and first clip.
   - [ ] 15b Keyframe tracks: any property of a node and its children
         (position, rotation, scale, color, visibility, exported fields) over
         time, with interpolation (step, linear, eased) and calls to methods

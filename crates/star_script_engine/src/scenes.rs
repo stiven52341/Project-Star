@@ -42,6 +42,9 @@ fn scene_node(node: NodeOutline) -> SceneNode {
             layer: image.layer,
             pixelated: image.filter == TextureFilter::Pixelated,
             color: [image.color.r, image.color.g, image.color.b, image.color.a],
+            columns: i32::from(image.sheet.columns()),
+            rows: i32::from(image.sheet.rows()),
+            frame: i32::try_from(image.sheet.frame()).unwrap_or(0),
         }),
         body: match (node.transform_3d.is_some(), node.body_3d, node.body) {
             (true, Some(settings), _) => Some(scene_body(&ScriptBody::from_settings_3d(&settings))),

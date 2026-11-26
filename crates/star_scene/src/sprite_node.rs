@@ -3,7 +3,7 @@
 use star_core::EngineResult;
 use star_ecs::World;
 use star_math::Vec2;
-use star_render::{Color, Frame, MAX_LIGHTS, Sprite, TextureId, TextureRegion};
+use star_render::{Color, Frame, MAX_LIGHTS, Sprite, SpriteSheet, TextureId, TextureRegion};
 
 use crate::{GlobalTransform2D, Light2dNode};
 
@@ -24,6 +24,8 @@ pub struct SpriteNode {
     pub color: Color,
     /// Sprites in higher layers are drawn on top of lower ones.
     pub layer: i32,
+    /// How `region` is cut into cells, and the one shown.
+    pub sheet: SpriteSheet,
 }
 
 impl SpriteNode {
@@ -38,6 +40,7 @@ impl SpriteNode {
             anchor: Sprite::CENTER,
             color: Color::WHITE,
             layer: 0,
+            sheet: SpriteSheet::SINGLE,
         }
     }
 
@@ -69,13 +72,20 @@ impl SpriteNode {
         self
     }
 
+    /// The same sprite showing a cell of a sprite `sheet`.
+    #[must_use]
+    pub const fn with_sheet(mut self, sheet: SpriteSheet) -> Self {
+        self.sheet = sheet;
+        self
+    }
+
     /// The sprite to draw for a node placed at `global`.
     #[must_use]
     pub fn to_sprite(self, global: GlobalTransform2D) -> Sprite {
         let scale = global.scale();
         let size = Vec2::new(self.size.x * scale.x, self.size.y * scale.y);
         Sprite::new(self.texture, global.position(), size)
-            .with_region(self.region)
+            .with_region(self.sheet.region_in(self.region))
             .with_rotation(global.rotation())
             .with_anchor(self.anchor)
             .with_color(self.color)
@@ -150,6 +160,28 @@ mod tests {
         assert!((sprite.size.x - 2.0).abs() < EPSILON);
         assert!((sprite.size.y + 3.0).abs() < EPSILON);
         assert_eq!(sprite.layer, 2);
+    }
+
+    #[test]
+    fn sprites_of_a_sheet_show_the_cell_of_their_frame() {
+        let mut world = World::new();
+        let hero = world.spawn_node("Hero", None).unwrap();
+        world.insert(hero, Transform2D::IDENTITY).unwrap();
+        let sheet = SpriteSheet::new(2, 2, 3);
+        world
+            .insert(
+                hero,
+                SpriteNode::new(texture(), Vec2::ONE).with_sheet(sheet),
+            )
+            .unwrap();
+        TransformPropagation::new().run(&mut world).unwrap();
+        let mut frame = Frame::new();
+
+        draw_sprite_nodes(&world, &mut frame).unwrap();
+
+        let region = frame.sprites()[0].region;
+        assert_eq!(region.min, Vec2::new(0.5, 0.5));
+        assert_eq!(region.max, Vec2::ONE);
     }
 
     #[test]

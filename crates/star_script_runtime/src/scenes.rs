@@ -168,6 +168,12 @@ pub struct SceneSprite {
     pub pixelated: bool,
     /// Red, green, blue and opacity, from `0.0` to `1.0`.
     pub color: [f32; 4],
+    /// How many cells wide its image is.
+    pub columns: i32,
+    /// How many cells tall its image is.
+    pub rows: i32,
+    /// The cell shown, counted from the top-left one, row by row.
+    pub frame: i32,
 }
 
 /// The physics body of a [`SceneNode`], with the words and values of

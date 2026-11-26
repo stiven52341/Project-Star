@@ -242,6 +242,7 @@ fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResul
                 anchor: sprite.anchor,
                 color: sprite.color,
                 layer: sprite.layer,
+                sheet: sprite.sheet,
             })
         })
         .transpose()
@@ -330,6 +331,7 @@ fn outline_sprite(sprite: SpriteNode, sources: &impl SceneSources) -> EngineResu
         anchor: sprite.anchor,
         color: sprite.color,
         layer: sprite.layer,
+        sheet: sprite.sheet,
     })
 }
 

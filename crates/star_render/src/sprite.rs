@@ -45,6 +45,81 @@ impl Default for TextureRegion {
     }
 }
 
+/// A sprite sheet: an image cut into `columns` x `rows` equal cells, of
+/// which a sprite shows one, its frame. Frames are counted from the
+/// top-left cell, row by row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpriteSheet {
+    columns: u16,
+    rows: u16,
+    frame: u32,
+}
+
+impl SpriteSheet {
+    /// The whole image as one cell.
+    pub const SINGLE: Self = Self {
+        columns: 1,
+        rows: 1,
+        frame: 0,
+    };
+
+    /// The sheet of `columns` x `rows` cells showing `frame`. A sheet has
+    /// at least one column and one row, and frames past the last cell start
+    /// over from the first, so every value shows a cell.
+    #[must_use]
+    pub fn new(columns: u16, rows: u16, frame: u32) -> Self {
+        let (columns, rows) = (columns.max(1), rows.max(1));
+        let frames = u32::from(columns) * u32::from(rows);
+        Self {
+            columns,
+            rows,
+            frame: frame % frames,
+        }
+    }
+
+    /// How many cells wide the image is.
+    #[must_use]
+    pub const fn columns(self) -> u16 {
+        self.columns
+    }
+
+    /// How many cells tall the image is.
+    #[must_use]
+    pub const fn rows(self) -> u16 {
+        self.rows
+    }
+
+    /// The cell shown.
+    #[must_use]
+    pub const fn frame(self) -> u32 {
+        self.frame
+    }
+
+    /// The cell shown of `region`, cut as this sheet says.
+    #[must_use]
+    pub fn region_in(self, region: TextureRegion) -> TextureRegion {
+        let columns = u32::from(self.columns);
+        let (column, row) = (self.frame % columns, self.frame / columns);
+        let span = region.max - region.min;
+        let cell = Vec2::new(
+            span.x / f32::from(self.columns),
+            span.y / f32::from(self.rows),
+        );
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "a cell's column and row are below u16::MAX, exact in f32"
+        )]
+        let min = region.min + Vec2::new(cell.x * column as f32, cell.y * row as f32);
+        TextureRegion::new(min, min + cell)
+    }
+}
+
+impl Default for SpriteSheet {
+    fn default() -> Self {
+        Self::SINGLE
+    }
+}
+
 /// A textured rectangle in the 2D world (the `z = 0` plane).
 ///
 /// Sprites are drawn after meshes, ordered by [`layer`](Self::layer); within
@@ -196,6 +271,36 @@ mod tests {
 
         assert_near(bottom_left.0, Vec2::new(10.0, 20.0));
         assert_near(bottom_right.0, Vec2::new(10.0, 24.0));
+    }
+
+    #[test]
+    fn sheet_frames_go_row_by_row_from_the_top_left() {
+        let sheet = SpriteSheet::new(4, 2, 5);
+
+        let cell = sheet.region_in(TextureRegion::FULL);
+
+        assert_near(cell.min, Vec2::new(0.25, 0.5));
+        assert_near(cell.max, Vec2::new(0.5, 1.0));
+    }
+
+    #[test]
+    fn sheets_cut_the_region_they_are_given() {
+        let region = TextureRegion::new(Vec2::new(0.5, 0.0), Vec2::new(1.0, 0.5));
+
+        let cell = SpriteSheet::new(2, 1, 1).region_in(region);
+
+        assert_near(cell.min, Vec2::new(0.75, 0.0));
+        assert_near(cell.max, Vec2::new(1.0, 0.5));
+    }
+
+    #[test]
+    fn every_sheet_shows_a_cell() {
+        assert_eq!(SpriteSheet::new(0, 0, 7), SpriteSheet::SINGLE);
+        assert_eq!(SpriteSheet::new(3, 2, 8).frame(), 2);
+        assert_eq!(
+            SpriteSheet::SINGLE.region_in(TextureRegion::FULL),
+            TextureRegion::FULL
+        );
     }
 
     #[test]

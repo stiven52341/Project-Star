@@ -3,7 +3,7 @@
 use star_assets::AssetPath;
 use star_core::EngineResult;
 use star_math::Vec2;
-use star_render::{Color, TextureFilter, TextureId};
+use star_render::{Color, SpriteSheet, TextureFilter, TextureId};
 
 use crate::texture_slot::TextureSlot;
 
@@ -24,6 +24,8 @@ pub struct SpriteFile {
     pub layer: i32,
     /// Multiplied by the image's colors.
     pub color: Color,
+    /// How the image is cut into cells, and the one shown.
+    pub sheet: SpriteSheet,
     loaded: TextureSlot,
 }
 
@@ -38,6 +40,7 @@ impl SpriteFile {
             size,
             layer: 0,
             color: Color::WHITE,
+            sheet: SpriteSheet::SINGLE,
             loaded: TextureSlot::EMPTY,
         }
     }
@@ -60,6 +63,13 @@ impl SpriteFile {
     #[must_use]
     pub fn with_color(mut self, color: Color) -> Self {
         self.color = color;
+        self
+    }
+
+    /// The same sprite showing a cell of a sprite `sheet`.
+    #[must_use]
+    pub fn with_sheet(mut self, sheet: SpriteSheet) -> Self {
+        self.sheet = sheet;
         self
     }
 
