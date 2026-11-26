@@ -17,6 +17,26 @@ const PLAYER_CRATE: &str = "star_player";
 const MAIN: &str = "//! Plays the project in the current folder (written by the editor).\n\n\
                     fn main() -> std::process::ExitCode {\n    star_player::main()\n}\n";
 
+/// The player's build script. On Windows a program's main thread gets a
+/// stack of 1 MiB, where Linux and macOS give 8 MiB; the player asks for
+/// 8 MiB there too, so the nested calls StarScript allows fit in it
+/// interpreted (decision 77), and a call that never ends stops with its
+/// runtime error rather than a stack overflow. It only changes the
+/// player's own link, so the engine's build is not repeated.
+const BUILD_SCRIPT: &str = "//! Gives the player's main thread the stack of Linux and macOS on\n\
+                            //! Windows (written by the editor).\n\n\
+                            /// 8 MiB, what the main thread gets on Linux and macOS.\n\
+                            const STACK_BYTES: u32 = 8 * 1024 * 1024;\n\n\
+                            fn main() {\n    \
+                            let variable = |name| std::env::var(name).unwrap_or_default();\n    \
+                            if variable(\"CARGO_CFG_TARGET_OS\") != \"windows\" {\n        \
+                            return;\n    }\n    \
+                            let argument = if variable(\"CARGO_CFG_TARGET_ENV\") == \"msvc\" {\n        \
+                            format!(\"/STACK:{STACK_BYTES}\")\n    \
+                            } else {\n        \
+                            format!(\"-Wl,--stack,{STACK_BYTES}\")\n    };\n    \
+                            println!(\"cargo:rustc-link-arg-bins={argument}\");\n}\n";
+
 /// Writes the player's package (only what changed) and gives its folder.
 ///
 /// # Errors
@@ -36,6 +56,7 @@ pub(super) fn write_player() -> io::Result<PathBuf> {
         &fs::read_to_string(ENGINE_LOCKFILE)?,
     )?;
     write_if_changed(&package.join("src").join("main.rs"), MAIN)?;
+    write_if_changed(&package.join("build.rs"), BUILD_SCRIPT)?;
     Ok(package)
 }
 
@@ -95,6 +116,17 @@ mod tests {
         let written = fs::read_to_string(package.join("Cargo.lock")).expect("lockfile");
         let engine = fs::read_to_string(ENGINE_LOCKFILE).expect("engine lockfile");
         assert_eq!(written, engine);
+    }
+
+    #[test]
+    fn the_player_asks_windows_for_the_stack_of_linux_and_macos() {
+        let package = write_player().expect("written");
+
+        let script = fs::read_to_string(package.join("build.rs")).expect("build script");
+        assert!(script.contains("8 * 1024 * 1024"), "{script}");
+        assert!(script.contains("\"/STACK:{STACK_BYTES}\""), "{script}");
+        assert!(script.contains("\"-Wl,--stack,{STACK_BYTES}\""), "{script}");
+        assert!(script.contains("cargo:rustc-link-arg-bins="), "{script}");
     }
 
     #[test]
