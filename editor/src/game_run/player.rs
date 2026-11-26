@@ -105,11 +105,22 @@ fn write_if_changed(path: &Path, text: &str) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Mutex, MutexGuard, PoisonError};
+
     use super::*;
+
+    /// Tests that write the player's package take turns: one could read a
+    /// file while another is writing it.
+    static PACKAGE: Mutex<()> = Mutex::new(());
+
+    fn write_player_alone() -> (PathBuf, MutexGuard<'static, ()>) {
+        let turn = PACKAGE.lock().unwrap_or_else(PoisonError::into_inner);
+        (write_player().expect("written"), turn)
+    }
 
     #[test]
     fn the_player_package_is_written_with_the_engine_lockfile() {
-        let package = write_player().expect("written");
+        let (package, _turn) = write_player_alone();
 
         let main = fs::read_to_string(package.join("src").join("main.rs")).expect("main");
         assert!(main.contains("star_player::main()"), "{main}");
@@ -120,7 +131,7 @@ mod tests {
 
     #[test]
     fn the_player_asks_windows_for_the_stack_of_linux_and_macos() {
-        let package = write_player().expect("written");
+        let (package, _turn) = write_player_alone();
 
         let script = fs::read_to_string(package.join("build.rs")).expect("build script");
         assert!(script.contains("8 * 1024 * 1024"), "{script}");
