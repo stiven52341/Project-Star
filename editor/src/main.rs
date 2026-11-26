@@ -7,6 +7,7 @@ mod drag_drop;
 mod editor_log;
 mod file_tree;
 mod folder_dialog;
+mod frames_editor;
 mod game_run;
 mod language_menu;
 mod last_scenes;

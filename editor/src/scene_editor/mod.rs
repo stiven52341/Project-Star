@@ -4,6 +4,7 @@
 //! parent, and the inspector edits the node selected in
 //! it. Changes are kept until the scene is saved, and can be undone.
 
+mod animation_rows;
 mod body_drawing;
 mod class_choice;
 mod class_drop;
@@ -28,6 +29,7 @@ use star_engine::prelude::{Camera, Frame, SceneOutline, Vec3};
 use star_engine::star_scene::NodeOutline;
 use star_script::semantic::ClassTable;
 
+pub(crate) use self::animation_rows::AnimationFiles;
 pub(crate) use self::body_drawing::BodyMarks;
 use self::class_choice::{ChoiceOutcome, ClassChoice};
 pub(crate) use self::class_drop::ClassDrop;
@@ -398,13 +400,15 @@ impl SceneDocument {
         }
     }
 
-    /// The node selected, to edit, choosing images among `images`. Returns
+    /// The node selected, to edit, choosing images among `images` and
+    /// animations among `animations`. Returns
     /// whether one is selected, so the inspector can show something else
     /// when none is.
     pub(crate) fn edit_selected_node(
         &mut self,
         ui: &mut egui::Ui,
         images: &[String],
+        animations: AnimationFiles<'_>,
         classes: Option<&ClassTable>,
     ) -> bool {
         let node = self.content.as_mut().ok().and_then(|outline| {
@@ -417,6 +421,7 @@ impl SceneDocument {
         let context = NodeContext {
             dimension: self.dimension,
             images,
+            animations,
             classes,
         };
         let was_main = node.is_main_camera();

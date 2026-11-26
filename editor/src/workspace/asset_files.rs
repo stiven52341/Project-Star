@@ -10,9 +10,10 @@ use star_engine::prelude::SceneOutline;
 
 use super::project_classes::is_class_taken;
 use crate::blueprint_editor::{BlueprintTemplate, new_blueprint_text, new_script_text};
+use crate::frames_editor::new_frames_text;
 use crate::project::{
-    BLUEPRINT_EXTENSION, MAX_NAME_LENGTH, ProjectDimension, RUST_EXTENSION, SCENE_EXTENSION,
-    SCRIPT_EXTENSION, add_missing_actions,
+    BLUEPRINT_EXTENSION, FRAMES_EXTENSION, MAX_NAME_LENGTH, ProjectDimension, RUST_EXTENSION,
+    SCENE_EXTENSION, SCRIPT_EXTENSION, add_missing_actions,
 };
 
 /// The scene new scenes start from: a root, placed in the project's space.
@@ -124,19 +125,51 @@ pub(super) fn create(
         fs::create_dir_all(&target)?;
         return Ok(path);
     }
-    let contents = contents(kind, stem, dimension)?;
+    write_new(&target, &contents(kind, stem, dimension)?)?;
+    if let NewAsset::Template(template) = kind {
+        add_template_actions(assets, template);
+    }
+    Ok(path)
+}
+
+/// Creates a `.frames` file called `name` in `folder` of the `assets`
+/// folder, of the image at `image` (whole, without clips), and returns its
+/// path. It never overwrites anything.
+///
+/// # Errors
+///
+/// Fails if the name is not valid, a file is already called so, the
+/// image's path is not an asset path, or the disk refuses.
+pub(super) fn create_frames(
+    assets: &Path,
+    folder: &str,
+    name: &str,
+    image: &str,
+) -> Result<String, AssetFileError> {
+    let name = name.trim();
+    let stem = name.strip_suffix(FRAMES_EXTENSION).unwrap_or(name);
+    check_name(stem)?;
+    let path = join(folder, &format!("{stem}{FRAMES_EXTENSION}"));
+    let target = assets.join(&path);
+    if target.exists() {
+        return Err(AssetFileError::AlreadyExists(path));
+    }
+    let contents = new_frames_text(image).map_err(io::Error::other)?;
+    write_new(&target, &contents)?;
+    Ok(path)
+}
+
+/// Writes `contents` to a new file at `target`, making its folder if
+/// needed; fails rather than overwrite a file.
+fn write_new(target: &Path, contents: &str) -> io::Result<()> {
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
     }
     let mut file = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(&target)?;
-    io::Write::write_all(&mut file, contents.as_bytes())?;
-    if let NewAsset::Template(template) = kind {
-        add_template_actions(assets, template);
-    }
-    Ok(path)
+        .open(target)?;
+    io::Write::write_all(&mut file, contents.as_bytes())
 }
 
 /// Adds to the project the input actions `template` reads, if it lacks
@@ -324,6 +357,22 @@ mod tests {
         let outline = SceneOutline::from_text(&text).unwrap();
         assert_eq!(outline.nodes()[0].name, "Intro");
         assert!(outline.nodes()[0].transform.is_some());
+    }
+
+    #[test]
+    fn animations_are_made_of_an_image_and_never_overwrite() {
+        let assets = assets("asset_files_frames");
+
+        let path = create_frames(assets.path(), "levels", "hero", "sprites/hero.png").unwrap();
+
+        assert_eq!(path, "levels/hero.frames");
+        let text = fs::read_to_string(assets.path().join(&path)).unwrap();
+        let frames = star_engine::star_scene::SpriteFrames::from_text(&text).unwrap();
+        assert_eq!(frames.texture.as_str(), "sprites/hero.png");
+        assert!(matches!(
+            create_frames(assets.path(), "levels", "hero.frames", "sprites/hero.png"),
+            Err(AssetFileError::AlreadyExists(_))
+        ));
     }
 
     #[test]

@@ -7,6 +7,7 @@
 mod asset_messages;
 mod console_messages;
 mod english;
+mod frames_messages;
 mod messages;
 mod scene_messages;
 mod script_messages;

@@ -15,6 +15,7 @@ use star_engine::star_scene::{
     Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
 };
 
+use super::animation_rows::{AnimationFiles, animation_rows};
 use super::components::{
     DEFAULT_CAPSULE_HEIGHT, DEFAULT_RADIUS, LightKind, add_component_menu, new_light, new_light_2d,
 };
@@ -35,6 +36,8 @@ use crate::texts;
 pub(super) struct NodeContext<'context> {
     pub(super) dimension: ProjectDimension,
     pub(super) images: &'context [String],
+    /// The `.frames` files of the assets folder, for sprites.
+    pub(super) animations: AnimationFiles<'context>,
     /// The classes of the scripts, once checked, for `export` fields.
     pub(super) classes: Option<&'context ClassTable>,
 }
@@ -61,7 +64,7 @@ pub(super) fn edit_node(
         edit_transform_3d,
     );
     changed |= optional_section(ui, texts.sprite_section, &mut node.sprite, |ui, sprite| {
-        edit_sprite(ui, sprite, context.images)
+        edit_sprite(ui, sprite, context.images) | animation_rows(ui, sprite, context.animations)
     });
     changed |= optional_section(ui, texts.mesh_section, &mut node.mesh, |ui, mesh| {
         edit_mesh(ui, mesh, context.images)

@@ -8,3 +8,5 @@ pub(crate) const BLUEPRINT_EXTENSION: &str = ".blueprint";
 pub(crate) const SCENE_EXTENSION: &str = ".scene";
 /// Extension of Rust source files.
 pub(crate) const RUST_EXTENSION: &str = ".rs";
+/// Extension of the files of a sprite's animations (`.frames`).
+pub(crate) const FRAMES_EXTENSION: &str = star_engine::star_scene::FRAMES_EXTENSION;

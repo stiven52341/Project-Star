@@ -47,7 +47,7 @@ use crate::game_run::{EngineWarmUp, PlayMode, PlayRequest};
 use crate::last_scenes::LastSceneStore;
 use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, Project, SCRIPT_EXTENSION};
 use crate::project_check::Problem;
-use crate::scene_editor::SceneDocument;
+use crate::scene_editor::{AnimationFiles, SceneDocument};
 use crate::style::ERROR_COLOR;
 use crate::texts::{self, Language};
 
@@ -212,6 +212,10 @@ impl EditorWindow {
                     &self.project,
                     self.documents.scene_mut(),
                     self.assets.images(),
+                    AnimationFiles {
+                        folder: self.assets.directory(),
+                        paths: self.assets.animations(),
+                    },
                     self.live_check.outline().map(|outline| &outline.classes),
                 ),
                 ActiveDocument::Blueprint(tab) => {
@@ -223,6 +227,13 @@ impl EditorWindow {
                     ui.strong(texts::current().inspector);
                     ui.separator();
                     ui.weak(texts::current().script_inspector_hint());
+                }
+                ActiveDocument::Frames(tab) => {
+                    ui.strong(texts::current().inspector);
+                    ui.separator();
+                    egui::ScrollArea::vertical()
+                        .auto_shrink(false)
+                        .show(ui, |ui| tab.show_inspector(ui));
                 }
             });
         egui::Panel::bottom("bottom_panel")
@@ -303,7 +314,9 @@ impl EditorWindow {
     fn shown_scene(&mut self) -> Option<&mut SceneDocument> {
         match self.documents.active() {
             ActiveDocument::Scene => self.documents.scene_mut(),
-            ActiveDocument::Blueprint(_) | ActiveDocument::Script(_) => None,
+            ActiveDocument::Blueprint(_)
+            | ActiveDocument::Script(_)
+            | ActiveDocument::Frames(_) => None,
         }
     }
 
@@ -467,6 +480,7 @@ impl EditorWindow {
                 }
             },
             ActiveDocument::Blueprint(tab) => tab.show(ui, self.problems.problems()),
+            ActiveDocument::Frames(tab) => tab.show(ui, self.assets.images()),
             ActiveDocument::Script(tab) => {
                 let edited = tab.show(ui, self.live_check.problems(), self.live_check.outline());
                 if edited.changed {
@@ -514,6 +528,9 @@ impl EditorWindow {
                 Some(AssetEvent::Opened(OpenedAsset::Script(path))) => {
                     self.documents.open_script(self.assets.directory(), path);
                     self.live_check.request();
+                }
+                Some(AssetEvent::Opened(OpenedAsset::Frames(path))) => {
+                    self.documents.open_frames(self.assets.directory(), path);
                 }
                 Some(AssetEvent::Gone(path)) => self.forget(&path),
                 Some(AssetEvent::Renamed { from, to }) => {

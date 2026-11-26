@@ -1220,7 +1220,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       2026-11-25; done part by part, each designed with the owner first).
       Ideas taken from Godot's `AnimationPlayer`, `AnimatedSprite2D` and
       `AnimationTree`, and Unity's Animator, without copying them:
-  - [ ] 15a Frame animations for 2D: named clips of sprite sheet cells
+  - [x] 15a Frame animations for 2D: named clips of sprite sheet cells
         (frames per second, loop), played by a node from StarScript
         (`play`, `stop`, the clip that ends), saved in the project. Agreed
         with the owner: the clips live in their own `.frames` file of the
@@ -1246,9 +1246,12 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           `engine_game` and `window` play), and an entry of the blueprint's
           “Graphs” menu for each event of its engine base it does not
           redefine yet (so `start` and `update` can come back too).
-    - [ ] 15a.4 The editor's frames panel: cutting the sheet, picking each
+    - [x] 15a.4 The editor's frames panel: cutting the sheet, picking each
           clip's cells by clicking them, speed, loop and a preview; the
-          inspector chooses a sprite's `.frames` and first clip.
+          inspector chooses a sprite's `.frames` and first clip. A tab of
+          its own for `.frames` files, made from an image's menu (“New
+          animations”); choosing a sprite's file copies its image, cells
+          and first frame into the sprite, so the scene shows it.
   - [ ] 15b Keyframe tracks: any property of a node and its children
         (position, rotation, scale, color, visibility, exported fields) over
         time, with interpolation (step, linear, eased) and calls to methods

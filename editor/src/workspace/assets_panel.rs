@@ -18,8 +18,8 @@ use super::thumbnails::Thumbnails;
 use crate::blueprint_editor::BlueprintTemplate;
 use crate::file_tree::{FileNode, file_paths, scan_directory};
 use crate::project::{
-    ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, ProjectDimension, SCENE_EXTENSION, SCRIPT_EXTENSION,
-    read_main_scene, set_main_scene,
+    ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, FRAMES_EXTENSION, ProjectDimension, SCENE_EXTENSION,
+    SCRIPT_EXTENSION, read_main_scene, set_main_scene,
 };
 use crate::scene_editor::{ClassDrop, ImageDrop};
 use crate::style::ERROR_COLOR;
@@ -30,6 +30,7 @@ pub(crate) enum OpenedAsset {
     Blueprint(String),
     Scene(String),
     Script(String),
+    Frames(String),
 }
 
 impl OpenedAsset {
@@ -41,6 +42,8 @@ impl OpenedAsset {
             Some(Self::Scene(path))
         } else if path.ends_with(SCRIPT_EXTENSION) {
             Some(Self::Script(path))
+        } else if path.ends_with(FRAMES_EXTENSION) {
+            Some(Self::Frames(path))
         } else {
             None
         }
@@ -111,6 +114,8 @@ pub(crate) struct AssetsPanel {
     thumbnails: Thumbnails,
     /// The images among the contents, as paths inside the folder.
     images: Vec<String>,
+    /// The `.frames` files among the contents, as paths inside the folder.
+    animations: Vec<String>,
     /// Naming files and asking before deleting them.
     actions: AssetActions,
     /// The size of the icons, in percent.
@@ -131,6 +136,7 @@ impl AssetsPanel {
             project_directory: project_directory.to_path_buf(),
             main_scene: read_main_scene(project_directory),
             images: image_paths(&contents),
+            animations: animation_paths(&contents),
             thumbnails: Thumbnails::new(&directory),
             directory,
             contents,
@@ -162,6 +168,7 @@ impl AssetsPanel {
     fn refresh(&mut self) {
         self.contents = scan_directory(&self.directory);
         self.images = image_paths(&self.contents);
+        self.animations = animation_paths(&self.contents);
         self.thumbnails.clear();
     }
 
@@ -169,6 +176,12 @@ impl AssetsPanel {
     /// inside it, as they were when it was last listed.
     pub(crate) fn images(&self) -> &[String] {
         &self.images
+    }
+
+    /// The `.frames` files of the folder, as paths inside it, as they were
+    /// when it was last listed.
+    pub(crate) fn animations(&self) -> &[String] {
+        &self.animations
     }
 
     /// The folder it lists.
@@ -316,8 +329,10 @@ impl AssetsPanel {
                 if self.main_scene.is_none() && path.ends_with(SCENE_EXTENSION) {
                     self.set_main_scene(path.clone());
                 }
-                self.selected = Some(path);
-                None
+                self.selected = Some(path.clone());
+                // New animations open at once: they are made to be edited.
+                path.ends_with(FRAMES_EXTENSION)
+                    .then_some(AssetEvent::Opened(OpenedAsset::Frames(path)))
             }
             Outcome::Renamed { from, to } => {
                 if let Some(moved) = self
@@ -575,6 +590,14 @@ fn tile_menu(
             *choice = Some(MenuChoice::SetMainScene(entry.path.clone()));
         }
     }
+    if entry.kind == AssetKind::Image
+        && ui
+            .button(texts.new_animations())
+            .on_hover_text(texts.new_animations_hint())
+            .clicked()
+    {
+        *choice = Some(MenuChoice::Act(Choice::CreateFrames(entry.path.clone())));
+    }
     if ui.button(texts.rename).clicked() {
         *choice = Some(MenuChoice::Act(Choice::Rename(entry.target())));
     }
@@ -647,6 +670,17 @@ fn image_paths(contents: &io::Result<Vec<FileNode>>) -> Vec<String> {
                 .and_then(|path| ImageFormat::of(&path))
                 .is_ok()
         })
+        .collect()
+}
+
+/// The paths of the `.frames` files among `contents`.
+fn animation_paths(contents: &io::Result<Vec<FileNode>>) -> Vec<String> {
+    let Ok(nodes) = contents else {
+        return Vec::new();
+    };
+    file_paths(nodes)
+        .into_iter()
+        .filter(|path| path.ends_with(FRAMES_EXTENSION))
         .collect()
 }
 

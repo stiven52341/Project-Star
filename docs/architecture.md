@@ -771,6 +771,25 @@ unit tall, as wide as the image's shape; in 3D, a plane of that size
 with the image as its texture. It is named after the file, unique among
 its siblings, and selected.
 
+The **frames editor** (`frames_editor/`, decision 78) opens a `.frames`
+file in a tab of the central area. An image's menu in the assets panel
+makes one (“New animations”: the whole image, no clips, named after it)
+and opens it. The middle of the tab chooses the image and how many columns
+and rows it is cut into (up to 64 a side), says what is wrong with the file
+(a clip without frames, a cell outside the sheet), and draws the sheet fit
+in the space left, with its grid, the number of each cell and the cells of
+the clip selected marked; clicking a cell adds it to that clip
+(`sheet.rs`, whose geometry has tests). The inspector lists the clips
+(“New clip” names them `clip1`, `clip2`…) and edits the selected one: name,
+speed, loop, its frames (each removed with its ×) and a preview that plays
+it, always looping. It saves only valid files, through
+`SpriteFrames::to_text`. A sprite's inspector chooses its `.frames` file
+and its starting clip (`scene_editor/animation_rows.rs`): choosing them
+copies the file's image and cells, and the clip's first frame, into the
+sprite, so the scene view shows the frame it starts on without reading the
+file while drawing; the file is read only when one is chosen, or while the
+list of its clips is open.
+
 The **blueprint editor** (`blueprint_editor/`) draws a graph of the open
 blueprint on a canvas of its own, painted with egui's painter (no node
 editor library: the model, its pins and its rules are `star_blueprint`'s).

@@ -6,7 +6,7 @@ use std::path::Path;
 
 use eframe::egui;
 
-use super::asset_files::{AssetFileError, NewAsset, create, delete, rename};
+use super::asset_files::{AssetFileError, NewAsset, create, create_frames, delete, rename};
 use crate::project::ProjectDimension;
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -23,6 +23,8 @@ pub(super) struct Target {
 /// What the user chose in a menu that needs more from them.
 pub(super) enum Choice {
     Create(NewAsset),
+    /// A `.frames` file of the image at this path.
+    CreateFrames(String),
     Rename(Target),
     Delete(Target),
 }
@@ -54,6 +56,8 @@ struct Naming {
 
 enum Purpose {
     Create(NewAsset),
+    /// A `.frames` file of the image at this path.
+    CreateFrames(String),
     Rename(Target),
 }
 
@@ -81,6 +85,10 @@ impl AssetActions {
     pub(super) fn choose(&mut self, choice: Choice) {
         let (purpose, name) = match choice {
             Choice::Create(kind) => (Purpose::Create(kind), kind.default_name().to_owned()),
+            Choice::CreateFrames(image) => {
+                let name = image_stem(&image).to_owned();
+                (Purpose::CreateFrames(image), name)
+            }
             Choice::Rename(target) => {
                 let name = stem(&target).to_owned();
                 (Purpose::Rename(target), name)
@@ -119,6 +127,7 @@ impl AssetActions {
         let texts = texts::current();
         let (label, confirm) = match &naming.purpose {
             Purpose::Create(kind) => (texts.name_of_new(*kind), texts.create),
+            Purpose::CreateFrames(_) => (texts.name_of_new_animations(), texts.create),
             Purpose::Rename(_) => (texts.rename_to, texts.rename),
         };
         let mut submit = false;
@@ -149,6 +158,9 @@ impl AssetActions {
         let done = match &naming.purpose {
             Purpose::Create(kind) => {
                 create(assets, folder, *kind, &naming.name, self.dimension).map(Outcome::Created)
+            }
+            Purpose::CreateFrames(image) => {
+                create_frames(assets, folder, &naming.name, image).map(Outcome::Created)
             }
             Purpose::Rename(target) => rename(assets, &target.path, &naming.name, target.is_folder)
                 .map(|to| Outcome::Renamed {
@@ -208,6 +220,12 @@ impl AssetActions {
     }
 }
 
+/// The name of the file at `path`, without its folders or extension.
+fn image_stem(path: &str) -> &str {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    name.rsplit_once('.').map_or(name, |(stem, _)| stem)
+}
+
 /// The name of `target` without a file's extension: what renaming edits.
 fn stem(target: &Target) -> &str {
     if target.is_folder {
@@ -229,6 +247,18 @@ mod tests {
             name: name.to_owned(),
             is_folder,
         }
+    }
+
+    #[test]
+    fn new_animations_are_named_after_their_image() {
+        let mut actions = AssetActions::new(ProjectDimension::TwoD);
+
+        actions.choose(Choice::CreateFrames("sprites/hero.png".to_owned()));
+
+        assert_eq!(
+            actions.naming.map(|naming| naming.name),
+            Some("hero".to_owned())
+        );
     }
 
     #[test]

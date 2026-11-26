@@ -1,12 +1,13 @@
 //! The tabs of the central area: the scene, always there (with the scene
-//! file open in it, if any), and the blueprints and scripts the user
-//! opened.
+//! file open in it, if any), and the blueprints, scripts and animations
+//! (`.frames` files) the user opened.
 
 use std::path::Path;
 
 use eframe::egui;
 
 use crate::blueprint_editor::BlueprintTab;
+use crate::frames_editor::FramesTab;
 use crate::project::ProjectDimension;
 use crate::project_check::OpenTexts;
 use crate::scene_editor::SceneDocument;
@@ -26,6 +27,7 @@ pub(crate) struct Documents {
 enum Tab {
     Blueprint(BlueprintTab),
     Script(ScriptTab),
+    Frames(FramesTab),
 }
 
 impl Tab {
@@ -33,6 +35,7 @@ impl Tab {
         match self {
             Self::Blueprint(tab) => tab.path(),
             Self::Script(tab) => tab.path(),
+            Self::Frames(tab) => tab.path(),
         }
     }
 
@@ -40,6 +43,7 @@ impl Tab {
         match self {
             Self::Blueprint(tab) => tab.title(),
             Self::Script(tab) => tab.title(),
+            Self::Frames(tab) => tab.title(),
         }
     }
 
@@ -47,6 +51,7 @@ impl Tab {
         match self {
             Self::Blueprint(tab) => tab.is_unsaved(),
             Self::Script(tab) => tab.is_unsaved(),
+            Self::Frames(tab) => tab.is_unsaved(),
         }
     }
 
@@ -54,6 +59,7 @@ impl Tab {
         match self {
             Self::Blueprint(tab) => tab.save(),
             Self::Script(tab) => tab.save(),
+            Self::Frames(tab) => tab.save(),
         }
     }
 }
@@ -63,6 +69,7 @@ pub(crate) enum ActiveDocument<'documents> {
     Scene,
     Blueprint(&'documents mut BlueprintTab),
     Script(&'documents mut ScriptTab),
+    Frames(&'documents mut FramesTab),
 }
 
 impl Documents {
@@ -88,6 +95,12 @@ impl Documents {
         self.show_or_open(path, |path| Tab::Script(ScriptTab::open(assets, path)));
     }
 
+    /// Shows the `.frames` file at `path` of the `assets` folder, opening
+    /// it if it is not open yet.
+    pub(crate) fn open_frames(&mut self, assets: &Path, path: String) {
+        self.show_or_open(path, |path| Tab::Frames(FramesTab::open(assets, path)));
+    }
+
     /// The texts of the open scripts, by their path inside the assets
     /// folder, saved or not.
     pub(crate) fn open_texts(&self) -> OpenTexts {
@@ -97,7 +110,7 @@ impl Documents {
                 Tab::Script(script) => script
                     .text()
                     .map(|text| (script.path().to_owned(), text.to_owned())),
-                Tab::Blueprint(_) => None,
+                Tab::Blueprint(_) | Tab::Frames(_) => None,
             })
             .collect()
     }
@@ -192,6 +205,7 @@ impl Documents {
             *tab = match tab {
                 Tab::Blueprint(_) => Tab::Blueprint(BlueprintTab::open(assets, path)),
                 Tab::Script(_) => Tab::Script(ScriptTab::open(assets, path)),
+                Tab::Frames(_) => Tab::Frames(FramesTab::open(assets, path)),
             };
         }
     }
@@ -261,6 +275,7 @@ impl Documents {
         match self.active.and_then(|index| self.tabs.get_mut(index)) {
             Some(Tab::Blueprint(tab)) => ActiveDocument::Blueprint(tab),
             Some(Tab::Script(tab)) => ActiveDocument::Script(tab),
+            Some(Tab::Frames(tab)) => ActiveDocument::Frames(tab),
             None => ActiveDocument::Scene,
         }
     }
@@ -311,6 +326,7 @@ mod tests {
             ActiveDocument::Scene => None,
             ActiveDocument::Blueprint(tab) => Some(tab.path().to_owned()),
             ActiveDocument::Script(tab) => Some(tab.path().to_owned()),
+            ActiveDocument::Frames(tab) => Some(tab.path().to_owned()),
         }
     }
 
@@ -329,6 +345,17 @@ mod tests {
 
         assert!(!documents.any_unsaved());
         assert!(!documents.active_is_unsaved());
+    }
+
+    #[test]
+    fn opened_animations_are_shown_in_a_tab_of_their_own() {
+        let (assets, mut documents) = documents_with(&["a.blueprint"]);
+
+        documents.open_frames(assets.path(), "hero.frames".to_owned());
+        documents.open_frames(assets.path(), "hero.frames".to_owned());
+
+        assert_eq!(active_path(&mut documents).as_deref(), Some("hero.frames"));
+        assert_eq!(documents.tabs.len(), 2);
     }
 
     #[test]

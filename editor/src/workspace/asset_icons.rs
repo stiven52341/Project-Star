@@ -6,7 +6,9 @@ use eframe::egui;
 use star_engine::prelude::AssetPath;
 use star_engine::star_assets::{ImageFormat, SoundFormat};
 
-use crate::project::{BLUEPRINT_EXTENSION, RUST_EXTENSION, SCENE_EXTENSION, SCRIPT_EXTENSION};
+use crate::project::{
+    BLUEPRINT_EXTENSION, FRAMES_EXTENSION, RUST_EXTENSION, SCENE_EXTENSION, SCRIPT_EXTENSION,
+};
 
 /// Most letters of an extension shown on a page's tag.
 const MAX_TAG_LETTERS: usize = 5;
@@ -21,6 +23,7 @@ const BLUEPRINT_COLOR: egui::Color32 = egui::Color32::from_rgb(150, 95, 210);
 const SCRIPT_COLOR: egui::Color32 = egui::Color32::from_rgb(70, 170, 100);
 const RUST_COLOR: egui::Color32 = egui::Color32::from_rgb(210, 110, 55);
 const IMAGE_COLOR: egui::Color32 = egui::Color32::from_rgb(200, 80, 140);
+const FRAMES_COLOR: egui::Color32 = egui::Color32::from_rgb(225, 150, 40);
 const SOUND_COLOR: egui::Color32 = egui::Color32::from_rgb(40, 160, 170);
 const OTHER_COLOR: egui::Color32 = egui::Color32::from_rgb(120, 122, 130);
 
@@ -44,6 +47,7 @@ pub(super) enum AssetKind {
     Blueprint,
     Script,
     Rust,
+    Frames,
     Image,
     Sound,
     Other,
@@ -62,6 +66,8 @@ impl AssetKind {
             Self::Script
         } else if lower.ends_with(RUST_EXTENSION) {
             Self::Rust
+        } else if lower.ends_with(FRAMES_EXTENSION) {
+            Self::Frames
         } else if path
             .as_ref()
             .is_ok_and(|path| ImageFormat::of(path).is_ok())
@@ -84,6 +90,7 @@ impl AssetKind {
             Self::Blueprint => BLUEPRINT_COLOR,
             Self::Script => SCRIPT_COLOR,
             Self::Rust => RUST_COLOR,
+            Self::Frames => FRAMES_COLOR,
             Self::Image => IMAGE_COLOR,
             Self::Sound => SOUND_COLOR,
             Self::Other => OTHER_COLOR,

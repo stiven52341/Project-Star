@@ -9,7 +9,7 @@ use crate::drag_drop::released;
 use star_script::semantic::ClassTable;
 
 use crate::project::Project;
-use crate::scene_editor::{ClassDrop, SceneDocument};
+use crate::scene_editor::{AnimationFiles, ClassDrop, SceneDocument};
 use crate::style::{PROPERTY_SPACING, property_row};
 use crate::texts;
 
@@ -25,6 +25,7 @@ pub(crate) fn show_inspector(
     project: &Project,
     mut scene: Option<&mut SceneDocument>,
     images: &[String],
+    animations: AnimationFiles<'_>,
     classes: Option<&ClassTable>,
 ) {
     let area = ui.max_rect();
@@ -35,7 +36,7 @@ pub(crate) fn show_inspector(
         .show(ui, |ui| {
             let edited = scene
                 .as_deref_mut()
-                .is_some_and(|scene| scene.edit_selected_node(ui, images, classes));
+                .is_some_and(|scene| scene.edit_selected_node(ui, images, animations, classes));
             if !edited {
                 egui::CollapsingHeader::new(texts::current().project)
                     .default_open(true)
