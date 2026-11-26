@@ -695,6 +695,14 @@ class Space extends Game {
   play from the start). A file that cannot be read, an animation it does
   not have, a node that is not there or a value that does not fit its
   property is a warning on the error output (once), and the rest goes on.
+- An animator whose `animations` names a 3D model (`.glb`, `.gltf`)
+  plays that model's own animations on its parent `Model` (decision 83):
+  they are played as an `.anim`'s are (`play`, `animation()`,
+  `is_playing()`, a `.states` machine with its fades and blends), loop,
+  and change no property; the engine bends the model's skeleton with the
+  animations the animator shows, at their times and weights. A `Model`
+  is posed by the first animator under it that plays a model's file; one
+  without it stands at rest.
 - An animator whose `states` names a `.states` file runs a **state
   machine** that chooses its animations (decision 81):
 

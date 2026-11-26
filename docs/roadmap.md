@@ -1216,7 +1216,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] A script with mistakes dragged onto a node said that none of its
         classes extends another; it now says it has mistakes, and the
         first one.
-- [ ] **Phase 15 — Animation editor, 2D and 3D** (owner's request,
+- [x] **Phase 15 — Animation editor, 2D and 3D** (owner's request,
       2026-11-25; done part by part, each designed with the owner first).
       Ideas taken from Godot's `AnimationPlayer`, `AnimatedSprite2D` and
       `AnimationTree`, and Unity's Animator, without copying them:
@@ -1349,7 +1349,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 15e.5 The editor: a graph tab for `.states` files, states as
           boxes and transitions as arrows, edited in the inspector;
           Create > State machine, and the animator's “States” row.
-  - [ ] 15f Skeletons (agreed with the owner, 2026-11-26: cut-out 2D
+  - [x] 15f Skeletons (agreed with the owner, 2026-11-26: cut-out 2D
         first, and the `gltf` crate to import 3D models):
     - [x] 15f.1 2D bones: bone nodes that sprites hang from (cut-out
           characters), animated by the `.anim` tracks; sprites that bend
@@ -1388,11 +1388,15 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       - [x] 15f.3c The engine poses a model: its joints from the rest pose
             or from animations at times and weights, and draws its skinned
             parts with them.
-    - [ ] 15f.4 A model's animations played by an `Animator` (and its
+    - [x] 15f.4 A model's animations played by an `Animator` (and its
           states): an animator whose `animations` is a `.glb` plays its
           clips (they loop) on its parent `Model`, with fades and blends of
           `.states` machines, compiled and interpreted; the editor offers
-          models among an animator's files.
+          models among an animator's files. Done: each animator records
+          the clips it shows (`tracks::shown_clips`), the mirror gives
+          them to its parent `Model` as a `ModelPose`, and the game
+          `model_game` (a skinned `wave.glb`) plays the same compiled and
+          interpreted.
 - [ ] **Phase 16 — Ready-made nodes and tools** (owner's request,
       2026-11-25; mostly after Godot's nodes and templates). Each is an
       engine node or a class the editor offers, usable from StarScript and

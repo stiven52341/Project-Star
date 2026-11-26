@@ -6,19 +6,18 @@
 use std::fs;
 
 use eframe::egui;
-use star_engine::prelude::AssetPath;
+use star_engine::prelude::{AssetFolder, AssetPath};
+use star_engine::star_assets::ModelFormat;
 use star_engine::star_scene::{AnimatorOutline, TrackAnimations};
 
 use super::animation_rows::AssetFiles;
 use crate::texts;
 
-/// An animator of the first `.anim` file of `files`, playing nothing yet;
-/// `None` if there is none.
+/// An animator of the first `.anim` file of `files` (or else of its first
+/// 3D model, whose animations it plays on a `Model`), playing nothing yet;
+/// `None` if there is neither.
 pub(super) fn new_animator(files: AssetFiles<'_>) -> Option<AnimatorOutline> {
-    let animations = files
-        .keyframes
-        .iter()
-        .find_map(|path| AssetPath::new(path).ok())?;
+    let animations = playable(files).find_map(|path| AssetPath::new(path).ok())?;
     Some(AnimatorOutline {
         animations,
         animation: None,
@@ -77,7 +76,7 @@ fn file_row(ui: &mut egui::Ui, animator: &mut AnimatorOutline, files: AssetFiles
     egui::ComboBox::from_id_salt("animator_animations")
         .selected_text(animator.animations.as_str())
         .show_ui(ui, |ui| {
-            for path in files.keyframes {
+            for path in playable(files) {
                 let current = animator.animations.as_str() == path;
                 if ui.selectable_label(current, path).clicked() && !current {
                     chosen = AssetPath::new(path).ok();
@@ -130,9 +129,28 @@ fn starting_animation_row(
     changed
 }
 
+/// The files an animator can play: the `.anim` files, then the 3D models
+/// (decision 83).
+fn playable(files: AssetFiles<'_>) -> impl Iterator<Item = &String> {
+    files.keyframes.iter().chain(files.models)
+}
+
 /// The names of the animations of the file at `path`; none if it cannot
 /// be read (the reason is logged).
 fn animation_names(files: AssetFiles<'_>, path: &AssetPath) -> Vec<String> {
+    if ModelFormat::of(path).is_ok() {
+        return AssetFolder::new(files.folder)
+            .load_model(path)
+            .inspect_err(|error| log::warn!("\"{path}\": {error}"))
+            .map(|model| {
+                model
+                    .animations()
+                    .iter()
+                    .map(|animation| animation.name.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+    }
     fs::read_to_string(files.folder.join(path.as_str()))
         .map_err(|error| error.to_string())
         .and_then(|text| TrackAnimations::from_text(&text).map_err(|error| error.to_string()))
@@ -172,5 +190,12 @@ mod tests {
             ..files
         };
         assert_eq!(new_animator(none), None);
+        let models = ["hero.glb".to_owned()];
+        let only_models = AssetFiles {
+            models: &models,
+            ..none
+        };
+        let animator = new_animator(only_models).unwrap();
+        assert_eq!(animator.animations.as_str(), "hero.glb");
     }
 }

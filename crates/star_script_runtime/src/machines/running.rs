@@ -4,7 +4,7 @@
 use std::rc::Rc;
 
 use super::{Condition, MachineState, Motion, StateMachine, Test, Transition, machine_of};
-use crate::node_classes::{AnimatorFields, BEFORE_START};
+use crate::node_classes::{AnimatorFields, BEFORE_START, MAX_SHOWN_CLIPS, ShownClip};
 use crate::nodes::{self, Host};
 use crate::poses::Pose;
 use crate::tracks::{self, TrackClip, Tracks, warn};
@@ -260,9 +260,29 @@ pub(crate) fn advance<H: Host>(node: &H::Node, delta: f32) -> bool {
     };
     let frame = H::with_animator(node, |animator| step(animator, &machine, clips, delta)).flatten();
     if let Some(frame) = frame {
+        H::with_animator(node, |animator| {
+            animator.shown_clips.set(shown_clips(&frame));
+        });
         show::<H>(node, &frame);
     }
     true
+}
+
+/// The animations `frame` shows that weigh something, for the skeleton of
+/// a `Model` the animator animates.
+fn shown_clips(frame: &Frame) -> [Option<ShownClip>; MAX_SHOWN_CLIPS] {
+    let mut shown = frame
+        .from
+        .iter()
+        .chain(&frame.to)
+        .flatten()
+        .filter(|&&(_, _, weight)| weight > 0.0)
+        .map(|&(index, time, weight)| ShownClip {
+            index,
+            time,
+            weight,
+        });
+    std::array::from_fn(|_| shown.next())
 }
 
 /// Moves the machine `delta` seconds on and says what to show.

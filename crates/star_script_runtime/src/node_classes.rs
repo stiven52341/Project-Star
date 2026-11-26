@@ -252,6 +252,22 @@ impl Default for BoneFields {
     }
 }
 
+/// The most animations an animator shows at once: two a state blends,
+/// and two of the state it fades from.
+pub const MAX_SHOWN_CLIPS: usize = 4;
+
+/// An animation an animator showed in its last frame, at a time and
+/// weighing in a mix: what poses the skeleton of a `Model` it animates.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ShownClip {
+    /// The animation, as a position in its file.
+    pub index: usize,
+    /// Seconds into it.
+    pub time: f32,
+    /// How much it weighs against the others.
+    pub weight: f32,
+}
+
 /// The time an animator has shown before showing any: below every call's.
 pub(crate) const BEFORE_START: f32 = -1.0;
 
@@ -265,6 +281,9 @@ pub struct AnimatorFields {
     pub states: Field<String>,
     /// What its state machine is doing.
     pub(crate) machine: RefCell<MachineRun>,
+    /// The animations it showed in its last frame, for the skeleton of a
+    /// `Model` it animates.
+    pub(crate) shown_clips: Cell<[Option<ShownClip>; MAX_SHOWN_CLIPS]>,
     /// The animation playing, or the last one played; empty before any.
     pub(crate) animation: Field<String>,
     /// Whether `animation` is playing.
@@ -284,6 +303,7 @@ impl AnimatorFields {
             animations: Field::new(String::new()),
             states: Field::new(String::new()),
             machine: RefCell::new(MachineRun::new()),
+            shown_clips: Cell::new([None; MAX_SHOWN_CLIPS]),
             animation: Field::new(String::new()),
             playing: Cell::new(false),
             time: Cell::new(0.0),

@@ -254,3 +254,28 @@ fn values_of_another_kind_or_name_are_not_set() {
 
     assert_eq!(state::<TestHost>(&animator), "idle");
 }
+
+#[test]
+fn animators_say_which_clips_they_show_and_how_much() {
+    let (hero, animator) = hero();
+    x_after(&hero, &animator, 0.1);
+    let alone: Vec<_> = tracks::shown_clips::<TestHost>(&animator)
+        .into_iter()
+        .flatten()
+        .collect();
+    assert_eq!(alone.len(), 1);
+    assert_eq!((alone[0].index, alone[0].weight), (0, 1.0), "idle, alone");
+
+    set_value::<TestHost>(&animator, "speed", 1.0);
+    x_after(&hero, &animator, 0.25);
+    x_after(&hero, &animator, 0.25);
+    let fading: Vec<_> = tracks::shown_clips::<TestHost>(&animator)
+        .into_iter()
+        .flatten()
+        .collect();
+
+    let indices: Vec<usize> = fading.iter().map(|clip| clip.index).collect();
+    assert_eq!(indices, [0, 1], "from idle to walk");
+    let total: f32 = fading.iter().map(|clip| clip.weight).sum();
+    assert!((total - 1.0).abs() < EPSILON, "{fading:?}");
+}

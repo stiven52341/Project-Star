@@ -254,6 +254,12 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   rest, then each joint's matrix down the skeleton times its inverse bind
   matrix; `ShownModel::draw` (engine and editor alike) draws the skinned
   parts with those matrices and the others where the model puts them.
+  An animator whose `animations` is a model file plays its animations
+  (the loader of `star_script_engine` gives them as clips that loop and
+  change no property), and records the clips it shows with their times and
+  weights (`tracks::shown_clips`: one alone, or up to four while a
+  `.states` machine fades between blends); the mirror gives those of the
+  first such animator under a `Model` to its node as a `ModelPose`.
   Bones are an optional `[node.bone]` (`length`, 0.5 if left out) on 2D
   nodes (decision 82); the editor draws each one as a diamond from its
   node along its rotation, picks it by clicking it, and starts the nodes

@@ -30,6 +30,8 @@ const ANIMATOR_GAME: &str = include_str!("games/animator_game.star");
 const KNIGHT_SCENE: &str = include_str!("games/knight.scene");
 const TWEEN_GAME: &str = include_str!("games/tween_game.star");
 const STATES_GAME: &str = include_str!("games/states_game.star");
+const MODEL_GAME: &str = include_str!("games/model_game.star");
+const WAVE_MODEL: &[u8] = include_bytes!("games/wave.glb");
 const GUARD_SCENE: &str = include_str!("games/guard.scene");
 const GUARD_ANIMATIONS: &str = include_str!("games/guard.anim");
 const GUARD_STATES: &str = include_str!("games/guard.states");
@@ -86,6 +88,7 @@ fn games_run_in_the_engine_until_they_quit() {
         ("animator_game", ANIMATOR_GAME),
         ("tween_game", TWEEN_GAME),
         ("states_game", STATES_GAME),
+        ("model_game", MODEL_GAME),
     ] {
         package
             .add_program(name, compile_with(name, source, &valid))
@@ -144,6 +147,10 @@ fn games_run_in_the_engine_until_they_quit() {
     assert_eq!(stdout, include_str!("games/tween_game.out"));
 
     state_machines_choose_the_animations(&directory, &levels);
+
+    std::fs::write(levels.join("wave.glb"), WAVE_MODEL).expect("model written");
+    let (stdout, _) = play(&directory, "model_game");
+    assert_eq!(stdout, include_str!("games/model_game.out"));
 
     scene_only_games_need_their_scene(&directory);
 

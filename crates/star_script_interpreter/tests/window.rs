@@ -47,8 +47,9 @@ enum Ending {
 struct Game {
     name: &'static str,
     source: &'static str,
-    /// The scenes of its `levels` folder: their names and contents.
-    scenes: &'static [(&'static str, &'static str)],
+    /// The scenes of its `levels` folder (and other files, such as
+    /// `.frames` and models): their names and contents.
+    scenes: &'static [(&'static str, &'static [u8])],
     /// The bindings of its action `jump`.
     bindings: &'static [&'static str],
     /// The main scene of its project, if it has one.
@@ -60,7 +61,7 @@ struct Game {
 
 const COUNTING_GAME: &str = game_file!("counting_game.star");
 
-const GAMES: [Game; 11] = [
+const GAMES: [Game; 12] = [
     Game {
         name: "counting_game",
         source: COUNTING_GAME,
@@ -83,8 +84,11 @@ const GAMES: [Game; 11] = [
         name: "node_game",
         source: game_file!("node_game.star"),
         scenes: &[
-            ("fleet.scene", game_file!("fleet.scene")),
-            ("misspelled.scene", game_file!("misspelled.scene")),
+            ("fleet.scene", game_file!("fleet.scene").as_bytes()),
+            (
+                "misspelled.scene",
+                game_file!("misspelled.scene").as_bytes(),
+            ),
         ],
         bindings: &BINDINGS,
         main_scene: None,
@@ -94,7 +98,7 @@ const GAMES: [Game; 11] = [
     Game {
         name: "physics_game",
         source: game_file!("physics_game.star"),
-        scenes: &[("floor.scene", game_file!("floor.scene"))],
+        scenes: &[("floor.scene", game_file!("floor.scene").as_bytes())],
         bindings: &BINDINGS,
         main_scene: None,
         ending: Ending::Prints(game_file!("physics_game.out")),
@@ -103,7 +107,7 @@ const GAMES: [Game; 11] = [
     Game {
         name: "physics_3d_game",
         source: game_file!("physics_3d_game.star"),
-        scenes: &[("floor_3d.scene", game_file!("floor_3d.scene"))],
+        scenes: &[("floor_3d.scene", game_file!("floor_3d.scene").as_bytes())],
         bindings: &BINDINGS,
         main_scene: None,
         ending: Ending::Prints(game_file!("physics_3d_game.out")),
@@ -121,7 +125,7 @@ const GAMES: [Game; 11] = [
     Game {
         name: "animation_game",
         source: game_file!("animation_game.star"),
-        scenes: &[("hero.frames", game_file!("hero.frames"))],
+        scenes: &[("hero.frames", game_file!("hero.frames").as_bytes())],
         bindings: &BINDINGS,
         main_scene: None,
         ending: Ending::Prints(game_file!("animation_game.out")),
@@ -131,8 +135,8 @@ const GAMES: [Game; 11] = [
         name: "animator_game",
         source: game_file!("animator_game.star"),
         scenes: &[
-            ("knight.scene", game_file!("knight.scene")),
-            ("knight.anim", game_file!("knight.anim")),
+            ("knight.scene", game_file!("knight.scene").as_bytes()),
+            ("knight.anim", game_file!("knight.anim").as_bytes()),
         ],
         bindings: &BINDINGS,
         main_scene: None,
@@ -152,13 +156,25 @@ const GAMES: [Game; 11] = [
         name: "states_game",
         source: game_file!("states_game.star"),
         scenes: &[
-            ("guard.scene", game_file!("guard.scene")),
-            ("guard.anim", game_file!("guard.anim")),
-            ("guard.states", game_file!("guard.states")),
+            ("guard.scene", game_file!("guard.scene").as_bytes()),
+            ("guard.anim", game_file!("guard.anim").as_bytes()),
+            ("guard.states", game_file!("guard.states").as_bytes()),
         ],
         bindings: &BINDINGS,
         main_scene: None,
         ending: Ending::Prints(game_file!("states_game.out")),
+        warns: None,
+    },
+    Game {
+        name: "model_game",
+        source: game_file!("model_game.star"),
+        scenes: &[(
+            "wave.glb",
+            include_bytes!("../../star_script/tests/games/wave.glb"),
+        )],
+        bindings: &BINDINGS,
+        main_scene: None,
+        ending: Ending::Prints(game_file!("model_game.out")),
         warns: None,
     },
     // Never quits by itself: played only with a scene it cannot load.

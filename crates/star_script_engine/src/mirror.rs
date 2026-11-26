@@ -5,13 +5,14 @@
 use std::collections::HashMap;
 
 use star_engine::script_nodes::{
-    ScriptBody, ScriptCamera, ScriptCamera3D, ScriptLight, ScriptMesh, ScriptNode, ScriptNodes,
-    ScriptSprite,
+    MAX_POSED_CLIPS, ScriptBody, ScriptCamera, ScriptCamera3D, ScriptLight, ScriptMesh,
+    ScriptModel, ScriptNode, ScriptNodes, ScriptSprite,
 };
+use star_engine::star_assets::{AssetPath, ModelFormat};
 use star_engine::star_ecs::World;
 use star_engine::star_math::{Quat, Vec2, Vec3};
 use star_engine::star_render::{Color, SpriteSheet};
-use star_engine::star_scene::{Transform2D, Transform3D};
+use star_engine::star_scene::{ClipAt, Transform2D, Transform3D};
 use star_script_runtime::bodies::Contact;
 use star_script_runtime::nodes::{Host, NodeFields};
 
@@ -181,19 +182,52 @@ fn with_mesh<H: Host>(node: &H::Node, then: impl FnOnce(Option<ScriptMesh<'_>>))
     }
 }
 
-/// Runs `then` with the model file `node` shows, if it is a `Model`.
-fn with_model<H: Host>(node: &H::Node, then: impl FnOnce(Option<&str>)) {
+/// Runs `then` with the model `node` shows, if it is a `Model`, posed by
+/// the first animator under it that plays a model's animations.
+fn with_model<H: Host>(node: &H::Node, then: impl FnOnce(Option<ScriptModel<'_>>)) {
     let mut then = Some(then);
     H::with_model(node, |look| {
         look.file.read(|file| {
             if let Some(then) = then.take() {
-                then(Some(file));
+                then(Some(ScriptModel {
+                    file,
+                    clips: model_clips::<H>(node),
+                }));
             }
         });
     });
     if let Some(then) = then {
         then(None);
     }
+}
+
+/// The animations the first animator under `node` that plays a model's
+/// file shows; none if no animator does.
+fn model_clips<H: Host>(node: &H::Node) -> [Option<ClipAt>; MAX_POSED_CLIPS] {
+    let fields = H::node(node);
+    let children = fields.children();
+    let animator = children.iter().find(|child| {
+        H::with_animator(child, |animator| {
+            animator.animations.read(|path| is_model_file(path))
+        })
+        .unwrap_or(false)
+    });
+    let Some(animator) = animator else {
+        return [None; MAX_POSED_CLIPS];
+    };
+    let shown = star_script_runtime::tracks::shown_clips::<H>(animator);
+    std::array::from_fn(|position| {
+        shown.get(position).copied().flatten().map(|clip| ClipAt {
+            animation: clip.index,
+            time: clip.time,
+            weight: clip.weight,
+        })
+    })
+}
+
+/// Whether `path` names a 3D model file.
+fn is_model_file(path: &str) -> bool {
+    AssetPath::new(path).is_ok_and(|path| ModelFormat::of(&path).is_ok())
 }
 
 /// Runs `then` with the light `node` shines, if it is a `Light2D` (when

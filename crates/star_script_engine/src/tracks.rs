@@ -1,7 +1,8 @@
 //! `.anim` files of the game's asset folder, read for the animators that
-//! play their animations.
+//! play their animations, and the animations of 3D models (`.glb`,
+//! `.gltf`), which an animator plays on its parent `Model` (decision 83).
 
-use star_engine::star_assets::{AssetFolder, AssetPath};
+use star_engine::star_assets::{AssetFolder, AssetPath, ModelFormat};
 use star_engine::star_scene::{
     Interpolation, MethodCall, PropertyTrack, TrackAnimation, TrackAnimations,
 };
@@ -15,12 +16,41 @@ use crate::scenes::scene_value;
 ///
 /// Why the file could not be read, for the warning the game writes.
 pub fn read_animations(folder: &AssetFolder, path: &str) -> Result<Tracks, String> {
+    if let Ok(model) = AssetPath::new(path)
+        && ModelFormat::of(&model).is_ok()
+    {
+        return read_model_animations(folder, &model);
+    }
     let file = AssetPath::new(path)
         .and_then(|path| folder.read_text(&path))
         .and_then(|text| TrackAnimations::from_text(&text))
         .map_err(|error| error.to_string())?;
     Ok(Tracks {
         animations: file.animations.into_iter().map(track_clip).collect(),
+    })
+}
+
+/// The shortest a model's animation lasts: one with every key at the start
+/// still plays.
+const MIN_MODEL_ANIMATION_LENGTH: f32 = 0.001;
+
+/// The animations of the model at `path`, as clips that loop and change no
+/// property: the engine poses the model's skeleton with the times and
+/// weights the animator shows.
+fn read_model_animations(folder: &AssetFolder, path: &AssetPath) -> Result<Tracks, String> {
+    let model = folder.load_model(path).map_err(|error| error.to_string())?;
+    Ok(Tracks {
+        animations: model
+            .animations()
+            .iter()
+            .map(|animation| TrackClip {
+                name: animation.name.clone(),
+                length: animation.length.max(MIN_MODEL_ANIMATION_LENGTH),
+                looping: true,
+                tracks: Vec::new(),
+                calls: Vec::new(),
+            })
+            .collect(),
     })
 }
 

@@ -14,7 +14,7 @@ use std::io::Write as _;
 use std::rc::Rc;
 
 use crate::machines;
-use crate::node_classes::{AnimatorFields, BEFORE_START};
+use crate::node_classes::{AnimatorFields, BEFORE_START, MAX_SHOWN_CLIPS, ShownClip};
 use crate::nodes::{self, Host};
 use crate::properties::set_property;
 use crate::scene_fields::SceneValue;
@@ -330,6 +330,14 @@ pub fn advance<H: Host>(node: &H::Node, delta: f32) {
     if let Some(root) = &root {
         apply::<H>(root, clip, playing.time);
     }
+    let shown = ShownClip {
+        index: playing.index,
+        time: playing.time,
+        weight: 1.0,
+    };
+    H::with_animator(node, |animator| {
+        animator.shown_clips.set([Some(shown), None, None, None]);
+    });
     // The animator is moved on before any script runs, so a method called
     // here can play another animation without this one undoing it.
     let ended = H::with_animator(node, |animator| {
@@ -352,6 +360,13 @@ pub fn advance<H: Host>(node: &H::Node, delta: f32) {
     if ended {
         H::animation_finished(node, &clip.name);
     }
+}
+
+/// The animations the animator `node` showed in its last frame, at their
+/// times and weights; none before its first, or if it is not an animator.
+#[must_use]
+pub fn shown_clips<H: Host>(node: &H::Node) -> [Option<ShownClip>; MAX_SHOWN_CLIPS] {
+    H::with_animator(node, |animator| animator.shown_clips.get()).unwrap_or_default()
 }
 
 /// The animation `animator` plays and the time it is at, if it plays one

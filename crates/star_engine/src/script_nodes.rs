@@ -27,9 +27,9 @@ use star_math::{Mat4, Vec2, Vec3};
 use star_physics::{BodySettings, ContactPhase};
 use star_render::{Camera, Color, SpriteSheet, TextureFilter};
 use star_scene::{
-    Body2D, Body3D, GlobalTransform2D, GlobalTransform3D, Hidden, Hierarchy, Light2dNode,
-    LightNode, ModelNode, Name, NodeBody, NodeContact, PhysicsNodes, PhysicsNodes3d, Transform2D,
-    Transform3D,
+    Body2D, Body3D, ClipAt, GlobalTransform2D, GlobalTransform3D, Hidden, Hierarchy, Light2dNode,
+    LightNode, ModelNode, ModelPose, Name, NodeBody, NodeContact, PhysicsNodes, PhysicsNodes3d,
+    Transform2D, Transform3D,
 };
 
 pub use crate::script_3d::{
@@ -63,13 +63,26 @@ pub struct ScriptNode<'a> {
     pub body: Option<ScriptBody<'a>>,
     /// The mesh it shows, for `Mesh` objects.
     pub mesh: Option<ScriptMesh<'a>>,
-    /// The asset path of the model it shows, for `Model` objects.
-    pub model: Option<&'a str>,
+    /// The model it shows, for `Model` objects.
+    pub model: Option<ScriptModel<'a>>,
     /// The light it shines, for `Light` objects.
     pub light: Option<ScriptLight<'a>>,
     /// The light it shines on the sprites, for `Light2D` objects.
     pub light_2d: Option<ScriptLight<'a>>,
 }
+
+/// What a StarScript `Model` shows.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ScriptModel<'a> {
+    /// Asset path of the model file, as the script wrote it.
+    pub file: &'a str,
+    /// The animations of the file its animator shows, at their times and
+    /// weights; none stands the model at rest.
+    pub clips: [Option<ClipAt>; MAX_POSED_CLIPS],
+}
+
+/// The most animations a script's model shows at once.
+pub const MAX_POSED_CLIPS: usize = 4;
 
 /// What a StarScript `Sprite` shows.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -507,10 +520,13 @@ impl ScriptNodes {
         node: &ScriptNode<'_>,
         entity: Entity,
     ) -> EngineResult<()> {
-        let Some(file) = node.model.filter(|_| node.transform_3d.is_some()) else {
+        let Some(model) = node.model.filter(|_| node.transform_3d.is_some()) else {
             world.remove::<ModelNode>(entity);
+            world.remove::<ModelPose>(entity);
             return Ok(());
         };
+        update_pose(world, entity, &model.clips)?;
+        let file = model.file;
         let same = world
             .get::<ModelNode>(entity)
             .is_some_and(|shown| shown.file.as_str() == file);
@@ -703,6 +719,27 @@ fn update_visible(world: &mut World, entity: Entity, visible: bool) -> EngineRes
     } else if !world.has::<Hidden>(entity) {
         world.insert(entity, Hidden)?;
     }
+    Ok(())
+}
+
+/// Gives `entity` the pose of `clips`, reusing the room of the one it has.
+fn update_pose(
+    world: &mut World,
+    entity: Entity,
+    clips: &[Option<ClipAt>; MAX_POSED_CLIPS],
+) -> EngineResult<()> {
+    let shown = clips.iter().flatten().copied();
+    if let Some(mut pose) = world.get_mut::<ModelPose>(entity) {
+        pose.clips.clear();
+        pose.clips.extend(shown);
+        return Ok(());
+    }
+    world.insert(
+        entity,
+        ModelPose {
+            clips: shown.collect(),
+        },
+    )?;
     Ok(())
 }
 
@@ -1052,6 +1089,41 @@ mod tests {
             texture: "crate.png",
             pixelated: true,
         }
+    }
+
+    #[test]
+    fn models_get_their_file_and_the_pose_of_their_animator() {
+        let mut world = World::new();
+        let mut mirror = ScriptNodes::new();
+        let walking = ClipAt {
+            animation: 1,
+            time: 0.5,
+            weight: 1.0,
+        };
+        let mut knight = node_3d(1, "Knight", Vec3::ZERO);
+        knight.model = Some(ScriptModel {
+            file: "knight.glb",
+            clips: [Some(walking), None, None, None],
+        });
+
+        frame(&mut mirror, &mut world, &[knight]);
+
+        let entity = mirror.entity(1).unwrap();
+        assert_eq!(
+            world.get::<ModelNode>(entity).unwrap().file.as_str(),
+            "knight.glb"
+        );
+        assert_eq!(world.get::<ModelPose>(entity).unwrap().clips, [walking]);
+
+        knight.model = Some(ScriptModel {
+            file: "knight.obj",
+            clips: [None; MAX_POSED_CLIPS],
+        });
+        frame(&mut mirror, &mut world, &[knight]);
+        assert!(!world.has::<ModelNode>(entity), "not a model file");
+        knight.model = None;
+        frame(&mut mirror, &mut world, &[knight]);
+        assert!(!world.has::<ModelPose>(entity));
     }
 
     #[test]
