@@ -98,6 +98,12 @@ impl Texts {
             (AssetFileError::AlreadyExists(path), Language::Spanish) => {
                 format!("Ya existe {path}.")
             }
+            (AssetFileError::ClassExists(class), Language::English) => format!(
+                "The class {class} already exists, in the engine or in another script or blueprint: scripts and blueprints are one program, so each class needs its own name."
+            ),
+            (AssetFileError::ClassExists(class), Language::Spanish) => format!(
+                "La clase {class} ya existe, en el motor o en otro script o blueprint: los scripts y blueprints forman un solo programa, así que cada clase necesita su propio nombre."
+            ),
             (AssetFileError::Io(error), Language::English) => format!("The disk refused: {error}"),
             (AssetFileError::Io(error), Language::Spanish) => {
                 format!("El disco lo rechazó: {error}")

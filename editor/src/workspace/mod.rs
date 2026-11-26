@@ -15,6 +15,7 @@ mod live_check;
 mod menu_bar;
 mod output_panel;
 mod problems_panel;
+mod project_classes;
 mod thumbnails;
 mod unsaved_dialog;
 mod viewport;

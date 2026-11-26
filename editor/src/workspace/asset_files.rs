@@ -8,6 +8,7 @@ use std::path::Path;
 
 use star_engine::prelude::SceneOutline;
 
+use super::project_classes::is_class_taken;
 use crate::blueprint_editor::{BlueprintTemplate, new_blueprint_text, new_script_text};
 use crate::project::{
     BLUEPRINT_EXTENSION, MAX_NAME_LENGTH, ProjectDimension, RUST_EXTENSION, SCENE_EXTENSION,
@@ -54,6 +55,11 @@ impl NewAsset {
         }
     }
 
+    /// Whether it declares a class named as its file.
+    const fn declares_class(self) -> bool {
+        matches!(self, Self::Blueprint | Self::Script | Self::Template(_))
+    }
+
     const fn extension(self) -> &'static str {
         match self {
             Self::Folder => "",
@@ -75,6 +81,9 @@ pub(crate) enum AssetFileError {
     InvalidCodeName,
     /// Something else is already called that.
     AlreadyExists(String),
+    /// A script or blueprint would declare a class the engine or another
+    /// script or blueprint already declares: they form one program.
+    ClassExists(String),
     /// The disk refused.
     Io(io::Error),
 }
@@ -91,8 +100,8 @@ impl From<io::Error> for AssetFileError {
 ///
 /// # Errors
 ///
-/// Fails if the name is not valid, something is already called so, or the
-/// disk refuses.
+/// Fails if the name is not valid, something is already called so (a
+/// file, or the class of a script or blueprint), or the disk refuses.
 pub(super) fn create(
     assets: &Path,
     folder: &str,
@@ -107,6 +116,9 @@ pub(super) fn create(
     let target = assets.join(&path);
     if target.exists() {
         return Err(AssetFileError::AlreadyExists(path));
+    }
+    if kind.declares_class() && is_class_taken(assets, stem, None) {
+        return Err(AssetFileError::ClassExists(stem.to_owned()));
     }
     if kind == NewAsset::Folder {
         fs::create_dir_all(&target)?;
@@ -220,6 +232,12 @@ pub(super) fn rename(
     let target = assets.join(&new_path);
     if target.exists() {
         return Err(AssetFileError::AlreadyExists(new_path));
+    }
+    // Renaming a script or blueprint renames the class called as it.
+    let is_class_file =
+        !is_folder && (path.ends_with(SCRIPT_EXTENSION) || path.ends_with(BLUEPRINT_EXTENSION));
+    if is_class_file && is_class_taken(assets, stem, Some(path)) {
+        return Err(AssetFileError::ClassExists(stem.to_owned()));
     }
     fs::rename(assets.join(path), target)?;
     Ok(new_path)
@@ -335,6 +353,48 @@ mod tests {
         assert!(
             manifest.contains("left = [\"A\", \"ArrowLeft\""),
             "{manifest}"
+        );
+    }
+
+    // Regression: a script and a blueprint could both declare
+    // `StarMovement`, and the project only failed when it played.
+    #[test]
+    fn scripts_and_blueprints_need_a_class_name_of_their_own() {
+        let assets = assets("asset_files_class_taken");
+        create_in(&assets, NewAsset::Blueprint, "StarMovement");
+        let in_root = |kind, name| create(assets.path(), "", kind, name, ProjectDimension::TwoD);
+
+        let script = in_root(NewAsset::Script, "StarMovement");
+        let engine = in_root(NewAsset::Blueprint, "Sprite");
+        let template = in_root(NewAsset::Template(BlueprintTemplate::Spinner2D), "Sprite");
+
+        for result in [script, engine, template] {
+            assert!(
+                matches!(&result, Err(AssetFileError::ClassExists(_))),
+                "{result:?}"
+            );
+        }
+        assert!(!assets.path().join("StarMovement.star").exists());
+        assert!(in_root(NewAsset::Scene, "StarMovement").is_ok());
+        assert!(in_root(NewAsset::Script, "StarSpin").is_ok());
+    }
+
+    #[test]
+    fn scripts_are_not_renamed_after_a_class_that_exists() {
+        let assets = assets("asset_files_rename_class_taken");
+        let rock = create_in(&assets, NewAsset::Script, "Rock");
+        create_in(&assets, NewAsset::Blueprint, "Ship");
+
+        let result = rename(assets.path(), &rock, "Ship", false);
+
+        assert!(
+            matches!(result, Err(AssetFileError::ClassExists(_))),
+            "{result:?}"
+        );
+        assert!(assets.path().join(&rock).exists());
+        assert_eq!(
+            rename(assets.path(), &rock, "Stone", false).unwrap(),
+            "levels/Stone.star"
         );
     }
 

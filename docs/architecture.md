@@ -610,6 +610,12 @@ of the StarScript compiler and of the project check stay in English:
    them. Every template is checked by a test that validates it, translates
    it and compiles it. Names are given in a
    row over the grid; `asset_files.rs` checks them and never overwrites.
+   Scripts and blueprints are one program, so a new one, or one renamed,
+   cannot take the name of a class that already exists: the engine's or
+   one another script or blueprint declares (`project_classes.rs`, which
+   reads scripts by their tokens, so one with mistakes still counts). A
+   name typed in the blueprint's own class field or in a script's code is
+   left to the live check, which reports the class as existing.
    What is renamed or deleted closes the tabs open from it. A script or
    blueprint renamed whose class is called as the file was (and whose new
    name can be a class) renames its class in the whole project
