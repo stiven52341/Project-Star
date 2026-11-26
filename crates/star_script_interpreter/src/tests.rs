@@ -324,6 +324,21 @@ fn games_start_update_and_quit() {
 }
 
 #[test]
+fn time_delta_is_the_frame_s_away_from_update() {
+    let source = "class Spinner extends Node {\n init() {\n super.init(\"Spinner\")\n }\n \
+                  func turn() {\n rotation += Time.delta()\n }\n \
+                  override func update(delta: float) {\n turn()\n Debug.print(rotation.to_string() + \" \" + (Time.delta() == delta).to_string())\n }\n}\n\
+                  class Spin extends Game {\n var frames = 0\n \
+                  override func start() {\n add_child(Spinner())\n }\n \
+                  override func update(delta: float) {\n frames += 1\n if frames == 2 {\n quit()\n }\n }\n}\n";
+
+    let (printed, result) = play(source, 10);
+
+    assert_eq!(printed, "0.5 true\n1.0 true\n");
+    assert!(result.is_ok(), "{result:?}");
+}
+
+#[test]
 fn nodes_of_the_game_run_and_main_cameras_are_seen_from() {
     let source = "class Eye extends Camera2D {\n init() {\n super.init(\"Eye\")\n main = true\n }\n \
                   override func start() {\n super.start()\n Debug.print(\"eye start\")\n }\n \

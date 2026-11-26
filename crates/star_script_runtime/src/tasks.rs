@@ -81,6 +81,8 @@ thread_local! {
     static WAITING: RefCell<Vec<Coroutine>> = const { RefCell::new(Vec::new()) };
     /// Seconds of the game: the sum of the frames' `delta`s.
     static NOW: Cell<f64> = const { Cell::new(0.0) };
+    /// Seconds of the frame going on: the `delta` its `update`s get.
+    static DELTA: Cell<f32> = const { Cell::new(0.0) };
     /// Frames whose coroutines already went on.
     static FRAME: Cell<u64> = const { Cell::new(0) };
 }
@@ -103,6 +105,7 @@ pub fn start<T: 'static>(task: Task<T>) {
 /// Moves the game's clock: a frame of `delta` seconds begins.
 pub fn frame_started(delta: f32) {
     NOW.with(|now| now.set(now.get() + f64::from(delta)));
+    DELTA.with(|current| current.set(delta));
 }
 
 /// Lets every coroutine whose wait is over go on until its next one.
@@ -164,6 +167,14 @@ pub fn run_until_finished_or(stop: impl Fn() -> bool) {
 #[allow(clippy::cast_possible_truncation)] // `float` is how StarScript keeps decimals.
 pub fn now() -> f32 {
     NOW.with(Cell::get) as f32
+}
+
+/// `Time.delta()`: the seconds of the frame going on, the same `delta`
+/// that `update` gets, so code away from `update` can read it; 0 before
+/// the first frame.
+#[must_use]
+pub fn delta() -> f32 {
+    DELTA.with(Cell::get)
 }
 
 /// `Time.wait(seconds)`: waits until `seconds` of the game have passed,
@@ -235,6 +246,15 @@ mod tests {
         frame(0.5);
 
         assert!((now() - start - 0.75).abs() < 1e-6);
+    }
+
+    #[test]
+    fn the_delta_is_the_last_frame_s() {
+        frame(0.25);
+        assert!((delta() - 0.25).abs() < f32::EPSILON);
+
+        frame(0.5);
+        assert!((delta() - 0.5).abs() < f32::EPSILON);
     }
 
     #[test]

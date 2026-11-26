@@ -1203,4 +1203,17 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           window test plays a game that prints with its old script,
           saves the script again while it plays and expects the new
           output with the frames kept.
+- [x] **Owner's requests (2026-11-25)**:
+  - [x] Blueprint wires can be selected with a click (drawn wider, in
+        the selection's color) and removed with `Delete` or the right
+        button's “Remove wire”.
+  - [x] `Time.delta()`: the seconds of the frame going on, the `delta`
+        that `update` gets, for code away from `update`; compiled and
+        interpreted, so also in the code editor and the blueprints'
+        “Functions”.
+  - [x] Referring to the node of a script: nothing new, since a script's
+        class is the node, so `self` (written or implicit) already is it.
+  - [x] A script with mistakes dragged onto a node said that none of its
+        classes extends another; it now says it has mistakes, and the
+        first one.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

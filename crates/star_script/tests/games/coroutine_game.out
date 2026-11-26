@@ -1,8 +1,8 @@
-frame 1
+frame 1 true
 blink
-frame 2
+frame 2 true
 later
 blink
-frame 3
-frame 4
-frame 5
+frame 3 true
+frame 4 true
+frame 5 true

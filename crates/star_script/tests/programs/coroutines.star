@@ -60,6 +60,9 @@ class Main {
         somebody?.greet()
         Debug.print((maybe(0) ?? await twice(4)).to_string())
         Time.wait(0.05)
+        // The frames of a console program last real time: only its sign
+        // is the same every run.
+        Debug.print("delta " + (Time.delta() >= 0.0).to_string())
         Debug.print("main ends")
     }
 }

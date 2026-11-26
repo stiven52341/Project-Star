@@ -185,12 +185,14 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     ];
     classes.add(audio);
 
-    // What coroutines wait for: seconds of the game, or the next frame.
+    // What coroutines wait for (seconds of the game, or the next frame),
+    // and the game's clock.
     let mut time = ClassInfo::new(TIME_CLASS.to_owned(), ClassOrigin::Native);
     time.methods = vec![
         native_async_method("wait", &[("seconds", Type::Float)]),
         native_async_method("next_frame", &[]),
         native_method("now", &[], Type::Float, true),
+        native_method("delta", &[], Type::Float, true),
     ];
     classes.add(time);
 

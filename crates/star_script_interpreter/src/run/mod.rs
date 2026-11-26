@@ -645,6 +645,7 @@ impl Machine {
             }
             Expression::Then(first, value) => self.evaluate_pair(first, value, frame)?.1,
             Expression::Now => Value::Float(star_script_runtime::tasks::now()),
+            Expression::Delta => Value::Float(star_script_runtime::tasks::delta()),
             Expression::Print(message) => {
                 self.print(&self.evaluate(message, frame)?.to_text()?)?;
                 Value::Null

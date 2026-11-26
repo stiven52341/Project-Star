@@ -626,6 +626,9 @@ pub(crate) enum Expression {
     /// `Time.now()`: the seconds of the game so far, from the clock of
     /// `star_script_runtime` that the compiled game reads too.
     Now,
+    /// `Time.delta()`: the seconds of the frame going on, from the same
+    /// clock.
+    Delta,
     /// `Debug.print(text)`.
     Print(Box<Expression>),
     /// A method of the engine, such as `Input.is_down(action)`, with its

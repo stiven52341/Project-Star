@@ -44,7 +44,9 @@ fn mark_statement(statement: &mut Statement) -> bool {
 /// Marks `expression` (and what is inside it); whether it waits.
 fn mark(expression: &mut Expression) -> bool {
     let waits = match expression {
-        Expression::Constant(_) | Expression::Local(_) | Expression::Now => false,
+        Expression::Constant(_) | Expression::Local(_) | Expression::Now | Expression::Delta => {
+            false
+        }
         Expression::Convert { value, .. }
         | Expression::Negate(value)
         | Expression::Not(value)

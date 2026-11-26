@@ -1,5 +1,6 @@
 // A node whose coroutine prints every frame until it leaves the tree, and
-// a coroutine of the game that waits for a frame.
+// a coroutine of the game that waits for a frame; every frame checks that
+// `Time.delta()` is the `delta` of `update`.
 class Blinker extends Node {
     init() {
         super.init("Blinker")
@@ -33,7 +34,7 @@ class CoroutineGame extends Game {
 
     override func update(delta: float) {
         frames += 1
-        Debug.print("frame " + frames.to_string())
+        Debug.print("frame " + frames.to_string() + " " + (Time.delta() == delta).to_string())
         if frames == 3 {
             blinker.remove()
         }

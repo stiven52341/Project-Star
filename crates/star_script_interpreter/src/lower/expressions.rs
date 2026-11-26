@@ -373,6 +373,7 @@ impl Body<'_> {
                     Ok(Expression::Print(Box::new(message)))
                 }
                 (TIME_CLASS, "now") => Ok(Expression::Now),
+                (TIME_CLASS, "delta") => Ok(Expression::Delta),
                 (TIME_CLASS, "wait") => {
                     let seconds = arguments.into_iter().next().ok_or_else(|| {
                         LowerError::internal("`wait` without seconds", callee.span)
