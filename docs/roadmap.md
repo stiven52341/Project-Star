@@ -1376,4 +1376,21 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         room for them behind `Frame`).
   - [ ] 17i Profiling in the editor: frame time, draws, triangles and
         memory, so the right technique can be chosen.
+- [ ] **Owner's requests (2026-11-26)**, done one by one, each with a
+      plan agreed with the owner first:
+  - To fix:
+    - [ ] 3D collision shapes follow their node: a `Body3D` on a simple
+          mesh that was changed (a cube scaled, for example) gets a
+          collision shape of the mesh's real size, not of the unscaled
+          one. Complex models (a soldier, for example) can still take a
+          simple shape (a capsule), and also an automatic one that fits
+          every polygon of the model (a triangle mesh): costly, but the
+          engine is a tool and must spare the developer that work.
+  - To do:
+    - [ ] Frames per second shown while a game runs.
+    - [ ] Basic 2D bodies: shape nodes for 2D (a box, for example) that
+          can be scaled, given collisions and used as a floor, and hidden
+          while their collisions and everything else stay (as in Unity).
+    - [ ] An audio editor, to manage a project's sounds (after Unity's).
+    - [ ] A sprite editor (after Godot's).
 - [ ] **Future — Consoles** (PlayStation, Xbox).
