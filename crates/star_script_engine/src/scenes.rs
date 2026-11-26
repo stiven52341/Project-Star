@@ -88,6 +88,10 @@ fn scene_node(node: NodeOutline) -> SceneNode {
                 .map(|states| states.as_str().to_owned())
                 .unwrap_or_default(),
         }),
+        model: node
+            .model
+            .as_ref()
+            .map(|model| model.file.as_str().to_owned()),
         bone: node.bone.map(|bone| SceneBone {
             length: bone.length,
         }),

@@ -488,6 +488,17 @@ const MESH: NodeClass = NodeClass {
     bodies: &[],
 };
 
+const MODEL: NodeClass = NodeClass {
+    name: "Model",
+    about: "the glTF file of the model it shows",
+    ancestors: &["Node", "Node3D"],
+    fields: "::star_script_runtime::node_classes::ModelFields",
+    new_fields: "Fields::new(file)",
+    parameters: &[("file", STRING)],
+    methods: &[],
+    bodies: &[],
+};
+
 const LIGHT: NodeClass = NodeClass {
     name: "Light",
     about: "the kind of light it shines, its color, how bright it is, how far it reaches and the cone of spots",
@@ -514,7 +525,7 @@ const CAMERA_3D: NodeClass = NodeClass {
 /// `Mesh`, `Light` and `Camera3D`.
 pub(super) fn node_class_modules(out: &mut Writer) {
     for class in [
-        SPRITE, CAMERA_2D, LIGHT_2D, ANIMATOR, BONE_2D, NODE_3D, MESH, LIGHT, CAMERA_3D,
+        SPRITE, CAMERA_2D, LIGHT_2D, ANIMATOR, BONE_2D, NODE_3D, MESH, MODEL, LIGHT, CAMERA_3D,
     ] {
         out.line("");
         module(out, &class);

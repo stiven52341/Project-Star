@@ -106,12 +106,13 @@ pub(crate) enum EngineClass {
     Animator,
     TweenOptions,
     Bone2D,
+    Model,
 }
 
 impl EngineClass {
     /// Every engine class the interpreter knows, in the order of their
     /// places.
-    pub(crate) const ALL: [Self; 15] = [
+    pub(crate) const ALL: [Self; 16] = [
         Self::Color,
         Self::Node,
         Self::Camera2D,
@@ -127,6 +128,7 @@ impl EngineClass {
         Self::Animator,
         Self::TweenOptions,
         Self::Bone2D,
+        Self::Model,
     ];
 
     /// Its place among the classes.
@@ -152,6 +154,7 @@ impl EngineClass {
             Self::Animator => "Animator",
             Self::TweenOptions => "TweenOptions",
             Self::Bone2D => "Bone2D",
+            Self::Model => "Model",
         }
     }
 }
@@ -289,6 +292,8 @@ pub(crate) enum EngineField {
     States,
     /// `length` of `Bone2D`.
     Length,
+    /// `file` of `Model`.
+    ModelFile,
     /// `body` of `Node`.
     Body,
     /// `view_height` and `main` of `Camera2D` (`main` of `Camera3D` too).

@@ -62,20 +62,23 @@ fn describe<H: Host>(node: &H::Node, parent: Option<u64>, then: impl FnOnce(&Scr
         with_sprite::<H>(node, |sprite| {
             with_body::<H>(fields, |body| {
                 with_mesh::<H>(node, |mesh| {
-                    with_light::<H>(node, false, |light| {
-                        with_light::<H>(node, true, |light_2d| {
-                            then(&ScriptNode {
-                                id: fields.id(),
-                                parent,
-                                name,
-                                visible: fields.visible.get(),
-                                transform,
-                                transform_3d,
-                                sprite,
-                                body,
-                                mesh,
-                                light,
-                                light_2d,
+                    with_model::<H>(node, |model| {
+                        with_light::<H>(node, false, |light| {
+                            with_light::<H>(node, true, |light_2d| {
+                                then(&ScriptNode {
+                                    id: fields.id(),
+                                    parent,
+                                    name,
+                                    visible: fields.visible.get(),
+                                    transform,
+                                    transform_3d,
+                                    sprite,
+                                    body,
+                                    mesh,
+                                    model,
+                                    light,
+                                    light_2d,
+                                });
                             });
                         });
                     });
@@ -171,6 +174,21 @@ fn with_mesh<H: Host>(node: &H::Node, then: impl FnOnce(Option<ScriptMesh<'_>>))
                     }));
                 }
             });
+        });
+    });
+    if let Some(then) = then {
+        then(None);
+    }
+}
+
+/// Runs `then` with the model file `node` shows, if it is a `Model`.
+fn with_model<H: Host>(node: &H::Node, then: impl FnOnce(Option<&str>)) {
+    let mut then = Some(then);
+    H::with_model(node, |look| {
+        look.file.read(|file| {
+            if let Some(then) = then.take() {
+                then(Some(file));
+            }
         });
     });
     if let Some(then) = then {

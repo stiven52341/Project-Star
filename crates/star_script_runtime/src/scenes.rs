@@ -48,6 +48,9 @@ pub struct SceneNode {
     pub light_2d: Option<SceneLight>,
     /// The bone it is; only `Bone2D` objects can be one.
     pub bone: Option<SceneBone>,
+    /// The asset path of the 3D model it shows; only `Model` objects can
+    /// show one.
+    pub model: Option<String>,
     /// The 2D camera it is; only `Camera2D` objects can be one.
     pub camera: Option<SceneCamera>,
     /// The 3D camera it is; only `Camera3D` objects can be one.
@@ -329,6 +332,7 @@ mod tests {
             light: None,
             light_2d: None,
             bone: None,
+            model: None,
             camera: None,
             camera_3d: None,
             animator: None,

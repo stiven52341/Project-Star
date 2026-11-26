@@ -15,12 +15,12 @@
 //! [`ScriptNodes::body_state`]).
 //!
 //! A `Node3D` gets a [`Transform3D`] instead of a [`Transform2D`]; a `Mesh`
-//! a [`MeshFile`] and a `Light` a [`LightNode`].
+//! a [`MeshFile`], a `Model` a [`ModelNode`] and a `Light` a [`LightNode`].
 
 use std::collections::HashMap;
 use std::ops::Add;
 
-use star_assets::AssetPath;
+use star_assets::{AssetPath, ModelFormat};
 use star_core::EngineResult;
 use star_ecs::{Entity, World};
 use star_math::{Mat4, Vec2, Vec3};
@@ -28,7 +28,8 @@ use star_physics::{BodySettings, ContactPhase};
 use star_render::{Camera, Color, SpriteSheet, TextureFilter};
 use star_scene::{
     Body2D, Body3D, GlobalTransform2D, GlobalTransform3D, Hidden, Hierarchy, Light2dNode,
-    LightNode, Name, NodeBody, NodeContact, PhysicsNodes, PhysicsNodes3d, Transform2D, Transform3D,
+    LightNode, ModelNode, Name, NodeBody, NodeContact, PhysicsNodes, PhysicsNodes3d, Transform2D,
+    Transform3D,
 };
 
 pub use crate::script_3d::{
@@ -62,6 +63,8 @@ pub struct ScriptNode<'a> {
     pub body: Option<ScriptBody<'a>>,
     /// The mesh it shows, for `Mesh` objects.
     pub mesh: Option<ScriptMesh<'a>>,
+    /// The asset path of the model it shows, for `Model` objects.
+    pub model: Option<&'a str>,
     /// The light it shines, for `Light` objects.
     pub light: Option<ScriptLight<'a>>,
     /// The light it shines on the sprites, for `Light2D` objects.
@@ -367,6 +370,7 @@ impl ScriptNodes {
         }
         self.update_body(world, node, entity)?;
         self.update_mesh(world, node, entity)?;
+        self.update_model(world, node, entity)?;
         self.update_light(world, node, entity)?;
         self.update_light_2d(world, node, entity)?;
         if let Some(sprite) = node.sprite {
@@ -493,6 +497,38 @@ impl ScriptNodes {
             world.insert(entity, file)?;
         }
         Ok(())
+    }
+
+    /// Gives `entity` the [`ModelNode`] of the script's `Model`, changing
+    /// it only when the script names another file.
+    fn update_model(
+        &mut self,
+        world: &mut World,
+        node: &ScriptNode<'_>,
+        entity: Entity,
+    ) -> EngineResult<()> {
+        let Some(file) = node.model.filter(|_| node.transform_3d.is_some()) else {
+            world.remove::<ModelNode>(entity);
+            return Ok(());
+        };
+        let same = world
+            .get::<ModelNode>(entity)
+            .is_some_and(|shown| shown.file.as_str() == file);
+        if same {
+            return Ok(());
+        }
+        let checked = AssetPath::new(file).and_then(|path| {
+            ModelFormat::of(&path)?;
+            Ok(path)
+        });
+        match checked {
+            Ok(file) => replace(world, entity, ModelNode { file }),
+            Err(error) => {
+                world.remove::<ModelNode>(entity);
+                self.reject_look(node, &error.to_string());
+                Ok(())
+            }
+        }
     }
 
     fn update_light(
@@ -703,6 +739,7 @@ mod tests {
             sprite: None,
             body: None,
             mesh: None,
+            model: None,
             light: None,
             light_2d: None,
         }

@@ -40,6 +40,11 @@ pub enum NewNode<'scene> {
     Animator,
     /// `Bone2D`
     Bone2D,
+    /// `Model` showing `file`.
+    Model {
+        /// The model file it shows.
+        file: &'scene str,
+    },
     /// A class of the program, created with `init()`.
     Script(&'scene str),
 }
@@ -155,6 +160,10 @@ fn new_node<'scene>(
         "Camera3D" => NewNode::Camera3D,
         "Animator" => NewNode::Animator,
         "Bone2D" => NewNode::Bone2D,
+        "Model" => match &node.model {
+            Some(file) => NewNode::Model { file },
+            None => return missing("model"),
+        },
         script => NewNode::Script(script),
     })
 }
@@ -164,6 +173,8 @@ fn new_node<'scene>(
 fn default_class(node: &SceneNode) -> &'static str {
     if node.sprite.is_some() {
         "Sprite"
+    } else if node.model.is_some() {
+        "Model"
     } else if node.mesh.is_some() {
         "Mesh"
     } else if node.light.is_some() {

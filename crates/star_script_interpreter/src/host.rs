@@ -18,7 +18,7 @@ use star_script_runtime::color::ColorFields;
 use star_script_runtime::game::GameFields;
 use star_script_runtime::node_classes::{
     AnimatorFields, BoneFields, Camera2dFields, Camera3dFields, LightFields, MeshFields,
-    SpriteFields,
+    ModelFields, SpriteFields,
 };
 use star_script_runtime::nodes::{Host, Node3dFields, NodeFields};
 use star_script_runtime::scene_fields::SceneValue;
@@ -75,6 +75,7 @@ pub(crate) enum ClassParts {
     Camera3D(Rc<Camera3dFields>),
     Animator(AnimatorFields),
     Bone2D(BoneFields),
+    Model(ModelFields),
 }
 
 impl NodeParts {
@@ -141,6 +142,14 @@ impl NodeParts {
     pub(crate) const fn animator(&self) -> Option<&AnimatorFields> {
         match &self.class {
             ClassParts::Animator(fields) => Some(fields),
+            _ => None,
+        }
+    }
+
+    /// The fields of `Model`, if it is one.
+    pub(crate) const fn model(&self) -> Option<&ModelFields> {
+        match &self.class {
+            ClassParts::Model(fields) => Some(fields),
             _ => None,
         }
     }
@@ -275,6 +284,10 @@ impl Host for Interpreted {
 
     fn with_animator<R>(node: &Self::Node, read: impl FnOnce(&AnimatorFields) -> R) -> Option<R> {
         node.engine.animator().map(read)
+    }
+
+    fn with_model<R>(node: &Self::Node, read: impl FnOnce(&ModelFields) -> R) -> Option<R> {
+        node.engine.model().map(read)
     }
 
     fn with_bone<R>(node: &Self::Node, read: impl FnOnce(&BoneFields) -> R) -> Option<R> {

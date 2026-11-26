@@ -60,6 +60,9 @@ pub const CAMERA_3D_CLASS: &str = "Camera3D";
 /// Name of the engine class of the nodes that play keyframe animations.
 pub const ANIMATOR_CLASS: &str = "Animator";
 
+/// Name of the engine class of the 3D nodes that show a model file.
+pub const MODEL_CLASS: &str = "Model";
+
 /// Name of the engine class of the bones of cut-out 2D characters.
 pub const BONE_2D_CLASS: &str = "Bone2D";
 
@@ -182,6 +185,7 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     add_light_2d_class(classes, node, color);
     let node_3d = add_node_3d_class(classes, node);
     add_mesh_class(classes, node_3d, color);
+    add_model_class(classes, node_3d);
     add_light_class(classes, node_3d, color);
     let camera_3d = add_camera_3d_class(classes, node_3d);
     add_animator_class(classes, node);
@@ -595,6 +599,19 @@ fn add_node_3d_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
 }
 
 /// `Mesh`: a 3D node that shows a basic shape with a PBR surface.
+/// `Model`: a 3D node that shows a glTF model file whole, every mesh and
+/// material of it (decision 83).
+fn add_model_class(classes: &mut ClassTable, node_3d: ClassId) -> ClassId {
+    let mut model = ClassInfo::new(MODEL_CLASS.to_owned(), ClassOrigin::Native);
+    model.base = Some(node_3d);
+    model.fields = vec![native_field("file", Type::String)];
+    model.constructor = Some(native_constructor(&[
+        ("name", Type::String),
+        ("file", Type::String),
+    ]));
+    classes.add(model)
+}
+
 fn add_mesh_class(classes: &mut ClassTable, node_3d: ClassId, color: ClassId) -> ClassId {
     let mut mesh = ClassInfo::new(MESH_CLASS.to_owned(), ClassOrigin::Native);
     mesh.base = Some(node_3d);

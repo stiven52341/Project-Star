@@ -588,6 +588,10 @@ impl ::star_script_runtime::nodes::Host for Host_ {
         crate::AnyObject::Animator(::std::rc::Rc::clone(node)).map(|animator_| read(crate::classes::Animator::HasFields::fields(&*animator_)))
     }
 
+    fn with_model<R>(node: &Self::Node, read: impl FnOnce(&::star_script_runtime::node_classes::ModelFields) -> R) -> ::std::option::Option<R> {
+        crate::AnyObject::Model(::std::rc::Rc::clone(node)).map(|model_| read(crate::classes::Model::HasFields::fields(&*model_)))
+    }
+
     fn with_bone<R>(node: &Self::Node, read: impl FnOnce(&::star_script_runtime::node_classes::BoneFields) -> R) -> ::std::option::Option<R> {
         crate::AnyObject::Bone2D(::std::rc::Rc::clone(node)).map(|bone_| read(crate::classes::Bone2D::HasFields::fields(&*bone_)))
     }
@@ -621,6 +625,7 @@ impl ::star_script_runtime::nodes::Host for Host_ {
             NewNode::Light2D { kind } => crate::classes::Light2D::new(name, ::std::string::String::from(kind)),
             NewNode::Node3D => crate::classes::Node3D::new(name),
             NewNode::Mesh { shape } => crate::classes::Mesh::new(name, ::std::string::String::from(shape)),
+            NewNode::Model { file } => crate::classes::Model::new(name, ::std::string::String::from(file)),
             NewNode::Light { kind } => crate::classes::Light::new(name, ::std::string::String::from(kind)),
             NewNode::Camera3D => crate::classes::Camera3D::new(name),
             NewNode::Animator => crate::classes::Animator::new(name),

@@ -211,6 +211,22 @@ impl Default for Camera3dFields {
     }
 }
 
+/// The fields of a `Model`: the glTF file it shows (decision 83).
+pub struct ModelFields {
+    /// `file`: the asset path of its `.glb` or `.gltf`.
+    pub file: Field<String>,
+}
+
+impl ModelFields {
+    /// A model of the file at `file`.
+    #[must_use]
+    pub const fn new(file: String) -> Self {
+        Self {
+            file: Field::new(file),
+        }
+    }
+}
+
 /// How long a new `Bone2D` is, in world units.
 const BONE_LENGTH: f32 = 0.5;
 

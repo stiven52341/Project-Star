@@ -9,7 +9,7 @@ use crate::bodies::BodyFields;
 use crate::game::GameFields;
 use crate::node_classes::{
     AnimatorFields, BoneFields, Camera2dFields, Camera3dFields, LightFields, MeshFields,
-    SpriteFields,
+    ModelFields, SpriteFields,
 };
 use crate::nodes::{self, Host, Node3dFields, NodeFields};
 use crate::scene_fields::SceneValue;
@@ -150,6 +150,10 @@ impl Host for TestHost {
 
     fn with_animator<R>(node: &Self::Node, read: impl FnOnce(&AnimatorFields) -> R) -> Option<R> {
         node.animator.as_ref().map(read)
+    }
+
+    fn with_model<R>(_node: &Self::Node, _read: impl FnOnce(&ModelFields) -> R) -> Option<R> {
+        None
     }
 
     fn with_bone<R>(node: &Self::Node, read: impl FnOnce(&BoneFields) -> R) -> Option<R> {
