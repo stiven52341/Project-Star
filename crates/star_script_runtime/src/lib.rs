@@ -10,6 +10,7 @@
 //! It has no dependencies, so a game built from StarScript only needs the
 //! Rust toolchain and the engine.
 
+pub mod animations;
 pub mod audio;
 pub mod bodies;
 pub mod calls;

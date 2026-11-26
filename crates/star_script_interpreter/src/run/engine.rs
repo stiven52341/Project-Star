@@ -7,6 +7,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
+use star_script_runtime::animations;
 use star_script_runtime::audio::{self, SoundFields};
 use star_script_runtime::bodies::{BodyFields, Contact};
 use star_script_runtime::color::ColorFields;
@@ -216,6 +217,7 @@ fn sprite_slot(sprite: &SpriteFields<Interpreted>, field: EngineField) -> Option
         EngineField::Columns => Slot::Int(&sprite.columns),
         EngineField::Rows => Slot::Int(&sprite.rows),
         EngineField::Frame => Slot::Int(&sprite.frame),
+        EngineField::Frames => Slot::Text(&sprite.frames),
         _ => return None,
     })
 }
@@ -553,6 +555,18 @@ fn node_method(
         (NodeMethod::TranslateGlobal3D, [x, y, z]) => {
             nodes::translate_global_3d::<Runtime>(node, float(x)?, float(y)?, float(z)?);
             Value::Null
+        }
+        (NodeMethod::Play, [name]) => {
+            animations::play::<Runtime>(node, text(name)?);
+            Value::Null
+        }
+        (NodeMethod::Stop, []) => {
+            animations::stop::<Runtime>(node);
+            Value::Null
+        }
+        (NodeMethod::IsPlaying, []) => Value::Bool(animations::is_playing::<Runtime>(node)),
+        (NodeMethod::Animation, []) => {
+            Value::String(Arc::from(animations::animation::<Runtime>(node)))
         }
         _ => return Err(RunError::Internal("method of `Node` with other arguments")),
     })

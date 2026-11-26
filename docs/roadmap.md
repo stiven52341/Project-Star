@@ -1234,10 +1234,12 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           `Sprite` (compiled and interpreted). In scenes the cells cut the
           sprite's `region`; any value shows a cell (frames go round the
           sheet), so scripts can step `frame` without checks.
-    - [ ] 15a.2 The `.frames` file (image, cells, clips with their frames,
-          speed and loop) and playing it: `Sprite` fields `frames` and
-          `animation`, `play(name)`, `stop()`, the frame advanced by the
-          engine every frame, and the clip a scene's sprite starts with.
+    - [x] 15a.2 The `.frames` file (image, cells, clips with their frames,
+          speed and loop) and playing it (decision 78): `Sprite`'s field
+          `frames` and `play(name)`, `stop()`, `is_playing()` and
+          `animation()` (methods, as `Sound`'s), the frame moved on by the
+          runtime after each `update`, and the clip a scene's sprite starts
+          with (`[node.sprite]` `frames` and `animation`).
     - [ ] 15a.3 The `animation_finished(name)` event, also as a blueprint
           graph.
     - [ ] 15a.4 The editor's frames panel: cutting the sheet, picking each

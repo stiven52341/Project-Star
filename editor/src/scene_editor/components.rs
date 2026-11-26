@@ -338,6 +338,8 @@ pub(super) const fn sprite_of(texture: AssetPath, size: Vec2) -> SpriteOutline {
         color: Color::WHITE,
         layer: 0,
         sheet: SpriteSheet::SINGLE,
+        frames: None,
+        animation: None,
     }
 }
 

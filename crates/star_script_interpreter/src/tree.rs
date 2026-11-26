@@ -285,10 +285,12 @@ pub(crate) enum EngineField {
     Layer,
     Pixelated,
     Tint,
-    /// `columns`, `rows` and `frame` of `Sprite`: its sprite sheet.
+    /// `columns`, `rows` and `frame` of `Sprite`: its sprite sheet; and
+    /// `frames`, the file of its animations.
     Columns,
     Rows,
     Frame,
+    Frames,
     /// `kind`, `intensity`, `range`, `angle` and `blend` of `Light2D`
     /// (`kind` of `Body` too).
     Kind,
@@ -438,6 +440,11 @@ pub(crate) enum NodeMethod {
     SetGlobalPosition3D,
     Translate3D,
     TranslateGlobal3D,
+    /// `play`, `stop`, `is_playing` and `animation` of `Sprite`.
+    Play,
+    Stop,
+    IsPlaying,
+    Animation,
 }
 
 impl NodeMethod {
@@ -465,6 +472,17 @@ impl NodeMethod {
             "set_global_position_3d" => Self::SetGlobalPosition3D,
             "translate_3d" => Self::Translate3D,
             "translate_global_3d" => Self::TranslateGlobal3D,
+            _ => return None,
+        })
+    }
+
+    /// The method of `Sprite` called `name`, if the runtime runs it.
+    pub(crate) fn of_sprite(name: &str) -> Option<Self> {
+        Some(match name {
+            "play" => Self::Play,
+            "stop" => Self::Stop,
+            "is_playing" => Self::IsPlaying,
+            "animation" => Self::Animation,
             _ => return None,
         })
     }

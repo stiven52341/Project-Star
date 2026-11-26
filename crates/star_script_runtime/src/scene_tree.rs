@@ -214,8 +214,12 @@ fn show<H: Host>(object: &H::Node, node: &SceneNode, class: &str) -> Result<(), 
             look.columns.set(image.columns);
             look.rows.set(image.rows);
             look.frame.set(image.frame);
+            look.frames.set(image.frames.clone());
         })
         .ok_or_else(|| not_a("shows an image", "Sprite"))?;
+        if !image.animation.is_empty() {
+            crate::animations::play::<H>(object, &image.animation);
+        }
     }
     if let Some(shown) = &node.mesh {
         H::with_mesh(object, |look| {

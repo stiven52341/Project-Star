@@ -197,6 +197,54 @@ if let ::std::option::Option::Some(node_) = node_ {
     ::star_script_runtime::nodes::look_at::<crate::classes::Host_>(&node_, x, y, z);
 }";
 
+/// The methods of `Sprite`: playing the clips of its `.frames` file.
+const SPRITE_METHODS: [Method; 4] = [
+    Method {
+        name: "play",
+        parameters: "name: ::std::string::String",
+        arguments: "name",
+        returns: "",
+    },
+    Method {
+        name: "stop",
+        parameters: "",
+        arguments: "",
+        returns: "",
+    },
+    Method {
+        name: "is_playing",
+        parameters: "",
+        arguments: "",
+        returns: " -> bool",
+    },
+    Method {
+        name: "animation",
+        parameters: "",
+        arguments: "",
+        returns: " -> ::std::string::String",
+    },
+];
+
+/// `func play`: plays a clip of the sprite's `frames`.
+const PLAY_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+if let ::std::option::Option::Some(node_) = node_ {
+    ::star_script_runtime::animations::play::<crate::classes::Host_>(&node_, &name);
+}";
+
+/// `func stop`: stops the sprite's clip on its frame.
+const STOP_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+if let ::std::option::Option::Some(node_) = node_ {
+    ::star_script_runtime::animations::stop::<crate::classes::Host_>(&node_);
+}";
+
+/// `func is_playing`: whether the sprite's clip plays.
+const IS_PLAYING_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+node_.is_some_and(|node_| ::star_script_runtime::animations::is_playing::<crate::classes::Host_>(&node_))";
+
+/// `func animation`: the clip the sprite plays, or played last.
+const ANIMATION_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+node_.map(|node_| ::star_script_runtime::animations::animation::<crate::classes::Host_>(&node_)).unwrap_or_default()";
+
 /// An engine node class written from a description. Its own fields are a
 /// type of `star_script_runtime`, shared with every way of running
 /// StarScript.
@@ -228,8 +276,8 @@ const SPRITE: NodeClass = NodeClass {
     fields: "::star_script_runtime::node_classes::SpriteFields<crate::classes::Host_>",
     new_fields: "Fields::new(texture)",
     parameters: &[("texture", STRING)],
-    methods: &[],
-    bodies: &[],
+    methods: &SPRITE_METHODS,
+    bodies: &[PLAY_BODY, STOP_BODY, IS_PLAYING_BODY, ANIMATION_BODY],
 };
 
 const CAMERA_2D: NodeClass = NodeClass {
@@ -318,6 +366,7 @@ fn methods_of(class: &str) -> &'static [Method] {
     match class {
         "Node" => &NODE_METHODS,
         "Node3D" => &NODE_3D_METHODS,
+        "Sprite" => &SPRITE_METHODS,
         _ => &[],
     }
 }

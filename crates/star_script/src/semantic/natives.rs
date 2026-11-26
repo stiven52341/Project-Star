@@ -423,11 +423,18 @@ fn add_sprite_class(classes: &mut ClassTable, node: ClassId, color: ClassId) -> 
         native_field("columns", Type::Int),
         native_field("rows", Type::Int),
         native_field("frame", Type::Int),
+        native_field("frames", Type::String),
     ];
     sprite.constructor = Some(native_constructor(&[
         ("name", Type::String),
         ("texture", Type::String),
     ]));
+    sprite.methods = vec![
+        native_method("play", &[("name", Type::String)], Type::Void, false),
+        native_method("stop", &[], Type::Void, false),
+        native_method("is_playing", &[], Type::Bool, false),
+        native_method("animation", &[], Type::String, false),
+    ];
     classes.add(sprite)
 }
 

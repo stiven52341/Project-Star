@@ -174,6 +174,10 @@ pub struct SceneSprite {
     pub rows: i32,
     /// The cell shown, counted from the top-left one, row by row.
     pub frame: i32,
+    /// Asset path of the `.frames` file of its animations; empty for none.
+    pub frames: String,
+    /// The clip of `frames` it plays from the start; empty for none.
+    pub animation: String,
 }
 
 /// The physics body of a [`SceneNode`], with the words and values of

@@ -96,6 +96,12 @@ pub(crate) struct SpriteData {
     pub(crate) rows: Option<u16>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) frame: Option<u32>,
+    /// Asset path of the `.frames` file of its animations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) frames: Option<String>,
+    /// The clip of `frames` it plays from the start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) animation: Option<String>,
 }
 
 /// How a texture is sampled, as written in files.
@@ -211,6 +217,8 @@ mod tests {
                     columns: Some(4),
                     rows: None,
                     frame: Some(2),
+                    frames: Some("hero.frames".to_owned()),
+                    animation: Some("run".to_owned()),
                 }),
                 body: None,
                 transform_3d: None,

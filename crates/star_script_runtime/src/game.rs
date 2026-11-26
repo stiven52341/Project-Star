@@ -78,7 +78,8 @@ impl<H: Host> GameFields<H> {
 }
 
 /// Runs a frame of the game's code: the game's `update`, then `start` (the
-/// first time) and `update` of every node of its tree, parents first.
+/// first time) and `update` of every node of its tree, parents first, each
+/// node's animation moving on after its `update`.
 /// Nodes added during the frame start in the next one; nodes removed
 /// during it are skipped. `nodes` is a reused list, left empty.
 pub fn run_frame<H: Host>(game: &H::Game, delta: f32, nodes: &mut Vec<H::Node>) {
@@ -100,6 +101,7 @@ pub fn run_frame<H: Host>(game: &H::Game, delta: f32, nodes: &mut Vec<H::Node>) 
             H::start(node);
         }
         H::update(node, delta);
+        crate::animations::advance::<H>(node, delta);
     }
     nodes.clear();
 }

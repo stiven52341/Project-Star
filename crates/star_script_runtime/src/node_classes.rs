@@ -2,6 +2,7 @@
 //! (those are in [`crate::nodes`]), with their first values, shared by
 //! every way of running StarScript.
 
+use std::cell::Cell;
 use std::f32::consts::{FRAC_PI_3, FRAC_PI_6};
 
 use crate::Field;
@@ -27,6 +28,15 @@ pub struct SpriteFields<H: Host> {
     pub rows: Field<i32>,
     /// `frame`: the cell shown, counted from the top-left one, row by row.
     pub frame: Field<i32>,
+    /// `frames`: the asset path of the `.frames` file of its animations;
+    /// empty for none.
+    pub frames: Field<String>,
+    /// The clip playing, or the last one played; empty before any.
+    pub(crate) animation: Field<String>,
+    /// Whether `animation` is playing.
+    pub(crate) playing: Cell<bool>,
+    /// Seconds `animation` has played.
+    pub(crate) clip_time: Cell<f32>,
 }
 
 impl<H: Host> SpriteFields<H> {
@@ -43,6 +53,10 @@ impl<H: Host> SpriteFields<H> {
             columns: Field::new(1),
             rows: Field::new(1),
             frame: Field::new(0),
+            frames: Field::new(String::new()),
+            animation: Field::new(String::new()),
+            playing: Cell::new(false),
+            clip_time: Cell::new(0.0),
         }
     }
 }

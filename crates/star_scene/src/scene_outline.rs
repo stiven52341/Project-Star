@@ -95,6 +95,10 @@ pub struct SpriteOutline {
     pub layer: i32,
     /// How `region` is cut into cells, and the one shown.
     pub sheet: SpriteSheet,
+    /// The `.frames` file of its animations, if it has one.
+    pub frames: Option<AssetPath>,
+    /// The clip of `frames` it plays from the start, if any.
+    pub animation: Option<String>,
 }
 
 impl SceneOutline {
@@ -457,6 +461,8 @@ fn read_sprite(sprite: &SpriteData) -> EngineResult<SpriteOutline> {
             sprite.rows.unwrap_or(1),
             sprite.frame.unwrap_or(0),
         ),
+        frames: sprite.frames.as_deref().map(AssetPath::new).transpose()?,
+        animation: sprite.animation.clone(),
     })
 }
 
@@ -503,6 +509,8 @@ fn write_sprite(sprite: &SpriteOutline) -> SpriteData {
         columns: (sheet.columns() != 1).then_some(sheet.columns()),
         rows: (sheet.rows() != 1).then_some(sheet.rows()),
         frame: (sheet.frame() != 0).then_some(sheet.frame()),
+        frames: sprite.frames.as_ref().map(|path| path.as_str().to_owned()),
+        animation: sprite.animation.clone(),
     }
 }
 
@@ -657,15 +665,21 @@ mod tests {
     #[test]
     fn sprite_sheets_are_read_and_written() {
         let text = "format = 1\n[[node]]\nname = \"Hero\"\n[node.sprite]\n\
-                    texture = \"hero.png\"\nsize = [1.0, 1.0]\ncolumns = 4\nrows = 2\nframe = 5\n";
+                    texture = \"hero.png\"\nsize = [1.0, 1.0]\ncolumns = 4\nrows = 2\nframe = 5\n\
+                    frames = \"hero.frames\"\nanimation = \"run\"\n";
 
         let outline = SceneOutline::from_text(text).unwrap();
 
         let sprite = outline.nodes()[0].sprite.as_ref().unwrap();
         assert_eq!(sprite.sheet, SpriteSheet::new(4, 2, 5));
+        let frames = sprite.frames.as_ref().map(AssetPath::as_str);
+        assert_eq!(
+            (frames, sprite.animation.as_deref()),
+            (Some("hero.frames"), Some("run"))
+        );
         let written = hero_text(&outline);
         assert!(
-            written.contains("columns = 4\nrows = 2\nframe = 5"),
+            written.contains("frame = 5\nframes = \"hero.frames\"\nanimation = \"run\""),
             "{written}"
         );
     }

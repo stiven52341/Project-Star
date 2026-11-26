@@ -29,6 +29,7 @@ mod node_physics_3d;
 mod scene;
 mod scene_file;
 mod scene_outline;
+mod sprite_frames;
 mod sprite_node;
 mod transform;
 
@@ -43,6 +44,7 @@ pub use node_physics::{BodyNodes, NodeContact, PhysicsNodes, PhysicsNodes3d, ste
 pub use node_physics_3d::step_node_physics_3d;
 pub use scene::{Scene, SceneAssets, SceneSources};
 pub use scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
+pub use sprite_frames::{DEFAULT_CLIP_SPEED, FRAMES_EXTENSION, FrameClip, SpriteFrames};
 pub use sprite_node::{SpriteNode, draw_sprite_nodes};
 pub use transform::{
     GlobalTransform2D, GlobalTransform3D, Transform2D, Transform3D, TransformPropagation,

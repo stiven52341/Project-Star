@@ -332,6 +332,8 @@ fn outline_sprite(sprite: SpriteNode, sources: &impl SceneSources) -> EngineResu
         color: sprite.color,
         layer: sprite.layer,
         sheet: sprite.sheet,
+        frames: None,
+        animation: None,
     })
 }
 

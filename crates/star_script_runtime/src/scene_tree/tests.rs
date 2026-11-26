@@ -36,6 +36,8 @@ fn sprite() -> SceneSprite {
         columns: 4,
         rows: 2,
         frame: 5,
+        frames: "ship.frames".to_owned(),
+        animation: "fly".to_owned(),
     }
 }
 
@@ -92,6 +94,9 @@ fn nodes_without_a_class_are_what_their_parts_show() {
     assert_eq!(look.color.get(), [0.5, 0.5, 0.5, 1.0]);
     let sheet = (look.columns.get(), look.rows.get(), look.frame.get());
     assert_eq!(sheet, (4, 2, 5));
+    assert_eq!(look.frames.get(), "ship.frames");
+    assert_eq!(crate::animations::animation::<TestHost>(&built), "fly");
+    assert!(crate::animations::is_playing::<TestHost>(&built));
     assert!(nodes::has_tag::<TestHost>(&built, "player"));
     assert!((built.node.y.get() - 2.0).abs() < f32::EPSILON);
 }

@@ -421,6 +421,7 @@ pub(super) fn engine_field(class: &str, field: &str) -> Option<EngineField> {
         ("Sprite", "columns") => EngineField::Columns,
         ("Sprite", "rows") => EngineField::Rows,
         ("Sprite", "frame") => EngineField::Frame,
+        ("Sprite", "frames") => EngineField::Frames,
         ("Sprite" | "Mesh", "pixelated") => EngineField::Pixelated,
         ("Sprite" | "Light2D" | "Light" | "Mesh", "color") => EngineField::Tint,
         ("Light2D" | "Light" | "Body", "kind") => EngineField::Kind,

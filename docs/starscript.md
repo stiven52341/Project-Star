@@ -462,7 +462,7 @@ The engine provides them; their names cannot be used for other classes.
 | `Debug` | `static print(message: string)`: writes a line to the output. It also takes a number of any type and writes it as its `to_string` does (`Debug.print(2.0)` writes `2.0`); anything else (a `bool`, a list, an object, a nullable number) is converted first with `.to_string()` if it has one. |
 | `Game` | fields `background: Color` (black), `camera: Camera2D?` (`null`), `camera_3d: Camera3D?` (`null`), `ambient: Color` (black: no ambient light), `ambient_2d: Color` (white: sprites show their own colors); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
 | `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `body: Body?` (`null`), `tags: [string]` (`[]`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?`, `has_tag(tag: string) -> bool`, `find_by_name(name: string) -> Node?`, `find_by_tag(tag: string) -> [Node]`, `global_x() -> float`, `global_y() -> float`, `global_rotation() -> float`, `set_global_position(x: float, y: float)`, `set_global_rotation(angle: float)`, `translate(x: float, y: float)`, `translate_global(x: float, y: float)`, `rotate(angle: float)` |
-| `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors), `columns`, `rows: int` (1), `frame: int` (0): its sprite sheet |
+| `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors), `columns`, `rows: int` (1), `frame: int` (0): its sprite sheet; `frames: string` (`""`): its `.frames` file; `play(name: string)`, `stop()`, `is_playing() -> bool`, `animation() -> string` |
 | `Light2D` (extends `Node`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (3.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
 | `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `main: bool` (`false`) |
 | `Node3D` (extends `Node`) | `init(name: string)`; fields `z`, `pitch`, `yaw: float` (0.0), `scale_z: float` (1.0); `look_at(x: float, y: float, z: float)`, `global_z() -> float`, `set_global_position_3d(x: float, y: float, z: float)`, `translate_3d(x: float, y: float, z: float)`, `translate_global_3d(x: float, y: float, z: float)` |
@@ -592,6 +592,36 @@ class Space extends Game {
   go round the sheet both ways, so `frame += 1` (or `-= 1`) loops over its
   cells. A scene's sprite keeps them in its `[node.sprite]` (`columns`,
   `rows`, `frame`), where they cut the sprite's `region`.
+- A sprite's animations are the clips of a `.frames` file of the assets,
+  named in its `frames` field. The file names the image and its cells, and
+  each clip's frames, speed (frames per second) and whether it loops:
+
+  ```toml
+  format = 1
+  texture = "sprites/hero.png"
+  columns = 8
+  rows = 4
+
+  [[clip]]
+  name = "run"
+  frames = [8, 9, 10, 11, 12, 13]
+  speed = 12.0     # 10 if left out
+  looping = true   # true if left out
+  ```
+
+  While a game runs, a sprite with `frames` shows the file's image and
+  cells, and `play("run")` starts the clip from its first frame (playing
+  the clip that already plays does not restart it). Every frame, right
+  after the sprite's `update`, its `frame` moves to the clip's cell for the
+  time it has played, so a clip played in `update` shows its first frame at
+  once. A clip that loops starts over; one that does not stays on its last
+  frame and `is_playing()` becomes `false`. `stop()` keeps the frame shown.
+  `animation()` is the clip playing, or the last one played. A scene's
+  sprite names them in its `[node.sprite]` (`frames = "hero.frames"`,
+  `animation = "idle"` to play from the start). A file that cannot be read,
+  or a clip it does not have, is a warning on the error output, and the
+  sprite stays as it is. A program without a game keeps the fields, but no
+  clip moves.
 - A `Color` has red, green, blue and opacity (`a`) from `0.0` to `1.0`, as
   image editors show them. A sprite's `color` multiplies its image: white
   keeps it as it is, `Color(1.0, 1.0, 1.0, 0.5)` makes it half transparent.

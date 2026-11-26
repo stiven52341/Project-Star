@@ -13,5 +13,9 @@ enemies: 1
 1.0
 1 1 0
 4 2 5
+sprites/run.frames [] false
+run true
+run false
+idle
 true
 Eye 4.0 1

@@ -45,6 +45,11 @@ fn scene_node(node: NodeOutline) -> SceneNode {
             columns: i32::from(image.sheet.columns()),
             rows: i32::from(image.sheet.rows()),
             frame: i32::try_from(image.sheet.frame()).unwrap_or(0),
+            frames: image
+                .frames
+                .map(|path| path.as_str().to_owned())
+                .unwrap_or_default(),
+            animation: image.animation.unwrap_or_default(),
         }),
         body: match (node.transform_3d.is_some(), node.body_3d, node.body) {
             (true, Some(settings), _) => Some(scene_body(&ScriptBody::from_settings_3d(&settings))),

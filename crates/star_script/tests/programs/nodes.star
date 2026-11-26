@@ -68,6 +68,16 @@ class Main {
         runner.frame += 5
         Debug.print(runner.columns.to_string() + " " + runner.rows.to_string() + " " + runner.frame.to_string())
 
+        // Animations: clips of a `.frames` file, moved on by the game's frames.
+        runner.frames = "sprites/run.frames"
+        Debug.print(runner.frames + " [" + runner.animation() + "] " + runner.is_playing().to_string())
+        runner.play("run")
+        Debug.print(runner.animation() + " " + runner.is_playing().to_string())
+        runner.stop()
+        Debug.print(runner.animation() + " " + runner.is_playing().to_string())
+        player.play("idle")
+        Debug.print(player.animation())
+
         // Scenes are read by the engine: a program without a game has none.
         Debug.print((Scene.load("levels/one.scene") == null).to_string())
 
