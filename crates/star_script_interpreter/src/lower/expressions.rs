@@ -30,6 +30,8 @@ const NODE_3D_CLASS: &str = "Node3D";
 const SCENE_CLASS: &str = "Scene";
 /// The engine class of sprites.
 const SPRITE_CLASS: &str = "Sprite";
+/// The engine class of the nodes that play keyframe animations.
+const ANIMATOR_CLASS: &str = "Animator";
 /// The engine class of physics bodies.
 const BODY_CLASS: &str = "Body";
 /// The engine class of sounds.
@@ -599,6 +601,7 @@ pub(super) fn object_method(class: &str, name: &str) -> Option<EngineMethod> {
         (GAME_CLASS | NODE_CLASS, "update") => EngineMethod::Update,
         (NODE_CLASS | NODE_3D_CLASS, name) => EngineMethod::Node(NodeMethod::named(name)?),
         (SPRITE_CLASS, name) => EngineMethod::Node(NodeMethod::of_sprite(name)?),
+        (ANIMATOR_CLASS, name) => EngineMethod::Node(NodeMethod::of_animator(name)?),
         (BODY_CLASS, "apply_impulse") => EngineMethod::Body(BodyMethod::ApplyImpulse),
         (BODY_CLASS, "apply_impulse_3d") => EngineMethod::Body(BodyMethod::ApplyImpulse3D),
         (BODY_CLASS, "touching") => EngineMethod::Body(BodyMethod::Touching),

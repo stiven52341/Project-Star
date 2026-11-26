@@ -464,6 +464,7 @@ The engine provides them; their names cannot be used for other classes.
 | `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `visible: bool` (`true`), `body: Body?` (`null`), `tags: [string]` (`[]`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?`, `has_tag(tag: string) -> bool`, `find_by_name(name: string) -> Node?`, `find_by_tag(tag: string) -> [Node]`, `global_x() -> float`, `global_y() -> float`, `global_rotation() -> float`, `set_global_position(x: float, y: float)`, `set_global_rotation(angle: float)`, `translate(x: float, y: float)`, `translate_global(x: float, y: float)`, `rotate(angle: float)` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors), `columns`, `rows: int` (1), `frame: int` (0): its sprite sheet; `frames: string` (`""`): its `.frames` file; `play(name: string)`, `stop()`, `is_playing() -> bool`, `animation() -> string`; the event `animation_finished(name: string)` |
 | `Light2D` (extends `Node`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (3.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
+| `Animator` (extends `Node`) | `init(name: string)`; field `animations: string` (`""`): its `.anim` file; `play(name: string)`, `stop()`, `is_playing() -> bool`, `animation() -> string`; the event `animation_finished(name: string)` |
 | `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `main: bool` (`false`) |
 | `Node3D` (extends `Node`) | `init(name: string)`; fields `z`, `pitch`, `yaw: float` (0.0), `scale_z: float` (1.0); `look_at(x: float, y: float, z: float)`, `global_z() -> float`, `set_global_position_3d(x: float, y: float, z: float)`, `translate_3d(x: float, y: float, z: float)`, `translate_global_3d(x: float, y: float, z: float)` |
 | `Mesh` (extends `Node3D`) | `init(name: string, shape: string)`; fields `shape: string`, `width`, `height`, `depth` (1.0), `radius` (0.5), `color: Color` (white), `metallic` (0.0), `roughness: float` (0.5), `texture: string` (`""`: none), `pixelated: bool` (`false`) |
@@ -630,6 +631,58 @@ class Space extends Game {
   or a clip it does not have, is a warning on the error output, and the
   sprite stays as it is. A program without a game keeps the fields, but no
   clip moves.
+- An `Animator` plays keyframe animations on its **parent** and the nodes
+  under it: those of the `.anim` file of the assets named in its
+  `animations` field. Each animation has a length in seconds, whether it
+  loops, tracks that change a property of a node from key to key, and calls
+  to methods:
+
+  ```toml
+  format = 1
+
+  [[animation]]
+  name = "attack"
+  length = 0.6
+  looping = false              # false if left out
+
+  [[animation.track]]
+  node = "Arm"                 # a path from the parent: "" (or left out) is
+                               # the parent, "Arm/Hand" a child of a child
+  property = "rotation"
+  interpolation = "ease_out"   # step, linear (if left out), ease_in,
+                               # ease_out or ease_in_out
+  keys = [[0.0, 0.0], [0.3, 1.2], [0.6, 0.0]]   # [time, value]
+
+  [[animation.call]]
+  node = ""
+  time = 0.3
+  method = "hit"
+  ```
+
+  A track changes a field of the node's engine class (`x`, `y`,
+  `rotation`, `scale_x`, `scale_y`, `visible`; `z`, `pitch`, `yaw`,
+  `scale_z` of a `Node3D`; a sprite's `texture`, `width`, `height`,
+  `layer`, `pixelated`, `color`, `columns`, `rows`, `frame`; a mesh's or a
+  light's numbers and `color`; a camera's `view_height` or `fov`) or else
+  an `export` field of its class. Keys take the values scenes give fields:
+  `true`/`false`, whole numbers, decimals, texts and colors (`[r, g, b,
+  a]`); all the keys of a track are of one kind, in order of time, within
+  the length. Decimals and colors follow the interpolation between two
+  keys; whole numbers, `bool`s and texts jump from one key's value to the
+  next (so `frame` steps through cells). Before its first key a track has
+  that key's value, and after its last, the last one's.
+  While a game runs, `play("attack")` starts an animation from its start
+  (playing the one that already plays does not restart it). Every frame,
+  right after the animator's `update`, each property its tracks change
+  gets its value for the time the animation has played. One that loops
+  starts over; one that does not ends on its last values, `is_playing()`
+  becomes `false` and the engine calls the animator's
+  `animation_finished(name)`, as a sprite's. `stop()` leaves every
+  property as it is. A scene's animator names its file in its
+  `[node.animator]` (`animations = "knight.anim"`, `animation = "idle"` to
+  play from the start). A file that cannot be read, an animation it does
+  not have, a node that is not there or a value that does not fit its
+  property is a warning on the error output (once), and the rest goes on.
 - A `Color` has red, green, blue and opacity (`a`) from `0.0` to `1.0`, as
   image editors show them. A sprite's `color` multiplies its image: white
   keeps it as it is, `Color(1.0, 1.0, 1.0, 0.5)` makes it half transparent.

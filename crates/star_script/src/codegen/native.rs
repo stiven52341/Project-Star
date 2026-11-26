@@ -538,6 +538,10 @@ impl ::star_script_runtime::nodes::Host for Host_ {
         crate::AnyObject::Light2D(::std::rc::Rc::clone(node)).map(|light_| read(crate::classes::Light2D::HasFields::fields(&*light_)))
     }
 
+    fn with_animator<R>(node: &Self::Node, read: impl FnOnce(&::star_script_runtime::node_classes::AnimatorFields) -> R) -> ::std::option::Option<R> {
+        crate::AnyObject::Animator(::std::rc::Rc::clone(node)).map(|animator_| read(crate::classes::Animator::HasFields::fields(&*animator_)))
+    }
+
     fn new_tags(tags: ::std::vec::Vec<::std::string::String>) -> Self::Tags {
         ::star_script_runtime::List::from_vec(tags)
     }
@@ -569,6 +573,7 @@ impl ::star_script_runtime::nodes::Host for Host_ {
             NewNode::Mesh { shape } => crate::classes::Mesh::new(name, ::std::string::String::from(shape)),
             NewNode::Light { kind } => crate::classes::Light::new(name, ::std::string::String::from(kind)),
             NewNode::Camera3D => crate::classes::Camera3D::new(name),
+            NewNode::Animator => crate::classes::Animator::new(name),
             NewNode::Script(class_) => crate::new_scene_object_(class_)?,
         };
         ::std::result::Result::Ok(node_)
@@ -576,6 +581,10 @@ impl ::star_script_runtime::nodes::Host for Host_ {
 
     fn set_exported(class: &str, node: &Self::Node, values: &[(::std::string::String, ::star_script_runtime::scene_fields::SceneValue)]) -> ::std::result::Result<(), ::std::string::String> {
         crate::set_scene_fields_(class, node, values)
+    }
+
+    fn set_exported_field(node: &Self::Node, field: &str, value: &::star_script_runtime::scene_fields::SceneValue) -> ::std::result::Result<(), ::std::string::String> {
+        crate::set_exported_field_(node, field, value)
     }
 
     fn new_body(fields: ::star_script_runtime::bodies::BodyFields<Self>) -> Self::Body {
@@ -593,6 +602,8 @@ impl ::star_script_runtime::nodes::Host for Host_ {
     fn animation_finished(node: &Self::Node, name: &str) {
         if let ::std::option::Option::Some(sprite_) = crate::AnyObject::Sprite(::std::rc::Rc::clone(node)) {
             crate::classes::Sprite::Object::animation_finished(sprite_, ::std::borrow::ToOwned::to_owned(name));
+        } else if let ::std::option::Option::Some(animator_) = crate::AnyObject::Animator(::std::rc::Rc::clone(node)) {
+            crate::classes::Animator::Object::animation_finished(animator_, ::std::borrow::ToOwned::to_owned(name));
         }
     }
 

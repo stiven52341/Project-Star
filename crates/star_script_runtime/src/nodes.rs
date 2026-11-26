@@ -12,7 +12,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::bodies::BodyFields;
 use crate::game::GameFields;
-use crate::node_classes::{Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields};
+use crate::node_classes::{
+    AnimatorFields, Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields,
+};
 use crate::placement::{Place2d, Place3d};
 use crate::scene_fields::SceneValue;
 use crate::scene_tree::NewNode;
@@ -75,6 +77,8 @@ pub trait Host: Sized + 'static {
     /// Runs `read` on the fields of `Light2D` in `node`, if it is one.
     fn with_light_2d<R>(node: &Self::Node, read: impl FnOnce(&LightFields<Self>) -> R)
     -> Option<R>;
+    /// Runs `read` on the fields of `Animator` in `node`, if it is one.
+    fn with_animator<R>(node: &Self::Node, read: impl FnOnce(&AnimatorFields) -> R) -> Option<R>;
     /// A new list of tags holding `tags`.
     fn new_tags(tags: Vec<String>) -> Self::Tags;
     /// Whether `tags` holds `tag`.
@@ -104,14 +108,23 @@ pub trait Host: Sized + 'static {
         node: &Self::Node,
         values: &[(String, SceneValue)],
     ) -> Result<(), String>;
+    /// Gives the `export` field `field` of the class of `node` the value
+    /// `value`, as an animation does.
+    ///
+    /// # Errors
+    ///
+    /// Why it cannot be given: the class of `node` has no such `export`
+    /// field, or the value does not fit it.
+    fn set_exported_field(node: &Self::Node, field: &str, value: &SceneValue)
+    -> Result<(), String>;
     /// A new body with the fields `fields`.
     fn new_body(fields: BodyFields<Self>) -> Self::Body;
     /// Runs the `start` of `node`: its script's, or `Node`'s.
     fn start(node: &Self::Node);
     /// Runs the `update` of `node`: its script's, or `Node`'s.
     fn update(node: &Self::Node, delta: f32);
-    /// Runs the `animation_finished` of `node`, if it is a sprite: its
-    /// script's, or `Sprite`'s (nothing).
+    /// Runs the `animation_finished` of `node`, if it is a sprite or an
+    /// animator: its script's, or the engine class's (nothing).
     fn animation_finished(node: &Self::Node, name: &str);
     /// The fields of `Game` in `game`.
     fn game(game: &Self::Game) -> &GameFields<Self>;

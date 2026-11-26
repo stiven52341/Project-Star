@@ -102,6 +102,7 @@ pub fn run_frame<H: Host>(game: &H::Game, delta: f32, nodes: &mut Vec<H::Node>) 
         }
         H::update(node, delta);
         crate::animations::advance::<H>(node, delta);
+        crate::tracks::advance::<H>(node, delta);
     }
     nodes.clear();
 }

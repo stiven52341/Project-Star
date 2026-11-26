@@ -11,13 +11,13 @@ use super::{
 use crate::Span;
 use crate::ast::{ClassDecl, ConstructorDecl, Expr, MemberKind, MethodDecl, VariableKind};
 use crate::semantic::{
-    BODY_CLASS, CAMERA_3D_CLASS, CAMERA_CLASS, COLOR_CLASS, ClassId, ClassOrigin, GAME_CLASS,
-    LIGHT_2D_CLASS, LIGHT_CLASS, MESH_CLASS, MethodInfo, NODE_3D_CLASS, NODE_CLASS, ParameterInfo,
-    SOUND_CLASS, SPRITE_CLASS, SceneClassError, Type,
+    ANIMATOR_CLASS, BODY_CLASS, CAMERA_3D_CLASS, CAMERA_CLASS, COLOR_CLASS, ClassId, ClassOrigin,
+    GAME_CLASS, LIGHT_2D_CLASS, LIGHT_CLASS, MESH_CLASS, MethodInfo, NODE_3D_CLASS, NODE_CLASS,
+    ParameterInfo, SOUND_CLASS, SPRITE_CLASS, SceneClassError, Type,
 };
 
 /// The engine classes of nodes, which `Scene.load` creates itself.
-const NATIVE_NODE_CLASSES: [&str; 8] = [
+const NATIVE_NODE_CLASSES: [&str; 9] = [
     NODE_CLASS,
     SPRITE_CLASS,
     CAMERA_CLASS,
@@ -26,10 +26,11 @@ const NATIVE_NODE_CLASSES: [&str; 8] = [
     MESH_CLASS,
     LIGHT_CLASS,
     CAMERA_3D_CLASS,
+    ANIMATOR_CLASS,
 ];
 
 /// The engine classes that scripts can extend: the game and the nodes.
-const EXTENDABLE_NATIVE_CLASSES: [&str; 9] = [
+const EXTENDABLE_NATIVE_CLASSES: [&str; 10] = [
     GAME_CLASS,
     NODE_CLASS,
     SPRITE_CLASS,
@@ -39,11 +40,12 @@ const EXTENDABLE_NATIVE_CLASSES: [&str; 9] = [
     MESH_CLASS,
     LIGHT_CLASS,
     CAMERA_3D_CLASS,
+    ANIMATOR_CLASS,
 ];
 
 /// The engine classes that have objects, and so a module and a conversion
 /// in `AnyObject`.
-const NATIVE_OBJECT_CLASSES: [&str; 12] = [
+const NATIVE_OBJECT_CLASSES: [&str; 13] = [
     GAME_CLASS,
     COLOR_CLASS,
     BODY_CLASS,
@@ -55,6 +57,7 @@ const NATIVE_OBJECT_CLASSES: [&str; 12] = [
     MESH_CLASS,
     LIGHT_CLASS,
     CAMERA_3D_CLASS,
+    ANIMATOR_CLASS,
     SOUND_CLASS,
 ];
 
@@ -133,6 +136,7 @@ pub(super) fn generate(context: Context<'_>) -> Result<GeneratedProgram> {
     out.close("}");
     scene_classes(context, &mut out);
     super::scene_fields::scene_fields(context, &mut out);
+    super::scene_fields::exported_field_setter(context, &mut out);
     let entry_point = entry_point(context, &mut out, &items, game)?;
     Ok(GeneratedProgram {
         code: out.finish(),

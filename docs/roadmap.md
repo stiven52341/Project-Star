@@ -1275,12 +1275,13 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           numbers, `bool`, `int`, text and colors) and call tracks (a
           node's path, a time and a method without arguments), validated
           when read (`star_scene::TrackAnimations`, decision 79).
-    - [ ] 15b.3 The `Animator` node: its file, `play(name)`, `stop()`,
+    - [x] 15b.3 The `Animator` node: its file, `play(name)`, `stop()`,
           `is_playing()`, `animation()` and the event
           `animation_finished(name)`, the starting animation of a scene's
           animator, and the property tracks applied after each `update`
           (the engine nodes' fields and the classes' `export` fields;
-          compiled and interpreted).
+          compiled and interpreted, with a game of each `engine_game` and
+          `window` play: `animator_game`, from a scene).
     - [ ] 15b.4 Call tracks: the methods called as the playhead passes
           their times (also when a frame jumps over several, and when an
           animation loops), with a game of each `engine_game` and `window`

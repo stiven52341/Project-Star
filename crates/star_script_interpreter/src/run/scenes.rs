@@ -83,6 +83,45 @@ impl Machine {
     }
 }
 
+impl Machine {
+    /// Gives the `export` field `name` of `node`, an object of any class of
+    /// the program, `value`, as an animation does.
+    fn set_exported_field(
+        &self,
+        node: &Rc<NodeObject>,
+        name: &str,
+        value: &SceneValue,
+    ) -> Result<(), String> {
+        let field = self
+            .code
+            .classes
+            .get(node.class().0)
+            .and_then(|class| self.code.scene_classes.get(&*class.name))
+            .and_then(|class| class.exported.iter().find(|field| field.name == name))
+            .ok_or_else(|| scene_fields::no_property(name))?;
+        node.set_field(field.position, scene_value(field, value)?)
+            .map_err(|error| error.to_string())
+    }
+}
+
+/// `Host::set_exported_field`: gives the `export` field `name` of `node`
+/// the value an animation gives it.
+///
+/// # Errors
+///
+/// Why it cannot be given: the class of `node` has no such `export` field,
+/// or the value does not fit it.
+pub(crate) fn set_exported_field(
+    node: &Rc<NodeObject>,
+    name: &str,
+    value: &SceneValue,
+) -> Result<(), String> {
+    play::machine()
+        .or_else(play::scene_program)
+        .ok_or_else(|| NO_PROGRAM.to_owned())?
+        .set_exported_field(node, name, value)
+}
+
 /// `Host::create`: a new node of `class`, called `name`, for a scene.
 ///
 /// # Errors
@@ -99,6 +138,7 @@ pub(crate) fn create(name: String, class: NewNode<'_>) -> Result<Rc<NodeObject>,
         NewNode::Mesh { shape } => (EngineClass::Mesh, vec![text(shape)]),
         NewNode::Light { kind } => (EngineClass::Light, vec![text(kind)]),
         NewNode::Camera3D => (EngineClass::Camera3D, Vec::new()),
+        NewNode::Animator => (EngineClass::Animator, Vec::new()),
         NewNode::Script(class) => {
             return play::scene_program()
                 .ok_or_else(|| NO_PROGRAM.to_owned())?

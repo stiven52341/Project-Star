@@ -1,0 +1,26 @@
+format = 1
+
+# Swings the arm, counts the power up and hides the knight. The game
+# prints what the animation ends on, which does not depend on the frames.
+[[animation]]
+name = "attack"
+length = 0.3
+
+[[animation.track]]
+node = "Arm"
+property = "rotation"
+interpolation = "ease_out"
+keys = [[0.0, 0.0], [0.3, 1.5]]
+
+[[animation.track]]
+node = "Arm"
+property = "color"
+keys = [[0.0, [1.0, 1.0, 1.0, 1.0]], [0.3, [1.0, 0.0, 0.0, 1.0]]]
+
+[[animation.track]]
+property = "power"
+keys = [[0.0, 0], [0.3, 9]]
+
+[[animation.track]]
+property = "visible"
+keys = [[0.0, true], [0.3, false]]

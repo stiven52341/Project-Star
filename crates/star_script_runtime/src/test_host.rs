@@ -7,7 +7,9 @@ use std::rc::{Rc, Weak};
 use crate::List;
 use crate::bodies::BodyFields;
 use crate::game::GameFields;
-use crate::node_classes::{Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields};
+use crate::node_classes::{
+    AnimatorFields, Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields,
+};
 use crate::nodes::{self, Host, Node3dFields, NodeFields};
 use crate::scene_fields::SceneValue;
 use crate::scene_tree::NewNode;
@@ -23,6 +25,7 @@ pub(crate) struct TestNode {
     pub(crate) camera: Option<Camera2dFields>,
     pub(crate) camera_3d: Option<Camera3dFields>,
     pub(crate) sprite: Option<SpriteFields<TestHost>>,
+    pub(crate) animator: Option<AnimatorFields>,
     /// The methods the host ran on it, in order.
     pub(crate) calls: RefCell<Vec<String>>,
     /// A node its next `update` takes out of the tree.
@@ -39,6 +42,7 @@ impl TestNode {
             camera: None,
             camera_3d: None,
             sprite: None,
+            animator: None,
             calls: RefCell::new(Vec::new()),
             removes: RefCell::new(None),
         }
@@ -141,6 +145,10 @@ impl Host for TestHost {
         None
     }
 
+    fn with_animator<R>(node: &Self::Node, read: impl FnOnce(&AnimatorFields) -> R) -> Option<R> {
+        node.animator.as_ref().map(read)
+    }
+
     fn new_tags(tags: Vec<String>) -> Self::Tags {
         List::from_vec(tags)
     }
@@ -174,6 +182,7 @@ impl Host for TestHost {
             NewNode::Sprite { texture } => {
                 node.sprite = Some(SpriteFields::new(texture.to_owned()));
             }
+            NewNode::Animator => node.animator = Some(AnimatorFields::new()),
             other => return Err(format!("the test host cannot create {other:?}")),
         }
         Ok(Rc::new(node))
@@ -194,6 +203,16 @@ impl Host for TestHost {
             }
         }
         Ok(())
+    }
+
+    /// The test nodes are named after the class they stand for.
+    fn set_exported_field(
+        node: &Self::Node,
+        field: &str,
+        value: &SceneValue,
+    ) -> Result<(), String> {
+        let class = node.node.name.get();
+        Self::set_exported(&class, node, &[(field.to_owned(), value.clone())])
     }
 
     fn new_body(fields: BodyFields<Self>) -> Self::Body {

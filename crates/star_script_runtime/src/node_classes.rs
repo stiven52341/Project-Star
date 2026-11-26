@@ -210,6 +210,38 @@ impl Default for Camera3dFields {
     }
 }
 
+/// The fields of an `Animator`: the `.anim` file of its animations, and
+/// the one it plays.
+pub struct AnimatorFields {
+    /// `animations`: the asset path of the `.anim` file; empty for none.
+    pub animations: Field<String>,
+    /// The animation playing, or the last one played; empty before any.
+    pub(crate) animation: Field<String>,
+    /// Whether `animation` is playing.
+    pub(crate) playing: Cell<bool>,
+    /// Seconds `animation` has played.
+    pub(crate) time: Cell<f32>,
+}
+
+impl AnimatorFields {
+    /// An animator without animations, playing nothing.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            animations: Field::new(String::new()),
+            animation: Field::new(String::new()),
+            playing: Cell::new(false),
+            time: Cell::new(0.0),
+        }
+    }
+}
+
+impl Default for AnimatorFields {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn white<H: Host>() -> H::Color {
     H::color(1.0, 1.0, 1.0, 1.0)
 }

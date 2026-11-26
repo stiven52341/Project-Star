@@ -60,7 +60,7 @@ struct Game {
 
 const COUNTING_GAME: &str = game_file!("counting_game.star");
 
-const GAMES: [Game; 8] = [
+const GAMES: [Game; 9] = [
     Game {
         name: "counting_game",
         source: COUNTING_GAME,
@@ -125,6 +125,18 @@ const GAMES: [Game; 8] = [
         bindings: &BINDINGS,
         main_scene: None,
         ending: Ending::Prints(game_file!("animation_game.out")),
+        warns: None,
+    },
+    Game {
+        name: "animator_game",
+        source: game_file!("animator_game.star"),
+        scenes: &[
+            ("knight.scene", game_file!("knight.scene")),
+            ("knight.anim", game_file!("knight.anim")),
+        ],
+        bindings: &BINDINGS,
+        main_scene: None,
+        ending: Ending::Prints(game_file!("animator_game.out")),
         warns: None,
     },
     // Never quits by itself: played only with a scene it cannot load.

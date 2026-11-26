@@ -27,12 +27,14 @@ mod operations;
 pub mod parallel;
 pub mod placement;
 mod plain;
+pub mod properties;
 pub mod scene_fields;
 pub mod scene_tree;
 pub mod scenes;
 pub mod tasks;
 #[cfg(test)]
 mod test_host;
+pub mod tracks;
 
 pub use equality::StarEq;
 pub use fault::{RuntimeError, fault, proven};

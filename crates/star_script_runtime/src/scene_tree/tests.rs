@@ -3,7 +3,9 @@ use std::rc::Rc;
 use super::*;
 use crate::List;
 use crate::scene_fields::SceneValue;
-use crate::scenes::{SceneBody, SceneCamera, SceneSprite, SceneTransform, SceneTransform3D};
+use crate::scenes::{
+    SceneAnimator, SceneBody, SceneCamera, SceneSprite, SceneTransform, SceneTransform3D,
+};
 use crate::test_host::TestHost;
 
 fn node(name: &str, class: Option<&str>, parent: Option<usize>) -> SceneNode {
@@ -22,6 +24,7 @@ fn node(name: &str, class: Option<&str>, parent: Option<usize>) -> SceneNode {
         light_2d: None,
         camera: None,
         camera_3d: None,
+        animator: None,
         fields: Vec::new(),
     }
 }
@@ -79,6 +82,26 @@ fn hidden_scene_nodes_are_built_hidden() {
     assert!(root.node.visible.get());
     let ghost = nodes::find_child::<TestHost>(&root, "Ghost").expect("ghost");
     assert!(!ghost.node.visible.get());
+}
+
+#[test]
+fn animators_take_their_file_and_play_their_first_animation() {
+    let animator = SceneNode {
+        animator: Some(SceneAnimator {
+            animations: "knight.anim".to_owned(),
+            animation: "idle".to_owned(),
+        }),
+        ..node("Animator", None, Some(0))
+    };
+    let nodes = [node("Knight", None, None), animator];
+
+    let root = build::<TestHost>(&nodes).expect("built");
+
+    let animator = nodes::find_child::<TestHost>(&root, "Animator").expect("animator");
+    let file = TestHost::with_animator(&animator, |fields| fields.animations.get());
+    assert_eq!(file.as_deref(), Some("knight.anim"));
+    assert_eq!(crate::tracks::animation::<TestHost>(&animator), "idle");
+    assert!(crate::tracks::is_playing::<TestHost>(&animator));
 }
 
 #[test]

@@ -57,6 +57,9 @@ pub const LIGHT_2D_CLASS: &str = "Light2D";
 /// Name of the engine class of the 3D nodes the game is seen from.
 pub const CAMERA_3D_CLASS: &str = "Camera3D";
 
+/// Name of the engine class of the nodes that play keyframe animations.
+pub const ANIMATOR_CLASS: &str = "Animator";
+
 /// Name of the engine class that loads `.scene` files.
 pub const SCENE_CLASS: &str = "Scene";
 
@@ -172,29 +175,9 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     add_mesh_class(classes, node_3d, color);
     add_light_class(classes, node_3d, color);
     let camera_3d = add_camera_3d_class(classes, node_3d);
+    add_animator_class(classes, node);
 
-    // Builds the nodes of a `.scene` file, or gives `null` if it cannot.
-    let mut scene = ClassInfo::new(SCENE_CLASS.to_owned(), ClassOrigin::Native);
-    scene.methods.push(native_method(
-        "load",
-        &[("path", Type::String)],
-        Type::Class(node).nullable(),
-        true,
-    ));
-    // Find the nodes of the game's tree, from any script.
-    scene.methods.push(native_method(
-        "find_by_name",
-        &[("name", Type::String)],
-        Type::Class(node).nullable(),
-        true,
-    ));
-    scene.methods.push(native_method(
-        "find_by_tag",
-        &[("tag", Type::String)],
-        Type::list(Type::Class(node)),
-        true,
-    ));
-    classes.add(scene);
+    add_scene_class(classes, node);
 
     add_sound_class(classes);
     // The volume every sound is scaled by.
@@ -430,18 +413,7 @@ fn add_sprite_class(classes: &mut ClassTable, node: ClassId, color: ClassId) -> 
         ("name", Type::String),
         ("texture", Type::String),
     ]));
-    sprite.methods = vec![
-        native_method("play", &[("name", Type::String)], Type::Void, false),
-        native_method("stop", &[], Type::Void, false),
-        native_method("is_playing", &[], Type::Bool, false),
-        native_method("animation", &[], Type::String, false),
-        native_method(
-            "animation_finished",
-            &[("name", Type::String)],
-            Type::Void,
-            false,
-        ),
-    ];
+    sprite.methods = playing_methods();
     classes.add(sprite)
 }
 
@@ -456,6 +428,59 @@ fn add_camera_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
     ];
     camera.constructor = Some(native_constructor(&[("name", Type::String)]));
     classes.add(camera)
+}
+
+/// `Scene`: builds the nodes of a `.scene` file, or gives `null` if it
+/// cannot, and finds the nodes of the game's tree.
+fn add_scene_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
+    let mut scene = ClassInfo::new(SCENE_CLASS.to_owned(), ClassOrigin::Native);
+    scene.methods.push(native_method(
+        "load",
+        &[("path", Type::String)],
+        Type::Class(node).nullable(),
+        true,
+    ));
+    // Find the nodes of the game's tree, from any script.
+    scene.methods.push(native_method(
+        "find_by_name",
+        &[("name", Type::String)],
+        Type::Class(node).nullable(),
+        true,
+    ));
+    scene.methods.push(native_method(
+        "find_by_tag",
+        &[("tag", Type::String)],
+        Type::list(Type::Class(node)),
+        true,
+    ));
+    classes.add(scene)
+}
+
+/// `Animator`: a node that plays the animations of an `.anim` file on its
+/// parent and the nodes under it.
+fn add_animator_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
+    let mut animator = ClassInfo::new(ANIMATOR_CLASS.to_owned(), ClassOrigin::Native);
+    animator.base = Some(node);
+    animator.fields = vec![native_field("animations", Type::String)];
+    animator.constructor = Some(native_constructor(&[("name", Type::String)]));
+    animator.methods = playing_methods();
+    classes.add(animator)
+}
+
+/// The methods of the nodes that play animations: `Sprite` and `Animator`.
+fn playing_methods() -> Vec<MethodInfo> {
+    vec![
+        native_method("play", &[("name", Type::String)], Type::Void, false),
+        native_method("stop", &[], Type::Void, false),
+        native_method("is_playing", &[], Type::Bool, false),
+        native_method("animation", &[], Type::String, false),
+        native_method(
+            "animation_finished",
+            &[("name", Type::String)],
+            Type::Void,
+            false,
+        ),
+    ]
 }
 
 /// `Node3D`: a node placed in 3D. Its `x`, `y`, `rotation` (the roll,

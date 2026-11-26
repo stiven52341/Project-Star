@@ -18,5 +18,8 @@ sprites/run.frames [] false
 run true
 run false
 idle
+sprites/player.anim [] false
+wave true
+wave false true
 true
 Eye 4.0 1

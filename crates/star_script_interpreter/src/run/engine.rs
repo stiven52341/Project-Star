@@ -7,17 +7,17 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use star_script_runtime::animations;
 use star_script_runtime::audio::{self, SoundFields};
 use star_script_runtime::bodies::{BodyFields, Contact};
 use star_script_runtime::color::ColorFields;
 use star_script_runtime::game::GameFields;
 use star_script_runtime::input::{action_state, axis, pointer};
 use star_script_runtime::node_classes::{
-    Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields,
+    AnimatorFields, Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields,
 };
 use star_script_runtime::nodes::{self, Host as _, Node3dFields};
 use star_script_runtime::{Field, List};
+use star_script_runtime::{animations, tracks};
 
 use super::object_of;
 use crate::error::RunError;
@@ -172,6 +172,10 @@ fn class_slot(class: &ClassParts, field: EngineField) -> Option<Slot<'_>> {
         ClassParts::Light2D(light) | ClassParts::Light(light) => light_slot(light, field),
         ClassParts::Mesh(mesh) => mesh_slot(mesh, field),
         ClassParts::Camera3D(camera) => camera_3d_slot(camera, field),
+        ClassParts::Animator(animator) => match field {
+            EngineField::Animations => Some(Slot::Text(&animator.animations)),
+            _ => None,
+        },
     }
 }
 
@@ -305,7 +309,8 @@ pub(super) fn new_object(
         | EngineClass::Node3D
         | EngineClass::Mesh
         | EngineClass::Light
-        | EngineClass::Camera3D => Value::Node(Rc::new(Object::new(
+        | EngineClass::Camera3D
+        | EngineClass::Animator => Value::Node(Rc::new(Object::new(
             class,
             fields,
             node_parts(engine, arguments)?,
@@ -348,6 +353,7 @@ fn node_parts(engine: EngineClass, arguments: &[Value]) -> Result<NodeParts, Run
             let camera = ClassParts::Camera3D(Rc::new(Camera3dFields::new()));
             return Ok(NodeParts::new_3d(text(name)?.to_owned(), camera));
         }
+        (EngineClass::Animator, [name]) => (name, ClassParts::Animator(AnimatorFields::new())),
         _ => return Err(RunError::Internal("a node without its arguments")),
     };
     Ok(NodeParts::new(text(name)?.to_owned(), parts))
@@ -566,10 +572,23 @@ fn node_method(
             Value::Null
         }
         (NodeMethod::IsPlaying, []) => Value::Bool(animations::is_playing::<Runtime>(node)),
-        // What a sprite does when a clip ends, unless its script says.
+        // What a sprite or an animator does when an animation ends, unless
+        // its script says.
         (NodeMethod::AnimationFinished, [_]) => Value::Null,
         (NodeMethod::Animation, []) => {
             Value::String(Arc::from(animations::animation::<Runtime>(node)))
+        }
+        (NodeMethod::AnimatorPlay, [name]) => {
+            tracks::play::<Runtime>(node, text(name)?);
+            Value::Null
+        }
+        (NodeMethod::AnimatorStop, []) => {
+            tracks::stop::<Runtime>(node);
+            Value::Null
+        }
+        (NodeMethod::AnimatorIsPlaying, []) => Value::Bool(tracks::is_playing::<Runtime>(node)),
+        (NodeMethod::AnimatorAnimation, []) => {
+            Value::String(Arc::from(tracks::animation::<Runtime>(node)))
         }
         _ => return Err(RunError::Internal("method of `Node` with other arguments")),
     })

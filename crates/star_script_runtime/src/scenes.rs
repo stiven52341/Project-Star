@@ -50,8 +50,19 @@ pub struct SceneNode {
     pub camera: Option<SceneCamera>,
     /// The 3D camera it is; only `Camera3D` objects can be one.
     pub camera_3d: Option<SceneCamera3D>,
+    /// The animations it plays; only `Animator` objects can play them.
+    pub animator: Option<SceneAnimator>,
     /// The values of the `export` fields of its class, by name.
     pub fields: Vec<(String, crate::scene_fields::SceneValue)>,
+}
+
+/// The animations a [`SceneNode`] plays, as an `Animator`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneAnimator {
+    /// Asset path of the `.anim` file.
+    pub animations: String,
+    /// The animation it plays from the start; empty for none.
+    pub animation: String,
 }
 
 /// The 2D camera a [`SceneNode`] is.
@@ -308,6 +319,7 @@ mod tests {
             light_2d: None,
             camera: None,
             camera_3d: None,
+            animator: None,
             fields: Vec::new(),
         }
     }

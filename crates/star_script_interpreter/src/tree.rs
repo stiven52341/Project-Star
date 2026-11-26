@@ -103,12 +103,13 @@ pub(crate) enum EngineClass {
     Mesh,
     Light,
     Camera3D,
+    Animator,
 }
 
 impl EngineClass {
     /// Every engine class the interpreter knows, in the order of their
     /// places.
-    pub(crate) const ALL: [Self; 12] = [
+    pub(crate) const ALL: [Self; 13] = [
         Self::Color,
         Self::Node,
         Self::Camera2D,
@@ -121,6 +122,7 @@ impl EngineClass {
         Self::Mesh,
         Self::Light,
         Self::Camera3D,
+        Self::Animator,
     ];
 
     /// Its place among the classes.
@@ -143,6 +145,7 @@ impl EngineClass {
             Self::Mesh => "Mesh",
             Self::Light => "Light",
             Self::Camera3D => "Camera3D",
+            Self::Animator => "Animator",
         }
     }
 }
@@ -262,6 +265,8 @@ pub(crate) enum EngineField {
     Tags,
     /// `visible` of `Node`.
     Visible,
+    /// `animations` of `Animator`: the file of its animations.
+    Animations,
     /// `body` of `Node`.
     Body,
     /// `view_height` and `main` of `Camera2D` (`main` of `Camera3D` too).
@@ -443,12 +448,17 @@ pub(crate) enum NodeMethod {
     Translate3D,
     TranslateGlobal3D,
     /// `play`, `stop`, `is_playing`, `animation` and the event
-    /// `animation_finished` of `Sprite`.
+    /// `animation_finished` of `Sprite` (the event of `Animator` too).
     Play,
     Stop,
     IsPlaying,
     Animation,
     AnimationFinished,
+    /// `play`, `stop`, `is_playing` and `animation` of `Animator`.
+    AnimatorPlay,
+    AnimatorStop,
+    AnimatorIsPlaying,
+    AnimatorAnimation,
 }
 
 impl NodeMethod {
@@ -487,6 +497,18 @@ impl NodeMethod {
             "stop" => Self::Stop,
             "is_playing" => Self::IsPlaying,
             "animation" => Self::Animation,
+            "animation_finished" => Self::AnimationFinished,
+            _ => return None,
+        })
+    }
+
+    /// The method of `Animator` called `name`, if the runtime runs it.
+    pub(crate) fn of_animator(name: &str) -> Option<Self> {
+        Some(match name {
+            "play" => Self::AnimatorPlay,
+            "stop" => Self::AnimatorStop,
+            "is_playing" => Self::AnimatorIsPlaying,
+            "animation" => Self::AnimatorAnimation,
             "animation_finished" => Self::AnimationFinished,
             _ => return None,
         })

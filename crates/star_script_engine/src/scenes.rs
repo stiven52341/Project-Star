@@ -6,8 +6,8 @@ use star_engine::star_render::TextureFilter;
 use star_engine::star_scene::{FieldValue, NodeOutline, SceneOutline};
 use star_script_runtime::scene_fields::SceneValue;
 use star_script_runtime::scenes::{
-    SceneBody, SceneCamera, SceneCamera3D, SceneLight, SceneMesh, SceneNode, SceneSprite,
-    SceneTransform, SceneTransform3D,
+    SceneAnimator, SceneBody, SceneCamera, SceneCamera3D, SceneLight, SceneMesh, SceneNode,
+    SceneSprite, SceneTransform, SceneTransform3D,
 };
 
 /// Reads the scene at `path` of the asset `folder`. Parts of a scene that
@@ -80,6 +80,10 @@ fn scene_node(node: NodeOutline) -> SceneNode {
             .into_iter()
             .map(|(name, value)| (name, scene_value(value)))
             .collect(),
+        animator: node.animator.map(|animator| SceneAnimator {
+            animations: animator.animations.as_str().to_owned(),
+            animation: animator.animation.unwrap_or_default(),
+        }),
         camera: node.camera.map(|view| SceneCamera {
             view_height: view.view_height,
             main: view.main,
@@ -149,7 +153,7 @@ fn scene_light(light: &ScriptLight<'_>) -> SceneLight {
 }
 
 /// The value of an exported field set in a scene.
-fn scene_value(value: FieldValue) -> SceneValue {
+pub(crate) fn scene_value(value: FieldValue) -> SceneValue {
     match value {
         FieldValue::Bool(truth) => SceneValue::Bool(truth),
         FieldValue::Int(number) => SceneValue::Int(number),

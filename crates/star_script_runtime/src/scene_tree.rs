@@ -36,6 +36,8 @@ pub enum NewNode<'scene> {
     },
     /// `Camera3D`
     Camera3D,
+    /// `Animator`
+    Animator,
     /// A class of the program, created with `init()`.
     Script(&'scene str),
 }
@@ -96,6 +98,7 @@ fn build_node<H: Host>(node: &SceneNode) -> Result<H::Node, String> {
     place::<H>(&object, node, class)?;
     show::<H>(&object, node, class)?;
     view::<H>(&object, node, class)?;
+    animate::<H>(&object, node, class)?;
     if let Some(solid) = &node.body {
         let body = BodyFields::new(
             solid.kind.clone(),
@@ -147,6 +150,7 @@ fn new_node<'scene>(
             None => return missing("light"),
         },
         "Camera3D" => NewNode::Camera3D,
+        "Animator" => NewNode::Animator,
         script => NewNode::Script(script),
     })
 }
@@ -166,6 +170,8 @@ fn default_class(node: &SceneNode) -> &'static str {
         "Camera3D"
     } else if node.camera.is_some() {
         "Camera2D"
+    } else if node.animator.is_some() {
+        "Animator"
     } else if node.transform_3d.is_some() {
         "Node3D"
     } else {
@@ -252,6 +258,22 @@ fn show<H: Host>(object: &H::Node, node: &SceneNode, class: &str) -> Result<(), 
     if let Some(shone) = &node.light_2d {
         H::with_light_2d(object, |look| shine(look, shone))
             .ok_or_else(|| not_a("lights the sprites", "Light2D"))?;
+    }
+    Ok(())
+}
+
+/// Gives `object` the animations the scene says it plays, and plays the
+/// first one.
+fn animate<H: Host>(object: &H::Node, node: &SceneNode, class: &str) -> Result<(), String> {
+    let Some(animator) = &node.animator else {
+        return Ok(());
+    };
+    H::with_animator(object, |fields| {
+        fields.animations.set(animator.animations.clone());
+    })
+    .ok_or_else(|| format!("it plays animations, but `{class}` is not an `Animator`"))?;
+    if !animator.animation.is_empty() {
+        crate::tracks::play::<H>(object, &animator.animation);
     }
     Ok(())
 }

@@ -67,6 +67,52 @@ pub(super) fn scene_fields(context: Context<'_>, out: &mut Writer) {
     out.close("}");
 }
 
+/// Writes `set_exported_field_`, which animations call: for each class of
+/// the program that declares `export` fields, a branch that sets the one
+/// named if the object is of that class. A field no class of the object
+/// declares is an error, which the animation warns about.
+pub(super) fn exported_field_setter(context: Context<'_>, out: &mut Writer) {
+    let classes = context.analysis.classes();
+    out.line("");
+    out.line("/// Gives the `export` field named of an object of any class of the program");
+    out.line("/// a value; fails if its class has no such field, or the value does not fit it.");
+    out.open(&format!(
+        "pub fn set_exported_field_(object_: &crate::classes::Node::Ref, {FIELD_ARGUMENT}: &str, {VALUE_ARGUMENT}: &{RUNTIME}::scene_fields::SceneValue) -> ::std::result::Result<(), ::std::string::String> {{"
+    ));
+    for (id, class) in classes.iter() {
+        if class.origin == ClassOrigin::Native {
+            continue;
+        }
+        let own: Vec<&FieldInfo> = class
+            .fields
+            .iter()
+            .filter(|field| field.is_exported)
+            .collect();
+        if own.is_empty() {
+            continue;
+        }
+        out.open(&format!(
+            "if let ::std::option::Option::Some({OBJECT}) = {}({RC}::clone(object_)) {{",
+            context.cast_function(id)
+        ));
+        out.open(&format!("match {FIELD_ARGUMENT} {{"));
+        for field in own {
+            out.line(&format!(
+                "{:?} => {{ {}; return ::std::result::Result::Ok(()); }}",
+                field.name,
+                set_field(context, id, field)
+            ));
+        }
+        out.line("_ => {}");
+        out.close("}");
+        out.close("}");
+    }
+    out.line(&format!(
+        "::std::result::Result::Err({RUNTIME}::scene_fields::no_property({FIELD_ARGUMENT}))"
+    ));
+    out.close("}");
+}
+
 /// The `export` fields of `class` and its bases, each with the class that
 /// declares it.
 fn exported_fields(context: Context<'_>, class: ClassId) -> Vec<(ClassId, &FieldInfo)> {

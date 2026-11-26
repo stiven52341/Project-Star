@@ -1,5 +1,6 @@
 //! Modules of the engine's node classes written from a description:
-//! `Sprite`, `Camera2D`, `Light2D` and `Node3D`, which extend `Node`; and
+//! `Sprite`, `Camera2D`, `Light2D`, `Animator` and `Node3D`, which extend
+//! `Node`; and
 //! `Mesh`, `Light` and `Camera3D`, which extend `Node3D`.
 //!
 //! They all have the same shape, so they are written from a description of
@@ -197,8 +198,9 @@ if let ::std::option::Option::Some(node_) = node_ {
     ::star_script_runtime::nodes::look_at::<crate::classes::Host_>(&node_, x, y, z);
 }";
 
-/// The methods of `Sprite`: playing the clips of its `.frames` file.
-const SPRITE_METHODS: [Method; 5] = [
+/// The methods of `Sprite` (playing the clips of its `.frames` file) and
+/// of `Animator` (playing the animations of its `.anim` file).
+const PLAYING_METHODS: [Method; 5] = [
     Method {
         name: "play",
         parameters: "name: ::std::string::String",
@@ -251,9 +253,29 @@ node_.is_some_and(|node_| ::star_script_runtime::animations::is_playing::<crate:
 const ANIMATION_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
 node_.map(|node_| ::star_script_runtime::animations::animation::<crate::classes::Host_>(&node_)).unwrap_or_default()";
 
-/// `func animation_finished`: what a sprite does when a clip ends, unless
-/// its script says: nothing.
+/// `func animation_finished`: what a sprite or an animator does when an
+/// animation ends, unless its script says: nothing.
 const ANIMATION_FINISHED_BODY: &str = "";
+
+/// `func play` of `Animator`: plays an animation of its `animations`.
+const ANIMATOR_PLAY_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+if let ::std::option::Option::Some(node_) = node_ {
+    ::star_script_runtime::tracks::play::<crate::classes::Host_>(&node_, &name);
+}";
+
+/// `func stop` of `Animator`: stops its animation where it is.
+const ANIMATOR_STOP_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+if let ::std::option::Option::Some(node_) = node_ {
+    ::star_script_runtime::tracks::stop::<crate::classes::Host_>(&node_);
+}";
+
+/// `func is_playing` of `Animator`: whether its animation plays.
+const ANIMATOR_IS_PLAYING_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+node_.is_some_and(|node_| ::star_script_runtime::tracks::is_playing::<crate::classes::Host_>(&node_))";
+
+/// `func animation` of `Animator`: the animation it plays, or played last.
+const ANIMATOR_ANIMATION_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
+node_.map(|node_| ::star_script_runtime::tracks::animation::<crate::classes::Host_>(&node_)).unwrap_or_default()";
 
 /// An engine node class written from a description. Its own fields are a
 /// type of `star_script_runtime`, shared with every way of running
@@ -286,7 +308,7 @@ const SPRITE: NodeClass = NodeClass {
     fields: "::star_script_runtime::node_classes::SpriteFields<crate::classes::Host_>",
     new_fields: "Fields::new(texture)",
     parameters: &[("texture", STRING)],
-    methods: &SPRITE_METHODS,
+    methods: &PLAYING_METHODS,
     bodies: &[
         PLAY_BODY,
         STOP_BODY,
@@ -316,6 +338,23 @@ const LIGHT_2D: NodeClass = NodeClass {
     parameters: &[("kind", STRING)],
     methods: &[],
     bodies: &[],
+};
+
+const ANIMATOR: NodeClass = NodeClass {
+    name: "Animator",
+    about: "the `.anim` file of the animations it plays on its parent and the nodes under it, and the one it plays",
+    ancestors: &["Node"],
+    fields: "::star_script_runtime::node_classes::AnimatorFields",
+    new_fields: "Fields::new()",
+    parameters: &[],
+    methods: &PLAYING_METHODS,
+    bodies: &[
+        ANIMATOR_PLAY_BODY,
+        ANIMATOR_STOP_BODY,
+        ANIMATOR_IS_PLAYING_BODY,
+        ANIMATOR_ANIMATION_BODY,
+        ANIMATION_FINISHED_BODY,
+    ],
 };
 
 const NODE_3D: NodeClass = NodeClass {
@@ -368,10 +407,12 @@ const CAMERA_3D: NodeClass = NodeClass {
     bodies: &[],
 };
 
-/// The modules of `Sprite`, `Camera2D`, `Light2D`, `Node3D`, `Mesh`,
-/// `Light` and `Camera3D`.
+/// The modules of `Sprite`, `Camera2D`, `Light2D`, `Animator`, `Node3D`,
+/// `Mesh`, `Light` and `Camera3D`.
 pub(super) fn node_class_modules(out: &mut Writer) {
-    for class in [SPRITE, CAMERA_2D, LIGHT_2D, NODE_3D, MESH, LIGHT, CAMERA_3D] {
+    for class in [
+        SPRITE, CAMERA_2D, LIGHT_2D, ANIMATOR, NODE_3D, MESH, LIGHT, CAMERA_3D,
+    ] {
         out.line("");
         module(out, &class);
     }
@@ -382,7 +423,7 @@ fn methods_of(class: &str) -> &'static [Method] {
     match class {
         "Node" => &NODE_METHODS,
         "Node3D" => &NODE_3D_METHODS,
-        "Sprite" => &SPRITE_METHODS,
+        "Sprite" | "Animator" => &PLAYING_METHODS,
         _ => &[],
     }
 }

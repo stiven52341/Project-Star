@@ -7,6 +7,7 @@ use star_core::{EngineError, EngineResult};
 use star_render::TextureFilter;
 
 use crate::FieldValue;
+use crate::animator_node::AnimatorData;
 use crate::body_data::{Body3dData, BodyData};
 use crate::camera_node::{Camera2dData, Camera3dData};
 use crate::light_2d_node::Light2dData;
@@ -68,6 +69,8 @@ pub(crate) struct NodeData {
     pub(crate) light_2d: Option<Light2dData>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) camera_3d: Option<Camera3dData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) animator: Option<AnimatorData>,
     /// `[node.fields]`: the values of the `export` fields of its class.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub(crate) fields: BTreeMap<String, FieldValue>,
@@ -232,6 +235,7 @@ mod tests {
                 camera: None,
                 light_2d: None,
                 camera_3d: None,
+                animator: None,
                 fields: BTreeMap::new(),
             }],
         };

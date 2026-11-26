@@ -134,6 +134,13 @@ pub fn unknown_field(class: &str, field: &str) -> String {
     format!("`{class}` has no `export` field `{field}`")
 }
 
+/// Why an animation cannot change `property` of a node: neither its
+/// engine class nor its script class has such a field.
+#[must_use]
+pub fn no_property(property: &str) -> String {
+    format!("the node has no property `{property}` (nor an `export` field so named)")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -9,6 +9,7 @@ use star_render::{Color, Sprite, SpriteSheet, TextureFilter, TextureRegion};
 
 use star_physics::{BodySettings, Shape3d};
 
+use crate::animator_node::{AnimatorData, AnimatorOutline};
 use crate::body_data::{Body3dData, BodyData};
 use crate::camera_node::{Camera2dData, Camera3dData};
 use crate::light_2d_node::Light2dData;
@@ -64,6 +65,8 @@ pub struct NodeOutline {
     pub light_2d: Option<Light2dNode>,
     /// The 3D camera the game can be seen from, if it is one.
     pub camera_3d: Option<Camera3dNode>,
+    /// The animations it plays, if it is an animator.
+    pub animator: Option<AnimatorOutline>,
     /// The values of the `export` fields of its class, by name.
     pub fields: BTreeMap<String, FieldValue>,
 }
@@ -404,6 +407,12 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         .map(Camera3dData::to_camera)
         .transpose()
         .map_err(named)?;
+    let animator = node
+        .animator
+        .as_ref()
+        .map(AnimatorData::to_outline)
+        .transpose()
+        .map_err(named)?;
     let light_2d = node
         .light_2d
         .as_ref()
@@ -439,6 +448,7 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         camera,
         light_2d,
         camera_3d,
+        animator,
         fields: node.fields,
     })
 }
@@ -491,6 +501,7 @@ fn write_node(node: &NodeOutline) -> NodeData {
         camera: node.camera.map(Camera2dData::from_camera),
         light_2d: node.light_2d.map(Light2dData::from_light),
         camera_3d: node.camera_3d.map(Camera3dData::from_camera),
+        animator: node.animator.as_ref().map(AnimatorData::from_outline),
         fields: node.fields.clone(),
     }
 }
@@ -572,6 +583,23 @@ mod tests {
 
         assert_eq!(outline.nodes()[0].tags, ["enemy", "loud"]);
         assert_eq!(written, outline);
+    }
+
+    #[test]
+    fn animators_are_read_and_written() {
+        let text = "format = 1\n[[node]]\nname = \"Knight\"\n\
+                    [[node]]\nname = \"Animator\"\nparent = 0\n\
+                    [node.animator]\nanimations = \"knight.anim\"\nanimation = \"idle\"\n";
+
+        let outline = SceneOutline::from_text(text).unwrap();
+
+        let animator = outline.nodes()[1].animator.as_ref().unwrap();
+        assert_eq!(animator.animations.as_str(), "knight.anim");
+        assert_eq!(animator.animation.as_deref(), Some("idle"));
+        assert_eq!(
+            SceneOutline::from_text(&outline.to_text().unwrap()).unwrap(),
+            outline
+        );
     }
 
     #[test]

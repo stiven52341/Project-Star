@@ -14,6 +14,7 @@ pub mod game;
 pub mod input;
 mod mirror;
 pub mod scenes;
+pub mod tracks;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -21,9 +22,10 @@ use std::rc::Rc;
 use star_engine::star_assets::AssetFolder;
 use star_engine::star_audio::Audio;
 
-/// Gives StarScript's runtime the scenes, sounds and `.frames` files of the
-/// asset `folder`: `Scene.load` reads scenes, sprites play the clips of
-/// `.frames` files, and `Sound` plays sounds through the returned
+/// Gives StarScript's runtime the scenes, sounds, `.frames` and `.anim`
+/// files of the asset `folder`: `Scene.load` reads scenes, sprites play the
+/// clips of `.frames` files, animators the animations of `.anim` files, and
+/// `Sound` plays sounds through the returned
 /// audio output, which stays silent until the game replaces it with the
 /// engine's.
 #[must_use]
@@ -38,6 +40,10 @@ pub fn connect_runtime(folder: &AssetFolder) -> Rc<RefCell<Audio>> {
     let frames_folder = folder.clone();
     star_script_runtime::animations::set_loader(move |path| {
         frames::read_frames(&frames_folder, path)
+    });
+    let tracks_folder = folder.clone();
+    star_script_runtime::tracks::set_loader(move |path| {
+        tracks::read_animations(&tracks_folder, path)
     });
     output
 }

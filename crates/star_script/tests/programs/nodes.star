@@ -81,6 +81,18 @@ class Main {
         player.play("idle")
         Debug.print(player.animation())
 
+        // Keyframe animations: an animator plays those of an `.anim` file on
+        // its parent and the nodes under it, moved on by the game's frames.
+        const animator = Animator("Animator")
+        player.add_child(animator)
+        animator.animations = "sprites/player.anim"
+        Debug.print(animator.animations + " [" + animator.animation() + "] " + animator.is_playing().to_string())
+        animator.play("wave")
+        Debug.print(animator.animation() + " " + animator.is_playing().to_string())
+        animator.stop()
+        Debug.print(animator.animation() + " " + animator.is_playing().to_string() + " " + (animator.parent() == player).to_string())
+        animator.remove()
+
         // Scenes are read by the engine: a program without a game has none.
         Debug.print((Scene.load("levels/one.scene") == null).to_string())
 

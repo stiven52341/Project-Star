@@ -17,6 +17,7 @@
 //! many times as needed; its [`SceneOutline`] describes the file's nodes
 //! without loading their images.
 
+mod animator_node;
 mod body_data;
 mod body_node;
 mod camera_node;
@@ -36,6 +37,7 @@ mod track_animations;
 mod transform;
 mod visibility;
 
+pub use animator_node::AnimatorOutline;
 pub use body_node::{Body2D, Body3D, NodeBody};
 pub use camera_node::{Camera2dNode, Camera3dNode};
 pub use field_value::FieldValue;
