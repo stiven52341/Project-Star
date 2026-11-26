@@ -184,6 +184,31 @@ fn blend(from: &SceneValue, to: &SceneValue, amount: f32) -> SceneValue {
     }
 }
 
+/// The value `amount` of the way from `from` to `to` when two animations
+/// are mixed: decimals and colors blend, and whole numbers, `bool`s and
+/// texts jump to `to` halfway.
+pub(crate) fn mix(from: &SceneValue, to: &SceneValue, amount: f32) -> SceneValue {
+    let continuous = matches!(
+        (from, to),
+        (SceneValue::Color(_), SceneValue::Color(_))
+            | (
+                SceneValue::Float(_),
+                SceneValue::Float(_) | SceneValue::Int(_)
+            )
+            | (SceneValue::Int(_), SceneValue::Float(_))
+    );
+    if continuous {
+        blend(from, to, amount)
+    } else if amount >= HALFWAY {
+        to.clone()
+    } else {
+        from.clone()
+    }
+}
+
+/// Where a mix of values that cannot blend jumps to the second.
+const HALFWAY: f32 = 0.5;
+
 /// Reads the `.anim` file at an asset path, or explains why it cannot.
 type Loader = Box<dyn Fn(&str) -> Result<Tracks, String>>;
 
@@ -369,22 +394,31 @@ fn call<H: Host>(root: &H::Node, clip: &TrackClip, shown: f32, time: f32) {
 /// their values `time` seconds into it.
 fn apply<H: Host>(root: &H::Node, clip: &TrackClip, time: f32) {
     for track in &clip.tracks {
-        let Some(target) = find::<H>(root, &track.node) else {
-            warn(&format!(
-                "the animation \"{}\" changes `{}` of \"{}\", which is not there",
-                clip.name, track.property, track.node
-            ));
-            continue;
-        };
-        let Some(value) = track.sample(time) else {
-            continue;
-        };
-        if let Err(reason) = set_property::<H>(&target, &track.property, &value) {
-            warn(&format!(
-                "the animation \"{}\" cannot change `{}`: {reason}",
-                clip.name, track.property
-            ));
+        if let Some(value) = track.sample(time) {
+            set_track_value::<H>(root, &clip.name, &track.node, &track.property, &value);
         }
+    }
+}
+
+/// Gives `property` of the node at `path` from `root` the value an
+/// animation called `animation` has for it, or warns why it cannot.
+pub(crate) fn set_track_value<H: Host>(
+    root: &H::Node,
+    animation: &str,
+    path: &str,
+    property: &str,
+    value: &SceneValue,
+) {
+    let Some(target) = find::<H>(root, path) else {
+        warn(&format!(
+            "the animation \"{animation}\" changes `{property}` of \"{path}\", which is not there"
+        ));
+        return;
+    };
+    if let Err(reason) = set_property::<H>(&target, property, value) {
+        warn(&format!(
+            "the animation \"{animation}\" cannot change `{property}`: {reason}"
+        ));
     }
 }
 

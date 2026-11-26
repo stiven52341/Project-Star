@@ -27,6 +27,7 @@ mod operations;
 pub mod parallel;
 pub mod placement;
 mod plain;
+pub mod poses;
 pub mod properties;
 pub mod scene_fields;
 pub mod scene_tree;

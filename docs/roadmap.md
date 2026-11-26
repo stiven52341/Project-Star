@@ -1333,9 +1333,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           animation, or a blend of animations at points of a number) with
           their place on the graph, and transitions (from, to, conditions,
           fade, waiting for the end), validated when read (decision 81).
-    - [ ] 15e.2 Cross-fades in the runtime: two animations' tracks applied
+    - [x] 15e.2 Cross-fades in the runtime: two animations' tracks applied
           together by weights (decimals and colors blended, the rest
-          jumping halfway).
+          jumping halfway; a property only one changes keeps its value),
+          `star_script_runtime::poses`.
     - [ ] 15e.3 The machine in the runtime and StarScript's API, compiled
           and interpreted, with a conformance program and a game.
     - [ ] 15e.4 Blends by a value (walk/run by speed), synced by phase.
