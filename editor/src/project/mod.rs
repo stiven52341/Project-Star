@@ -14,7 +14,7 @@ mod test_support;
 
 pub(crate) use asset_kinds::{
     BLUEPRINT_EXTENSION, FRAMES_EXTENSION, KEYFRAMES_EXTENSION, RUST_EXTENSION, SCENE_EXTENSION,
-    SCRIPT_EXTENSION,
+    SCRIPT_EXTENSION, STATES_EXTENSION,
 };
 pub(crate) use creation::{
     ASSETS_DIRECTORY, CreateProjectError, create_project, default_projects_location,

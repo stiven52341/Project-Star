@@ -14,7 +14,8 @@ use star_engine::star_scene::{FrameClip, SpriteFrames, SpriteOutline};
 
 use crate::texts;
 
-/// The `.frames` and `.anim` files of the assets folder, to choose from.
+/// The `.frames`, `.anim` and `.states` files of the assets folder, to
+/// choose from.
 #[derive(Clone, Copy)]
 pub(crate) struct AnimationFiles<'files> {
     /// The assets folder.
@@ -23,6 +24,9 @@ pub(crate) struct AnimationFiles<'files> {
     pub(crate) paths: &'files [String],
     /// The `.anim` files, for animators, as paths inside it.
     pub(crate) keyframes: &'files [String],
+    /// The `.states` files, for animators' state machines, as paths
+    /// inside it.
+    pub(crate) states: &'files [String],
 }
 
 impl AnimationFiles<'_> {

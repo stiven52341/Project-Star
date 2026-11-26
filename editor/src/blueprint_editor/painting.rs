@@ -8,7 +8,7 @@ use eframe::egui::{
 use star_blueprint::{Direction, Link, Node, NodeId, NodeKind, PinKind};
 
 use super::layout::{HEADER_HEIGHT, NodeLayout, PlacedPin, wire_curve, wire_ends};
-use super::view::CanvasView;
+use crate::canvas_view::CanvasView;
 use crate::style::ERROR_COLOR;
 use crate::texts;
 

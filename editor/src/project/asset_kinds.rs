@@ -12,3 +12,5 @@ pub(crate) const RUST_EXTENSION: &str = ".rs";
 pub(crate) const FRAMES_EXTENSION: &str = star_engine::star_scene::FRAMES_EXTENSION;
 /// Extension of the files of an animator's keyframe animations (`.anim`).
 pub(crate) const KEYFRAMES_EXTENSION: &str = star_engine::star_scene::ANIMATIONS_EXTENSION;
+/// Extension of the files of an animator's state machine (`.states`).
+pub(crate) const STATES_EXTENSION: &str = star_engine::star_scene::STATES_EXTENSION;

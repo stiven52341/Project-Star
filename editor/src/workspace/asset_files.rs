@@ -13,7 +13,7 @@ use crate::blueprint_editor::{BlueprintTemplate, new_blueprint_text, new_script_
 use crate::frames_editor::new_frames_text;
 use crate::project::{
     BLUEPRINT_EXTENSION, FRAMES_EXTENSION, KEYFRAMES_EXTENSION, MAX_NAME_LENGTH, ProjectDimension,
-    RUST_EXTENSION, SCENE_EXTENSION, SCRIPT_EXTENSION, add_missing_actions,
+    RUST_EXTENSION, SCENE_EXTENSION, SCRIPT_EXTENSION, STATES_EXTENSION, add_missing_actions,
 };
 
 /// The scene new scenes start from: a root, placed in the project's space.
@@ -32,19 +32,22 @@ pub(crate) enum NewAsset {
     Rust,
     /// An animator's keyframe animations (`.anim`).
     Keyframes,
+    /// An animator's state machine (`.states`).
+    States,
     /// A copy of a ready-made blueprint.
     Template(BlueprintTemplate),
 }
 
 impl NewAsset {
     /// Every kind, in the order the menu lists them.
-    pub(super) const ALL: [Self; 6] = [
+    pub(super) const ALL: [Self; 7] = [
         Self::Folder,
         Self::Scene,
         Self::Blueprint,
         Self::Script,
         Self::Rust,
         Self::Keyframes,
+        Self::States,
     ];
 
     /// The name a new one is given until the user changes it.
@@ -56,6 +59,7 @@ impl NewAsset {
             Self::Script => "NewScript",
             Self::Rust => "new_module",
             Self::Keyframes => "NewAnimations",
+            Self::States => "NewStates",
             Self::Template(template) => template.name(),
         }
     }
@@ -73,6 +77,7 @@ impl NewAsset {
             Self::Script => SCRIPT_EXTENSION,
             Self::Rust => RUST_EXTENSION,
             Self::Keyframes => KEYFRAMES_EXTENSION,
+            Self::States => STATES_EXTENSION,
         }
     }
 }
@@ -225,6 +230,7 @@ fn contents(
             Ok(format!("//! {stem}: Rust code of the game.\n"))
         }
         NewAsset::Keyframes => Ok(NEW_KEYFRAMES.to_owned()),
+        NewAsset::States => Ok(NEW_STATES.to_owned()),
     }
 }
 
@@ -249,6 +255,17 @@ const NEW_KEYFRAMES: &str = r#"format = 1
 # [[animation.call]]
 # time = 0.5
 # method = "step"
+"#;
+
+/// A new `.states` file: a machine with one state, playing the animation
+/// `idle`, to grow in its graph.
+const NEW_STATES: &str = r#"format = 1
+start = "idle"
+
+[[state]]
+name = "idle"
+animation = "idle"
+position = [0.0, 0.0]
 "#;
 
 /// A scene with only its root, named `stem`.

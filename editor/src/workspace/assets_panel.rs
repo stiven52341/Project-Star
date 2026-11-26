@@ -19,7 +19,7 @@ use crate::blueprint_editor::BlueprintTemplate;
 use crate::file_tree::{FileNode, file_paths, scan_directory};
 use crate::project::{
     ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, FRAMES_EXTENSION, KEYFRAMES_EXTENSION, ProjectDimension,
-    SCENE_EXTENSION, SCRIPT_EXTENSION, read_main_scene, set_main_scene,
+    SCENE_EXTENSION, SCRIPT_EXTENSION, STATES_EXTENSION, read_main_scene, set_main_scene,
 };
 use crate::scene_editor::{ClassDrop, ImageDrop};
 use crate::style::ERROR_COLOR;
@@ -31,6 +31,7 @@ pub(crate) enum OpenedAsset {
     Scene(String),
     Script(String),
     Frames(String),
+    States(String),
 }
 
 impl OpenedAsset {
@@ -44,6 +45,8 @@ impl OpenedAsset {
             Some(Self::Script(path))
         } else if path.ends_with(FRAMES_EXTENSION) {
             Some(Self::Frames(path))
+        } else if path.ends_with(STATES_EXTENSION) {
+            Some(Self::States(path))
         } else {
             None
         }
@@ -118,6 +121,8 @@ pub(crate) struct AssetsPanel {
     animations: Vec<String>,
     /// The `.anim` files among the contents, as paths inside the folder.
     keyframes: Vec<String>,
+    /// The `.states` files among the contents, as paths inside the folder.
+    states: Vec<String>,
     /// Naming files and asking before deleting them.
     actions: AssetActions,
     /// The size of the icons, in percent.
@@ -140,6 +145,7 @@ impl AssetsPanel {
             images: image_paths(&contents),
             animations: paths_ending_with(&contents, FRAMES_EXTENSION),
             keyframes: paths_ending_with(&contents, KEYFRAMES_EXTENSION),
+            states: paths_ending_with(&contents, STATES_EXTENSION),
             thumbnails: Thumbnails::new(&directory),
             directory,
             contents,
@@ -173,6 +179,7 @@ impl AssetsPanel {
         self.images = image_paths(&self.contents);
         self.animations = paths_ending_with(&self.contents, FRAMES_EXTENSION);
         self.keyframes = paths_ending_with(&self.contents, KEYFRAMES_EXTENSION);
+        self.states = paths_ending_with(&self.contents, STATES_EXTENSION);
         self.thumbnails.clear();
     }
 
@@ -192,6 +199,12 @@ impl AssetsPanel {
     /// when it was last listed.
     pub(crate) fn keyframes(&self) -> &[String] {
         &self.keyframes
+    }
+
+    /// The `.states` files of the folder, as paths inside it, as they were
+    /// when it was last listed.
+    pub(crate) fn states(&self) -> &[String] {
+        &self.states
     }
 
     /// The folder it lists.
@@ -340,9 +353,15 @@ impl AssetsPanel {
                     self.set_main_scene(path.clone());
                 }
                 self.selected = Some(path.clone());
-                // New animations open at once: they are made to be edited.
-                path.ends_with(FRAMES_EXTENSION)
-                    .then_some(AssetEvent::Opened(OpenedAsset::Frames(path)))
+                // New animations and state machines open at once: they are
+                // made to be edited.
+                if path.ends_with(FRAMES_EXTENSION) {
+                    Some(AssetEvent::Opened(OpenedAsset::Frames(path)))
+                } else if path.ends_with(STATES_EXTENSION) {
+                    Some(AssetEvent::Opened(OpenedAsset::States(path)))
+                } else {
+                    None
+                }
             }
             Outcome::Renamed { from, to } => {
                 if let Some(moved) = self

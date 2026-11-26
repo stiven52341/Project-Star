@@ -14,6 +14,7 @@ impl Texts {
             NewAsset::Script => self.pick("StarScript script", "Script de StarScript"),
             NewAsset::Rust => self.pick("Rust script", "Script de Rust"),
             NewAsset::Keyframes => self.pick("Keyframe animations", "Animaciones de keyframes"),
+            NewAsset::States => self.pick("State machine", "Máquina de estados"),
             NewAsset::Template(template) => template.name(),
         }
     }
@@ -66,6 +67,7 @@ impl Texts {
                 "New keyframe animations:",
                 "Animaciones de keyframes nuevas:",
             ),
+            NewAsset::States => self.pick("New state machine:", "Máquina de estados nueva:"),
         }
     }
 

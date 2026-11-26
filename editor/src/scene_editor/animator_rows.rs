@@ -1,6 +1,7 @@
-//! The rows of an animator in the inspector: its `.anim` file and the
-//! animation it plays from the start (decision 79). The file is only read
-//! while the list of its animations is open.
+//! The rows of an animator in the inspector: its `.anim` file, the
+//! animation it plays from the start (decision 79) and the `.states` file
+//! of its state machine (decision 81). The file is only read while the
+//! list of its animations is open.
 
 use std::fs;
 
@@ -32,7 +33,44 @@ pub(super) fn edit_animator(
     animator: &mut AnimatorOutline,
     files: AnimationFiles<'_>,
 ) -> bool {
-    file_row(ui, animator, files) | starting_animation_row(ui, animator, files)
+    file_row(ui, animator, files)
+        | starting_animation_row(ui, animator, files)
+        | states_row(ui, animator, files)
+}
+
+fn states_row(
+    ui: &mut egui::Ui,
+    animator: &mut AnimatorOutline,
+    files: AnimationFiles<'_>,
+) -> bool {
+    let texts = texts::current();
+    ui.weak(texts.animator_states())
+        .on_hover_text(texts.animator_states_hint());
+    let shown = animator.states.as_ref().map(AssetPath::as_str);
+    let mut chosen: Option<Option<AssetPath>> = None;
+    egui::ComboBox::from_id_salt("animator_states")
+        .selected_text(shown.unwrap_or(texts.no_states()))
+        .show_ui(ui, |ui| {
+            if ui
+                .selectable_label(shown.is_none(), texts.no_states())
+                .clicked()
+                && shown.is_some()
+            {
+                chosen = Some(None);
+            }
+            for path in files.states {
+                let current = shown == Some(path.as_str());
+                if ui.selectable_label(current, path).clicked() && !current {
+                    chosen = AssetPath::new(path).ok().map(Some);
+                }
+            }
+        });
+    ui.end_row();
+    let Some(chosen) = chosen else {
+        return false;
+    };
+    animator.states = chosen;
+    true
 }
 
 fn file_row(ui: &mut egui::Ui, animator: &mut AnimatorOutline, files: AnimationFiles<'_>) -> bool {
@@ -125,6 +163,7 @@ mod tests {
             folder: Path::new("assets"),
             paths: &[],
             keyframes: &keyframes,
+            states: &[],
         };
 
         let animator = new_animator(files).unwrap();

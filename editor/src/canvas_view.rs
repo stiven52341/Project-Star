@@ -1,7 +1,7 @@
-//! Which part of a graph the canvas shows: how far it is moved and how
-//! close it is.
+//! Which part of a graph a canvas shows (a blueprint's, a state
+//! machine's): how far it is moved and how close it is.
 
-use eframe::egui::{Pos2, Rect, Vec2, vec2};
+use eframe::egui::{self, Event, Modifiers, MouseWheelUnit, Pos2, Rect, Response, Vec2, vec2};
 
 /// The closest the view gets.
 const MAX_ZOOM: f32 = 2.0;
@@ -11,10 +11,13 @@ const MIN_ZOOM: f32 = 0.25;
 /// nodes at the origin are not stuck to the edge.
 const START_OFFSET: Vec2 = vec2(40.0, 40.0);
 
+/// How much one line of the mouse wheel zooms.
+const ZOOM_PER_LINE: f32 = 0.1;
+
 /// Pan and zoom of a canvas. A point of the graph is drawn at
 /// `canvas origin + pan + point × zoom`.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) struct CanvasView {
+pub(crate) struct CanvasView {
     pan: Vec2,
     zoom: f32,
 }
@@ -29,17 +32,17 @@ impl Default for CanvasView {
 }
 
 impl CanvasView {
-    pub(super) const fn zoom(self) -> f32 {
+    pub(crate) const fn zoom(self) -> f32 {
         self.zoom
     }
 
     /// Where `point` of the graph is on the screen.
-    pub(super) fn to_screen(self, canvas_origin: Pos2, point: Pos2) -> Pos2 {
+    pub(crate) fn to_screen(self, canvas_origin: Pos2, point: Pos2) -> Pos2 {
         canvas_origin + self.pan + point.to_vec2() * self.zoom
     }
 
     /// Where `rect` of the graph is on the screen.
-    pub(super) fn rect_to_screen(self, canvas_origin: Pos2, rect: Rect) -> Rect {
+    pub(crate) fn rect_to_screen(self, canvas_origin: Pos2, rect: Rect) -> Rect {
         Rect::from_min_max(
             self.to_screen(canvas_origin, rect.min),
             self.to_screen(canvas_origin, rect.max),
@@ -47,26 +50,84 @@ impl CanvasView {
     }
 
     /// The point of the graph drawn at `screen_point`.
-    pub(super) fn to_graph(self, canvas_origin: Pos2, screen_point: Pos2) -> Pos2 {
+    pub(crate) fn to_graph(self, canvas_origin: Pos2, screen_point: Pos2) -> Pos2 {
         ((screen_point - canvas_origin - self.pan) / self.zoom).to_pos2()
     }
 
     /// Moves the graph so `point` is at the middle of a canvas of `size`.
-    pub(super) fn look_at(&mut self, point: Pos2, size: Vec2) {
+    pub(crate) fn look_at(&mut self, point: Pos2, size: Vec2) {
         self.pan = size / 2.0 - point.to_vec2() * self.zoom;
     }
 
     /// Moves the graph by `delta` screen points.
-    pub(super) fn pan_by(&mut self, delta: Vec2) {
+    pub(crate) fn pan_by(&mut self, delta: Vec2) {
         self.pan += delta;
     }
 
     /// Multiplies the zoom by `factor`, within its limits, keeping the
     /// point under `screen_point` where it is.
-    pub(super) fn zoom_around(&mut self, canvas_origin: Pos2, screen_point: Pos2, factor: f32) {
+    pub(crate) fn zoom_around(&mut self, canvas_origin: Pos2, screen_point: Pos2, factor: f32) {
         let fixed = self.to_graph(canvas_origin, screen_point);
         self.zoom = (self.zoom * factor).clamp(MIN_ZOOM, MAX_ZOOM);
         self.pan = screen_point - canvas_origin - fixed.to_vec2() * self.zoom;
+    }
+}
+
+/// What the mouse wheel or the touchpad asks of the view.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Scroll {
+    /// Zoom by so many lines of the wheel (up is closer).
+    Zoom(f32),
+    /// Move the graph by so many screen points.
+    Pan(Vec2),
+}
+
+/// Zooms and moves `view` with the wheel and the touchpad, while the
+/// pointer is over the canvas of `response`, whose top-left is `origin`.
+pub(crate) fn scroll_view(ui: &egui::Ui, view: &mut CanvasView, response: &Response, origin: Pos2) {
+    let Some(pointer) = response.hover_pos() else {
+        return;
+    };
+    let (scrolls, pinch) = ui.input(|input| {
+        let scrolls: Vec<Scroll> = input
+            .raw
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                Event::MouseWheel {
+                    unit,
+                    delta,
+                    modifiers,
+                    ..
+                } => scroll_of(*unit, *delta, *modifiers),
+                _ => None,
+            })
+            .collect();
+        (scrolls, input.zoom_delta())
+    });
+    for scroll in scrolls {
+        match scroll {
+            Scroll::Zoom(lines) => {
+                view.zoom_around(origin, pointer, (lines * ZOOM_PER_LINE).exp());
+            }
+            Scroll::Pan(delta) => view.pan_by(delta),
+        }
+    }
+    if (pinch - 1.0).abs() > f32::EPSILON {
+        view.zoom_around(origin, pointer, pinch);
+    }
+}
+
+/// What a wheel event asks: a mouse wheel counts lines and zooms, a
+/// touchpad counts points and moves the view. With `Ctrl` it is egui's
+/// zoom (read with pinching), so it is not counted twice.
+fn scroll_of(unit: MouseWheelUnit, delta: Vec2, modifiers: Modifiers) -> Option<Scroll> {
+    if modifiers.command || modifiers.ctrl {
+        return None;
+    }
+    match unit {
+        MouseWheelUnit::Point => Some(Scroll::Pan(delta)),
+        MouseWheelUnit::Line | MouseWheelUnit::Page => Some(Scroll::Zoom(delta.y)),
     }
 }
 
@@ -130,5 +191,27 @@ mod tests {
 
         view.zoom_around(ORIGIN, ORIGIN, 0.001);
         assert_eq!(view.zoom(), MIN_ZOOM);
+    }
+
+    #[test]
+    fn the_mouse_wheel_zooms_and_the_touchpad_moves() {
+        let delta = vec2(3.0, -2.0);
+
+        assert_eq!(
+            scroll_of(MouseWheelUnit::Line, delta, Modifiers::NONE),
+            Some(Scroll::Zoom(-2.0))
+        );
+        assert_eq!(
+            scroll_of(MouseWheelUnit::Point, delta, Modifiers::NONE),
+            Some(Scroll::Pan(delta))
+        );
+    }
+
+    #[test]
+    fn control_and_wheel_is_left_to_the_zoom_of_egui() {
+        assert_eq!(
+            scroll_of(MouseWheelUnit::Line, vec2(0.0, 1.0), Modifiers::COMMAND),
+            None
+        );
     }
 }

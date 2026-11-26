@@ -17,9 +17,7 @@
 
 use std::collections::HashMap;
 
-use eframe::egui::{
-    self, Event, Key, Modifiers, MouseWheelUnit, PointerButton, Pos2, Rect, Response, Sense, Vec2,
-};
+use eframe::egui::{self, Key, Modifiers, PointerButton, Pos2, Rect, Response, Sense};
 use star_blueprint::{Graph, NodeId, PinRef};
 
 use super::edit;
@@ -28,10 +26,7 @@ use super::menus::{MenuTarget, show_menu};
 use super::names::BlueprintNames;
 use super::painting::Painting;
 use super::selection::Selection;
-use super::view::CanvasView;
-
-/// How much one line of the mouse wheel zooms.
-const ZOOM_PER_LINE: f32 = 0.1;
+use crate::canvas_view::{CanvasView, scroll_view};
 
 /// What the canvas of one blueprint remembers between frames.
 #[derive(Default)]
@@ -60,15 +55,6 @@ enum Drag {
         start: Pos2,
         kept: Selection,
     },
-}
-
-/// What the mouse wheel or the touchpad asks of the view.
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Scroll {
-    /// Zoom by so many lines of the wheel (up is closer).
-    Zoom(f32),
-    /// Move the graph by so many screen points.
-    Pan(Vec2),
 }
 
 impl CanvasState {
@@ -103,7 +89,7 @@ pub(super) fn show_graph(
     state.selection.keep_existing(graph);
     let selection_before = state.selection.clone();
     let mut changed = handle_pointer(ui, graph, state, &response, rect.min);
-    handle_scroll(ui, state, &response, rect.min);
+    scroll_view(ui, &mut state.view, &response, rect.min);
     response.context_menu(|ui| {
         if let Some(target) = &state.menu {
             changed |= show_menu(ui, graph, target, names, &mut state.selection);
@@ -251,57 +237,6 @@ const fn adds_to_selection(modifiers: Modifiers) -> bool {
     modifiers.shift || modifiers.command
 }
 
-/// Zooms and moves the view with the wheel and the touchpad, while the
-/// pointer is over the canvas.
-fn handle_scroll(ui: &egui::Ui, state: &mut CanvasState, response: &Response, origin: Pos2) {
-    let Some(pointer) = response.hover_pos() else {
-        return;
-    };
-    let (scrolls, pinch) = ui.input(|input| {
-        let scrolls: Vec<Scroll> = input
-            .raw
-            .events
-            .iter()
-            .filter_map(|event| match event {
-                Event::MouseWheel {
-                    unit,
-                    delta,
-                    modifiers,
-                    ..
-                } => scroll_of(*unit, *delta, *modifiers),
-                _ => None,
-            })
-            .collect();
-        (scrolls, input.zoom_delta())
-    });
-    for scroll in scrolls {
-        match scroll {
-            Scroll::Zoom(lines) => {
-                state
-                    .view
-                    .zoom_around(origin, pointer, (lines * ZOOM_PER_LINE).exp());
-            }
-            Scroll::Pan(delta) => state.view.pan_by(delta),
-        }
-    }
-    if (pinch - 1.0).abs() > f32::EPSILON {
-        state.view.zoom_around(origin, pointer, pinch);
-    }
-}
-
-/// What a wheel event asks: a mouse wheel counts lines and zooms, a
-/// touchpad counts points and moves the view. With `Ctrl` it is egui's
-/// zoom (read with pinching), so it is not counted twice.
-fn scroll_of(unit: MouseWheelUnit, delta: Vec2, modifiers: Modifiers) -> Option<Scroll> {
-    if modifiers.command || modifiers.ctrl {
-        return None;
-    }
-    match unit {
-        MouseWheelUnit::Point => Some(Scroll::Pan(delta)),
-        MouseWheelUnit::Line | MouseWheelUnit::Page => Some(Scroll::Zoom(delta.y)),
-    }
-}
-
 /// `Delete` deletes the selected wire, or the selected nodes but the
 /// entry, which every graph needs, unless a text field is being typed in.
 fn delete_selected_on_key(ui: &egui::Ui, graph: &mut Graph, state: &mut CanvasState) -> bool {
@@ -363,31 +298,7 @@ fn paint(
 
 #[cfg(test)]
 mod tests {
-    use eframe::egui::vec2;
-
     use super::*;
-
-    #[test]
-    fn the_mouse_wheel_zooms_and_the_touchpad_moves() {
-        let delta = vec2(3.0, -2.0);
-
-        assert_eq!(
-            scroll_of(MouseWheelUnit::Line, delta, Modifiers::NONE),
-            Some(Scroll::Zoom(-2.0))
-        );
-        assert_eq!(
-            scroll_of(MouseWheelUnit::Point, delta, Modifiers::NONE),
-            Some(Scroll::Pan(delta))
-        );
-    }
-
-    #[test]
-    fn control_and_wheel_is_left_to_the_zoom_of_egui() {
-        assert_eq!(
-            scroll_of(MouseWheelUnit::Line, vec2(0.0, 1.0), Modifiers::COMMAND),
-            None
-        );
-    }
 
     #[test]
     fn shift_and_control_add_to_the_selection() {

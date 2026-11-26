@@ -218,6 +218,7 @@ impl EditorWindow {
                         folder: self.assets.directory(),
                         paths: self.assets.animations(),
                         keyframes: self.assets.keyframes(),
+                        states: self.assets.states(),
                     },
                     self.live_check.outline().map(|outline| &outline.classes),
                 ),
@@ -232,6 +233,13 @@ impl EditorWindow {
                     ui.weak(texts::current().script_inspector_hint());
                 }
                 ActiveDocument::Frames(tab) => {
+                    ui.strong(texts::current().inspector);
+                    ui.separator();
+                    egui::ScrollArea::vertical()
+                        .auto_shrink(false)
+                        .show(ui, |ui| tab.show_inspector(ui));
+                }
+                ActiveDocument::States(tab) => {
                     ui.strong(texts::current().inspector);
                     ui.separator();
                     egui::ScrollArea::vertical()
@@ -319,7 +327,8 @@ impl EditorWindow {
             ActiveDocument::Scene => self.documents.scene_mut(),
             ActiveDocument::Blueprint(_)
             | ActiveDocument::Script(_)
-            | ActiveDocument::Frames(_) => None,
+            | ActiveDocument::Frames(_)
+            | ActiveDocument::States(_) => None,
         }
     }
 
@@ -484,6 +493,7 @@ impl EditorWindow {
             },
             ActiveDocument::Blueprint(tab) => tab.show(ui, self.problems.problems()),
             ActiveDocument::Frames(tab) => tab.show(ui, self.assets.images()),
+            ActiveDocument::States(tab) => tab.show(ui, self.assets.keyframes()),
             ActiveDocument::Script(tab) => {
                 let edited = tab.show(ui, self.live_check.problems(), self.live_check.outline());
                 if edited.changed {
@@ -536,6 +546,9 @@ impl EditorWindow {
                 Some(AssetEvent::Opened(OpenedAsset::Script(path))) => {
                     self.documents.open_script(self.assets.directory(), path);
                     self.live_check.request();
+                }
+                Some(AssetEvent::Opened(OpenedAsset::States(path))) => {
+                    self.documents.open_states(self.assets.directory(), path);
                 }
                 Some(AssetEvent::Opened(OpenedAsset::Frames(path))) => {
                     self.documents.open_frames(self.assets.directory(), path);

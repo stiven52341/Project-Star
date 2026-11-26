@@ -827,6 +827,25 @@ scene's history (`history::KeyframeFiles`), so one undo goes back through
 scene and animation changes in order, and saving the scene writes the
 files that changed since they were read or written.
 
+The **states editor** (`states_editor/`, decision 81) opens a `.states`
+file, made from Create > State machine (one state, `idle`), in a tab of its
+own. The middle draws its graph on a canvas that pans and zooms as the
+blueprints' does (`canvas_view.rs`, shared): states are boxes (the start
+one green) placed where the file says, “Any state” stands left of them for
+the transitions that leave any state, and transitions are arrows with
+their head halfway, beside the line between two states so the two ways do
+not cover each other (`graph.rs`). The right button adds states,
+transitions (from a state or from any, ending on the state clicked next),
+sets the start and deletes; dragging moves states. The inspector edits the
+state selected (its name, whether it starts, an animation or a blend by a
+number value with its points), the transition selected (its ends, fade,
+waiting for the end and conditions, each testing what its value's kind
+can) and the values (`inspector.rs`); renaming or deleting a state or a
+value updates what names it (`edits.rs`). The animations to choose from
+are those of an `.anim` file chosen above the graph, the one of the same
+name if there is one. An animator's “States” row in the scene's inspector
+chooses its `.states` file.
+
 The **blueprint editor** (`blueprint_editor/`) draws a graph of the open
 blueprint on a canvas of its own, painted with egui's painter (no node
 editor library: the model, its pins and its rules are `star_blueprint`'s).

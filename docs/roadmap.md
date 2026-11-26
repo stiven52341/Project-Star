@@ -1318,7 +1318,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         takes the place of the old one. Compiled and interpreted, with the
         conformance programs `tweens` and `tween_fault` and the game
         `tween_game` of `engine_game` and `window`.
-  - [ ] 15e Transitions between animations: a state machine (idle → run →
+  - [x] 15e Transitions between animations: a state machine (idle → run →
         jump) with conditions, cross-fades and blends by a value (walk/run
         by speed), editable as a graph like the blueprints. Agreed with the
         owner (2026-11-26): a `.states` file of the assets, named by an
@@ -1346,8 +1346,9 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 15e.4 Blends by a value (walk/run by speed), synced by phase
           (done with 15e.3: a blend state mixes the two animations around
           its value, their rounds lasting the lengths by their weights).
-    - [ ] 15e.5 The editor: a graph tab for `.states` files, states as
-          boxes and transitions as arrows, edited in the inspector.
+    - [x] 15e.5 The editor: a graph tab for `.states` files, states as
+          boxes and transitions as arrows, edited in the inspector;
+          Create > State machine, and the animator's “States” row.
   - [ ] 15f Skeletons (agreed with the owner, 2026-11-26: cut-out 2D
         first, and the `gltf` crate to import 3D models):
     - [ ] 15f.1 2D bones: bone nodes that sprites hang from (cut-out

@@ -1,6 +1,7 @@
 //! The tabs of the central area: the scene, always there (with the scene
 //! file open in it, if any), and the blueprints, scripts and animations
-//! (`.frames` files) the user opened.
+//! (`.frames` files) and state machines (`.states` files) the user
+//! opened.
 
 use std::path::Path;
 
@@ -12,6 +13,7 @@ use crate::project::ProjectDimension;
 use crate::project_check::OpenTexts;
 use crate::scene_editor::SceneDocument;
 use crate::script_editor::ScriptTab;
+use crate::states_editor::StatesTab;
 use crate::texts;
 
 /// The open scene, blueprints and scripts, and which tab is shown.
@@ -28,6 +30,7 @@ enum Tab {
     Blueprint(BlueprintTab),
     Script(ScriptTab),
     Frames(FramesTab),
+    States(StatesTab),
 }
 
 impl Tab {
@@ -36,6 +39,7 @@ impl Tab {
             Self::Blueprint(tab) => tab.path(),
             Self::Script(tab) => tab.path(),
             Self::Frames(tab) => tab.path(),
+            Self::States(tab) => tab.path(),
         }
     }
 
@@ -44,6 +48,7 @@ impl Tab {
             Self::Blueprint(tab) => tab.title(),
             Self::Script(tab) => tab.title(),
             Self::Frames(tab) => tab.title(),
+            Self::States(tab) => tab.title(),
         }
     }
 
@@ -52,6 +57,7 @@ impl Tab {
             Self::Blueprint(tab) => tab.is_unsaved(),
             Self::Script(tab) => tab.is_unsaved(),
             Self::Frames(tab) => tab.is_unsaved(),
+            Self::States(tab) => tab.is_unsaved(),
         }
     }
 
@@ -60,6 +66,7 @@ impl Tab {
             Self::Blueprint(tab) => tab.save(),
             Self::Script(tab) => tab.save(),
             Self::Frames(tab) => tab.save(),
+            Self::States(tab) => tab.save(),
         }
     }
 }
@@ -70,6 +77,7 @@ pub(crate) enum ActiveDocument<'documents> {
     Blueprint(&'documents mut BlueprintTab),
     Script(&'documents mut ScriptTab),
     Frames(&'documents mut FramesTab),
+    States(&'documents mut StatesTab),
 }
 
 impl Documents {
@@ -101,6 +109,12 @@ impl Documents {
         self.show_or_open(path, |path| Tab::Frames(FramesTab::open(assets, path)));
     }
 
+    /// Shows the `.states` file at `path` of the `assets` folder, opening
+    /// it if it is not open yet.
+    pub(crate) fn open_states(&mut self, assets: &Path, path: String) {
+        self.show_or_open(path, |path| Tab::States(StatesTab::open(assets, path)));
+    }
+
     /// The texts of the open scripts, by their path inside the assets
     /// folder, saved or not.
     pub(crate) fn open_texts(&self) -> OpenTexts {
@@ -110,7 +124,7 @@ impl Documents {
                 Tab::Script(script) => script
                     .text()
                     .map(|text| (script.path().to_owned(), text.to_owned())),
-                Tab::Blueprint(_) | Tab::Frames(_) => None,
+                Tab::Blueprint(_) | Tab::Frames(_) | Tab::States(_) => None,
             })
             .collect()
     }
@@ -206,6 +220,7 @@ impl Documents {
                 Tab::Blueprint(_) => Tab::Blueprint(BlueprintTab::open(assets, path)),
                 Tab::Script(_) => Tab::Script(ScriptTab::open(assets, path)),
                 Tab::Frames(_) => Tab::Frames(FramesTab::open(assets, path)),
+                Tab::States(_) => Tab::States(StatesTab::open(assets, path)),
             };
         }
     }
@@ -276,6 +291,7 @@ impl Documents {
             Some(Tab::Blueprint(tab)) => ActiveDocument::Blueprint(tab),
             Some(Tab::Script(tab)) => ActiveDocument::Script(tab),
             Some(Tab::Frames(tab)) => ActiveDocument::Frames(tab),
+            Some(Tab::States(tab)) => ActiveDocument::States(tab),
             None => ActiveDocument::Scene,
         }
     }
@@ -327,6 +343,7 @@ mod tests {
             ActiveDocument::Blueprint(tab) => Some(tab.path().to_owned()),
             ActiveDocument::Script(tab) => Some(tab.path().to_owned()),
             ActiveDocument::Frames(tab) => Some(tab.path().to_owned()),
+            ActiveDocument::States(tab) => Some(tab.path().to_owned()),
         }
     }
 

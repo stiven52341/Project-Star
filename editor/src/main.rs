@@ -2,6 +2,7 @@
 
 mod app;
 mod blueprint_editor;
+mod canvas_view;
 mod config_file;
 mod drag_drop;
 mod editor_log;
@@ -18,6 +19,7 @@ mod project_check;
 mod recent_projects;
 mod scene_editor;
 mod script_editor;
+mod states_editor;
 mod style;
 mod texts;
 mod workspace;

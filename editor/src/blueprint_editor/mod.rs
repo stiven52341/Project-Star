@@ -16,7 +16,6 @@ mod painting;
 mod properties;
 mod selection;
 mod templates;
-mod view;
 
 use std::fs;
 use std::path::{Path, PathBuf};

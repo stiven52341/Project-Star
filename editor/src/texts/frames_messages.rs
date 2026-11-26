@@ -145,4 +145,20 @@ impl Texts {
     pub(crate) const fn starting_animation(&self) -> &'static str {
         self.pick("Starting animation", "Animación inicial")
     }
+
+    /// The row of an animator's `.states` file.
+    pub(crate) const fn animator_states(&self) -> &'static str {
+        self.pick("States", "Estados")
+    }
+
+    pub(crate) const fn animator_states_hint(&self) -> &'static str {
+        self.pick(
+            "A .states file: a state machine that chooses which of the animations play, from values the scripts set.",
+            "Un archivo .states: una máquina de estados que elige qué animaciones suenan, según valores que ponen los scripts.",
+        )
+    }
+
+    pub(crate) const fn no_states(&self) -> &'static str {
+        self.pick("None", "Ninguno")
+    }
 }
