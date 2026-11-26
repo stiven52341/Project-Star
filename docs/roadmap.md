@@ -1269,12 +1269,12 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           false`), the inspector and the scene view (hidden nodes are not
           drawn nor picked), and StarScript's `Node` (compiled and
           interpreted).
-    - [ ] 15b.2 The `.anim` file: animations with a length and a loop,
+    - [x] 15b.2 The `.anim` file: animations with a length and a loop,
           property tracks (a node's path, a property, an interpolation:
           step, linear, ease in, out or in-out; keys of time and value:
           numbers, `bool`, `int`, text and colors) and call tracks (a
-          node's path, times and a method without arguments), validated
-          when read.
+          node's path, a time and a method without arguments), validated
+          when read (`star_scene::TrackAnimations`, decision 79).
     - [ ] 15b.3 The `Animator` node: its file, `play(name)`, `stop()`,
           `is_playing()`, `animation()` and the event
           `animation_finished(name)`, the starting animation of a scene's
