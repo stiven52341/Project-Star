@@ -109,21 +109,24 @@ pub fn animation<H: Host>(node: &H::Node) -> String {
 /// Moves the clip of `node`, if it is a sprite with `frames`, `delta`
 /// seconds on: it shows the file's image and cells, and the cell its clip
 /// is on. Called after the node's `update`, so a clip played there shows
-/// its first frame in the same frame.
+/// its first frame in the same frame. When a clip that does not loop ends,
+/// the node's `animation_finished` runs with its name.
 pub fn advance<H: Host>(node: &H::Node, delta: f32) {
-    H::with_sprite(node, |sprite| advance_sprite(sprite, delta));
+    let finished = H::with_sprite(node, |sprite| advance_sprite(sprite, delta)).flatten();
+    if let Some(name) = finished {
+        H::animation_finished(node, &name);
+    }
 }
 
-fn advance_sprite<H: Host>(sprite: &SpriteFields<H>, delta: f32) {
-    let Some(sheet) = sprite
+/// [`advance`] on the fields of a sprite; the name of the clip that ended,
+/// if one did.
+fn advance_sprite<H: Host>(sprite: &SpriteFields<H>, delta: f32) -> Option<String> {
+    let sheet = sprite
         .frames
-        .read(|path| if path.is_empty() { None } else { load(path) })
-    else {
-        return;
-    };
+        .read(|path| if path.is_empty() { None } else { load(path) })?;
     show_sheet(sprite, &sheet);
     if !sprite.playing.get() {
-        return;
+        return None;
     }
     let found = sprite.animation.read(|name| {
         let clip = sheet.clip(name);
@@ -134,17 +137,19 @@ fn advance_sprite<H: Host>(sprite: &SpriteFields<H>, delta: f32) {
     });
     let Some(clip) = found else {
         sprite.playing.set(false);
-        return;
+        return None;
     };
     let (index, time) = clip_position(clip, sprite.clip_time.get());
-    if !clip.looping && index >= clip.frames.len() {
-        sprite.playing.set(false);
-    }
     let last = clip.frames.len().saturating_sub(1);
     if let Some(&frame) = clip.frames.get(index.min(last)) {
         sprite.frame.set(frame);
     }
     sprite.clip_time.set(time + delta);
+    let ended = !clip.looping && index >= clip.frames.len();
+    ended.then(|| {
+        sprite.playing.set(false);
+        clip.name.clone()
+    })
 }
 
 /// The frame of `clip` shown after `time` seconds (past its end for a
@@ -310,6 +315,21 @@ mod tests {
         assert!(is_playing::<TestHost>(&hero));
         assert_eq!(frames_shown(&hero, 2), [2, 2]);
         assert!(!is_playing::<TestHost>(&hero));
+    }
+
+    #[test]
+    fn ended_clips_tell_the_sprite_once() {
+        let hero = hero();
+        play::<TestHost>(&hero, "attack");
+
+        frames_shown(&hero, 2);
+        assert_eq!(hero.calls(), Vec::<String>::new());
+        frames_shown(&hero, 3);
+        assert_eq!(hero.calls(), ["finished attack"]);
+
+        play::<TestHost>(&hero, "run");
+        frames_shown(&hero, 10);
+        assert_eq!(hero.calls(), ["finished attack"]);
     }
 
     #[test]

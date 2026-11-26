@@ -60,7 +60,7 @@ struct Game {
 
 const COUNTING_GAME: &str = game_file!("counting_game.star");
 
-const GAMES: [Game; 7] = [
+const GAMES: [Game; 8] = [
     Game {
         name: "counting_game",
         source: COUNTING_GAME,
@@ -116,6 +116,15 @@ const GAMES: [Game; 7] = [
         bindings: &BINDINGS,
         main_scene: None,
         ending: Ending::Prints(game_file!("coroutine_game.out")),
+        warns: None,
+    },
+    Game {
+        name: "animation_game",
+        source: game_file!("animation_game.star"),
+        scenes: &[("hero.frames", game_file!("hero.frames"))],
+        bindings: &BINDINGS,
+        main_scene: None,
+        ending: Ending::Prints(game_file!("animation_game.out")),
         warns: None,
     },
     // Never quits by itself: played only with a scene it cannot load.
@@ -245,7 +254,8 @@ fn action_map(actions: &[InputAction]) -> EngineResult<ActionMap> {
     Ok(map)
 }
 
-/// An asset folder of its own for `game`, with its scenes in `levels`.
+/// An asset folder of its own for `game`, with its scenes (and other
+/// files, such as `.frames`) in `levels`.
 fn asset_folder(game: &Game) -> PathBuf {
     let folder = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
         .join("interpreted_games")

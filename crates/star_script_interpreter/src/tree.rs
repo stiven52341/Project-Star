@@ -440,11 +440,13 @@ pub(crate) enum NodeMethod {
     SetGlobalPosition3D,
     Translate3D,
     TranslateGlobal3D,
-    /// `play`, `stop`, `is_playing` and `animation` of `Sprite`.
+    /// `play`, `stop`, `is_playing`, `animation` and the event
+    /// `animation_finished` of `Sprite`.
     Play,
     Stop,
     IsPlaying,
     Animation,
+    AnimationFinished,
 }
 
 impl NodeMethod {
@@ -483,6 +485,7 @@ impl NodeMethod {
             "stop" => Self::Stop,
             "is_playing" => Self::IsPlaying,
             "animation" => Self::Animation,
+            "animation_finished" => Self::AnimationFinished,
             _ => return None,
         })
     }

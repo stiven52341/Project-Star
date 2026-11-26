@@ -434,6 +434,12 @@ fn add_sprite_class(classes: &mut ClassTable, node: ClassId, color: ClassId) -> 
         native_method("stop", &[], Type::Void, false),
         native_method("is_playing", &[], Type::Bool, false),
         native_method("animation", &[], Type::String, false),
+        native_method(
+            "animation_finished",
+            &[("name", Type::String)],
+            Type::Void,
+            false,
+        ),
     ];
     classes.add(sprite)
 }

@@ -198,7 +198,7 @@ if let ::std::option::Option::Some(node_) = node_ {
 }";
 
 /// The methods of `Sprite`: playing the clips of its `.frames` file.
-const SPRITE_METHODS: [Method; 4] = [
+const SPRITE_METHODS: [Method; 5] = [
     Method {
         name: "play",
         parameters: "name: ::std::string::String",
@@ -223,6 +223,12 @@ const SPRITE_METHODS: [Method; 4] = [
         arguments: "",
         returns: " -> ::std::string::String",
     },
+    Method {
+        name: "animation_finished",
+        parameters: "name: ::std::string::String",
+        arguments: "name",
+        returns: "",
+    },
 ];
 
 /// `func play`: plays a clip of the sprite's `frames`.
@@ -244,6 +250,10 @@ node_.is_some_and(|node_| ::star_script_runtime::animations::is_playing::<crate:
 /// `func animation`: the clip the sprite plays, or played last.
 const ANIMATION_BODY: &str = "let node_ = crate::AnyObject::Node(::std::rc::Rc::clone(this_));
 node_.map(|node_| ::star_script_runtime::animations::animation::<crate::classes::Host_>(&node_)).unwrap_or_default()";
+
+/// `func animation_finished`: what a sprite does when a clip ends, unless
+/// its script says: nothing.
+const ANIMATION_FINISHED_BODY: &str = "";
 
 /// An engine node class written from a description. Its own fields are a
 /// type of `star_script_runtime`, shared with every way of running
@@ -277,7 +287,13 @@ const SPRITE: NodeClass = NodeClass {
     new_fields: "Fields::new(texture)",
     parameters: &[("texture", STRING)],
     methods: &SPRITE_METHODS,
-    bodies: &[PLAY_BODY, STOP_BODY, IS_PLAYING_BODY, ANIMATION_BODY],
+    bodies: &[
+        PLAY_BODY,
+        STOP_BODY,
+        IS_PLAYING_BODY,
+        ANIMATION_BODY,
+        ANIMATION_FINISHED_BODY,
+    ],
 };
 
 const CAMERA_2D: NodeClass = NodeClass {

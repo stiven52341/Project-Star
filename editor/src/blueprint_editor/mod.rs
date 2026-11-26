@@ -25,7 +25,7 @@ use eframe::egui;
 use star_blueprint::{Blueprint, Origin};
 
 use self::canvas::{CanvasState, NodeMistakes};
-use self::creation::{START_EVENT, UPDATE_EVENT};
+use self::creation::{ANIMATION_FINISHED_EVENT, START_EVENT, UPDATE_EVENT, missing_events};
 pub(crate) use self::creation::{new_blueprint_text, new_script_text};
 use self::names::BlueprintNames;
 pub(crate) use self::templates::BlueprintTemplate;
@@ -285,12 +285,14 @@ fn event_hint(name: &str) -> Option<&'static str> {
     match name {
         START_EVENT => Some(texts::current().start_event_hint),
         UPDATE_EVENT => Some(texts::current().update_event_hint),
+        ANIMATION_FINISHED_EVENT => Some(texts::current().animation_finished_hint),
         _ => None,
     }
 }
 
-/// “New graph” and “Delete this graph”. Returns whether the
-/// blueprint changed.
+/// “New graph”, one entry per event of the engine the blueprint does not
+/// redefine yet, and “Delete this graph”. Returns whether the blueprint
+/// changed.
 fn show_graphs_menu(
     ui: &mut egui::Ui,
     blueprint: &mut Blueprint,
@@ -310,6 +312,19 @@ fn show_graphs_menu(
             *selected = blueprint.graphs.len() - 1;
             canvas.show_other_graph();
             changed = true;
+        }
+        for event in missing_events(blueprint) {
+            let label = format!("{}: {}", texts::current().event_graph, event.name);
+            let mut button = ui.button(label);
+            if let Some(hint) = event_hint(&event.name) {
+                button = button.on_hover_text(hint);
+            }
+            if button.clicked() {
+                blueprint.graphs.push(event);
+                *selected = blueprint.graphs.len() - 1;
+                canvas.show_other_graph();
+                changed = true;
+            }
         }
         let can_delete = *selected < blueprint.graphs.len();
         if ui
@@ -343,6 +358,10 @@ mod tests {
         assert_eq!(
             event_hint("update"),
             Some(texts::current().update_event_hint)
+        );
+        assert_eq!(
+            event_hint("animation_finished"),
+            Some(texts::current().animation_finished_hint)
         );
         assert_eq!(event_hint("spin"), None);
     }

@@ -16,7 +16,7 @@ use crate::texts;
 
 /// Methods the engine calls itself, which a blueprint redefines as graphs
 /// rather than calls.
-pub(super) const EVENTS: [&str; 2] = ["start", "update"];
+pub(super) const EVENTS: [&str; 3] = ["start", "update", "animation_finished"];
 /// The members of nodes that place them, gathered under “Transform”.
 const TRANSFORM_MEMBERS: [(&str, &str); 22] = [
     (NODE_CLASS, "x"),

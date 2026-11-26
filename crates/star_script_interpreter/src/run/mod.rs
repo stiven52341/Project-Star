@@ -21,7 +21,7 @@ use crate::host::GameObject;
 use crate::tree::{
     Arithmetic, Class, ClassRef, Code, Constructor, ConstructorId, ConstructorRef, EngineCall,
     EngineClass, EngineMethod, Entry, Expression, FieldRef, Function, FunctionId, MethodTarget,
-    Statement,
+    NodeMethod, Statement,
 };
 use crate::value::{Elements, Object, Value, read, write};
 
@@ -29,12 +29,14 @@ use crate::{Output, ProgramKind};
 pub(crate) use scenes::{create, set_exported};
 
 /// What the engine calls on a node or the game.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) enum Hook {
     /// `start`, once.
     Start,
     /// `update`, every frame, with the seconds since the last one.
     Update(f32),
+    /// `animation_finished` of a sprite, with the clip that ended.
+    AnimationFinished(Arc<str>),
 }
 
 /// What the usual runner says of code that only coroutines can run.
@@ -200,6 +202,10 @@ impl Machine {
         let (method, arguments) = match hook {
             Hook::Start => (EngineMethod::Start, vec![object]),
             Hook::Update(delta) => (EngineMethod::Update, vec![object, Value::Float(delta)]),
+            Hook::AnimationFinished(name) => (
+                EngineMethod::Node(NodeMethod::AnimationFinished),
+                vec![object, Value::String(name)],
+            ),
         };
         self.engine(method, EngineCall::Object { null_safe: false }, arguments)
             .map(drop)

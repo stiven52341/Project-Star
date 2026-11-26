@@ -590,6 +590,12 @@ impl ::star_script_runtime::nodes::Host for Host_ {
         crate::classes::Node::Object::update(::std::rc::Rc::clone(node), delta);
     }
 
+    fn animation_finished(node: &Self::Node, name: &str) {
+        if let ::std::option::Option::Some(sprite_) = crate::AnyObject::Sprite(::std::rc::Rc::clone(node)) {
+            crate::classes::Sprite::Object::animation_finished(sprite_, ::std::borrow::ToOwned::to_owned(name));
+        }
+    }
+
     fn game(game: &Self::Game) -> &::star_script_runtime::game::GameFields<Self> {
         crate::classes::Game::HasFields::fields(&**game)
     }

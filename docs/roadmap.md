@@ -1240,8 +1240,12 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           `animation()` (methods, as `Sound`'s), the frame moved on by the
           runtime after each `update`, and the clip a scene's sprite starts
           with (`[node.sprite]` `frames` and `animation`).
-    - [ ] 15a.3 The `animation_finished(name)` event, also as a blueprint
-          graph.
+    - [x] 15a.3 The `animation_finished(name)` event, also as a blueprint
+          graph: a sprite's method the runtime calls when a clip that does
+          not loop ends (compiled and interpreted, with a game of each
+          `engine_game` and `window` play), and an entry of the blueprint's
+          “Graphs” menu for each event of its engine base it does not
+          redefine yet (so `start` and `update` can come back too).
     - [ ] 15a.4 The editor's frames panel: cutting the sheet, picking each
           clip's cells by clicking them, speed, loop and a preview; the
           inspector chooses a sprite's `.frames` and first clip.

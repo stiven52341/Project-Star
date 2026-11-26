@@ -240,6 +240,8 @@ pub(super) static SPANISH: Texts = Texts {
     new_graph: "Nuevo gráfico",
     start_event_hint: "El motor lo ejecuta una vez, cuando el nodo entra al juego, antes del primer frame (aquí Time.delta() todavía es 0).",
     update_event_hint: "El motor lo ejecuta en cada frame. Su entrada da delta, los segundos del frame: úsalo para mover y girar.",
+    animation_finished_hint: "El motor lo ejecuta cuando termina un clip del sprite que no se repite. Su entrada da name, el nombre del clip.",
+    event_graph: "Evento",
     delete_graph: "Borrar este gráfico",
     variables: "Variables",
     name: "Nombre",

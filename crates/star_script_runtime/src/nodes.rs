@@ -110,6 +110,9 @@ pub trait Host: Sized + 'static {
     fn start(node: &Self::Node);
     /// Runs the `update` of `node`: its script's, or `Node`'s.
     fn update(node: &Self::Node, delta: f32);
+    /// Runs the `animation_finished` of `node`, if it is a sprite: its
+    /// script's, or `Sprite`'s (nothing).
+    fn animation_finished(node: &Self::Node, name: &str);
     /// The fields of `Game` in `game`.
     fn game(game: &Self::Game) -> &GameFields<Self>;
     /// Runs the `start` of `game`.

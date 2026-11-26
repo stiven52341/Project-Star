@@ -307,6 +307,11 @@ impl Host for Interpreted {
         play::run_hook(Value::Node(Rc::clone(node)), Hook::Update(delta));
     }
 
+    fn animation_finished(node: &Self::Node, name: &str) {
+        let hook = Hook::AnimationFinished(Arc::from(name));
+        play::run_hook(Value::Node(Rc::clone(node)), hook);
+    }
+
     fn game(game: &Self::Game) -> &GameFields<Self> {
         &game.engine
     }

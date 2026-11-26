@@ -565,6 +565,8 @@ fn node_method(
             Value::Null
         }
         (NodeMethod::IsPlaying, []) => Value::Bool(animations::is_playing::<Runtime>(node)),
+        // What a sprite does when a clip ends, unless its script says.
+        (NodeMethod::AnimationFinished, [_]) => Value::Null,
         (NodeMethod::Animation, []) => {
             Value::String(Arc::from(animations::animation::<Runtime>(node)))
         }

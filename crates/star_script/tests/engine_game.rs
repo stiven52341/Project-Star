@@ -24,6 +24,8 @@ const NODE_GAME: &str = include_str!("games/node_game.star");
 const PHYSICS_GAME: &str = include_str!("games/physics_game.star");
 const PHYSICS_3D_GAME: &str = include_str!("games/physics_3d_game.star");
 const COROUTINE_GAME: &str = include_str!("games/coroutine_game.star");
+const ANIMATION_GAME: &str = include_str!("games/animation_game.star");
+const HERO_FRAMES: &str = include_str!("games/hero.frames");
 const FLOOR_SCENE: &str = include_str!("games/floor.scene");
 const FLOOR_3D_SCENE: &str = include_str!("games/floor_3d.scene");
 const FLEET_SCENE: &str = include_str!("games/fleet.scene");
@@ -88,6 +90,12 @@ fn games_run_in_the_engine_until_they_quit() {
             compile_with("coroutine_game", COROUTINE_GAME, &valid),
         )
         .expect("valid name");
+    package
+        .add_program(
+            "animation_game",
+            compile_with("animation_game", ANIMATION_GAME, &valid),
+        )
+        .expect("valid name");
     // Never quits by itself: played only with a scene it cannot load.
     let scene_only = GameSettings {
         main_scene: Some(MainScene {
@@ -127,6 +135,10 @@ fn games_run_in_the_engine_until_they_quit() {
     let (stdout, _) = play(&directory, "coroutine_game");
     // The blinker's coroutine ends with frame 3, when it leaves the tree.
     assert_eq!(stdout, include_str!("games/coroutine_game.out"));
+
+    std::fs::write(levels.join("hero.frames"), HERO_FRAMES).expect("frames written");
+    let (stdout, _) = play(&directory, "animation_game");
+    assert_eq!(stdout, include_str!("games/animation_game.out"));
 
     scene_only_games_need_their_scene(&directory);
 

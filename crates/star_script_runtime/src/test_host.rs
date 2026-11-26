@@ -211,6 +211,10 @@ impl Host for TestHost {
         }
     }
 
+    fn animation_finished(node: &Self::Node, name: &str) {
+        node.calls.borrow_mut().push(format!("finished {name}"));
+    }
+
     fn game(game: &Self::Game) -> &GameFields<Self> {
         &game.fields
     }

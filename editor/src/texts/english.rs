@@ -240,6 +240,8 @@ pub(super) static ENGLISH: Texts = Texts {
     new_graph: "New graph",
     start_event_hint: "Run once by the engine, when the node enters the game, before the first frame (Time.delta() is still 0 here).",
     update_event_hint: "Run by the engine every frame. Its entry gives delta, the seconds of the frame: use it to move and rotate.",
+    animation_finished_hint: "Run by the engine when a clip of the sprite that does not loop ends. Its entry gives name, the clip's name.",
+    event_graph: "Event",
     delete_graph: "Delete this graph",
     variables: "Variables",
     name: "Name",
