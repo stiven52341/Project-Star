@@ -175,6 +175,8 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
             .draw_sprite_files(&self.world, renderer, &mut self.frame)?;
         self.assets
             .draw_mesh_files(&self.world, renderer, &mut self.frame)?;
+        self.assets
+            .draw_models(&self.world, renderer, &mut self.frame)?;
         self.game.draw(&self.world, &mut self.frame);
         renderer.render(&self.frame)
     }

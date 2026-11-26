@@ -14,6 +14,7 @@ use crate::body_data::{Body3dData, BodyData};
 use crate::bone_node::{Bone2dNode, BoneData};
 use crate::camera_node::{Camera2dData, Camera3dData};
 use crate::light_2d_node::Light2dData;
+use crate::model_node::{ModelData, ModelNode};
 use crate::node_3d_data::{LightData, MeshOutline, MeshTable, Transform3dData};
 use crate::scene_file::{FORMAT_VERSION, NodeData, SceneFile, SpriteData};
 use crate::{
@@ -70,6 +71,8 @@ pub struct NodeOutline {
     pub animator: Option<AnimatorOutline>,
     /// The bone it is, for cut-out characters.
     pub bone: Option<Bone2dNode>,
+    /// The 3D model it shows, if any.
+    pub model: Option<ModelNode>,
     /// The values of the `export` fields of its class, by name.
     pub fields: BTreeMap<String, FieldValue>,
 }
@@ -360,6 +363,14 @@ fn validate_main_camera(nodes: &[NodeOutline]) -> EngineResult<()> {
     }
 }
 
+/// The part a table of a node gives, if the node has the table.
+fn read_part<Data, Part>(
+    data: Option<&Data>,
+    read: impl FnOnce(&Data) -> EngineResult<Part>,
+) -> EngineResult<Option<Part>> {
+    data.map(read).transpose()
+}
+
 fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
     let has_transform = node.position.is_some() || node.rotation.is_some() || node.scale.is_some();
     let transform = has_transform.then(|| Transform2D {
@@ -367,67 +378,26 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         rotation: node.rotation.unwrap_or_default(),
         scale: node.scale.map_or(Vec2::ONE, vec2),
     });
-    let sprite = node
-        .sprite
-        .as_ref()
-        .map(read_sprite)
-        .transpose()
-        .map_err(|error| EngineError::Scene(format!("node \"{}\": {error}", node.name)))?;
     let named = |error: EngineError| EngineError::Scene(format!("node \"{}\": {error}", node.name));
-    let body = node
-        .body
-        .as_ref()
-        .map(BodyData::to_settings)
-        .transpose()
-        .map_err(named)?;
-    let body_3d = node
-        .body_3d
-        .as_ref()
-        .map(Body3dData::to_settings)
-        .transpose()
-        .map_err(named)?;
-    let mesh = node
-        .mesh
-        .as_ref()
-        .map(crate::node_3d_data::MeshTable::to_outline)
-        .transpose()
-        .map_err(named)?;
-    let light = node
-        .light
-        .as_ref()
-        .map(crate::node_3d_data::LightData::to_light)
-        .transpose()
-        .map_err(named)?;
-    let camera = node
-        .camera
-        .as_ref()
-        .map(Camera2dData::to_camera)
-        .transpose()
-        .map_err(named)?;
-    let camera_3d = node
-        .camera_3d
-        .as_ref()
-        .map(Camera3dData::to_camera)
-        .transpose()
-        .map_err(named)?;
-    let animator = node
-        .animator
-        .as_ref()
-        .map(AnimatorData::to_outline)
-        .transpose()
-        .map_err(named)?;
-    let light_2d = node
-        .light_2d
-        .as_ref()
-        .map(Light2dData::to_light)
-        .transpose()
-        .map_err(named)?;
-    let bone = node
-        .bone
-        .as_ref()
-        .map(BoneData::to_bone)
-        .transpose()
-        .map_err(named)?;
+    let sprite = read_part(node.sprite.as_ref(), read_sprite).map_err(named)?;
+    let body = read_part(node.body.as_ref(), BodyData::to_settings).map_err(named)?;
+    let body_3d = read_part(node.body_3d.as_ref(), Body3dData::to_settings).map_err(named)?;
+    let mesh = read_part(
+        node.mesh.as_ref(),
+        crate::node_3d_data::MeshTable::to_outline,
+    )
+    .map_err(named)?;
+    let light = read_part(
+        node.light.as_ref(),
+        crate::node_3d_data::LightData::to_light,
+    )
+    .map_err(named)?;
+    let camera = read_part(node.camera.as_ref(), Camera2dData::to_camera).map_err(named)?;
+    let camera_3d = read_part(node.camera_3d.as_ref(), Camera3dData::to_camera).map_err(named)?;
+    let animator = read_part(node.animator.as_ref(), AnimatorData::to_outline).map_err(named)?;
+    let light_2d = read_part(node.light_2d.as_ref(), Light2dData::to_light).map_err(named)?;
+    let bone = read_part(node.bone.as_ref(), BoneData::to_bone).map_err(named)?;
+    let model = read_part(node.model.as_ref(), ModelData::to_model).map_err(named)?;
     if node
         .class
         .as_deref()
@@ -459,6 +429,7 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         camera_3d,
         animator,
         bone,
+        model,
         fields: node.fields,
     })
 }
@@ -513,6 +484,7 @@ fn write_node(node: &NodeOutline) -> NodeData {
         camera_3d: node.camera_3d.map(Camera3dData::from_camera),
         animator: node.animator.as_ref().map(AnimatorData::from_outline),
         bone: node.bone.map(BoneData::from_bone),
+        model: node.model.as_ref().map(ModelData::from_model),
         fields: node.fields.clone(),
     }
 }
@@ -612,6 +584,23 @@ mod tests {
             animator.states.as_ref().map(AssetPath::as_str),
             Some("knight.states")
         );
+        assert_eq!(
+            SceneOutline::from_text(&outline.to_text().unwrap()).unwrap(),
+            outline
+        );
+    }
+
+    #[test]
+    fn models_and_bones_are_read_and_written() {
+        let text = "format = 1\n[[node]]\nname = \"Knight\"\n[node.transform_3d]\n\
+                    [node.model]\nfile = \"chars/knight.glb\"\n\
+                    [[node]]\nname = \"Arm\"\nparent = 0\n[node.bone]\nlength = 0.8\n";
+
+        let outline = SceneOutline::from_text(text).unwrap();
+
+        let model = outline.nodes()[0].model.as_ref().unwrap();
+        assert_eq!(model.file.as_str(), "chars/knight.glb");
+        assert_eq!(outline.nodes()[1].bone.map(|bone| bone.length), Some(0.8));
         assert_eq!(
             SceneOutline::from_text(&outline.to_text().unwrap()).unwrap(),
             outline

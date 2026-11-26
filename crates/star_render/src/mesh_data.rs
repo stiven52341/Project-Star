@@ -3,7 +3,7 @@
 
 use std::f32::consts::{PI, TAU};
 
-use star_core::{EngineError, EngineResult};
+use star_core::{EngineError, EngineResult, ModelPart};
 use star_math::{Vec2, Vec3};
 
 /// The fewest segments around a sphere: fewer would not enclose anything.
@@ -130,6 +130,28 @@ impl MeshData {
             ));
         }
         Ok(Self { vertices, indices })
+    }
+
+    /// The mesh of a part of a 3D model, in the part's own space.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Rendering`] as [`MeshData::new`].
+    pub fn from_model_part(part: &ModelPart) -> EngineResult<Self> {
+        let vertices = part
+            .vertices
+            .iter()
+            .map(|vertex| {
+                let point = |[x, y, z]: [f32; 3]| Vec3::new(x, y, z);
+                let [u, v] = vertex.uv;
+                MeshVertex::new(
+                    point(vertex.position),
+                    point(vertex.normal),
+                    Vec2::new(u, v),
+                )
+            })
+            .collect();
+        Self::new(vertices, part.indices.clone())
     }
 
     /// A box of `size` (width, height and depth) centered on the origin,
@@ -341,6 +363,27 @@ fn is_finite(vertex: &MeshVertex) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn model_parts_become_meshes_of_their_vertices() {
+        let corner = |x: f32| star_core::ModelVertex {
+            position: [x, 0.0, 0.0],
+            normal: [0.0, 1.0, 0.0],
+            uv: [x, 1.0],
+        };
+        let part = ModelPart {
+            vertices: vec![corner(0.0), corner(1.0), corner(2.0)],
+            indices: vec![0, 2, 1],
+            material: star_core::ModelMaterial::default(),
+            transform: star_core::model::IDENTITY_COLUMNS,
+        };
+
+        let mesh = MeshData::from_model_part(&part).unwrap();
+
+        assert_eq!(mesh.indices(), [0, 2, 1]);
+        assert_eq!(mesh.vertices()[2].position, Vec3::new(2.0, 0.0, 0.0));
+        assert_eq!(mesh.vertices()[1].uv, Vec2::new(1.0, 1.0));
+    }
 
     const TOLERANCE: f32 = 1e-4;
 

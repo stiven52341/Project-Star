@@ -8,9 +8,12 @@ use star_core::{EngineResult, Sound};
 use star_ecs::World;
 use star_math::Mat4;
 use star_render::{Frame, Mesh3dId, MeshShape, Renderer, TextureFilter, TextureId};
-use star_scene::{GlobalTransform2D, GlobalTransform3D, Scene, SceneAssets, SpriteNode, is_shown};
+use star_scene::{
+    GlobalTransform2D, GlobalTransform3D, ModelNode, Scene, SceneAssets, SpriteNode, is_shown,
+};
 
 use crate::mesh_file::MeshFile;
+use crate::model_library::{ModelLibrary, upload_model};
 use crate::sound_library::SoundLibrary;
 use crate::sprite_file::SpriteFile;
 use crate::texture_library::TextureLibrary;
@@ -23,6 +26,7 @@ pub(crate) struct GameAssets {
     sounds: SoundLibrary,
     /// Every shape's mesh, built once; few shapes are used, so a list.
     meshes: Vec<(MeshShape, Mesh3dId)>,
+    models: ModelLibrary,
 }
 
 impl GameAssets {
@@ -33,6 +37,7 @@ impl GameAssets {
             textures: TextureLibrary::new(hot_reload),
             sounds: SoundLibrary::default(),
             meshes: Vec::new(),
+            models: ModelLibrary::default(),
         }
     }
 
@@ -143,6 +148,29 @@ impl GameAssets {
                 |error| log::warn!("{error}"),
             );
             frame.draw_mesh_3d(mesh, material, global.matrix() * Mat4::from_scale(scale));
+        })
+    }
+
+    /// Adds to `frame` every part of the model of each node with a
+    /// [`ModelNode`] and a global 3D transform that is not hidden, reading
+    /// and uploading each model the first time. A model that cannot be read
+    /// logs a warning once, and is not drawn.
+    pub(crate) fn draw_models(
+        &mut self,
+        world: &World,
+        renderer: &mut Renderer,
+        frame: &mut Frame,
+    ) -> EngineResult<()> {
+        world.each::<(&GlobalTransform3D, &ModelNode)>(|entity, (global, node)| {
+            if !is_shown(world, entity) {
+                return;
+            }
+            let parts = self.models.load(&self.folder, &node.file, |model| {
+                upload_model(renderer, model)
+            });
+            for part in parts.iter().flat_map(|parts| parts.iter()) {
+                frame.draw_mesh_3d(part.mesh, part.material, global.matrix() * part.transform);
+            }
         })
     }
 

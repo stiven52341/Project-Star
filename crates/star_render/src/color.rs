@@ -56,6 +56,18 @@ impl Color {
         )
     }
 
+    /// The sRGB color of a color given in linear space, as model files
+    /// (glTF) give them. Alpha is kept unchanged.
+    #[must_use]
+    pub fn from_linear(linear: Self) -> Self {
+        Self::rgba(
+            linear_to_srgb(linear.r),
+            linear_to_srgb(linear.g),
+            linear_to_srgb(linear.b),
+            linear.a,
+        )
+    }
+
     /// The color as a render target of `format` expects it: linear for sRGB
     /// targets (the GPU encodes it again), unchanged for the others.
     pub(crate) fn in_target_space(self, format: wgpu::TextureFormat) -> Self {
@@ -90,11 +102,31 @@ fn srgb_to_linear(component: f32) -> f32 {
     }
 }
 
+fn linear_to_srgb(component: f32) -> f32 {
+    if component <= SRGB_LINEAR_THRESHOLD / SRGB_LINEAR_SLOPE {
+        component * SRGB_LINEAR_SLOPE
+    } else {
+        (1.0 + SRGB_OFFSET) * component.powf(1.0 / SRGB_GAMMA) - SRGB_OFFSET
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const TOLERANCE: f32 = 1e-4;
+
+    #[test]
+    fn colors_go_to_linear_space_and_back() {
+        for gray in [0.0, 0.01, 0.2, 0.5, 0.9, 1.0] {
+            let color = Color::rgba(gray, gray, gray, 0.3);
+
+            let back = Color::from_linear(color.to_linear());
+
+            assert!((back.r - gray).abs() < TOLERANCE, "{gray}: {back:?}");
+            assert!((back.a - 0.3).abs() < TOLERANCE);
+        }
+    }
 
     #[test]
     fn black_and_white_are_unchanged_in_linear_space() {

@@ -236,6 +236,11 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   `[node.camera]` (`view_height`, `main`) on 2D nodes and
   `[node.camera_3d]` (`fov` in radians, `main`) on 3D ones; what they
   leave out takes its default, and the editor draws what each one sees.
+  Models are an optional `[node.model]` (`file`: a `.glb` or `.gltf` of
+  the assets) on 3D nodes (decision 83): a `star_scene::ModelNode` that
+  only names its file; the engine reads and uploads each model the first
+  time it draws it (`model_library`), once per file, and draws every part
+  of it at the node's place (a file that cannot be read warns once).
   Bones are an optional `[node.bone]` (`length`, 0.5 if left out) on 2D
   nodes (decision 82); the editor draws each one as a diamond from its
   node along its rotation, picks it by clicking it, and starts the nodes

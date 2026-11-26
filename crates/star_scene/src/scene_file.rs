@@ -12,6 +12,7 @@ use crate::body_data::{Body3dData, BodyData};
 use crate::bone_node::BoneData;
 use crate::camera_node::{Camera2dData, Camera3dData};
 use crate::light_2d_node::Light2dData;
+use crate::model_node::ModelData;
 use crate::node_3d_data::{LightData, MeshTable, Transform3dData};
 
 /// The version of the layout this engine writes and reads.
@@ -74,6 +75,8 @@ pub(crate) struct NodeData {
     pub(crate) animator: Option<AnimatorData>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) bone: Option<BoneData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) model: Option<ModelData>,
     /// `[node.fields]`: the values of the `export` fields of its class.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub(crate) fields: BTreeMap<String, FieldValue>,
@@ -240,6 +243,7 @@ mod tests {
                 camera_3d: None,
                 animator: None,
                 bone: None,
+                model: None,
                 fields: BTreeMap::new(),
             }],
         };

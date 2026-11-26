@@ -1364,7 +1364,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       - [x] 15f.2a Models in memory (`star_core::Model`) and reading glTF
             files (`.glb`, `.gltf` with its files beside it) in
             `star_assets`, through the `gltf` crate.
-      - [ ] 15f.2b Showing models: the engine's `ModelNode`, drawn with the
+      - [x] 15f.2b Showing models: the engine's `ModelNode`, drawn with the
             3D meshes, and `[node.model]` in scenes.
       - [ ] 15f.2c StarScript's `Model`, compiled and interpreted.
       - [ ] 15f.2d The editor: `.glb`/`.gltf` among the assets, dropped on

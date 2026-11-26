@@ -12,6 +12,7 @@ mod fallback_logger;
 pub mod game;
 mod game_assets;
 mod mesh_file;
+mod model_library;
 pub mod prelude;
 mod runtime;
 mod script_3d;

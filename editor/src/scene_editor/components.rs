@@ -343,6 +343,7 @@ pub(super) fn new_node(name: String, dimension: ProjectDimension) -> NodeOutline
         camera_3d: None,
         animator: None,
         bone: None,
+        model: None,
         fields: std::collections::BTreeMap::new(),
     }
 }
