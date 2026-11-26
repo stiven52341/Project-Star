@@ -46,6 +46,8 @@ pub struct SceneNode {
     /// The light it shines on the sprites; only `Light2D` objects can
     /// shine one.
     pub light_2d: Option<SceneLight>,
+    /// The bone it is; only `Bone2D` objects can be one.
+    pub bone: Option<SceneBone>,
     /// The 2D camera it is; only `Camera2D` objects can be one.
     pub camera: Option<SceneCamera>,
     /// The 3D camera it is; only `Camera3D` objects can be one.
@@ -65,6 +67,13 @@ pub struct SceneAnimator {
     pub animation: String,
     /// Asset path of the `.states` file of its machine; empty for none.
     pub states: String,
+}
+
+/// The bone a [`SceneNode`] is.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SceneBone {
+    /// How far it reaches along its rotation, in world units.
+    pub length: f32,
 }
 
 /// The 2D camera a [`SceneNode`] is.
@@ -319,6 +328,7 @@ mod tests {
             mesh: None,
             light: None,
             light_2d: None,
+            bone: None,
             camera: None,
             camera_3d: None,
             animator: None,

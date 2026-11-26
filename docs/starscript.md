@@ -465,6 +465,7 @@ The engine provides them; their names cannot be used for other classes.
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors), `columns`, `rows: int` (1), `frame: int` (0): its sprite sheet; `frames: string` (`""`): its `.frames` file; `play(name: string)`, `stop()`, `is_playing() -> bool`, `animation() -> string`; the event `animation_finished(name: string)` |
 | `Light2D` (extends `Node`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (3.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
 | `Animator` (extends `Node`) | `init(name: string)`; fields `animations: string` (`""`): its `.anim` file, and `states: string` (`""`): the `.states` file of its state machine; `play(name: string)`, `stop()`, `is_playing() -> bool`, `animation() -> string`; the event `animation_finished(name: string)`; its machine's `set_value(name: string, value: float)`, `set_flag(name: string, value: bool)`, `trigger(name: string)` and `state() -> string` |
+| `Bone2D` (extends `Node`) | `init(name: string)`; field `length: float` (0.5): how far the bone reaches along its rotation. Bones are joints of cut-out characters: their sprites are their children and turn with them; they are not drawn while the game plays (decision 82). A scene's bone is a `[node.bone]` (`length = 0.5`) |
 | `Camera2D` (extends `Node`) | `init(name: string)`; fields `view_height: float` (2.0), `main: bool` (`false`) |
 | `Node3D` (extends `Node`) | `init(name: string)`; fields `z`, `pitch`, `yaw: float` (0.0), `scale_z: float` (1.0); `look_at(x: float, y: float, z: float)`, `global_z() -> float`, `set_global_position_3d(x: float, y: float, z: float)`, `translate_3d(x: float, y: float, z: float)`, `translate_global_3d(x: float, y: float, z: float)` |
 | `Mesh` (extends `Node3D`) | `init(name: string, shape: string)`; fields `shape: string`, `width`, `height`, `depth` (1.0), `radius` (0.5), `color: Color` (white), `metallic` (0.0), `roughness: float` (0.5), `texture: string` (`""`: none), `pixelated: bool` (`false`) |
@@ -661,7 +662,7 @@ class Space extends Game {
   ```
 
   A track changes a field of the node's engine class (`x`, `y`,
-  `rotation`, `scale_x`, `scale_y`, `visible`; `z`, `pitch`, `yaw`,
+  `rotation`, `scale_x`, `scale_y`, `visible`; a bone's `length`; `z`, `pitch`, `yaw`,
   `scale_z` of a `Node3D`; a sprite's `texture`, `width`, `height`,
   `layer`, `pixelated`, `color`, `columns`, `rows`, `frame`; a mesh's or a
   light's numbers and `color`; a camera's `view_height` or `fov`) or else

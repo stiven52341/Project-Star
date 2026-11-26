@@ -8,7 +8,8 @@ use crate::List;
 use crate::bodies::BodyFields;
 use crate::game::GameFields;
 use crate::node_classes::{
-    AnimatorFields, Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields,
+    AnimatorFields, BoneFields, Camera2dFields, Camera3dFields, LightFields, MeshFields,
+    SpriteFields,
 };
 use crate::nodes::{self, Host, Node3dFields, NodeFields};
 use crate::scene_fields::SceneValue;
@@ -26,6 +27,7 @@ pub(crate) struct TestNode {
     pub(crate) camera_3d: Option<Camera3dFields>,
     pub(crate) sprite: Option<SpriteFields<TestHost>>,
     pub(crate) animator: Option<AnimatorFields>,
+    pub(crate) bone: Option<BoneFields>,
     /// The methods the host ran on it, in order.
     pub(crate) calls: RefCell<Vec<String>>,
     /// A node its next `update` takes out of the tree.
@@ -43,6 +45,7 @@ impl TestNode {
             camera_3d: None,
             sprite: None,
             animator: None,
+            bone: None,
             calls: RefCell::new(Vec::new()),
             removes: RefCell::new(None),
         }
@@ -149,6 +152,10 @@ impl Host for TestHost {
         node.animator.as_ref().map(read)
     }
 
+    fn with_bone<R>(node: &Self::Node, read: impl FnOnce(&BoneFields) -> R) -> Option<R> {
+        node.bone.as_ref().map(read)
+    }
+
     fn new_tags(tags: Vec<String>) -> Self::Tags {
         List::from_vec(tags)
     }
@@ -183,6 +190,7 @@ impl Host for TestHost {
                 node.sprite = Some(SpriteFields::new(texture.to_owned()));
             }
             NewNode::Animator => node.animator = Some(AnimatorFields::new()),
+            NewNode::Bone2D => node.bone = Some(BoneFields::new()),
             other => return Err(format!("the test host cannot create {other:?}")),
         }
         Ok(Rc::new(node))

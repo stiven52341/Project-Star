@@ -14,7 +14,8 @@ use star_script_runtime::color::ColorFields;
 use star_script_runtime::game::GameFields;
 use star_script_runtime::input::{action_state, axis, pointer};
 use star_script_runtime::node_classes::{
-    AnimatorFields, Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields,
+    AnimatorFields, BoneFields, Camera2dFields, Camera3dFields, LightFields, MeshFields,
+    SpriteFields,
 };
 use star_script_runtime::nodes::{self, Host as _, Node3dFields};
 use star_script_runtime::tweens::{self, Goal, Tween, TweenOptionsFields};
@@ -180,6 +181,10 @@ fn class_slot(class: &ClassParts, field: EngineField) -> Option<Slot<'_>> {
             EngineField::States => Some(Slot::Text(&animator.states)),
             _ => None,
         },
+        ClassParts::Bone2D(bone) => match field {
+            EngineField::Length => Some(Slot::Float(&bone.length)),
+            _ => None,
+        },
     }
 }
 
@@ -323,7 +328,8 @@ pub(super) fn new_object(
         | EngineClass::Mesh
         | EngineClass::Light
         | EngineClass::Camera3D
-        | EngineClass::Animator => Value::Node(Rc::new(Object::new(
+        | EngineClass::Animator
+        | EngineClass::Bone2D => Value::Node(Rc::new(Object::new(
             class,
             fields,
             node_parts(engine, arguments)?,
@@ -372,6 +378,7 @@ fn node_parts(engine: EngineClass, arguments: &[Value]) -> Result<NodeParts, Run
             return Ok(NodeParts::new_3d(text(name)?.to_owned(), camera));
         }
         (EngineClass::Animator, [name]) => (name, ClassParts::Animator(AnimatorFields::new())),
+        (EngineClass::Bone2D, [name]) => (name, ClassParts::Bone2D(BoneFields::new())),
         _ => return Err(RunError::Internal("a node without its arguments")),
     };
     Ok(NodeParts::new(text(name)?.to_owned(), parts))

@@ -178,6 +178,7 @@ pub(crate) fn create(name: String, class: NewNode<'_>) -> Result<Rc<NodeObject>,
         NewNode::Light { kind } => (EngineClass::Light, vec![text(kind)]),
         NewNode::Camera3D => (EngineClass::Camera3D, Vec::new()),
         NewNode::Animator => (EngineClass::Animator, Vec::new()),
+        NewNode::Bone2D => (EngineClass::Bone2D, Vec::new()),
         NewNode::Script(class) => {
             return play::scene_program()
                 .ok_or_else(|| NO_PROGRAM.to_owned())?

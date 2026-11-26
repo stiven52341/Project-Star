@@ -9,6 +9,7 @@ use star_physics::{BodySettings, Shape3d};
 use star_render::{Material, Mesh3dId, MeshShape, TextureFilter, TextureId};
 
 use crate::animator_node::AnimatorOutline;
+use crate::bone_node::Bone2dNode;
 use crate::node_3d_data::MeshOutline;
 use crate::scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
 use crate::{
@@ -51,6 +52,8 @@ struct SceneNode {
     camera_3d: Option<Camera3dNode>,
     /// Kept, as `class` is: worlds do not play animations yet.
     animator: Option<AnimatorOutline>,
+    /// Kept, as `class` is: bones only move the nodes under them.
+    bone: Option<Bone2dNode>,
     light_2d: Option<Light2dNode>,
     /// Kept, as `class` is, for the scene to be written again whole.
     fields: BTreeMap<String, FieldValue>,
@@ -276,6 +279,7 @@ fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResul
         camera: outline.camera,
         camera_3d: outline.camera_3d,
         animator: outline.animator,
+        bone: outline.bone,
         light_2d: outline.light_2d,
         fields: outline.fields,
     })
@@ -325,6 +329,7 @@ fn outline_node(node: &SceneNode, sources: &impl SceneSources) -> EngineResult<N
         camera: node.camera,
         camera_3d: node.camera_3d,
         animator: node.animator.clone(),
+        bone: node.bone,
         light_2d: node.light_2d,
         fields: node.fields.clone(),
     })
@@ -399,6 +404,7 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
         camera: world.get::<Camera2dNode>(entity).map(|camera| *camera),
         camera_3d: world.get::<Camera3dNode>(entity).map(|camera| *camera),
         animator: None,
+        bone: None,
         light_2d: world.get::<Light2dNode>(entity).map(|light| *light),
         fields: BTreeMap::new(),
     }

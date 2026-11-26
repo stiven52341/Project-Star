@@ -11,6 +11,9 @@ use star_engine::star_scene::{
     Camera2dNode, Camera3dNode, FieldValue, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
 };
 
+/// The property of a `Bone2D` beyond `Node`'s: how long it is.
+const BONE_LENGTH: &str = "length";
+
 /// The value of `property` of `node`; `None` if it has no such property,
 /// or an `export` field the scene gives no value.
 pub(super) fn value(node: &NodeOutline, property: &str) -> Option<FieldValue> {
@@ -36,6 +39,11 @@ pub(super) fn value(node: &NodeOutline, property: &str) -> Option<FieldValue> {
                 .and_then(|light| light_2d_value(light, property))
         })
         .or_else(|| camera_value(node.camera.as_ref(), node.camera_3d.as_ref(), property))
+        .or_else(|| {
+            node.bone
+                .filter(|_| property == BONE_LENGTH)
+                .map(|bone| float(bone.length))
+        })
         .or_else(|| node.fields.get(property).cloned())
 }
 
@@ -71,6 +79,12 @@ pub(super) fn set_value(node: &mut NodeOutline, property: &str, value: &FieldVal
                 property,
                 value,
             )
+        })
+        .or_else(|| {
+            node.bone
+                .as_mut()
+                .filter(|_| property == BONE_LENGTH)
+                .map(|bone| put(&mut bone.length, number(value)))
         });
     engine.unwrap_or_else(|| {
         node.fields.insert(property.to_owned(), value.clone());

@@ -43,8 +43,8 @@ pub(crate) use self::class_drop::ClassDrop;
 pub(crate) use self::components::LightKind;
 use self::components::NodeTemplate;
 pub(crate) use self::drawing::{
-    Marks, SceneGpu, cone_lines, cross_lines, cube_lines, game_aspect_ratio, pyramid_lines,
-    ray_lines, reach_lines, square_lines, view_lines,
+    Marks, SceneGpu, bone_lines, cone_lines, cross_lines, cube_lines, game_aspect_ratio,
+    pyramid_lines, ray_lines, reach_lines, square_lines, view_lines,
 };
 pub(crate) use self::dropping::ImageDrop;
 pub(crate) use self::gizmo::{
@@ -580,6 +580,19 @@ const fn stop_being_main(node: &mut NodeOutline) {
     }
 }
 
+/// Where the bone `node` ends in its own space, if it is a bone: the
+/// nodes added under it start there, as the next joint.
+fn bone_end(node: &NodeOutline) -> Option<f32> {
+    node.bone.map(|bone| bone.length)
+}
+
+/// Moves a new 2D `node` to `end` along its parent bone.
+const fn place_at_bone_end(node: &mut NodeOutline, end: f32) {
+    if let Some(transform) = &mut node.transform {
+        transform.position.x = end;
+    }
+}
+
 /// What changes the tree: adding, moving and deleting nodes.
 struct TreeEditor<'scene> {
     outline: &'scene mut SceneOutline,
@@ -594,6 +607,9 @@ impl TreeEditor<'_> {
         let mut node = template.build(name, self.dimension, images);
         if self.outline.main_camera().is_some() {
             stop_being_main(&mut node);
+        }
+        if let Some(end) = self.outline.nodes().get(parent).and_then(bone_end) {
+            place_at_bone_end(&mut node, end);
         }
         match self.outline.add_node(parent, node) {
             Ok(index) => {
@@ -822,6 +838,20 @@ mod tests {
             .collect();
         assert_eq!(names, ["One", "Node", "Node2"]);
         assert_eq!(scene.selected, Some(2));
+    }
+
+    #[test]
+    fn bones_added_under_a_bone_start_at_its_end() {
+        let (_assets, mut scene) = open_level("scene_document_bones");
+        let mut editor = tree_editor(&mut scene);
+
+        editor.add_child(ROOT, NodeTemplate::Bone2D, &[]);
+        editor.add_child(1, NodeTemplate::Bone2D, &[]);
+
+        let nodes = editor.outline.nodes();
+        let at = |index: usize| nodes[index].transform.map(|place| place.position.x);
+        assert_eq!(at(1), Some(0.0), "the root is not a bone");
+        assert_eq!(at(2), nodes[1].bone.map(|bone| bone.length));
     }
 
     #[test]

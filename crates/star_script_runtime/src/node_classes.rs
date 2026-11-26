@@ -211,6 +211,31 @@ impl Default for Camera3dFields {
     }
 }
 
+/// How long a new `Bone2D` is, in world units.
+const BONE_LENGTH: f32 = 0.5;
+
+/// The fields of a `Bone2D`: a joint of a cut-out character (decision 82).
+pub struct BoneFields {
+    /// `length`: how far it reaches along its rotation, in world units.
+    pub length: Field<f32>,
+}
+
+impl BoneFields {
+    /// A bone of the length bones start with.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            length: Field::new(BONE_LENGTH),
+        }
+    }
+}
+
+impl Default for BoneFields {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The time an animator has shown before showing any: below every call's.
 pub(crate) const BEFORE_START: f32 = -1.0;
 

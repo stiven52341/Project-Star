@@ -412,6 +412,7 @@ pub(super) fn engine_field(class: &str, field: &str) -> Option<EngineField> {
         ("Node", "visible") => EngineField::Visible,
         ("Animator", "animations") => EngineField::Animations,
         ("Animator", "states") => EngineField::States,
+        ("Bone2D", "length") => EngineField::Length,
         ("Node", "body") => EngineField::Body,
         ("Node3D", "z") => EngineField::Z,
         ("Node3D", "pitch") => EngineField::Pitch,

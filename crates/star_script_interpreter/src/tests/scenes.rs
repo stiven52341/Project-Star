@@ -26,6 +26,7 @@ fn scene_node(name: &str, class: Option<&str>, parent: Option<usize>) -> SceneNo
         camera: None,
         camera_3d: None,
         animator: None,
+        bone: None,
         fields: Vec::new(),
     }
 }

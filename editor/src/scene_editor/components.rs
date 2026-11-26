@@ -12,7 +12,7 @@ use star_engine::star_render::{
     DEFAULT_SPOT_BLEND, SpriteSheet,
 };
 use star_engine::star_scene::{
-    Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
+    Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
 };
 
 use super::animator_rows::new_animator;
@@ -87,6 +87,9 @@ pub(super) fn add_component_menu(
                 offer(ui, node.camera.is_none(), texts.camera_2d, &mut || {
                     node.camera = Some(Camera2dNode::default());
                 });
+                offer(ui, node.bone.is_none(), texts.bone_2d(), &mut || {
+                    node.bone = Some(Bone2dNode::default());
+                });
             }
             ProjectDimension::ThreeD => {
                 offer(
@@ -146,6 +149,9 @@ pub(super) enum NodeTemplate {
     SpotLight2D,
     Camera2D,
     Camera3D,
+    /// A joint of a cut-out character; under another bone it starts at
+    /// that one's end.
+    Bone2D,
     Body(BodyTemplate),
 }
 
@@ -202,6 +208,7 @@ impl NodeTemplate {
                 Self::PointLight2D,
                 Self::SpotLight2D,
                 Self::Camera2D,
+                Self::Bone2D,
             ],
             ProjectDimension::ThreeD => &[
                 Self::Empty,
@@ -232,6 +239,7 @@ impl NodeTemplate {
             Self::SpotLight2D => texts.spot_light_2d,
             Self::Camera2D => texts.camera_2d,
             Self::Camera3D => texts.camera_3d,
+            Self::Bone2D => texts.bone_2d(),
             Self::Body(body) => body.label(),
         }
     }
@@ -292,6 +300,7 @@ impl NodeTemplate {
                     ..Camera3dNode::default()
                 });
             }
+            Self::Bone2D => node.bone = Some(Bone2dNode::default()),
             Self::Body(body) => match dimension {
                 ProjectDimension::TwoD => {
                     node.body = Shape2d::rectangle(Vec2::ONE)
@@ -333,6 +342,7 @@ pub(super) fn new_node(name: String, dimension: ProjectDimension) -> NodeOutline
         light_2d: None,
         camera_3d: None,
         animator: None,
+        bone: None,
         fields: std::collections::BTreeMap::new(),
     }
 }

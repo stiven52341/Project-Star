@@ -9,7 +9,7 @@ use std::cmp::Ordering;
 
 use star_engine::MeshFile;
 use star_engine::prelude::{Affine2, Mat4, MeshShape, SceneOutline, Vec2, Vec3};
-use star_engine::star_scene::{NodeOutline, SpriteOutline};
+use star_engine::star_scene::{Bone2dNode, NodeOutline, SpriteOutline};
 
 use super::drawing::{POINT_MARK_SIZE, Place, places};
 
@@ -23,6 +23,9 @@ const PARALLEL_EPSILON: f32 = 1e-6;
 const SAME_DISTANCE: f32 = 1e-4;
 /// Half the side of the unit box meshes are made from.
 const UNIT_HALF: f32 = 0.5;
+/// How far from its line a click picks a bone, as a fraction of its
+/// length: a little wider than it is drawn.
+const BONE_PICK_WIDTH: f32 = 0.15;
 
 /// A line from the camera into the scene. Points along it are
 /// `origin + direction * distance`, distance 0 at the near plane and 1 at
@@ -140,8 +143,19 @@ fn flat_hit(node: &NodeOutline, global: Affine2, ray: Ray) -> Option<(f32, bool,
         let local = global.inverse()?.transform_point(point);
         return within_sprite(sprite, local).then_some((distance, true, sprite.layer));
     }
+    if let Some(bone) = node.bone
+        && within_bone(bone, global.inverse()?.transform_point(point))
+    {
+        return Some((distance, false, 0));
+    }
     let offset = point - global.translation();
     (offset.length() <= POINT_MARK_SIZE / 2.0).then_some((distance, false, 0))
+}
+
+/// Whether `local`, in the node's own space, falls on its bone: along its
+/// +x, within its length.
+fn within_bone(bone: Bone2dNode, local: Vec2) -> bool {
+    (0.0..=bone.length).contains(&local.x) && local.y.abs() <= bone.length * BONE_PICK_WIDTH
 }
 
 /// Whether `local`, in the node's own space, falls on its sprite.
@@ -248,6 +262,19 @@ mod tests {
         assert_eq!(node_at(&scene, down_at(-1.5, 1.5)), Some(1));
         assert_eq!(node_at(&scene, down_at(2.8, 0.2)), None);
         assert_eq!(node_at(&scene, down_at(3.5, 0.0)), None, "outside both");
+    }
+
+    #[test]
+    fn bones_are_hit_along_their_length() {
+        let scene = outline(
+            "[[node]]\nname = \"Root\"\n\
+             [[node]]\nname = \"Arm\"\nparent = 0\nposition = [0.0, 0.0]\nrotation = 1.5707964\n\
+             [node.bone]\nlength = 2.0\n",
+        );
+
+        assert_eq!(node_at(&scene, down_at(0.0, 1.5)), Some(1));
+        assert_eq!(node_at(&scene, down_at(1.5, 0.0)), None, "beside it");
+        assert_eq!(node_at(&scene, down_at(0.0, 2.5)), None, "past its end");
     }
 
     #[test]

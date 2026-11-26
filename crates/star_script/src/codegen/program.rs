@@ -11,13 +11,14 @@ use super::{
 use crate::Span;
 use crate::ast::{ClassDecl, ConstructorDecl, Expr, MemberKind, MethodDecl, VariableKind};
 use crate::semantic::{
-    ANIMATOR_CLASS, BODY_CLASS, CAMERA_3D_CLASS, CAMERA_CLASS, COLOR_CLASS, ClassId, ClassOrigin,
-    GAME_CLASS, LIGHT_2D_CLASS, LIGHT_CLASS, MESH_CLASS, MethodInfo, NODE_3D_CLASS, NODE_CLASS,
-    ParameterInfo, SOUND_CLASS, SPRITE_CLASS, SceneClassError, TWEEN_OPTIONS_CLASS, Type,
+    ANIMATOR_CLASS, BODY_CLASS, BONE_2D_CLASS, CAMERA_3D_CLASS, CAMERA_CLASS, COLOR_CLASS, ClassId,
+    ClassOrigin, GAME_CLASS, LIGHT_2D_CLASS, LIGHT_CLASS, MESH_CLASS, MethodInfo, NODE_3D_CLASS,
+    NODE_CLASS, ParameterInfo, SOUND_CLASS, SPRITE_CLASS, SceneClassError, TWEEN_OPTIONS_CLASS,
+    Type,
 };
 
 /// The engine classes of nodes, which `Scene.load` creates itself.
-const NATIVE_NODE_CLASSES: [&str; 9] = [
+const NATIVE_NODE_CLASSES: [&str; 10] = [
     NODE_CLASS,
     SPRITE_CLASS,
     CAMERA_CLASS,
@@ -27,10 +28,11 @@ const NATIVE_NODE_CLASSES: [&str; 9] = [
     LIGHT_CLASS,
     CAMERA_3D_CLASS,
     ANIMATOR_CLASS,
+    BONE_2D_CLASS,
 ];
 
 /// The engine classes that scripts can extend: the game and the nodes.
-const EXTENDABLE_NATIVE_CLASSES: [&str; 10] = [
+const EXTENDABLE_NATIVE_CLASSES: [&str; 11] = [
     GAME_CLASS,
     NODE_CLASS,
     SPRITE_CLASS,
@@ -41,11 +43,12 @@ const EXTENDABLE_NATIVE_CLASSES: [&str; 10] = [
     LIGHT_CLASS,
     CAMERA_3D_CLASS,
     ANIMATOR_CLASS,
+    BONE_2D_CLASS,
 ];
 
 /// The engine classes that have objects, and so a module and a conversion
 /// in `AnyObject`.
-const NATIVE_OBJECT_CLASSES: [&str; 14] = [
+const NATIVE_OBJECT_CLASSES: [&str; 15] = [
     GAME_CLASS,
     COLOR_CLASS,
     BODY_CLASS,
@@ -58,6 +61,7 @@ const NATIVE_OBJECT_CLASSES: [&str; 14] = [
     LIGHT_CLASS,
     CAMERA_3D_CLASS,
     ANIMATOR_CLASS,
+    BONE_2D_CLASS,
     SOUND_CLASS,
     TWEEN_OPTIONS_CLASS,
 ];

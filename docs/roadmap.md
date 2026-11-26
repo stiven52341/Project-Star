@@ -1351,9 +1351,12 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           Create > State machine, and the animator's “States” row.
   - [ ] 15f Skeletons (agreed with the owner, 2026-11-26: cut-out 2D
         first, and the `gltf` crate to import 3D models):
-    - [ ] 15f.1 2D bones: bone nodes that sprites hang from (cut-out
+    - [x] 15f.1 2D bones: bone nodes that sprites hang from (cut-out
           characters), animated by the `.anim` tracks; sprites that bend
-          with weighted polygons may come later.
+          with weighted polygons may come later. Decision 82: `Bone2D`
+          with a `length` (compiled and interpreted, conformance program
+          `bones`), `[node.bone]` in scenes, and the editor's “2D bone”
+          (drawn, picked, and new bones under a bone start at its end).
     - [ ] 15f.2 Importing glTF models (meshes and materials), wrapped by
           `star_assets`.
     - [ ] 15f.3 3D skinned meshes: a model's skeleton moving its mesh on

@@ -21,6 +21,7 @@ mod animation_states;
 mod animator_node;
 mod body_data;
 mod body_node;
+mod bone_node;
 mod camera_node;
 mod field_value;
 mod hierarchy;
@@ -45,6 +46,7 @@ pub use animation_states::{
 };
 pub use animator_node::AnimatorOutline;
 pub use body_node::{Body2D, Body3D, NodeBody};
+pub use bone_node::{Bone2dNode, DEFAULT_BONE_LENGTH};
 pub use camera_node::{Camera2dNode, Camera3dNode};
 pub use field_value::FieldValue;
 pub use hierarchy::{Children, Hierarchy, Name, Parent, Tags};

@@ -116,6 +116,16 @@ impl Texts {
         self.pick("None", "Ninguno")
     }
 
+    /// The section of a node's bone, the part the inspector adds and the
+    /// node “Create” makes.
+    pub(crate) const fn bone_2d(&self) -> &'static str {
+        self.pick("2D bone", "Hueso 2D")
+    }
+
+    pub(crate) const fn bone_length(&self) -> &'static str {
+        self.pick("Length", "Longitud")
+    }
+
     /// The section of a node's animator, and the part the inspector adds.
     pub(crate) const fn animator_section(&self) -> &'static str {
         self.pick("Animator", "Animador")

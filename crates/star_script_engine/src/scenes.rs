@@ -6,8 +6,8 @@ use star_engine::star_render::TextureFilter;
 use star_engine::star_scene::{FieldValue, NodeOutline, SceneOutline};
 use star_script_runtime::scene_fields::SceneValue;
 use star_script_runtime::scenes::{
-    SceneAnimator, SceneBody, SceneCamera, SceneCamera3D, SceneLight, SceneMesh, SceneNode,
-    SceneSprite, SceneTransform, SceneTransform3D,
+    SceneAnimator, SceneBody, SceneBone, SceneCamera, SceneCamera3D, SceneLight, SceneMesh,
+    SceneNode, SceneSprite, SceneTransform, SceneTransform3D,
 };
 
 /// Reads the scene at `path` of the asset `folder`. Parts of a scene that
@@ -87,6 +87,9 @@ fn scene_node(node: NodeOutline) -> SceneNode {
                 .states
                 .map(|states| states.as_str().to_owned())
                 .unwrap_or_default(),
+        }),
+        bone: node.bone.map(|bone| SceneBone {
+            length: bone.length,
         }),
         camera: node.camera.map(|view| SceneCamera {
             view_height: view.view_height,

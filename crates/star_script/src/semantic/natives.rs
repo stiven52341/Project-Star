@@ -60,6 +60,9 @@ pub const CAMERA_3D_CLASS: &str = "Camera3D";
 /// Name of the engine class of the nodes that play keyframe animations.
 pub const ANIMATOR_CLASS: &str = "Animator";
 
+/// Name of the engine class of the bones of cut-out 2D characters.
+pub const BONE_2D_CLASS: &str = "Bone2D";
+
 /// Name of the engine class that loads `.scene` files.
 pub const SCENE_CLASS: &str = "Scene";
 
@@ -182,6 +185,7 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     add_light_class(classes, node_3d, color);
     let camera_3d = add_camera_3d_class(classes, node_3d);
     add_animator_class(classes, node);
+    add_bone_2d_class(classes, node);
 
     add_scene_class(classes, node);
 
@@ -479,6 +483,16 @@ fn add_camera_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
     ];
     camera.constructor = Some(native_constructor(&[("name", Type::String)]));
     classes.add(camera)
+}
+
+/// `Bone2D`: a joint of a cut-out 2D character, whose sprites hang from it
+/// and turn with it (decision 82). It is not drawn while the game plays.
+fn add_bone_2d_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
+    let mut bone = ClassInfo::new(BONE_2D_CLASS.to_owned(), ClassOrigin::Native);
+    bone.base = Some(node);
+    bone.fields = vec![native_field("length", Type::Float)];
+    bone.constructor = Some(native_constructor(&[("name", Type::String)]));
+    classes.add(bone)
 }
 
 /// `Scene`: builds the nodes of a `.scene` file, or gives `null` if it

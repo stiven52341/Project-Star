@@ -1,5 +1,5 @@
 //! Modules of the engine's node classes written from a description:
-//! `Sprite`, `Camera2D`, `Light2D`, `Animator` and `Node3D`, which extend
+//! `Sprite`, `Camera2D`, `Light2D`, `Animator`, `Bone2D` and `Node3D`, which extend
 //! `Node`; and
 //! `Mesh`, `Light` and `Camera3D`, which extend `Node3D`.
 //!
@@ -417,6 +417,17 @@ const CAMERA_2D: NodeClass = NodeClass {
     bodies: &[],
 };
 
+const BONE_2D: NodeClass = NodeClass {
+    name: "Bone2D",
+    about: "how far it reaches along its rotation",
+    ancestors: &["Node"],
+    fields: "::star_script_runtime::node_classes::BoneFields",
+    new_fields: "Fields::new()",
+    parameters: &[],
+    methods: &[],
+    bodies: &[],
+};
+
 const LIGHT_2D: NodeClass = NodeClass {
     name: "Light2D",
     about: "the kind of light it shines on the sprites, its color, how bright it is, how far it reaches and the cone of spots",
@@ -499,11 +510,11 @@ const CAMERA_3D: NodeClass = NodeClass {
     bodies: &[],
 };
 
-/// The modules of `Sprite`, `Camera2D`, `Light2D`, `Animator`, `Node3D`,
+/// The modules of `Sprite`, `Camera2D`, `Light2D`, `Animator`, `Bone2D`, `Node3D`,
 /// `Mesh`, `Light` and `Camera3D`.
 pub(super) fn node_class_modules(out: &mut Writer) {
     for class in [
-        SPRITE, CAMERA_2D, LIGHT_2D, ANIMATOR, NODE_3D, MESH, LIGHT, CAMERA_3D,
+        SPRITE, CAMERA_2D, LIGHT_2D, ANIMATOR, BONE_2D, NODE_3D, MESH, LIGHT, CAMERA_3D,
     ] {
         out.line("");
         module(out, &class);

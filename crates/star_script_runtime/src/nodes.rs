@@ -13,7 +13,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::bodies::BodyFields;
 use crate::game::GameFields;
 use crate::node_classes::{
-    AnimatorFields, Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields,
+    AnimatorFields, BoneFields, Camera2dFields, Camera3dFields, LightFields, MeshFields,
+    SpriteFields,
 };
 use crate::placement::{Place2d, Place3d};
 use crate::scene_fields::SceneValue;
@@ -79,6 +80,8 @@ pub trait Host: Sized + 'static {
     -> Option<R>;
     /// Runs `read` on the fields of `Animator` in `node`, if it is one.
     fn with_animator<R>(node: &Self::Node, read: impl FnOnce(&AnimatorFields) -> R) -> Option<R>;
+    /// Runs `read` on the fields of `Bone2D` in `node`, if it is one.
+    fn with_bone<R>(node: &Self::Node, read: impl FnOnce(&BoneFields) -> R) -> Option<R>;
     /// A new list of tags holding `tags`.
     fn new_tags(tags: Vec<String>) -> Self::Tags;
     /// Whether `tags` holds `tag`.

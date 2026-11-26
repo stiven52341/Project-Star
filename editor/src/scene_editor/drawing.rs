@@ -10,7 +10,7 @@ use star_engine::prelude::{
 use star_engine::star_assets::AssetPath;
 use star_engine::star_platform::WindowConfig;
 use star_engine::star_scene::{
-    Camera2dNode, Camera3dNode, Light2dNode, LightNode, NodeOutline, SpriteOutline,
+    Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, LightNode, NodeOutline, SpriteOutline,
 };
 
 use super::body_drawing::{BodyMarks, draw_body_2d, draw_body_3d};
@@ -64,6 +64,9 @@ pub(crate) struct Marks {
     /// A segment from `(0, 0)` to `(1, 0)`, in the color of lights: an
     /// edge of the cone of a 2D spot.
     pub(crate) ray: MeshId,
+    /// A thin diamond from `(0, 0)` to `(1, 0)`, in the color of bones: a
+    /// bone one unit long.
+    pub(crate) bone: MeshId,
     /// The meshes of the shapes of bodies.
     pub(crate) bodies: BodyMarks,
 }
@@ -97,6 +100,9 @@ pub(crate) fn draw_scene(
         }
         if let (Some(camera), Some(global)) = (node.camera, place.flat) {
             draw_camera_2d(camera, global, marks, frame);
+        }
+        if let (Some(bone), Some(global)) = (node.bone, place.flat) {
+            draw_bone(bone, global, marks, frame);
         }
         if let (Some(camera), Some(global)) = (node.camera_3d, place.solid) {
             draw_camera_3d(camera, global, marks, frame);
@@ -321,6 +327,20 @@ fn draw_camera_3d(camera: Camera3dNode, global: Mat4, marks: Marks, frame: &mut 
     );
 }
 
+/// A bone placed at `global`, from its place along its rotation, as long
+/// as it is (scaled as its node is).
+fn draw_bone(bone: Bone2dNode, global: Affine2, marks: Marks, frame: &mut Frame) {
+    let global = GlobalTransform2D::from_affine(global);
+    let position = global.position();
+    let scale = global.scale();
+    frame.draw(
+        marks.bone,
+        Mat4::from_translation(Vec3::new(position.x, position.y, 0.0))
+            * Mat4::from_rotation_z(global.rotation())
+            * Mat4::from_scale(Vec3::new(bone.length * scale.x, bone.length * scale.y, 1.0)),
+    );
+}
+
 /// How far a 2D light placed at `global` reaches, and for spots the edges
 /// of their cone, along the node's +x axis.
 fn draw_light_2d_reach(light: Light2dNode, global: Affine2, marks: Marks, frame: &mut Frame) {
@@ -521,6 +541,25 @@ pub(crate) fn reach_lines() -> Vec<Vertex> {
     colored_loop(&corners, LIGHT_COLOR)
 }
 
+/// How wide a bone's diamond is, as a fraction of its length, and how far
+/// along it is widest.
+const BONE_WIDTH: f32 = 0.12;
+const BONE_WIDEST_AT: f32 = 0.2;
+const BONE_COLOR: Color = Color::rgb(0.85, 0.85, 0.95);
+
+/// The segments of [`Marks::bone`].
+pub(crate) fn bone_lines() -> Vec<Vertex> {
+    colored_loop(
+        &[
+            Vec3::ZERO,
+            Vec3::new(BONE_WIDEST_AT, BONE_WIDTH, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(BONE_WIDEST_AT, -BONE_WIDTH, 0.0),
+        ],
+        BONE_COLOR,
+    )
+}
+
 /// The segments of [`Marks::ray`].
 pub(crate) fn ray_lines() -> Vec<Vertex> {
     vec![
@@ -598,6 +637,7 @@ mod tests {
         cone: MeshId::from_index(5),
         reach: MeshId::from_index(6),
         ray: MeshId::from_index(7),
+        bone: MeshId::from_index(8),
         bodies: super::super::body_drawing::TEST_MARKS,
     };
 
@@ -803,6 +843,18 @@ mod tests {
             "a circle, and a circle and two edges"
         );
         assert_eq!(frame.lights_2d(), []);
+    }
+
+    #[test]
+    fn bones_are_drawn_along_their_rotation() {
+        let bones = "[[node]]\nname = \"Arm\"\nposition = [0.0, 0.0]\n\
+                     [node.bone]\nlength = 2.0\n\
+                     [[node]]\nname = \"Hand\"\nparent = 0\nposition = [2.0, 0.0]\n\
+                     [node.bone]\n";
+
+        let (frame, _) = draw(&outline(bones), None);
+
+        assert_eq!(frame.draw_count(), 2, "one diamond for each bone");
     }
 
     #[test]

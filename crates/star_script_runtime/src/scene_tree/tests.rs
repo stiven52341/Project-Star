@@ -4,7 +4,7 @@ use super::*;
 use crate::List;
 use crate::scene_fields::SceneValue;
 use crate::scenes::{
-    SceneAnimator, SceneBody, SceneCamera, SceneSprite, SceneTransform, SceneTransform3D,
+    SceneAnimator, SceneBody, SceneBone, SceneCamera, SceneSprite, SceneTransform, SceneTransform3D,
 };
 use crate::test_host::TestHost;
 
@@ -25,6 +25,7 @@ fn node(name: &str, class: Option<&str>, parent: Option<usize>) -> SceneNode {
         camera: None,
         camera_3d: None,
         animator: None,
+        bone: None,
         fields: Vec::new(),
     }
 }
@@ -242,4 +243,25 @@ fn bodies_take_the_scene_s_surface() {
     assert_eq!(body.shape.get(), "circle");
     assert!((body.bounciness.get() - 0.9).abs() < f32::EPSILON);
     assert!(body.fixed_rotation.get());
+}
+
+#[test]
+fn bones_take_their_length_and_are_bones_without_a_class() {
+    let bone = SceneNode {
+        bone: Some(SceneBone { length: 1.5 }),
+        ..node("Arm", None, Some(0))
+    };
+    let nodes = [node("Knight", None, None), bone];
+
+    let root = build::<TestHost>(&nodes).expect("built");
+
+    let arm = nodes::find_child::<TestHost>(&root, "Arm").expect("arm");
+    let length = TestHost::with_bone(&arm, |fields| fields.length.get());
+    assert_eq!(length, Some(1.5));
+    let error = build::<TestHost>(&[SceneNode {
+        bone: Some(SceneBone { length: 1.0 }),
+        ..node("Arm", Some("Node"), None)
+    }])
+    .err();
+    assert!(error.is_some_and(|error| error.contains("not a `Bone2D`")));
 }

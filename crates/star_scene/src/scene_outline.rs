@@ -11,6 +11,7 @@ use star_physics::{BodySettings, Shape3d};
 
 use crate::animator_node::{AnimatorData, AnimatorOutline};
 use crate::body_data::{Body3dData, BodyData};
+use crate::bone_node::{Bone2dNode, BoneData};
 use crate::camera_node::{Camera2dData, Camera3dData};
 use crate::light_2d_node::Light2dData;
 use crate::node_3d_data::{LightData, MeshOutline, MeshTable, Transform3dData};
@@ -67,6 +68,8 @@ pub struct NodeOutline {
     pub camera_3d: Option<Camera3dNode>,
     /// The animations it plays, if it is an animator.
     pub animator: Option<AnimatorOutline>,
+    /// The bone it is, for cut-out characters.
+    pub bone: Option<Bone2dNode>,
     /// The values of the `export` fields of its class, by name.
     pub fields: BTreeMap<String, FieldValue>,
 }
@@ -419,6 +422,12 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         .map(Light2dData::to_light)
         .transpose()
         .map_err(named)?;
+    let bone = node
+        .bone
+        .as_ref()
+        .map(BoneData::to_bone)
+        .transpose()
+        .map_err(named)?;
     if node
         .class
         .as_deref()
@@ -449,6 +458,7 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         light_2d,
         camera_3d,
         animator,
+        bone,
         fields: node.fields,
     })
 }
@@ -502,6 +512,7 @@ fn write_node(node: &NodeOutline) -> NodeData {
         light_2d: node.light_2d.map(Light2dData::from_light),
         camera_3d: node.camera_3d.map(Camera3dData::from_camera),
         animator: node.animator.as_ref().map(AnimatorData::from_outline),
+        bone: node.bone.map(BoneData::from_bone),
         fields: node.fields.clone(),
     }
 }

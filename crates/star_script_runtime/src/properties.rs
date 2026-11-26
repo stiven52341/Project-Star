@@ -23,6 +23,13 @@ pub fn set_property<H: Host>(node: &H::Node, name: &str, value: &SceneValue) -> 
         .or_else(|| H::with_light(node, |light| set_light(light, name, value)).flatten())
         .or_else(|| H::with_light_2d(node, |light| set_light(light, name, value)).flatten())
         .or_else(|| {
+            H::with_bone(node, |bone| match name {
+                "length" => Some(set_float(&bone.length, name, value)),
+                _ => None,
+            })
+            .flatten()
+        })
+        .or_else(|| {
             H::as_camera_2d(node).and_then(|camera| match name {
                 "view_height" => Some(set_float(&H::camera_2d(&camera).view_height, name, value)),
                 _ => None,
@@ -51,6 +58,13 @@ pub fn property<H: Host>(node: &H::Node, name: &str) -> Result<SceneValue, Strin
         .or_else(|| H::with_mesh(node, |mesh| mesh_value::<H>(mesh, name)).flatten())
         .or_else(|| H::with_light(node, |light| light_value::<H>(light, name)).flatten())
         .or_else(|| H::with_light_2d(node, |light| light_value::<H>(light, name)).flatten())
+        .or_else(|| {
+            H::with_bone(node, |bone| match name {
+                "length" => Some(float(&bone.length)),
+                _ => None,
+            })
+            .flatten()
+        })
         .or_else(|| {
             H::as_camera_2d(node).and_then(|camera| match name {
                 "view_height" => Some(float(&H::camera_2d(&camera).view_height)),

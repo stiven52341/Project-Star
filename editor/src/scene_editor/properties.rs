@@ -12,7 +12,7 @@ use star_engine::star_render::{
     MIN_SPHERE_SEGMENTS, SpriteSheet,
 };
 use star_engine::star_scene::{
-    Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
+    Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
 };
 
 use super::animation_rows::{AnimationFiles, animation_rows};
@@ -95,6 +95,9 @@ pub(super) fn edit_node(
     });
     changed |= optional_section(ui, texts.camera_3d, &mut node.camera_3d, |ui, camera| {
         edit_camera_3d(ui, camera, keys)
+    });
+    changed |= optional_section(ui, texts.bone_2d(), &mut node.bone, |ui, bone| {
+        edit_bone(ui, bone, keys)
     });
     changed |= optional_section(
         ui,
@@ -530,6 +533,16 @@ fn edit_camera_2d(ui: &mut egui::Ui, camera: &mut Camera2dNode, keys: Option<&Ke
         texts.main_camera,
         &mut camera.main,
         texts.main_camera_hint,
+    )
+}
+
+fn edit_bone(ui: &mut egui::Ui, bone: &mut Bone2dNode, keys: Option<&KeyButtons>) -> bool {
+    let texts = texts::current();
+    number_from_row(
+        ui,
+        keyed(keys, texts.bone_length(), &["length"]),
+        &mut bone.length,
+        MIN_SIZE,
     )
 }
 

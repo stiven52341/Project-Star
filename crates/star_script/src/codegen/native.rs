@@ -588,6 +588,10 @@ impl ::star_script_runtime::nodes::Host for Host_ {
         crate::AnyObject::Animator(::std::rc::Rc::clone(node)).map(|animator_| read(crate::classes::Animator::HasFields::fields(&*animator_)))
     }
 
+    fn with_bone<R>(node: &Self::Node, read: impl FnOnce(&::star_script_runtime::node_classes::BoneFields) -> R) -> ::std::option::Option<R> {
+        crate::AnyObject::Bone2D(::std::rc::Rc::clone(node)).map(|bone_| read(crate::classes::Bone2D::HasFields::fields(&*bone_)))
+    }
+
     fn new_tags(tags: ::std::vec::Vec<::std::string::String>) -> Self::Tags {
         ::star_script_runtime::List::from_vec(tags)
     }
@@ -620,6 +624,7 @@ impl ::star_script_runtime::nodes::Host for Host_ {
             NewNode::Light { kind } => crate::classes::Light::new(name, ::std::string::String::from(kind)),
             NewNode::Camera3D => crate::classes::Camera3D::new(name),
             NewNode::Animator => crate::classes::Animator::new(name),
+            NewNode::Bone2D => crate::classes::Bone2D::new(name),
             NewNode::Script(class_) => crate::new_scene_object_(class_)?,
         };
         ::std::result::Result::Ok(node_)

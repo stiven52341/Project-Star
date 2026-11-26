@@ -38,6 +38,8 @@ pub enum NewNode<'scene> {
     Camera3D,
     /// `Animator`
     Animator,
+    /// `Bone2D`
+    Bone2D,
     /// A class of the program, created with `init()`.
     Script(&'scene str),
 }
@@ -99,6 +101,7 @@ fn build_node<H: Host>(node: &SceneNode) -> Result<H::Node, String> {
     show::<H>(&object, node, class)?;
     view::<H>(&object, node, class)?;
     animate::<H>(&object, node, class)?;
+    joint::<H>(&object, node, class)?;
     if let Some(solid) = &node.body {
         let body = BodyFields::new(
             solid.kind.clone(),
@@ -151,6 +154,7 @@ fn new_node<'scene>(
         },
         "Camera3D" => NewNode::Camera3D,
         "Animator" => NewNode::Animator,
+        "Bone2D" => NewNode::Bone2D,
         script => NewNode::Script(script),
     })
 }
@@ -172,6 +176,8 @@ fn default_class(node: &SceneNode) -> &'static str {
         "Camera2D"
     } else if node.animator.is_some() {
         "Animator"
+    } else if node.bone.is_some() {
+        "Bone2D"
     } else if node.transform_3d.is_some() {
         "Node3D"
     } else {
@@ -277,6 +283,15 @@ fn animate<H: Host>(object: &H::Node, node: &SceneNode, class: &str) -> Result<(
         crate::tracks::play::<H>(object, &animator.animation);
     }
     Ok(())
+}
+
+/// Gives `object` the length of the bone the scene says it is.
+fn joint<H: Host>(object: &H::Node, node: &SceneNode, class: &str) -> Result<(), String> {
+    let Some(bone) = &node.bone else {
+        return Ok(());
+    };
+    H::with_bone(object, |fields| fields.length.set(bone.length))
+        .ok_or_else(|| format!("it is a bone, but `{class}` is not a `Bone2D`"))
 }
 
 /// Gives `object` the camera settings the scene says it has.
