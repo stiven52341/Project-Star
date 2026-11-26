@@ -34,6 +34,7 @@ mod scene_outline;
 mod sprite_frames;
 mod sprite_node;
 mod track_animations;
+mod track_sampling;
 mod transform;
 mod visibility;
 

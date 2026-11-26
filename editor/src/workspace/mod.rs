@@ -92,6 +92,7 @@ enum PlayWay {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum BottomTab {
     Assets,
+    Animation,
     Problems,
     Output,
     Console,
@@ -195,6 +196,7 @@ impl EditorWindow {
             self.documents.save_active();
         }
         self.undo_from_keys(ui.ctx());
+        self.follow_timeline();
         let mut action = self.show_menu(ui);
         egui::Panel::bottom("status_bar").show(ui, |ui| self.show_status_bar(ui));
         egui::Panel::left("hierarchy")
@@ -503,6 +505,11 @@ impl EditorWindow {
             );
             ui.selectable_value(
                 &mut self.bottom_tab,
+                BottomTab::Animation,
+                texts::current().animation_tab(),
+            );
+            ui.selectable_value(
+                &mut self.bottom_tab,
                 BottomTab::Problems,
                 self.problems.title(),
             );
@@ -546,9 +553,35 @@ impl EditorWindow {
                     self.show_problem(&problem);
                 }
             }
+            BottomTab::Animation => self.show_timeline(ui),
             BottomTab::Output => self.output.show(ui),
             BottomTab::Console => self.console.show(ui),
         }
+    }
+
+    /// The timeline of the scene shown, if the scene is shown.
+    fn show_timeline(&mut self, ui: &mut egui::Ui) {
+        let classes = self.live_check.outline().map(|outline| &outline.classes);
+        let scene_shown = matches!(self.documents.active(), ActiveDocument::Scene);
+        match self.documents.scene_mut() {
+            Some(scene) if scene_shown => scene.show_timeline(ui, classes),
+            _ => {
+                ui.weak(texts::current().timeline_no_animator());
+            }
+        }
+    }
+
+    /// Shows the timeline when an animator is selected, and tells the
+    /// scene whether it is shown, so its animation is previewed only then.
+    fn follow_timeline(&mut self) {
+        let scene_shown = matches!(self.documents.active(), ActiveDocument::Scene);
+        let Some(scene) = self.documents.scene_mut() else {
+            return;
+        };
+        if scene.take_animator_selected() {
+            self.bottom_tab = BottomTab::Animation;
+        }
+        scene.set_timeline_shown(scene_shown && self.bottom_tab == BottomTab::Animation);
     }
 
     /// Closes what was open from the file or folder at `path`, which is

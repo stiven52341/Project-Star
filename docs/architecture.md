@@ -791,12 +791,39 @@ sprite, so the scene view shows the frame it starts on without reading the
 file while drawing; the file is read only when one is chosen, or while the
 list of its clips is open.
 
-Keyframe animations (`.anim`, decision 79) have no tab of their own yet
-(the timeline is step 15c): the assets panel creates one (Create >
-Keyframe animations) with an example written in comments, to edit by
-hand. A node's “Animator” part (`scene_editor/animator_rows.rs`) chooses
-its `.anim` file and its starting animation, read only while that list is
-open; the part is offered once the folder has an `.anim` file.
+Keyframe animations (`.anim`, decision 79) are created by the assets
+panel (Create > Keyframe animations) with an example written in comments.
+A node's “Animator” part (`scene_editor/animator_rows.rs`) chooses its
+`.anim` file and its starting animation; the part is offered once the
+folder has an `.anim` file. They are edited on the **timeline**
+(`scene_editor/timeline/`), the “Animation” tab of the panel under the
+view, which shows itself when an animator is selected and keeps showing
+that animator while other nodes are selected. Its bar chooses, creates,
+renames, duplicates and deletes the animations (renaming or deleting one
+updates the animators that start with it), sets their length (never
+before their last key) and loop, and plays them; under it a ruler moves
+the playhead, and each track has a lane of keys, with its node's path,
+its property, its interpolation (drawn as a small curve) and a button
+that removes it, above a lane of calls, added from a menu of the
+methods an animation can call (`timeline/calls.rs`, the same rule as the
+compiler and the interpreter). Keys and calls are selected with a click
+(Shift or Ctrl add), dragged (from where they were when the drag
+started, so none is lost on the way over another), deleted, copied and
+pasted at the playhead; a double click adds a key with the value the
+track has there, and the key or call selected has its time and value (or
+method) to type. While the tab is shown, the scene view and the camera
+preview draw a copy of the scene as the animation leaves it at the
+playhead (`timeline/preview.rs`, through `PropertyTrack::value_at` in
+`star_scene` and `scene_editor/animated_properties.rs`, which reads and
+sets a node's properties by the names StarScript gives them); the scene
+itself is not changed. The inspector shows a key button (a diamond) beside
+each property the animator animates (`scene_editor/key_buttons.rs`),
+filled where there is a key at the playhead and outlined where there is
+a track: it keys the value the inspector shows, making the track and, if
+the file has none, an animation. The `.anim` files read are part of the
+scene's history (`history::KeyframeFiles`), so one undo goes back through
+scene and animation changes in order, and saving the scene writes the
+files that changed since they were read or written.
 
 The **blueprint editor** (`blueprint_editor/`) draws a graph of the open
 blueprint on a canvas of its own, painted with egui's painter (no node

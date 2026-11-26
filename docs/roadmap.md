@@ -1290,9 +1290,27 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           starting animation in the inspector, `.anim` among the assets
           (created from Create > Keyframe animations with an example in
           comments; editing them is 15c's timeline).
-  - [ ] 15c The editor's timeline: a panel with tracks and keys, the
-        playhead, playing in the scene view, adding a key from the
-        inspector's value, moving and deleting keys, curves for easing.
+  - [x] 15c The editor's timeline (designed with the owner, 2026-11-26:
+        a panel under the scene for the animator selected, a preview that
+        leaves the scene as it was, keys from a diamond in the inspector,
+        and everything below in this step):
+    - [x] 15c.1 A track's value at a time in `star_scene`
+          (`PropertyTrack::value_at`, as the runtime plays it) and a
+          node's properties by StarScript's names in the editor
+          (`animated_properties`).
+    - [x] 15c.2 The “Animation” tab: animations chosen, created, renamed,
+          duplicated and deleted, their length and loop, play, pause and
+          stop, the ruler and playhead, lanes of keys and calls, the
+          preview on the scene view, and the `.anim` files in the scene's
+          undo history and saved with it.
+    - [x] 15c.3 Key buttons in the inspector, for the engine's properties
+          and the `export` fields.
+    - [x] 15c.4 Keys and calls selected, dragged, deleted, copied and
+          pasted; a double click adds a key; the time and value of the one
+          selected typed.
+    - [x] 15c.5 Each track's interpolation, chosen with its curve drawn,
+          and call tracks added from a menu of the methods an animation
+          can call.
   - [ ] 15d Tweens from code: a property animated to a value in some
         seconds with an easing, awaitable from a coroutine.
   - [ ] 15e Transitions between animations: a state machine (idle → run →

@@ -11,6 +11,7 @@ use star_script::semantic::{
 };
 
 use super::fields::DRAG_SPEED;
+use super::key_buttons::KeyButtons;
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -138,10 +139,11 @@ pub(super) fn edit_exported(
     ui: &mut egui::Ui,
     values: &mut BTreeMap<String, FieldValue>,
     fields: &[ExportedField],
+    keys: Option<&KeyButtons>,
 ) -> bool {
     let mut changed = false;
     for field in fields {
-        changed |= field_row(ui, values, field);
+        changed |= field_row(ui, values, field, keys);
     }
     let strays: Vec<String> = values
         .keys()
@@ -160,12 +162,14 @@ pub(super) fn edit_exported(
     changed
 }
 
-/// The row of one field: its name (strong if the scene gives it a value),
-/// what edits its value, and a button back to the class's value.
+/// The row of one field: its key button, if `keys` are shown, its name
+/// (strong if the scene gives it a value), what edits its value, and a
+/// button back to the class's value.
 fn field_row(
     ui: &mut egui::Ui,
     values: &mut BTreeMap<String, FieldValue>,
     field: &ExportedField,
+    keys: Option<&KeyButtons>,
 ) -> bool {
     if let Some(header) = &field.hints.header {
         ui.strong(header);
@@ -174,11 +178,18 @@ fn field_row(
     let given = values
         .get(&field.name)
         .and_then(|value| shown(field.kind, value));
-    let name = if given.is_some() {
-        ui.strong(&field.name)
-    } else {
-        ui.weak(&field.name)
-    };
+    let name = ui
+        .horizontal(|ui| {
+            if let Some(keys) = keys {
+                keys.show(ui, &[field.name.as_str()]);
+            }
+            if given.is_some() {
+                ui.strong(&field.name)
+            } else {
+                ui.weak(&field.name)
+            }
+        })
+        .inner;
     if let Some(tooltip) = &field.hints.tooltip {
         name.on_hover_text(tooltip);
     }

@@ -1,19 +1,27 @@
-//! Undo and redo in a scene: copies of the scene as it was before each
-//! change.
+//! Undo and redo in a scene: copies of the scene, and of the keyframe
+//! animations of its animators, as they were before each change.
 //!
 //! A change can last several frames (dragging a handle, typing a number),
 //! so changes are only marked while they happen, and a step is closed once
 //! the user lets go: one drag or one number typed is undone at once.
 
+use std::collections::BTreeMap;
+
 use star_engine::prelude::SceneOutline;
+use star_engine::star_scene::TrackAnimations;
+
+/// The `.anim` files the scene's animators play, by their path in the
+/// assets folder, once read.
+pub(super) type KeyframeFiles = BTreeMap<String, TrackAnimations>;
 
 /// How many changes can be undone; older ones are forgotten.
 const MAXIMUM_STEPS: usize = 100;
 
-/// The scene and the node selected, at one moment.
+/// The scene, its animations and the node selected, at one moment.
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct Snapshot {
     pub(super) outline: SceneOutline,
+    pub(super) animations: KeyframeFiles,
     pub(super) selected: Option<usize>,
 }
 
@@ -21,6 +29,7 @@ pub(super) struct Snapshot {
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Now<'scene> {
     pub(super) outline: &'scene SceneOutline,
+    pub(super) animations: &'scene KeyframeFiles,
     pub(super) selected: Option<usize>,
 }
 
@@ -28,6 +37,7 @@ impl Now<'_> {
     fn snapshot(self) -> Snapshot {
         Snapshot {
             outline: self.outline.clone(),
+            animations: self.animations.clone(),
             selected: self.selected,
         }
     }
@@ -84,6 +94,22 @@ impl SceneHistory {
     pub(super) const fn follow_selection(&mut self, selected: Option<usize>) {
         if !self.pending {
             self.settled.snapshot.selected = selected;
+        }
+    }
+
+    /// The file at `path` was read as `animations`: every moment kept had
+    /// it so, as it was not changed before.
+    pub(super) fn adopt_animations(&mut self, path: &str, animations: &TrackAnimations) {
+        let steps = self
+            .past
+            .iter_mut()
+            .chain(&mut self.future)
+            .chain(std::iter::once(&mut self.settled));
+        for step in steps {
+            step.snapshot
+                .animations
+                .entry(path.to_owned())
+                .or_insert_with(|| animations.clone());
         }
     }
 
@@ -162,6 +188,7 @@ mod tests {
         let text = format!("format = 1\n[[node]]\nname = \"{name}\"");
         Snapshot {
             outline: SceneOutline::from_text(&text).unwrap(),
+            animations: KeyframeFiles::new(),
             selected,
         }
     }
@@ -169,6 +196,7 @@ mod tests {
     fn now(snapshot: &Snapshot) -> Now<'_> {
         Now {
             outline: &snapshot.outline,
+            animations: &snapshot.animations,
             selected: snapshot.selected,
         }
     }
@@ -262,6 +290,17 @@ mod tests {
         assert!(!history.is_saved());
         history.mark_saved(now(&scene("B", None)));
         assert!(history.is_saved());
+    }
+
+    #[test]
+    fn animations_read_later_are_how_every_step_had_them() {
+        let mut history = renamed_twice();
+        let read = TrackAnimations::default();
+
+        history.adopt_animations("knight.anim", &read);
+
+        let undone = history.undo(now(&scene("C", None))).unwrap();
+        assert_eq!(undone.animations.get("knight.anim"), Some(&read));
     }
 
     #[test]

@@ -4,6 +4,8 @@
 use eframe::egui;
 use star_engine::prelude::{Color, Vec2, Vec3};
 
+use super::key_buttons::{self, RowName};
+
 /// How much a number changes per pixel dragged.
 pub(super) const DRAG_SPEED: f32 = 0.01;
 /// Angles change faster: one degree per pixel dragged.
@@ -13,13 +15,18 @@ pub(super) const MIN_SIZE: f32 = 0.01;
 /// The largest value of a color channel, in bytes.
 const CHANNEL_MAX: f32 = 255.0;
 
-/// The faint name that starts a row.
-fn label(ui: &mut egui::Ui, name: &str) {
-    ui.weak(name);
+/// The faint name that starts a row, after its key button if it has one.
+/// Returns the name.
+fn label<'row>(ui: &mut egui::Ui, name: impl Into<RowName<'row>>) -> &'row str {
+    key_buttons::show_name(ui, name)
 }
 
 /// A number that can be any value.
-pub(super) fn number_row(ui: &mut egui::Ui, name: &str, value: &mut f32) -> bool {
+pub(super) fn number_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    value: &mut f32,
+) -> bool {
     label(ui, name);
     let changed = number(ui, value);
     ui.end_row();
@@ -27,7 +34,12 @@ pub(super) fn number_row(ui: &mut egui::Ui, name: &str, value: &mut f32) -> bool
 }
 
 /// A number from `min` up.
-pub(super) fn number_from_row(ui: &mut egui::Ui, name: &str, value: &mut f32, min: f32) -> bool {
+pub(super) fn number_from_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    value: &mut f32,
+    min: f32,
+) -> bool {
     label(ui, name);
     let changed = ui
         .add(
@@ -41,9 +53,9 @@ pub(super) fn number_from_row(ui: &mut egui::Ui, name: &str, value: &mut f32, mi
 }
 
 /// A whole number between `min` and `max`.
-pub(super) fn whole_row<Number: egui::emath::Numeric>(
+pub(super) fn whole_row<'row, Number: egui::emath::Numeric>(
     ui: &mut egui::Ui,
-    name: &str,
+    name: impl Into<RowName<'row>>,
     value: &mut Number,
     range: std::ops::RangeInclusive<Number>,
 ) -> bool {
@@ -54,7 +66,11 @@ pub(super) fn whole_row<Number: egui::emath::Numeric>(
 }
 
 /// A number from 0 to 1, as a slider.
-pub(super) fn fraction_row(ui: &mut egui::Ui, name: &str, value: &mut f32) -> bool {
+pub(super) fn fraction_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    value: &mut f32,
+) -> bool {
     label(ui, name);
     let changed = ui.add(egui::Slider::new(value, 0.0..=1.0)).changed();
     ui.end_row();
@@ -63,7 +79,11 @@ pub(super) fn fraction_row(ui: &mut egui::Ui, name: &str, value: &mut f32) -> bo
 
 /// An angle kept in radians, edited in degrees, which people read more
 /// easily.
-pub(super) fn angle_row(ui: &mut egui::Ui, name: &str, radians: &mut f32) -> bool {
+pub(super) fn angle_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    radians: &mut f32,
+) -> bool {
     label(ui, name);
     let changed = angle(ui, radians);
     ui.end_row();
@@ -71,7 +91,11 @@ pub(super) fn angle_row(ui: &mut egui::Ui, name: &str, radians: &mut f32) -> boo
 }
 
 /// Three angles kept in radians, edited in degrees.
-pub(super) fn angles_row(ui: &mut egui::Ui, name: &str, radians: &mut Vec3) -> bool {
+pub(super) fn angles_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    radians: &mut Vec3,
+) -> bool {
     label(ui, name);
     let changed = ui
         .horizontal(|ui| {
@@ -82,7 +106,11 @@ pub(super) fn angles_row(ui: &mut egui::Ui, name: &str, radians: &mut Vec3) -> b
     changed
 }
 
-pub(super) fn vec2_row(ui: &mut egui::Ui, name: &str, value: &mut Vec2) -> bool {
+pub(super) fn vec2_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    value: &mut Vec2,
+) -> bool {
     label(ui, name);
     let changed = ui
         .horizontal(|ui| number(ui, &mut value.x) | number(ui, &mut value.y))
@@ -91,7 +119,11 @@ pub(super) fn vec2_row(ui: &mut egui::Ui, name: &str, value: &mut Vec2) -> bool 
     changed
 }
 
-pub(super) fn vec3_row(ui: &mut egui::Ui, name: &str, value: &mut Vec3) -> bool {
+pub(super) fn vec3_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    value: &mut Vec3,
+) -> bool {
     label(ui, name);
     let changed = ui
         .horizontal(|ui| {
@@ -103,7 +135,11 @@ pub(super) fn vec3_row(ui: &mut egui::Ui, name: &str, value: &mut Vec3) -> bool 
 }
 
 /// A size along each axis, every one at least [`MIN_SIZE`].
-pub(super) fn size2_row(ui: &mut egui::Ui, name: &str, value: &mut Vec2) -> bool {
+pub(super) fn size2_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    value: &mut Vec2,
+) -> bool {
     label(ui, name);
     let changed = ui
         .horizontal(|ui| size(ui, &mut value.x) | size(ui, &mut value.y))
@@ -113,7 +149,11 @@ pub(super) fn size2_row(ui: &mut egui::Ui, name: &str, value: &mut Vec2) -> bool
 }
 
 /// A size along each axis, every one at least [`MIN_SIZE`].
-pub(super) fn size3_row(ui: &mut egui::Ui, name: &str, value: &mut Vec3) -> bool {
+pub(super) fn size3_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    value: &mut Vec3,
+) -> bool {
     label(ui, name);
     let changed = ui
         .horizontal(|ui| size(ui, &mut value.x) | size(ui, &mut value.y) | size(ui, &mut value.z))
@@ -124,7 +164,11 @@ pub(super) fn size3_row(ui: &mut egui::Ui, name: &str, value: &mut Vec3) -> bool
 
 /// A color with its opacity, picked with egui's color picker. Colors are
 /// sRGB in scenes and in the picker, so only their range changes.
-pub(super) fn color_row(ui: &mut egui::Ui, name: &str, color: &mut Color) -> bool {
+pub(super) fn color_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    color: &mut Color,
+) -> bool {
     label(ui, name);
     let mut bytes = [color.r, color.g, color.b, color.a].map(to_byte);
     let changed = ui
@@ -138,7 +182,11 @@ pub(super) fn color_row(ui: &mut egui::Ui, name: &str, color: &mut Color) -> boo
     changed
 }
 
-pub(super) fn checkbox_row(ui: &mut egui::Ui, name: &str, value: &mut bool) -> bool {
+pub(super) fn checkbox_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    value: &mut bool,
+) -> bool {
     label(ui, name);
     let changed = ui.checkbox(value, "").changed();
     ui.end_row();
@@ -146,7 +194,12 @@ pub(super) fn checkbox_row(ui: &mut egui::Ui, name: &str, value: &mut bool) -> b
 }
 
 /// A line of text.
-pub(super) fn text_row(ui: &mut egui::Ui, name: &str, text: &mut String, hint: &str) -> bool {
+pub(super) fn text_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    text: &mut String,
+    hint: &str,
+) -> bool {
     label(ui, name);
     let changed = ui
         .add(egui::TextEdit::singleline(text).hint_text(hint))
@@ -156,19 +209,19 @@ pub(super) fn text_row(ui: &mut egui::Ui, name: &str, text: &mut String, hint: &
 }
 
 /// One of `choices`, each with its name, in a drop-down list.
-pub(super) fn choice_row<Choice: Copy + PartialEq>(
+pub(super) fn choice_row<'row, Choice: Copy + PartialEq>(
     ui: &mut egui::Ui,
-    name: &str,
+    name: impl Into<RowName<'row>>,
     value: &mut Choice,
     choices: &[(Choice, &str)],
 ) -> bool {
-    label(ui, name);
+    let id = label(ui, name);
     let before = *value;
     let shown = choices
         .iter()
         .find_map(|(choice, text)| (*choice == before).then_some(*text))
         .unwrap_or_default();
-    egui::ComboBox::from_id_salt(name)
+    egui::ComboBox::from_id_salt(id)
         .selected_text(shown)
         .show_ui(ui, |ui| {
             for (choice, text) in choices {
@@ -181,9 +234,9 @@ pub(super) fn choice_row<Choice: Copy + PartialEq>(
 
 /// A row with an angle shown in degrees, on a slider between `degrees`,
 /// kept in radians.
-pub(super) fn angle_slider_row(
+pub(super) fn angle_slider_row<'row>(
     ui: &mut egui::Ui,
-    name: &str,
+    name: impl Into<RowName<'row>>,
     radians: &mut f32,
     degrees: std::ops::RangeInclusive<f32>,
 ) -> bool {
@@ -200,9 +253,9 @@ pub(super) fn angle_slider_row(
 }
 
 /// A row with a checkbox that explains itself with `hint`.
-pub(super) fn checkbox_hint_row(
+pub(super) fn checkbox_hint_row<'row>(
     ui: &mut egui::Ui,
-    name: &str,
+    name: impl Into<RowName<'row>>,
     value: &mut bool,
     hint: &str,
 ) -> bool {
@@ -214,7 +267,12 @@ pub(super) fn checkbox_hint_row(
 
 /// A row with the tags of a node, each with a button that removes it, and
 /// a field where a new one is written; Enter adds it.
-pub(super) fn tags_row(ui: &mut egui::Ui, name: &str, tags: &mut Vec<String>, hint: &str) -> bool {
+pub(super) fn tags_row<'row>(
+    ui: &mut egui::Ui,
+    name: impl Into<RowName<'row>>,
+    tags: &mut Vec<String>,
+    hint: &str,
+) -> bool {
     label(ui, name);
     let mut changed = false;
     ui.vertical(|ui| {

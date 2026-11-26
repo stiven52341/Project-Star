@@ -26,6 +26,7 @@ use super::fields::{
     color_row, fraction_row, number_from_row, number_row, size2_row, size3_row, tags_row, text_row,
     vec2_row, vec3_row, whole_row,
 };
+use super::key_buttons::{KeyButtons, keyed};
 use star_script::semantic::ClassTable;
 
 use crate::project::ProjectDimension;
@@ -42,6 +43,9 @@ pub(super) struct NodeContext<'context> {
     pub(super) animations: AnimationFiles<'context>,
     /// The classes of the scripts, once checked, for `export` fields.
     pub(super) classes: Option<&'context ClassTable>,
+    /// The key buttons of the node's properties, while the timeline of
+    /// an animator that animates it is shown.
+    pub(super) keys: Option<&'context KeyButtons>,
 }
 
 /// Shows the parts of `node` to edit. Returns whether it changed.
@@ -51,37 +55,47 @@ pub(super) fn edit_node(
     context: &NodeContext<'_>,
 ) -> bool {
     let texts = texts::current();
-    let mut changed = section(ui, texts.node_section, None, |ui| edit_identity(ui, node));
-    changed |= exported_section(ui, node, context.classes);
+    let keys = context.keys;
+    let mut changed = section(ui, texts.node_section, None, |ui| {
+        edit_identity(ui, node, keys)
+    });
+    changed |= exported_section(ui, node, context);
     changed |= optional_section(
         ui,
         texts.transform_section,
         &mut node.transform,
-        edit_transform,
+        |ui, transform| edit_transform(ui, transform, keys),
     );
     changed |= optional_section(
         ui,
         texts.transform_3d_section,
         &mut node.transform_3d,
-        edit_transform_3d,
+        |ui, transform| edit_transform_3d(ui, transform, keys),
     );
     changed |= optional_section(ui, texts.sprite_section, &mut node.sprite, |ui, sprite| {
-        edit_sprite(ui, sprite, context.images) | animation_rows(ui, sprite, context.animations)
+        edit_sprite(ui, sprite, context.images, keys)
+            | animation_rows(ui, sprite, context.animations)
     });
     changed |= optional_section(ui, texts.mesh_section, &mut node.mesh, |ui, mesh| {
-        edit_mesh(ui, mesh, context.images)
+        edit_mesh(ui, mesh, context.images, keys)
     });
-    changed |= optional_section(ui, texts.light_section, &mut node.light, edit_light);
+    changed |= optional_section(ui, texts.light_section, &mut node.light, |ui, light| {
+        edit_light(ui, light, keys)
+    });
     changed |= optional_section(
         ui,
         texts.light_2d_section,
         &mut node.light_2d,
-        edit_light_2d,
+        |ui, light| edit_light_2d(ui, light, keys),
     );
     changed |= optional_section(ui, texts.body_section, &mut node.body, edit_body);
     changed |= optional_section(ui, texts.body_3d_section, &mut node.body_3d, edit_body_3d);
-    changed |= optional_section(ui, texts.camera_2d, &mut node.camera, edit_camera_2d);
-    changed |= optional_section(ui, texts.camera_3d, &mut node.camera_3d, edit_camera_3d);
+    changed |= optional_section(ui, texts.camera_2d, &mut node.camera, |ui, camera| {
+        edit_camera_2d(ui, camera, keys)
+    });
+    changed |= optional_section(ui, texts.camera_3d, &mut node.camera_3d, |ui, camera| {
+        edit_camera_3d(ui, camera, keys)
+    });
     changed |= optional_section(
         ui,
         texts.animator_section(),
@@ -94,12 +108,8 @@ pub(super) fn edit_node(
 
 /// The `export` fields of the node's class, if the scripts are checked and
 /// it has any, or values the scene gives fields.
-fn exported_section(
-    ui: &mut egui::Ui,
-    node: &mut NodeOutline,
-    classes: Option<&ClassTable>,
-) -> bool {
-    let (Some(class), Some(classes)) = (node.class.clone(), classes) else {
+fn exported_section(ui: &mut egui::Ui, node: &mut NodeOutline, context: &NodeContext<'_>) -> bool {
+    let (Some(class), Some(classes)) = (node.class.clone(), context.classes) else {
         return false;
     };
     let fields = exported_fields(classes, &class).unwrap_or_default();
@@ -108,7 +118,7 @@ fn exported_section(
     }
     let title = texts::current().exported_section(&class);
     section(ui, &title, None, |ui| {
-        edit_exported(ui, &mut node.fields, &fields)
+        edit_exported(ui, &mut node.fields, &fields, context.keys)
     })
 }
 
@@ -155,7 +165,7 @@ fn section(
         .unwrap_or(false)
 }
 
-fn edit_identity(ui: &mut egui::Ui, node: &mut NodeOutline) -> bool {
+fn edit_identity(ui: &mut egui::Ui, node: &mut NodeOutline, keys: Option<&KeyButtons>) -> bool {
     let texts = texts::current();
     let mut changed = text_row(ui, texts.name, &mut node.name, "");
     let mut class = node.class.clone().unwrap_or_default();
@@ -165,52 +175,122 @@ fn edit_identity(ui: &mut egui::Ui, node: &mut NodeOutline) -> bool {
         changed = true;
     }
     changed |= tags_row(ui, texts.tags, &mut node.tags, texts.new_tag_hint);
-    changed | checkbox_hint_row(ui, texts.visible, &mut node.visible, texts.visible_hint)
+    changed
+        | checkbox_hint_row(
+            ui,
+            keyed(keys, texts.visible, &["visible"]),
+            &mut node.visible,
+            texts.visible_hint,
+        )
 }
 
-fn edit_transform(ui: &mut egui::Ui, transform: &mut Transform2D) -> bool {
+fn edit_transform(
+    ui: &mut egui::Ui,
+    transform: &mut Transform2D,
+    keys: Option<&KeyButtons>,
+) -> bool {
     let texts = texts::current();
-    vec2_row(ui, texts.position, &mut transform.position)
-        | angle_row(ui, texts.rotation, &mut transform.rotation)
-        | vec2_row(ui, texts.scale, &mut transform.scale)
+    vec2_row(
+        ui,
+        keyed(keys, texts.position, &["x", "y"]),
+        &mut transform.position,
+    ) | angle_row(
+        ui,
+        keyed(keys, texts.rotation, &["rotation"]),
+        &mut transform.rotation,
+    ) | vec2_row(
+        ui,
+        keyed(keys, texts.scale, &["scale_x", "scale_y"]),
+        &mut transform.scale,
+    )
 }
 
-fn edit_transform_3d(ui: &mut egui::Ui, transform: &mut Transform3D) -> bool {
+/// A 3D node's rotation is its `pitch`, its `yaw` and its `rotation` (the
+/// roll), as StarScript's `Node3D` names them.
+fn edit_transform_3d(
+    ui: &mut egui::Ui,
+    transform: &mut Transform3D,
+    keys: Option<&KeyButtons>,
+) -> bool {
     let texts = texts::current();
-    let moved = vec3_row(ui, texts.position, &mut transform.position);
+    let moved = vec3_row(
+        ui,
+        keyed(keys, texts.position, &["x", "y", "z"]),
+        &mut transform.position,
+    );
     let mut angles = transform.rotation.to_euler();
-    let turned = angles_row(ui, texts.rotation, &mut angles);
+    let turned = angles_row(
+        ui,
+        keyed(keys, texts.rotation, &["pitch", "yaw", "rotation"]),
+        &mut angles,
+    );
     if turned {
         transform.rotation = Quat::from_euler(angles);
     }
-    moved | turned | vec3_row(ui, texts.scale, &mut transform.scale)
+    moved
+        | turned
+        | vec3_row(
+            ui,
+            keyed(keys, texts.scale, &["scale_x", "scale_y", "scale_z"]),
+            &mut transform.scale,
+        )
 }
 
-fn edit_sprite(ui: &mut egui::Ui, sprite: &mut SpriteOutline, images: &[String]) -> bool {
+fn edit_sprite(
+    ui: &mut egui::Ui,
+    sprite: &mut SpriteOutline,
+    images: &[String],
+    keys: Option<&KeyButtons>,
+) -> bool {
     let texts = texts::current();
     let mut texture = Some(sprite.texture.clone());
-    let mut changed = image_row(ui, &mut texture, images, false);
+    let mut changed = image_row(ui, &mut texture, images, false, keys);
     if let Some(texture) = texture {
         sprite.texture = texture;
     }
-    changed |= filter_row(ui, &mut sprite.filter);
-    changed |= size2_row(ui, texts.size, &mut sprite.size);
+    changed |= filter_row(ui, &mut sprite.filter, keys);
+    changed |= size2_row(
+        ui,
+        keyed(keys, texts.size, &["width", "height"]),
+        &mut sprite.size,
+    );
     changed |= vec2_row(ui, texts.anchor, &mut sprite.anchor);
     changed |= vec2_row(ui, texts.region, &mut sprite.region.min);
     changed |= vec2_row(ui, "", &mut sprite.region.max);
-    changed |= sheet_rows(ui, &mut sprite.sheet);
-    changed |= color_row(ui, texts.color, &mut sprite.color);
-    changed | whole_row(ui, texts.layer, &mut sprite.layer, i32::MIN..=i32::MAX)
+    changed |= sheet_rows(ui, &mut sprite.sheet, keys);
+    changed |= color_row(ui, keyed(keys, texts.color, &["color"]), &mut sprite.color);
+    changed
+        | whole_row(
+            ui,
+            keyed(keys, texts.layer, &["layer"]),
+            &mut sprite.layer,
+            i32::MIN..=i32::MAX,
+        )
 }
 
 /// How a sprite's region is cut into cells, and the one it shows.
-fn sheet_rows(ui: &mut egui::Ui, sheet: &mut SpriteSheet) -> bool {
+fn sheet_rows(ui: &mut egui::Ui, sheet: &mut SpriteSheet, keys: Option<&KeyButtons>) -> bool {
     let texts = texts::current();
     let (mut columns, mut rows, mut frame) = (sheet.columns(), sheet.rows(), sheet.frame());
-    let mut changed = whole_row(ui, texts.sheet_columns, &mut columns, 1..=u16::MAX);
-    changed |= whole_row(ui, texts.sheet_rows, &mut rows, 1..=u16::MAX);
+    let mut changed = whole_row(
+        ui,
+        keyed(keys, texts.sheet_columns, &["columns"]),
+        &mut columns,
+        1..=u16::MAX,
+    );
+    changed |= whole_row(
+        ui,
+        keyed(keys, texts.sheet_rows, &["rows"]),
+        &mut rows,
+        1..=u16::MAX,
+    );
     let last = u32::from(columns) * u32::from(rows) - 1;
-    changed |= whole_row(ui, texts.sheet_frame, &mut frame, 0..=last);
+    changed |= whole_row(
+        ui,
+        keyed(keys, texts.sheet_frame, &["frame"]),
+        &mut frame,
+        0..=last,
+    );
     if changed {
         *sheet = SpriteSheet::new(columns, rows, frame);
     }
@@ -224,6 +304,7 @@ fn image_row(
     texture: &mut Option<AssetPath>,
     images: &[String],
     optional: bool,
+    keys: Option<&KeyButtons>,
 ) -> bool {
     let texts = texts::current();
     let current = texture.as_ref().map(|path| path.as_str().to_owned());
@@ -243,18 +324,30 @@ fn image_row(
             .map(|image| (Some(image.as_str()), image.as_str())),
     );
     let mut selected = current.as_deref();
-    let changed = choice_row(ui, texts.image, &mut selected, &choices);
+    // Only a sprite's image can be animated: a mesh's may be none.
+    let keys = keys.filter(|_| !optional);
+    let changed = choice_row(
+        ui,
+        keyed(keys, texts.image, &["texture"]),
+        &mut selected,
+        &choices,
+    );
     if changed {
         *texture = selected.and_then(|path| AssetPath::new(path).ok());
     }
     changed
 }
 
-fn filter_row(ui: &mut egui::Ui, filter: &mut TextureFilter) -> bool {
+fn filter_row(ui: &mut egui::Ui, filter: &mut TextureFilter, keys: Option<&KeyButtons>) -> bool {
     let texts = texts::current();
     let choices = [TextureFilter::Smooth, TextureFilter::Pixelated]
         .map(|choice| (choice, texts.filter_name(choice)));
-    choice_row(ui, texts.filter, filter, &choices)
+    choice_row(
+        ui,
+        keyed(keys, texts.filter, &["pixelated"]),
+        filter,
+        &choices,
+    )
 }
 
 /// The kinds of mesh shape, to choose one.
@@ -265,25 +358,40 @@ enum MeshChoice {
     Sphere,
 }
 
-fn edit_mesh(ui: &mut egui::Ui, mesh: &mut MeshOutline, images: &[String]) -> bool {
+fn edit_mesh(
+    ui: &mut egui::Ui,
+    mesh: &mut MeshOutline,
+    images: &[String],
+    keys: Option<&KeyButtons>,
+) -> bool {
     let texts = texts::current();
-    let mut changed = edit_mesh_shape(ui, &mut mesh.shape);
-    changed |= color_row(ui, texts.color, &mut mesh.color);
-    changed |= fraction_row(ui, texts.metallic, &mut mesh.metallic);
-    changed |= fraction_row(ui, texts.roughness, &mut mesh.roughness);
+    let mut changed = edit_mesh_shape(ui, &mut mesh.shape, keys);
+    changed |= color_row(ui, keyed(keys, texts.color, &["color"]), &mut mesh.color);
+    changed |= fraction_row(
+        ui,
+        keyed(keys, texts.metallic, &["metallic"]),
+        &mut mesh.metallic,
+    );
+    changed |= fraction_row(
+        ui,
+        keyed(keys, texts.roughness, &["roughness"]),
+        &mut mesh.roughness,
+    );
     let filter = mesh.texture.as_ref().map(|(_, filter)| *filter);
     let mut texture = mesh.texture.as_ref().map(|(path, _)| path.clone());
-    if image_row(ui, &mut texture, images, true) {
+    if image_row(ui, &mut texture, images, true, keys) {
         mesh.texture = texture.map(|path| (path, filter.unwrap_or_default()));
         changed = true;
     }
     if let Some((_, filter)) = &mut mesh.texture {
-        changed |= filter_row(ui, filter);
+        changed |= filter_row(ui, filter, keys);
     }
     changed
 }
 
-fn edit_mesh_shape(ui: &mut egui::Ui, shape: &mut MeshShape) -> bool {
+/// A mesh's sizes as StarScript's `Mesh` names them: a plane's are its
+/// `width` and `depth`, a sphere's its `radius`.
+fn edit_mesh_shape(ui: &mut egui::Ui, shape: &mut MeshShape, keys: Option<&KeyButtons>) -> bool {
     let texts = texts::current();
     let mut choice = match shape {
         MeshShape::Cube { .. } => MeshChoice::Cube,
@@ -308,14 +416,20 @@ fn edit_mesh_shape(ui: &mut egui::Ui, shape: &mut MeshShape) -> bool {
         };
     }
     let resized = match shape {
-        MeshShape::Cube { size } => size3_row(ui, texts.size, size),
-        MeshShape::Plane { size } => size2_row(ui, texts.size, size),
+        MeshShape::Cube { size } => size3_row(
+            ui,
+            keyed(keys, texts.size, &["width", "height", "depth"]),
+            size,
+        ),
+        MeshShape::Plane { size } => {
+            size2_row(ui, keyed(keys, texts.size, &["width", "depth"]), size)
+        }
         MeshShape::Sphere {
             radius,
             segments,
             rings,
         } => {
-            number_from_row(ui, texts.radius, radius, MIN_SIZE)
+            number_from_row(ui, keyed(keys, texts.radius, &["radius"]), radius, MIN_SIZE)
                 | whole_row(
                     ui,
                     texts.segments,
@@ -337,7 +451,7 @@ fn edit_mesh_shape(ui: &mut egui::Ui, shape: &mut MeshShape) -> bool {
 /// in degrees: scene files take anything between 0 and 90.
 const SPOT_ANGLE_DEGREES: std::ops::RangeInclusive<f32> = 1.0..=89.0;
 
-fn edit_light(ui: &mut egui::Ui, light: &mut LightNode) -> bool {
+fn edit_light(ui: &mut egui::Ui, light: &mut LightNode, keys: Option<&KeyButtons>) -> bool {
     let texts = texts::current();
     let mut kind = LightKind::of(light);
     let choices = LightKind::ALL.map(|choice| (choice, texts.light_kind_name(choice)));
@@ -352,38 +466,78 @@ fn edit_light(ui: &mut egui::Ui, light: &mut LightNode) -> bool {
     | LightNode::Spot {
         color, intensity, ..
     }) = light;
-    changed |= color_row(ui, texts.color, color);
-    changed |= number_from_row(ui, texts.intensity, intensity, 0.0);
+    changed |= light_rows(ui, color, intensity, keys);
     if let LightNode::Point { range, .. } | LightNode::Spot { range, .. } = light {
-        changed |= number_from_row(ui, texts.range, range, MIN_SIZE);
+        changed |= range_row(ui, range, keys);
     }
     if let LightNode::Spot { angle, blend, .. } = light {
-        changed |= angle_slider_row(ui, texts.cone_angle, angle, SPOT_ANGLE_DEGREES);
-        changed |= fraction_row(ui, texts.blend, blend);
+        changed |= spot_rows(ui, angle, blend, keys);
     }
     changed
+}
+
+/// What every light has: its color and how bright it is.
+fn light_rows(
+    ui: &mut egui::Ui,
+    color: &mut star_engine::prelude::Color,
+    intensity: &mut f32,
+    keys: Option<&KeyButtons>,
+) -> bool {
+    let texts = texts::current();
+    color_row(ui, keyed(keys, texts.color, &["color"]), color)
+        | number_from_row(
+            ui,
+            keyed(keys, texts.intensity, &["intensity"]),
+            intensity,
+            0.0,
+        )
+}
+
+fn range_row(ui: &mut egui::Ui, range: &mut f32, keys: Option<&KeyButtons>) -> bool {
+    let texts = texts::current();
+    number_from_row(ui, keyed(keys, texts.range, &["range"]), range, MIN_SIZE)
+}
+
+/// How wide a spot shines and how soft its edge is.
+fn spot_rows(
+    ui: &mut egui::Ui,
+    angle: &mut f32,
+    blend: &mut f32,
+    keys: Option<&KeyButtons>,
+) -> bool {
+    let texts = texts::current();
+    angle_slider_row(
+        ui,
+        keyed(keys, texts.cone_angle, &["angle"]),
+        angle,
+        SPOT_ANGLE_DEGREES,
+    ) | fraction_row(ui, keyed(keys, texts.blend, &["blend"]), blend)
 }
 
 /// The narrowest and widest fields of view a 3D camera can be given, in
 /// degrees: scene files take anything between 0 and 180.
 const FIELD_OF_VIEW_DEGREES: std::ops::RangeInclusive<f32> = 1.0..=179.0;
 
-fn edit_camera_2d(ui: &mut egui::Ui, camera: &mut Camera2dNode) -> bool {
+fn edit_camera_2d(ui: &mut egui::Ui, camera: &mut Camera2dNode, keys: Option<&KeyButtons>) -> bool {
     let texts = texts::current();
-    number_from_row(ui, texts.view_height, &mut camera.view_height, MIN_SIZE)
-        | checkbox_hint_row(
-            ui,
-            texts.main_camera,
-            &mut camera.main,
-            texts.main_camera_hint,
-        )
+    number_from_row(
+        ui,
+        keyed(keys, texts.view_height, &["view_height"]),
+        &mut camera.view_height,
+        MIN_SIZE,
+    ) | checkbox_hint_row(
+        ui,
+        texts.main_camera,
+        &mut camera.main,
+        texts.main_camera_hint,
+    )
 }
 
-fn edit_camera_3d(ui: &mut egui::Ui, camera: &mut Camera3dNode) -> bool {
+fn edit_camera_3d(ui: &mut egui::Ui, camera: &mut Camera3dNode, keys: Option<&KeyButtons>) -> bool {
     let texts = texts::current();
     angle_slider_row(
         ui,
-        texts.field_of_view,
+        keyed(keys, texts.field_of_view, &["fov"]),
         &mut camera.fov,
         FIELD_OF_VIEW_DEGREES,
     ) | checkbox_hint_row(
@@ -394,7 +548,7 @@ fn edit_camera_3d(ui: &mut egui::Ui, camera: &mut Camera3dNode) -> bool {
     )
 }
 
-fn edit_light_2d(ui: &mut egui::Ui, light: &mut Light2dNode) -> bool {
+fn edit_light_2d(ui: &mut egui::Ui, light: &mut Light2dNode, keys: Option<&KeyButtons>) -> bool {
     let texts = texts::current();
     let mut kind = LightKind::of_2d(light);
     let choices = LightKind::ALL_2D.map(|choice| (choice, texts.light_kind_name(choice)));
@@ -413,12 +567,10 @@ fn edit_light_2d(ui: &mut egui::Ui, light: &mut Light2dNode) -> bool {
         range,
         ..
     }) = light;
-    changed |= color_row(ui, texts.color, color);
-    changed |= number_from_row(ui, texts.intensity, intensity, 0.0);
-    changed |= number_from_row(ui, texts.range, range, MIN_SIZE);
+    changed |= light_rows(ui, color, intensity, keys);
+    changed |= range_row(ui, range, keys);
     if let Light2dNode::Spot { angle, blend, .. } = light {
-        changed |= angle_slider_row(ui, texts.cone_angle, angle, SPOT_ANGLE_DEGREES);
-        changed |= fraction_row(ui, texts.blend, blend);
+        changed |= spot_rows(ui, angle, blend, keys);
     }
     changed
 }

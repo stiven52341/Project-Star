@@ -4,6 +4,8 @@
 //! parent, and the inspector edits the node selected in
 //! it. Changes are kept until the scene is saved, and can be undone.
 
+mod animated_properties;
+mod animating;
 mod animation_rows;
 mod animator_rows;
 mod body_drawing;
@@ -16,12 +18,15 @@ mod exported_fields;
 mod fields;
 mod gizmo;
 mod history;
+mod key_buttons;
 mod picking;
 mod properties;
 mod reparenting;
+mod timeline;
 mod tree;
 mod tree_view;
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -30,6 +35,7 @@ use star_engine::prelude::{Camera, Frame, SceneOutline, Vec3};
 use star_engine::star_scene::NodeOutline;
 use star_script::semantic::ClassTable;
 
+use self::animating::write_animations;
 pub(crate) use self::animation_rows::AnimationFiles;
 pub(crate) use self::body_drawing::BodyMarks;
 use self::class_choice::{ChoiceOutcome, ClassChoice};
@@ -44,9 +50,10 @@ pub(crate) use self::dropping::ImageDrop;
 pub(crate) use self::gizmo::{
     Drag, Handle, HandleShape, Lens, Target, Tip, Tool, handle_at, shapes,
 };
-use self::history::{Now, SceneHistory, Snapshot};
+use self::history::{KeyframeFiles, Now, SceneHistory, Snapshot};
 pub(crate) use self::picking::Ray;
 use self::properties::{NodeContext, edit_node};
+use self::timeline::{Change, Timeline, TimelineFile};
 use self::tree_view::{MenuContext, TreeAction, TreeState, TreeView};
 use crate::project::ProjectDimension;
 use crate::style::ERROR_COLOR;
@@ -58,6 +65,8 @@ pub(crate) struct SceneDocument {
     path: String,
     /// Its file on disk.
     file: PathBuf,
+    /// The assets folder it is in, where its animators' `.anim` files are.
+    assets: PathBuf,
     /// The kind of project it belongs to, which new nodes and parts follow.
     dimension: ProjectDimension,
     /// Its nodes, or why its file could not be read.
@@ -73,6 +82,16 @@ pub(crate) struct SceneDocument {
     tree: TreeState,
     /// The classes of a script dropped on a node, to choose from.
     class_choice: Option<ClassChoice>,
+    /// The `.anim` files of its animators read so far, as they are now:
+    /// they change and are saved with the scene.
+    animations: KeyframeFiles,
+    /// The files as they were last read or written, to write only those
+    /// that changed.
+    written_animations: KeyframeFiles,
+    /// Why the `.anim` files that could not be read could not.
+    unreadable_animations: BTreeMap<String, String>,
+    /// The animations of the animator selected last.
+    timeline: Timeline,
 }
 
 impl SceneDocument {
@@ -86,12 +105,14 @@ impl SceneDocument {
         let history = content.as_ref().ok().map(|outline| {
             SceneHistory::new(Snapshot {
                 outline: outline.clone(),
+                animations: KeyframeFiles::new(),
                 selected: None,
             })
         });
         Self {
             path,
             file,
+            assets: assets.to_path_buf(),
             dimension,
             content,
             selected: None,
@@ -99,6 +120,10 @@ impl SceneDocument {
             save_error: None,
             tree: TreeState::default(),
             class_choice: None,
+            animations: KeyframeFiles::new(),
+            written_animations: KeyframeFiles::new(),
+            unreadable_animations: BTreeMap::new(),
+            timeline: Timeline::default(),
         }
     }
 
@@ -136,11 +161,15 @@ impl SceneDocument {
         let written = outline
             .to_text()
             .map_err(|error| error.to_string())
-            .and_then(|text| fs::write(&self.file, text).map_err(|error| error.to_string()));
+            .and_then(|text| fs::write(&self.file, text).map_err(|error| error.to_string()))
+            .and_then(|()| {
+                write_animations(&self.assets, &self.animations, &mut self.written_animations)
+            });
         match written {
             Ok(()) => {
                 history.mark_saved(Now {
                     outline,
+                    animations: &self.animations,
                     selected: self.selected,
                 });
                 self.save_error = None;
@@ -157,8 +186,21 @@ impl SceneDocument {
     /// selected, with the textures and meshes of `gpu`.
     pub(crate) fn draw(&self, gpu: &mut impl SceneGpu, marks: Marks, frame: &mut Frame) {
         if let Ok(outline) = &self.content {
-            drawing::draw_scene(outline, self.selected, gpu, marks, frame);
+            let previewed = self.previewed(outline);
+            let shown = previewed.as_ref().unwrap_or(outline);
+            drawing::draw_scene(shown, self.selected, gpu, marks, frame);
         }
+    }
+
+    /// The scene as the timeline's animation leaves it at its playhead,
+    /// while the timeline is shown.
+    fn previewed(&self, outline: &SceneOutline) -> Option<SceneOutline> {
+        let file = self.timeline.file(outline.nodes())?;
+        let animation = self
+            .timeline
+            .animation_name()
+            .and_then(|name| self.animations.get(file)?.animation(name));
+        self.timeline.previewed(outline, animation)
     }
 
     /// The camera whose view is previewed, with its node's name: the node
@@ -173,7 +215,8 @@ impl SceneDocument {
     /// changes anything.
     pub(crate) fn draw_game_view(&self, gpu: &mut impl SceneGpu, frame: &mut Frame) {
         if let Ok(outline) = &self.content {
-            drawing::draw_game_view(outline, gpu, frame);
+            let previewed = self.previewed(outline);
+            drawing::draw_game_view(previewed.as_ref().unwrap_or(outline), gpu, frame);
         }
     }
 
@@ -412,6 +455,7 @@ impl SceneDocument {
         animations: AnimationFiles<'_>,
         classes: Option<&ClassTable>,
     ) -> bool {
+        let keys = self.key_buttons();
         let node = self.content.as_mut().ok().and_then(|outline| {
             self.selected
                 .and_then(|selected| outline.node_mut(selected))
@@ -424,6 +468,7 @@ impl SceneDocument {
             images,
             animations,
             classes,
+            keys: keys.as_ref().map(|(keys, _)| keys),
         };
         let was_main = node.is_main_camera();
         if edit_node(ui, node, &context) {
@@ -431,6 +476,9 @@ impl SceneDocument {
                 self.make_only_main_camera();
             }
             self.mark_changed();
+        }
+        if let Some((keys, path)) = keys {
+            self.add_keys(&path, &keys.into_pressed(), classes);
         }
         true
     }
@@ -461,6 +509,7 @@ impl SceneDocument {
     /// and of the text being typed, so a whole drag or a whole number is
     /// undone at once. Called once per frame, after every change.
     pub(crate) fn settle(&mut self, context: &egui::Context) {
+        self.follow_timeline();
         let (Ok(outline), Some(history)) = (&self.content, &mut self.history) else {
             return;
         };
@@ -470,6 +519,7 @@ impl SceneDocument {
         if !busy {
             history.close_step(Now {
                 outline,
+                animations: &self.animations,
                 selected: self.selected,
             });
         }
@@ -502,12 +552,14 @@ impl SceneDocument {
         };
         let now = Now {
             outline,
+            animations: &self.animations,
             selected: self.selected,
         };
         let Some(snapshot) = step(history, now) else {
             return;
         };
         *outline = snapshot.outline;
+        self.animations = snapshot.animations;
         self.selected = snapshot
             .selected
             .filter(|&selected| selected < outline.nodes().len());

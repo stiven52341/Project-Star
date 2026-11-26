@@ -12,6 +12,7 @@ mod messages;
 mod scene_messages;
 mod script_messages;
 mod spanish;
+mod timeline_messages;
 
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
