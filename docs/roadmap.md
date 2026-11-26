@@ -1379,7 +1379,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           inside the model (they are not nodes of the scene), and the
           model's animations are played by an `Animator` whose
           `animations` names the `.glb`.
-      - [ ] 15f.3a The skeleton (joints, rest pose, inverse bind
+      - [x] 15f.3a The skeleton (joints, rest pose, inverse bind
             matrices), each vertex's joints and weights, and the
             animations (channels of translation, rotation and scale) read
             from glTF into `star_core::Model`.

@@ -42,7 +42,7 @@ gilrs = "0.11"             # Gamepads (needs libudev headers to build on Linux)
 png = "0.18"               # PNG image decoding for textures
 zune-jpeg = "0.5"           # JPEG image decoding for textures
 gltf = { version = "1.4", default-features = false, features = [
-    "utils",
+    "utils", "names",
 ] }                        # glTF 2.0 3D models (meshes and materials); images go through png and zune-jpeg
 symphonia = { version = "0.6", default-features = false, features = [
     "wav", "pcm", "ogg", "vorbis", "mp3", "flac",

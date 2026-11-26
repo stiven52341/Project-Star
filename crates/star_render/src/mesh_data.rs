@@ -366,16 +366,13 @@ mod tests {
 
     #[test]
     fn model_parts_become_meshes_of_their_vertices() {
-        let corner = |x: f32| star_core::ModelVertex {
-            position: [x, 0.0, 0.0],
-            normal: [0.0, 1.0, 0.0],
-            uv: [x, 1.0],
-        };
+        let corner = |x: f32| star_core::ModelVertex::new([x, 0.0, 0.0], [0.0, 1.0, 0.0], [x, 1.0]);
         let part = ModelPart {
             vertices: vec![corner(0.0), corner(1.0), corner(2.0)],
             indices: vec![0, 2, 1],
             material: star_core::ModelMaterial::default(),
             transform: star_core::model::IDENTITY_COLUMNS,
+            skinned: false,
         };
 
         let mesh = MeshData::from_model_part(&part).unwrap();

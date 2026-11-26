@@ -1,3 +1,5 @@
+use star_core::JointProperty;
+
 use super::*;
 
 /// The magic number, version and chunk types of `.glb` files.
@@ -177,4 +179,96 @@ fn matrices_multiply_as_columns() {
     // Doubled first, then moved: the move is not doubled.
     assert_eq!(multiply(moved, doubled)[3], [5.0, 0.0, 0.0, 1.0]);
     assert_eq!(multiply(doubled, moved)[3], [10.0, 0.0, 0.0, 1.0]);
+}
+
+/// The bytes of a skinned triangle: positions, indices, joints, weights,
+/// two identity inverse bind matrices, and an animation's times and
+/// rotations.
+fn skinned_bytes() -> Vec<u8> {
+    let mut bytes = triangle_bytes();
+    let joints: [u16; 12] = [0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0];
+    bytes.extend(joints.iter().flat_map(|value| value.to_le_bytes()));
+    let weights: [f32; 12] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0];
+    let identity: [f32; 16] = [
+        1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+    ];
+    let times: [f32; 2] = [0.0, 1.0];
+    let rotations: [f32; 8] = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.707, 0.707];
+    for floats in [&weights[..], &identity, &identity, &times, &rotations] {
+        bytes.extend(floats.iter().flat_map(|value| value.to_le_bytes()));
+    }
+    bytes
+}
+
+const SKINNED_JSON: &str = r#"{
+    "asset": { "version": "2.0" },
+    "scene": 0,
+    "scenes": [{ "nodes": [0, 1] }],
+    "nodes": [
+        { "mesh": 0, "skin": 0 },
+        { "name": "root", "translation": [0.0, 1.0, 0.0], "children": [2] },
+        { "name": "hand", "translation": [1.0, 0.0, 0.0] }
+    ],
+    "skins": [{ "joints": [2, 1], "inverseBindMatrices": 4 }],
+    "meshes": [{ "primitives": [{
+        "attributes": { "POSITION": 0, "JOINTS_0": 2, "WEIGHTS_0": 3 }, "indices": 1 }] }],
+    "animations": [{ "name": "wave",
+        "channels": [{ "sampler": 0, "target": { "node": 2, "path": "rotation" } }],
+        "samplers": [{ "input": 5, "output": 6, "interpolation": "LINEAR" }] }],
+    "buffers": [{ "byteLength": 284 }],
+    "bufferViews": [
+        { "buffer": 0, "byteOffset": 0, "byteLength": 36 },
+        { "buffer": 0, "byteOffset": 36, "byteLength": 6 },
+        { "buffer": 0, "byteOffset": 44, "byteLength": 24 },
+        { "buffer": 0, "byteOffset": 68, "byteLength": 48 },
+        { "buffer": 0, "byteOffset": 116, "byteLength": 128 },
+        { "buffer": 0, "byteOffset": 244, "byteLength": 8 },
+        { "buffer": 0, "byteOffset": 252, "byteLength": 32 }
+    ],
+    "accessors": [
+        { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
+          "min": [0.0, 0.0, 0.0], "max": [1.0, 1.0, 0.0] },
+        { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" },
+        { "bufferView": 2, "componentType": 5123, "count": 3, "type": "VEC4" },
+        { "bufferView": 3, "componentType": 5126, "count": 3, "type": "VEC4" },
+        { "bufferView": 4, "componentType": 5126, "count": 2, "type": "MAT4" },
+        { "bufferView": 5, "componentType": 5126, "count": 2, "type": "SCALAR",
+          "min": [0.0], "max": [1.0] },
+        { "bufferView": 6, "componentType": 5126, "count": 2, "type": "VEC4" }
+    ]
+}"#;
+
+#[test]
+fn skins_become_skeletons_with_parents_first() {
+    let model = decode_gltf(&glb(SKINNED_JSON, &skinned_bytes()), &nothing_beside).unwrap();
+
+    let skeleton = model.skeleton().unwrap();
+    let names: Vec<&str> = skeleton
+        .joints
+        .iter()
+        .map(|joint| joint.name.as_str())
+        .collect();
+    assert_eq!(names, ["root", "hand"], "the skin lists the hand first");
+    assert_eq!(skeleton.joints[1].parent, Some(0));
+    assert_eq!(skeleton.joints[0].rest.translation, [0.0, 1.0, 0.0]);
+    let part = &model.parts()[0];
+    assert!(part.skinned);
+    assert_eq!(part.vertices[0].joints[0], 1, "the hand, renumbered");
+    assert_eq!(part.vertices[1].joints[0], 0, "the root, renumbered");
+    assert_eq!(part.vertices[2].weights, [0.5, 0.5, 0.0, 0.0]);
+}
+
+#[test]
+fn animations_move_the_joints_they_name() {
+    let model = decode_gltf(&glb(SKINNED_JSON, &skinned_bytes()), &nothing_beside).unwrap();
+
+    let [wave] = model.animations() else {
+        panic!("one animation");
+    };
+    assert_eq!((wave.name.as_str(), wave.length), ("wave", 1.0));
+    let channel = &wave.channels[0];
+    assert_eq!(channel.joint, 1);
+    assert_eq!(channel.property, JointProperty::Rotation);
+    assert!(!channel.step);
+    assert_eq!(channel.values[1], [0.0, 0.0, 0.707, 0.707]);
 }

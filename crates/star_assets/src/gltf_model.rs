@@ -4,7 +4,9 @@
 //! The model is the default scene of the file (or its first one): every
 //! mesh its nodes show, placed where the nodes put it, with the base
 //! color, metalness, roughness and base color texture of its material.
-//! Triangles are all that is read; points and lines are left out.
+//! Triangles are all that is read; points and lines are left out. The
+//! file's first skin becomes the model's skeleton, with the animations
+//! that move its joints (`skeleton`).
 
 use std::collections::HashMap;
 
@@ -22,6 +24,8 @@ use crate::png_image::decode_png;
 const DATA_URI: &str = "data:";
 /// The set of texture coordinates the base color reads.
 const FIRST_TEX_COORDS: u32 = 0;
+/// The set of joints and weights skinned meshes read.
+const FIRST_SET: u32 = 0;
 
 /// Reads the bytes of a file a `.gltf` names, by the URI it gives, from
 /// the model's folder.
@@ -49,7 +53,14 @@ pub fn decode_gltf(bytes: &[u8], read_beside: ReadBeside<'_>) -> EngineResult<Mo
     for node in scene.iter().flat_map(gltf::Scene::nodes) {
         reader.read_node(&node, IDENTITY_COLUMNS)?;
     }
-    Model::new(reader.parts, reader.images)
+    let Some(skin) = gltf.skins().next() else {
+        return Model::new(reader.parts, reader.images);
+    };
+    let read = skeleton::read_skeleton(&gltf, &skin, &buffers)?;
+    let mut parts = reader.parts;
+    read.renumber(&mut parts);
+    let animations = read.animations(&gltf, &buffers);
+    Model::new(parts, reader.images)?.with_skeleton(read.skeleton, animations)
 }
 
 /// The bytes of every buffer of the file, in its order.
@@ -90,9 +101,10 @@ impl PartReader<'_> {
     fn read_node(&mut self, node: &gltf::Node<'_>, parent: [[f32; 4]; 4]) -> EngineResult<()> {
         let place = multiply(parent, node.transform().matrix());
         if let Some(mesh) = node.mesh() {
+            let skinned = node.skin().is_some();
             for primitive in mesh.primitives() {
                 if primitive.mode() == Mode::Triangles {
-                    let part = self.read_primitive(&primitive, place)?;
+                    let part = self.read_primitive(&primitive, place, skinned)?;
                     self.parts.push(part);
                 }
             }
@@ -107,6 +119,7 @@ impl PartReader<'_> {
         &mut self,
         primitive: &gltf::Primitive<'_>,
         transform: [[f32; 4]; 4],
+        skinned: bool,
     ) -> EngineResult<ModelPart> {
         let buffers = self.buffers;
         let reader = primitive.reader(|buffer| buffers.get(buffer.index()).map(Vec::as_slice));
@@ -127,13 +140,29 @@ impl PartReader<'_> {
             .read_tex_coords(FIRST_TEX_COORDS)
             .map(|coords| coords.into_f32().collect())
             .unwrap_or_default();
+        let joints: Vec<[u16; 4]> = reader
+            .read_joints(FIRST_SET)
+            .map(|joints| joints.into_u16().collect())
+            .unwrap_or_default();
+        let weights: Vec<[f32; 4]> = reader
+            .read_weights(FIRST_SET)
+            .map(|weights| weights.into_f32().collect())
+            .unwrap_or_default();
+        let skinned = skinned && !joints.is_empty() && !weights.is_empty();
         let vertices = positions
             .iter()
             .enumerate()
-            .map(|(index, &position)| ModelVertex {
-                position,
-                normal: normals.get(index).copied().unwrap_or([0.0, 0.0, 1.0]),
-                uv: uvs.get(index).copied().unwrap_or_default(),
+            .map(|(index, &position)| {
+                let mut vertex = ModelVertex::new(
+                    position,
+                    normals.get(index).copied().unwrap_or([0.0, 0.0, 1.0]),
+                    uvs.get(index).copied().unwrap_or_default(),
+                );
+                if skinned {
+                    vertex.joints = joints.get(index).copied().unwrap_or_default();
+                    vertex.weights = normalized_weights(weights.get(index).copied());
+                }
+                vertex
             })
             .collect();
         let material = self.read_material(&primitive.material())?;
@@ -142,6 +171,7 @@ impl PartReader<'_> {
             indices,
             material,
             transform,
+            skinned,
         })
     }
 
@@ -200,8 +230,20 @@ fn decode_image(bytes: &[u8], kind: &str) -> EngineResult<Image> {
     }
 }
 
+/// `weights` scaled to add up to 1; a vertex without weights follows its
+/// first joint alone.
+fn normalized_weights(weights: Option<[f32; 4]>) -> [f32; 4] {
+    let weights = weights.unwrap_or_default();
+    let total: f32 = weights.iter().sum();
+    if total > f32::EPSILON {
+        weights.map(|weight| weight / total)
+    } else {
+        [1.0, 0.0, 0.0, 0.0]
+    }
+}
+
 /// The product of two matrices given as columns: `first` after `second`.
-fn multiply(first: [[f32; 4]; 4], second: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
+pub(crate) fn multiply(first: [[f32; 4]; 4], second: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
     let mut product = [[0.0; 4]; 4];
     for (column, out) in second.iter().zip(&mut product) {
         for (row, cell) in out.iter_mut().enumerate() {
@@ -260,9 +302,10 @@ fn normalized(vector: [f32; 3]) -> [f32; 3] {
     }
 }
 
-fn invalid(reason: &str) -> EngineError {
+pub(crate) fn invalid(reason: &str) -> EngineError {
     EngineError::Asset(format!("invalid glTF model: {reason}"))
 }
 
+mod skeleton;
 #[cfg(test)]
 mod tests;

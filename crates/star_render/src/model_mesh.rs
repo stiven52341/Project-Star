@@ -64,11 +64,7 @@ mod tests {
     use super::*;
 
     fn part(texture: Option<usize>) -> ModelPart {
-        let corner = |x: f32| ModelVertex {
-            position: [x, 0.0, x],
-            normal: [0.0, 1.0, 0.0],
-            uv: [0.0, 0.0],
-        };
+        let corner = |x: f32| ModelVertex::new([x, 0.0, x], [0.0, 1.0, 0.0], [0.0, 0.0]);
         ModelPart {
             vertices: vec![corner(0.0), corner(1.0), corner(2.0)],
             indices: vec![0, 1, 2],
@@ -78,6 +74,7 @@ mod tests {
                 ..ModelMaterial::default()
             },
             transform: IDENTITY_COLUMNS,
+            skinned: false,
         }
     }
 
