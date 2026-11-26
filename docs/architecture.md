@@ -241,6 +241,13 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   only names its file; the engine reads and uploads each model the first
   time it draws it (`model_library`), once per file, and draws every part
   of it at the node's place (a file that cannot be read warns once).
+  A skinned model's meshes are bent on the GPU (`skinning.rs`): a mesh
+  with joints (`MeshData::with_skin`) gets a second vertex buffer of each
+  vertex's 4 joints and weights, and `Frame::draw_skinned_mesh_3d` gives a
+  draw up to `MAX_JOINTS` (128) joint matrices, uploaded into one slot per
+  skinned draw of a uniform buffer and picked with a dynamic offset, as the
+  draws' own uniforms are (every backend, OpenGL included, runs it); the
+  surface shader's `vs_skinned` mixes them by the weights.
   Bones are an optional `[node.bone]` (`length`, 0.5 if left out) on 2D
   nodes (decision 82); the editor draws each one as a diamond from its
   node along its rotation, picks it by clicking it, and starts the nodes

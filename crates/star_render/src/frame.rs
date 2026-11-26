@@ -1,7 +1,11 @@
 //! Description of what to draw in one frame.
 
+use std::ops::Range;
+
+use star_core::{EngineError, EngineResult};
 use star_math::Mat4;
 
+use crate::skinning::MAX_JOINTS;
 use crate::{AmbientLight, Camera, Color, Light, Light2d, Material, Mesh3dId, MeshId, Sprite};
 
 /// One mesh to draw, placed in the world by `transform`.
@@ -17,6 +21,8 @@ pub(crate) struct SurfaceDraw {
     pub(crate) mesh: Mesh3dId,
     pub(crate) material: Material,
     pub(crate) transform: Mat4,
+    /// For a skinned draw, where its joint matrices are among the frame's.
+    pub(crate) joints: Option<(usize, usize)>,
 }
 
 /// Everything to draw in a frame: background, camera, meshes and sprites.
@@ -34,6 +40,8 @@ pub struct Frame {
     lights_2d: Vec<Light2d>,
     draws: Vec<DrawCommand>,
     surfaces: Vec<SurfaceDraw>,
+    /// The joint matrices of every skinned draw, one after the other.
+    joints: Vec<Mat4>,
     sprites: Vec<Sprite>,
 }
 
@@ -53,6 +61,7 @@ impl Frame {
         self.lights_2d.clear();
         self.draws.clear();
         self.surfaces.clear();
+        self.joints.clear();
         self.sprites.clear();
     }
 
@@ -130,7 +139,40 @@ impl Frame {
             mesh,
             material,
             transform,
+            joints: None,
         });
+    }
+
+    /// Draws a skinned `mesh` as [`Frame::draw_mesh_3d`] does, each vertex
+    /// bent by the matrices of `joints` it follows: from the mesh's space,
+    /// as it was bound, to where each joint takes it, before `transform`.
+    /// A mesh without joints is drawn as it is.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::CapacityExceeded`] if there are more than
+    /// [`MAX_JOINTS`] joints; the mesh is not drawn.
+    pub fn draw_skinned_mesh_3d(
+        &mut self,
+        mesh: Mesh3dId,
+        material: Material,
+        transform: Mat4,
+        joints: &[Mat4],
+    ) -> EngineResult<()> {
+        if joints.len() > MAX_JOINTS {
+            return Err(EngineError::CapacityExceeded {
+                resource: "joints of a skinned mesh",
+            });
+        }
+        let start = self.joints.len();
+        self.joints.extend_from_slice(joints);
+        self.surfaces.push(SurfaceDraw {
+            mesh,
+            material,
+            transform,
+            joints: Some((start, joints.len())),
+        });
+        Ok(())
     }
 
     /// Draws `sprite`. Sprites are drawn after the meshes, by layer and, in
@@ -177,6 +219,15 @@ impl Frame {
 
     pub(crate) fn surfaces(&self) -> &[SurfaceDraw] {
         &self.surfaces
+    }
+
+    /// The joint matrices of `draw`, if it is skinned.
+    pub(crate) fn joints_of(&self, draw: &SurfaceDraw) -> Option<&[Mat4]> {
+        let (start, count) = draw.joints?;
+        self.joints.get(Range {
+            start,
+            end: start + count,
+        })
     }
 
     /// The sprites drawn in this frame, in the order they were added.

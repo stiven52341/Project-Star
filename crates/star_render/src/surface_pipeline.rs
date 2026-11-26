@@ -10,7 +10,8 @@ use crate::bytes::extend_with_f32s;
 use crate::depth::DEPTH_FORMAT;
 use crate::light::{LIGHTS_SIZE, encode_lights};
 use crate::mesh_pipeline::slot_stride;
-use crate::{AmbientLight, Color, Light, MAX_LIGHTS, MeshData, MeshVertex};
+use crate::skinning::JointBuffer;
+use crate::{AmbientLight, Color, Light, MAX_LIGHTS, MeshData, MeshVertex, VertexSkin};
 
 /// 3D draws allowed per frame; bounds the size of the draw buffer.
 const MAX_DRAWS_PER_FRAME: u32 = 4096;
@@ -24,12 +25,21 @@ const VERTEX_STRIDE: usize = FLOATS_PER_VERTEX * BYTES_PER_FLOAT;
 
 const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
     wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x2];
+/// A skinned vertex's joints (4 whole numbers) and weights (4 decimals).
+const SKIN_STRIDE: usize = 8 * BYTES_PER_FLOAT;
+const SKIN_ATTRIBUTES: [wgpu::VertexAttribute; 2] =
+    wgpu::vertex_attr_array![3 => Uint32x4, 4 => Float32x4];
+/// The bind groups of a skinned draw: its uniforms, the lights, the
+/// texture and its joints.
+const JOINTS_GROUP: u32 = 3;
 
 /// The buffers of a 3D mesh, ready to be drawn.
 pub(crate) struct GpuSurfaceMesh {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     index_count: u32,
+    /// The joints and weights of each vertex, if a skeleton bends it.
+    skin_buffer: Option<wgpu::Buffer>,
 }
 
 impl GpuSurfaceMesh {
@@ -54,10 +64,18 @@ impl GpuSurfaceMesh {
             contents: &indices,
             usage: wgpu::BufferUsages::INDEX,
         });
+        let skin_buffer = mesh.skin().map(|skin| {
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("3D mesh joints"),
+                contents: &encode_skin(skin),
+                usage: wgpu::BufferUsages::VERTEX,
+            })
+        });
         Ok(Self {
             vertex_buffer,
             index_buffer,
             index_count,
+            skin_buffer,
         })
     }
 }
@@ -86,6 +104,9 @@ pub(crate) struct FrameLights<'a> {
 /// buffer, selected with a dynamic offset.
 pub(crate) struct SurfacePipeline {
     pipeline: wgpu::RenderPipeline,
+    /// The same, bending each vertex with the joints of its draw.
+    skinned_pipeline: wgpu::RenderPipeline,
+    joints: JointBuffer,
     draw_buffer: wgpu::Buffer,
     draw_bind_group: wgpu::BindGroup,
     draw_stride: u32,
@@ -139,34 +160,7 @@ impl SurfacePipeline {
                 }),
             }],
         });
-        let lights_size = NonZeroU64::new(LIGHTS_SIZE as u64);
-        let lights_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("3D lights"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: lights_size,
-                },
-                count: None,
-            }],
-        });
-        let lights_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("3D lights"),
-            size: LIGHTS_SIZE as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let lights_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("3D lights"),
-            layout: &lights_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: lights_buffer.as_entire_binding(),
-            }],
-        });
+        let (lights_layout, lights_buffer, lights_bind_group) = create_lights(device);
         let shader = device.create_shader_module(wgpu::include_wgsl!("shaders/surface.wgsl"));
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("3D pipeline layout"),
@@ -177,8 +171,27 @@ impl SurfacePipeline {
             ],
             immediate_size: 0,
         });
+        let joints = JointBuffer::new(device);
+        let skinned_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("skinned 3D pipeline layout"),
+            bind_group_layouts: &[
+                Some(&bind_group_layout),
+                Some(&lights_layout),
+                Some(texture_layout),
+                Some(joints.layout()),
+            ],
+            immediate_size: 0,
+        });
+        let parts = |layout, skinned| PipelineParts {
+            shader: &shader,
+            layout,
+            target_format,
+            skinned,
+        };
         Self {
-            pipeline: create_pipeline(device, &shader, &layout, target_format),
+            pipeline: parts(&layout, false).create(device),
+            skinned_pipeline: parts(&skinned_layout, true).create(device),
+            joints,
             draw_buffer,
             draw_bind_group,
             draw_stride,
@@ -239,6 +252,45 @@ impl SurfacePipeline {
         Ok(())
     }
 
+    /// Copies the joint matrices of every skinned draw of this frame to the
+    /// GPU, in order.
+    pub(crate) fn upload_joints<'a>(
+        &mut self,
+        queue: &wgpu::Queue,
+        draws: impl Iterator<Item = &'a [Mat4]>,
+    ) -> EngineResult<()> {
+        self.joints.upload(queue, draws)
+    }
+
+    /// Draws `mesh` as [`SurfacePipeline::draw`], bent by the joints of the
+    /// skinned draw in position `joints`; a mesh without joints is drawn
+    /// as it is.
+    pub(crate) fn draw_skinned(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        (slot, joints): (u32, u32),
+        mesh: &GpuSurfaceMesh,
+        texture: &wgpu::BindGroup,
+    ) {
+        let Some(skin) = &mesh.skin_buffer else {
+            self.draw(pass, slot, mesh, texture);
+            return;
+        };
+        pass.set_pipeline(&self.skinned_pipeline);
+        self.bind_draw(pass, slot, texture);
+        self.joints.bind(pass, JOINTS_GROUP, joints);
+        pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+        pass.set_vertex_buffer(1, skin.slice(..));
+        pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        pass.draw_indexed(0..mesh.index_count, 0, 0..1);
+    }
+
+    fn bind_draw(&self, pass: &mut wgpu::RenderPass<'_>, slot: u32, texture: &wgpu::BindGroup) {
+        pass.set_bind_group(0, &self.draw_bind_group, &[slot * self.draw_stride]);
+        pass.set_bind_group(1, &self.lights_bind_group, &[]);
+        pass.set_bind_group(2, texture, &[]);
+    }
+
     /// Draws `mesh` with the uniforms uploaded in position `slot`, showing
     /// `texture`.
     pub(crate) fn draw(
@@ -249,13 +301,45 @@ impl SurfacePipeline {
         texture: &wgpu::BindGroup,
     ) {
         pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, &self.draw_bind_group, &[slot * self.draw_stride]);
-        pass.set_bind_group(1, &self.lights_bind_group, &[]);
-        pass.set_bind_group(2, texture, &[]);
+        self.bind_draw(pass, slot, texture);
         pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
         pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         pass.draw_indexed(0..mesh.index_count, 0, 0..1);
     }
+}
+
+/// The layout, buffer and bind group of the lights of a frame, shared by
+/// every 3D draw.
+fn create_lights(device: &wgpu::Device) -> (wgpu::BindGroupLayout, wgpu::Buffer, wgpu::BindGroup) {
+    let lights_size = NonZeroU64::new(LIGHTS_SIZE as u64);
+    let lights_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("3D lights"),
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: lights_size,
+            },
+            count: None,
+        }],
+    });
+    let lights_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("3D lights"),
+        size: LIGHTS_SIZE as u64,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let lights_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("3D lights"),
+        layout: &lights_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: lights_buffer.as_entire_binding(),
+        }],
+    });
+    (lights_layout, lights_buffer, lights_bind_group)
 }
 
 fn encode_uniforms(bytes: &mut Vec<u8>, draw: &SurfaceUniforms) {
@@ -292,24 +376,59 @@ fn encode_vertices(vertices: &[MeshVertex]) -> Vec<u8> {
     bytes
 }
 
+fn encode_skin(skin: &[VertexSkin]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(skin.len() * SKIN_STRIDE);
+    for vertex in skin {
+        bytes.extend(vertex.joints.iter().flat_map(|joint| joint.to_le_bytes()));
+        extend_with_f32s(&mut bytes, &vertex.weights);
+    }
+    bytes
+}
+
+/// Everything that differs between the plain and the skinned pipelines.
+struct PipelineParts<'a> {
+    shader: &'a wgpu::ShaderModule,
+    layout: &'a wgpu::PipelineLayout,
+    target_format: wgpu::TextureFormat,
+    skinned: bool,
+}
+
+impl PipelineParts<'_> {
+    fn create(&self, device: &wgpu::Device) -> wgpu::RenderPipeline {
+        let vertices = wgpu::VertexBufferLayout {
+            array_stride: VERTEX_STRIDE as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &ATTRIBUTES,
+        };
+        let skin = wgpu::VertexBufferLayout {
+            array_stride: SKIN_STRIDE as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &SKIN_ATTRIBUTES,
+        };
+        let (entry_point, buffers) = if self.skinned {
+            ("vs_skinned", vec![Some(vertices), Some(skin)])
+        } else {
+            ("vs_main", vec![Some(vertices)])
+        };
+        create_pipeline(device, self, entry_point, &buffers)
+    }
+}
+
 fn create_pipeline(
     device: &wgpu::Device,
-    shader: &wgpu::ShaderModule,
-    layout: &wgpu::PipelineLayout,
-    target_format: wgpu::TextureFormat,
+    parts: &PipelineParts<'_>,
+    entry_point: &str,
+    buffers: &[Option<wgpu::VertexBufferLayout<'_>>],
 ) -> wgpu::RenderPipeline {
+    let (shader, layout, target_format) = (parts.shader, parts.layout, parts.target_format);
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("3D pipeline"),
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: shader,
-            entry_point: Some("vs_main"),
+            entry_point: Some(entry_point),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Some(wgpu::VertexBufferLayout {
-                array_stride: VERTEX_STRIDE as wgpu::BufferAddress,
-                step_mode: wgpu::VertexStepMode::Vertex,
-                attributes: &ATTRIBUTES,
-            })],
+            buffers,
         },
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,

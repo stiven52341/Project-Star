@@ -469,3 +469,56 @@ fn textures_tint_3d_surfaces() {
 
     assert_eq!(pixel(&gpu.render(&frame), SIZE / 2, SIZE / 2), BLUE);
 }
+
+#[test]
+#[ignore = "needs a GPU"]
+fn skinned_meshes_follow_their_joints() {
+    let mut gpu = Gpu::new();
+    let flat = MeshData::plane(Vec2::new(2.0, 2.0)).unwrap();
+    let follow_first = crate::VertexSkin {
+        joints: [0; 4],
+        weights: [1.0, 0.0, 0.0, 0.0],
+    };
+    let skin = vec![follow_first; flat.vertices().len()];
+    let skinned = gpu
+        .scene
+        .create_mesh_3d(&flat.with_skin(skin).unwrap())
+        .unwrap();
+    let turned = Mat4::from_rotation_x(FACE_THE_CAMERA);
+    let draw = |joint: Mat4| {
+        let mut frame = frame_3d();
+        frame
+            .draw_skinned_mesh_3d(skinned, MATTE_WHITE, turned, &[joint])
+            .unwrap();
+        frame
+    };
+
+    let still = gpu.render(&draw(Mat4::IDENTITY));
+    let moved = gpu.render(&draw(Mat4::from_translation(Vec3::new(10.0, 0.0, 0.0))));
+
+    assert_ne!(
+        pixel(&still, SIZE / 2, SIZE / 2),
+        BLACK,
+        "the joint keeps it"
+    );
+    assert_eq!(
+        pixel(&moved, SIZE / 2, SIZE / 2),
+        BLACK,
+        "the joint takes it away"
+    );
+}
+
+#[test]
+fn skinned_draws_take_at_most_their_joints() {
+    let mut frame = Frame::new();
+    let joints = vec![Mat4::IDENTITY; crate::MAX_JOINTS + 1];
+
+    let drawn = frame.draw_skinned_mesh_3d(
+        crate::Mesh3dId::from_index(0),
+        MATTE_WHITE,
+        Mat4::IDENTITY,
+        &joints,
+    );
+
+    assert!(drawn.is_err());
+}

@@ -177,6 +177,13 @@ impl SceneRenderer {
                 roughness: draw.material.roughness,
             }),
         )?;
+        self.surface_pipeline.upload_joints(
+            &self.queue,
+            frame
+                .surfaces()
+                .iter()
+                .filter_map(|draw| frame.joints_of(draw)),
+        )?;
         self.surface_pipeline.upload_lights(
             &self.queue,
             &FrameLights {
@@ -220,14 +227,25 @@ impl SceneRenderer {
             });
         {
             let mut pass = self.begin_main_pass(&mut encoder, target, depth, frame.clear_color());
+            let mut skinned = 0;
             for (slot, draw) in (0..).zip(frame.surfaces()) {
                 let mesh = self.mesh_3d(draw.mesh)?;
                 let texture = match draw.material.base_color_texture {
                     Some(id) => self.texture(id)?,
                     None => &self.white_texture,
                 };
-                self.surface_pipeline
-                    .draw(&mut pass, slot, mesh, &texture.bind_group);
+                if frame.joints_of(draw).is_some() {
+                    self.surface_pipeline.draw_skinned(
+                        &mut pass,
+                        (slot, skinned),
+                        mesh,
+                        &texture.bind_group,
+                    );
+                    skinned += 1;
+                } else {
+                    self.surface_pipeline
+                        .draw(&mut pass, slot, mesh, &texture.bind_group);
+                }
             }
             for (slot, draw) in (0..).zip(frame.draws()) {
                 let mesh = self.mesh(draw.mesh)?;

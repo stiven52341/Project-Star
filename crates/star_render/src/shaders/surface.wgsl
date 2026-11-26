@@ -76,6 +76,42 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     return output;
 }
 
+// The most joints a skinned draw moves; as `MAX_JOINTS` of `skinning.rs`.
+const MAX_JOINTS: u32 = 128u;
+
+struct Joints {
+    // Each joint's matrix: from the mesh's space, as it was bound, to where
+    // the joint takes it in the model.
+    matrices: array<mat4x4<f32>, MAX_JOINTS>,
+}
+
+@group(3) @binding(0)
+var<uniform> joints: Joints;
+
+struct SkinnedVertexInput {
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
+    @location(3) joints: vec4<u32>,
+    @location(4) weights: vec4<f32>,
+}
+
+// As `vs_main`, after bending the vertex with the joints it follows.
+@vertex
+fn vs_skinned(input: SkinnedVertexInput) -> VertexOutput {
+    let skin = joints.matrices[min(input.joints.x, MAX_JOINTS - 1u)] * input.weights.x
+        + joints.matrices[min(input.joints.y, MAX_JOINTS - 1u)] * input.weights.y
+        + joints.matrices[min(input.joints.z, MAX_JOINTS - 1u)] * input.weights.z
+        + joints.matrices[min(input.joints.w, MAX_JOINTS - 1u)] * input.weights.w;
+    let position = skin * vec4<f32>(input.position, 1.0);
+    var output: VertexOutput;
+    output.clip_position = draw.model_view_projection * position;
+    output.world_position = (draw.model * position).xyz;
+    output.world_normal = draw.normal_matrix * (skin * vec4<f32>(input.normal, 0.0)).xyz;
+    output.uv = input.uv;
+    return output;
+}
+
 fn distribution_ggx(n_dot_h: f32, roughness: f32) -> f32 {
     let alpha = roughness * roughness;
     let alpha_squared = alpha * alpha;

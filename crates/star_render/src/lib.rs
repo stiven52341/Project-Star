@@ -27,6 +27,7 @@ mod mesh_pipeline;
 mod model_mesh;
 mod renderer;
 mod scene_renderer;
+mod skinning;
 mod sprite;
 mod sprite_batch;
 mod sprite_pipeline;
@@ -49,10 +50,11 @@ pub use material::{DEFAULT_ROUGHNESS, Material};
 pub use mesh::{Mesh3dId, MeshId};
 pub use mesh_data::{
     DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MAX_SPHERE_DIVISIONS, MIN_SPHERE_RINGS,
-    MIN_SPHERE_SEGMENTS, MeshData, MeshShape, MeshVertex,
+    MIN_SPHERE_SEGMENTS, MeshData, MeshShape, MeshVertex, VertexSkin,
 };
 pub use model_mesh::{ModelMeshPart, upload_model};
 pub use renderer::{Renderer, RendererConfig};
+pub use skinning::MAX_JOINTS;
 pub use sprite::{Sprite, SpriteSheet, TextureRegion};
 pub use star_core::Image;
 pub use texture::{TextureFilter, TextureId};

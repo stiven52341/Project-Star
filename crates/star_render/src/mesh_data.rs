@@ -98,6 +98,18 @@ impl MeshVertex {
 pub struct MeshData {
     vertices: Vec<MeshVertex>,
     indices: Vec<u32>,
+    /// For a mesh a skeleton bends, the joints each vertex follows.
+    skin: Option<Vec<VertexSkin>>,
+}
+
+/// The joints a vertex of a skinned mesh follows, and how much: the
+/// matrices of a draw's joints at those positions, mixed by the weights.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VertexSkin {
+    /// Positions among the joint matrices of a skinned draw.
+    pub joints: [u32; 4],
+    /// How much it follows each of `joints`, adding up to 1.
+    pub weights: [f32; 4],
 }
 
 impl MeshData {
@@ -129,10 +141,48 @@ impl MeshData {
                 "the vertices of a mesh must be finite numbers".to_owned(),
             ));
         }
-        Ok(Self { vertices, indices })
+        Ok(Self {
+            vertices,
+            indices,
+            skin: None,
+        })
     }
 
-    /// The mesh of a part of a 3D model, in the part's own space.
+    /// The mesh, bent by a skeleton: each vertex follows the joints of
+    /// `skin` at its position.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Rendering`] if `skin` does not have one entry per
+    /// vertex, or its weights are not finite.
+    pub fn with_skin(mut self, skin: Vec<VertexSkin>) -> EngineResult<Self> {
+        if skin.len() != self.vertices.len() {
+            return Err(EngineError::Rendering(format!(
+                "a skinned mesh needs the joints of each of its {} vertices, got {}",
+                self.vertices.len(),
+                skin.len()
+            )));
+        }
+        if !skin
+            .iter()
+            .all(|vertex| vertex.weights.iter().all(|weight| weight.is_finite()))
+        {
+            return Err(EngineError::Rendering(
+                "the weights of a skinned mesh must be finite numbers".to_owned(),
+            ));
+        }
+        self.skin = Some(skin);
+        Ok(self)
+    }
+
+    /// The joints each vertex follows, if a skeleton bends it.
+    #[must_use]
+    pub fn skin(&self) -> Option<&[VertexSkin]> {
+        self.skin.as_deref()
+    }
+
+    /// The mesh of a part of a 3D model, in the part's own space, with its
+    /// joints if it is skinned.
     ///
     /// # Errors
     ///
@@ -151,7 +201,19 @@ impl MeshData {
                 )
             })
             .collect();
-        Self::new(vertices, part.indices.clone())
+        let mesh = Self::new(vertices, part.indices.clone())?;
+        if !part.skinned {
+            return Ok(mesh);
+        }
+        let skin = part
+            .vertices
+            .iter()
+            .map(|vertex| VertexSkin {
+                joints: vertex.joints.map(u32::from),
+                weights: vertex.weights,
+            })
+            .collect();
+        mesh.with_skin(skin)
     }
 
     /// A box of `size` (width, height and depth) centered on the origin,
@@ -317,6 +379,7 @@ impl Builder {
         MeshData {
             vertices: self.vertices,
             indices: self.indices,
+            skin: None,
         }
     }
 }

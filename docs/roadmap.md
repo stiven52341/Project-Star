@@ -1383,7 +1383,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
             matrices), each vertex's joints and weights, and the
             animations (channels of translation, rotation and scale) read
             from glTF into `star_core::Model`.
-      - [ ] 15f.3b Skinning on the GPU: a skinned variant of the 3D
+      - [x] 15f.3b Skinning on the GPU: a skinned variant of the 3D
             pipeline, with each draw's joint matrices.
       - [ ] 15f.3c The engine poses a model: its joints from the rest pose
             or from animations at times and weights, and draws its skinned
