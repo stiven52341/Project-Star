@@ -1358,7 +1358,18 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           `bones`), `[node.bone]` in scenes, and the editor's “2D bone”
           (drawn, picked, and new bones under a bone start at its end).
     - [ ] 15f.2 Importing glTF models (meshes and materials), wrapped by
-          `star_assets`.
+          `star_assets`. Agreed with the owner (2026-11-26): a new node
+          class `Model` (extends `Node3D`) with a `file` field shows a
+          `.glb`/`.gltf` whole, every mesh and material of it.
+      - [x] 15f.2a Models in memory (`star_core::Model`) and reading glTF
+            files (`.glb`, `.gltf` with its files beside it) in
+            `star_assets`, through the `gltf` crate.
+      - [ ] 15f.2b Showing models: the engine's `ModelNode`, drawn with the
+            3D meshes, and `[node.model]` in scenes.
+      - [ ] 15f.2c StarScript's `Model`, compiled and interpreted.
+      - [ ] 15f.2d The editor: `.glb`/`.gltf` among the assets, dropped on
+            the scene as a `Model`, its inspector, drawn and picked in the
+            view.
     - [ ] 15f.3 3D skinned meshes: a model's skeleton moving its mesh on
           the GPU.
     - [ ] 15f.4 A model's animations played by an `Animator` (and its

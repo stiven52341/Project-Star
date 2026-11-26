@@ -152,12 +152,12 @@ Tools    star_script                         (StarScript compiler; no dependenci
 
 | Crate | Responsibility |
 |-------|----------------|
-| `star_core` | Errors, time, version, images and sounds in memory, basic utilities |
+| `star_core` | Errors, time, version, images, sounds and 3D models in memory, basic utilities |
 | `star_math` | Vectors, matrices, quaternions, transforms |
 | `star_ecs` | Entities, components, systems |
 | `star_platform` | OS windows and events (winit), gamepads (gilrs), platform detection, user folders, showing files in the system's file manager |
 | `star_input` | Keyboard, mouse, touch, gamepads (abstract actions) |
-| `star_assets` | Loading (PNG through png, JPEG through zune-jpeg; WAV, OGG, MP3 and FLAC through symphonia), caching and hot-reload of resources |
+| `star_assets` | Loading (PNG through png, JPEG through zune-jpeg; WAV, OGG, MP3 and FLAC through symphonia; glTF 3D models through gltf), caching and hot-reload of resources |
 | `star_render` | 2D and 3D rendering on wgpu (DX12, Vulkan, Metal, OpenGL) |
 | `star_audio` | Sound and music playback: an own mixer of voices (volume, loops) over the audio output |
 | `star_physics` | 2D and 3D physics: bodies, shapes, sensors and contacts over rapier2d and rapier3d (fixed steps) |

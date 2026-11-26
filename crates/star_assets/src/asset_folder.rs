@@ -4,9 +4,9 @@ use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use star_core::{EngineError, EngineResult, Image, Sound};
+use star_core::{EngineError, EngineResult, Image, Model, Sound};
 
-use crate::{AssetPath, ImageFormat, SoundFormat};
+use crate::{AssetPath, ImageFormat, ModelFormat, SoundFormat, decode_gltf};
 
 /// Name of the asset folder of a game, next to its executable or its project.
 pub const DEFAULT_ASSET_FOLDER: &str = "assets";
@@ -148,6 +148,30 @@ impl AssetFolder {
         format
             .decode(&bytes)
             .map_err(|error| EngineError::Asset(format!("\"{path}\": {error}")))
+    }
+
+    /// Reads and decodes the 3D model at `path`, with the files it names
+    /// beside it (a `.gltf`'s buffers and images), in the format of its
+    /// extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::Asset`] if the format is not supported, or the
+    /// file or one it names cannot be read or is not valid.
+    pub fn load_model(&self, path: &AssetPath) -> EngineResult<Model> {
+        match ModelFormat::of(path)? {
+            ModelFormat::Gltf => {
+                let bytes = self.read(path)?;
+                let folder = path.as_str().rsplit_once('/').map(|(folder, _)| folder);
+                let beside = |uri: &str| {
+                    let joined =
+                        folder.map_or_else(|| uri.to_owned(), |folder| format!("{folder}/{uri}"));
+                    self.read(&AssetPath::new(&joined)?)
+                };
+                decode_gltf(&bytes, &beside)
+                    .map_err(|error| EngineError::Asset(format!("\"{path}\": {error}")))
+            }
+        }
     }
 
     /// Reads and decodes the whole sound at `path`, in the format of its
