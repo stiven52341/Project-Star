@@ -651,7 +651,8 @@ fn image_paths(contents: &io::Result<Vec<FileNode>>) -> Vec<String> {
 }
 
 /// While a script or a blueprint is dragged, its icon and name follow
-/// the pointer, with a warning if it has no class a node can be built as.
+/// the pointer, with a warning if it has mistakes or no class a node can
+/// be built as.
 fn show_dragged_class(ui: &egui::Ui) {
     let ctx = ui.ctx();
     let Some(script) = egui::DragAndDrop::payload::<ClassDrop>(ctx) else {
@@ -671,11 +672,19 @@ fn show_dragged_class(ui: &egui::Ui) {
     );
     let name = script.path.rsplit('/').next().unwrap_or(&script.path);
     paint_icon(&painter, space, AssetKind::of_file(name), name);
-    if script.classes.is_empty() {
+    let warning = match &script.mistake {
+        Some(mistake) => Some(format!(
+            "{}\n{mistake}",
+            texts::current().class_file_mistakes
+        )),
+        None if script.classes.is_empty() => Some(texts::current().no_node_class.to_owned()),
+        None => None,
+    };
+    if let Some(warning) = warning {
         painter.text(
             space.left_bottom() + egui::vec2(0.0, DRAGGED_OFFSET),
             egui::Align2::LEFT_TOP,
-            texts::current().no_node_class,
+            warning,
             egui::TextStyle::Body.resolve(ui.style()),
             ERROR_COLOR,
         );

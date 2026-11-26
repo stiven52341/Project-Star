@@ -880,6 +880,7 @@ mod tests {
         ClassDrop {
             path: "level.star".to_owned(),
             classes: classes.iter().map(|&class| class.to_owned()).collect(),
+            mistake: None,
         }
     }
 

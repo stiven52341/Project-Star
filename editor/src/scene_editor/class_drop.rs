@@ -5,6 +5,7 @@ use std::fs;
 use std::path::Path;
 
 use star_blueprint::Blueprint;
+use star_script::{CompileError, LineIndex};
 
 use crate::project::{BLUEPRINT_EXTENSION, SCRIPT_EXTENSION};
 
@@ -18,6 +19,10 @@ pub(crate) struct ClassDrop {
     /// only those can be nodes (a node's class extends `Node`). Empty if
     /// it has none or cannot be read.
     pub(crate) classes: Vec<String>,
+    /// Why its classes could not be read, if it has mistakes: the first
+    /// one, as `line:column: message` for a script. A file that does not
+    /// read would otherwise look like one without node classes.
+    pub(crate) mistake: Option<String>,
 }
 
 impl ClassDrop {
@@ -29,36 +34,51 @@ impl ClassDrop {
             return None;
         }
         let text = fs::read_to_string(assets.join(&path)).unwrap_or_default();
-        let classes = if is_script {
+        let read = if is_script {
             script_classes(&text)
         } else {
-            blueprint_class(&text).into_iter().collect()
+            blueprint_class(&text).map(|class| class.into_iter().collect())
         };
-        Some(Self { path, classes })
+        let (classes, mistake) = match read {
+            Ok(classes) => (classes, None),
+            Err(mistake) => (Vec::new(), Some(mistake)),
+        };
+        Some(Self {
+            path,
+            classes,
+            mistake,
+        })
     }
 }
 
-/// The classes of a script that extend another class.
-fn script_classes(text: &str) -> Vec<String> {
-    star_script::parse_source(text).map_or_else(
-        |_| Vec::new(),
-        |source| {
-            source
-                .classes
-                .into_iter()
-                .filter(|class| class.base.is_some())
-                .map(|class| class.name.text)
-                .collect()
-        },
-    )
+/// The classes of a script that extend another class, or its first
+/// mistake if it does not parse.
+fn script_classes(text: &str) -> Result<Vec<String>, String> {
+    match star_script::parse_source(text) {
+        Ok(source) => Ok(source
+            .classes
+            .into_iter()
+            .filter(|class| class.base.is_some())
+            .map(|class| class.name.text)
+            .collect()),
+        Err(mistakes) => Err(first_mistake(text, &mistakes)),
+    }
 }
 
-/// The class of a blueprint, if it extends another class.
-fn blueprint_class(text: &str) -> Option<String> {
+/// `line:column: message` of the first of `mistakes` found in `text`.
+fn first_mistake(text: &str, mistakes: &[CompileError]) -> String {
+    mistakes.first().map_or_else(String::new, |mistake| {
+        let position = LineIndex::new(text).position(mistake.span().start());
+        format!("{}:{}: {mistake}", position.line, position.column)
+    })
+}
+
+/// The class of a blueprint, if it extends another class, or why the
+/// blueprint cannot be read.
+fn blueprint_class(text: &str) -> Result<Option<String>, String> {
     Blueprint::from_text(text)
-        .ok()
-        .filter(|blueprint| blueprint.extends.is_some())
-        .map(|blueprint| blueprint.class)
+        .map(|blueprint| blueprint.extends.is_some().then_some(blueprint.class))
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
@@ -74,7 +94,7 @@ mod tests {
              class Boss extends Enemy {}\n",
         );
 
-        assert_eq!(classes, ["Rock", "Boss"]);
+        assert_eq!(classes.unwrap(), ["Rock", "Boss"]);
     }
 
     #[test]
@@ -82,13 +102,23 @@ mod tests {
         let rock = "format = 1\nclass = \"Rock\"\nextends = \"Sprite\"\n";
         let helper = "format = 1\nclass = \"Helper\"\n";
 
-        assert_eq!(blueprint_class(rock).as_deref(), Some("Rock"));
-        assert_eq!(blueprint_class(helper), None);
+        assert_eq!(blueprint_class(rock).unwrap().as_deref(), Some("Rock"));
+        assert_eq!(blueprint_class(helper).unwrap(), None);
+    }
+
+    // Regression: a script with a syntax mistake was dragged with the
+    // warning that none of its classes extends another.
+    #[test]
+    fn scripts_that_do_not_parse_give_their_first_mistake() {
+        let mistake =
+            script_classes("class Rock extends Node {\n    export speed: float\n}").unwrap_err();
+
+        assert!(mistake.starts_with("2:12: "), "{mistake}");
     }
 
     #[test]
-    fn scripts_that_do_not_parse_offer_nothing() {
-        assert_eq!(script_classes("class {"), Vec::<String>::new());
+    fn blueprints_that_do_not_read_give_why() {
+        assert!(blueprint_class("format = ").is_err());
     }
 
     #[test]
@@ -105,6 +135,7 @@ mod tests {
         let missing = ClassDrop::read(assets.path(), "gone.blueprint".to_owned()).unwrap();
 
         assert_eq!(script.classes, ["Rock"]);
+        assert_eq!(script.mistake, None);
         assert_eq!(missing.classes, Vec::<String>::new());
         assert!(ClassDrop::read(assets.path(), "hero.png".to_owned()).is_none());
     }

@@ -115,6 +115,7 @@ pub(crate) struct Texts {
     pub(crate) menu_edit: &'static str,
     pub(crate) undo: &'static str,
     pub(crate) redo: &'static str,
+    pub(crate) class_file_mistakes: &'static str,
     pub(crate) no_node_class: &'static str,
     pub(crate) choose_class: &'static str,
     pub(crate) quit: &'static str,

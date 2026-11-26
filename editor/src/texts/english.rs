@@ -37,6 +37,7 @@ pub(super) static ENGLISH: Texts = Texts {
     menu_edit: "Edit",
     undo: "Undo",
     redo: "Redo",
+    class_file_mistakes: "It has mistakes, so it cannot be dropped on a node:",
     no_node_class: "No class here extends another: none can be a node.",
     choose_class: "Build the node as",
     quit: "Quit",
