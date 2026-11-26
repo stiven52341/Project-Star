@@ -433,11 +433,13 @@ class Player extends Node {
   the list inside the loop does not change what it goes through.
 - `float.to_string()` and `double.to_string()` always show a decimal:
   `2.0`, not `2`.
-- **Runtime errors**: reading outside a list (`list[5]` with two elements) or
-  dividing an integer by zero **stops the game** with a clear message
-  (`StarScript runtime error: index 5 is out of range for a list of length
-  2`). They cannot be detected when compiling, and continuing with a made-up
-  value would hide the bug.
+- **Runtime errors**: reading outside a list (`list[5]` with two elements),
+  dividing an integer by zero or nesting more than 1000 calls (a function
+  that calls itself without end; `async` methods and constructors are not
+  counted) **stops the game** with a clear message (`StarScript runtime
+  error: index 5 is out of range for a list of length 2`). They cannot be
+  detected when compiling, and continuing with a made-up value would hide
+  the bug.
 
 ### Predefined methods
 

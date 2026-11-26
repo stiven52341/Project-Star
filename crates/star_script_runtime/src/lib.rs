@@ -12,6 +12,7 @@
 
 pub mod audio;
 pub mod bodies;
+pub mod calls;
 pub mod color;
 mod equality;
 mod fault;

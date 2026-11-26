@@ -15,6 +15,10 @@ use std::rc::Rc;
 use star_script::{GameSettings, InputAction, check_source_with};
 use star_script_interpreter::{Output, Program, RunError};
 
+/// The stack programs run with: what the main thread of a desktop gets,
+/// where the player runs games (test threads get less). Deep calls need it.
+const PROGRAM_STACK: usize = 8 * 1024 * 1024;
+
 const PROGRAMS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../star_script/tests/programs");
 /// The compiler crate's example script, and the `main` its end-to-end test
 /// runs it with.
@@ -43,7 +47,7 @@ fn every_program_behaves_as_compiled() {
     assert!(!programs.is_empty(), "no programs in {PROGRAMS}");
     let failures: Vec<String> = programs
         .iter()
-        .filter_map(|path| check(path).err())
+        .filter_map(|path| on_program_stack(path.clone()).err())
         .collect();
     assert!(failures.is_empty(), "\n{}", failures.join("\n\n"));
 }
@@ -93,6 +97,16 @@ fn settings(program: &Path) -> GameSettings {
             .collect(),
         main_scene: None,
     }
+}
+
+/// [`check`] on a thread with the stack of a desktop's main thread.
+fn on_program_stack(path: PathBuf) -> Result<(), String> {
+    std::thread::Builder::new()
+        .stack_size(PROGRAM_STACK)
+        .spawn(move || check(&path))
+        .expect("a thread for the program")
+        .join()
+        .unwrap_or_else(|_| Err("the program's thread panicked".to_owned()))
 }
 
 fn check(path: &Path) -> Result<(), String> {

@@ -570,6 +570,9 @@ impl Context<'_> {
         if info.is_async() {
             self.coroutine_body(out, item.id, info, &body, method)?;
         } else {
+            // Nested calls are counted, so one that never ends stops the
+            // game with a runtime error rather than a stack overflow.
+            out.line(&format!("let depth_ = {RUNTIME}::calls::enter();"));
             body.statements(out, &method.body.statements)?;
         }
         out.close("}");

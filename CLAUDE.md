@@ -69,7 +69,8 @@ Rules:
   propagated with `Result` (`EngineResult<T>`). They are only allowed in tests.
   - **Only agreed exception**: `star_script_runtime::fault`, the single point
     that stops a game on a StarScript error that can only happen while
-    playing (index out of range, integer division by zero).
+    playing (index out of range, integer division by zero, calls nested
+    without end).
 - Every public API has `///` documentation (`missing_docs` is enabled).
   CamelCase proper names (e.g. `ProjectStar`, `PlayStation`) are registered
   in `doc-valid-idents` in `clippy.toml`, without disabling the lint.

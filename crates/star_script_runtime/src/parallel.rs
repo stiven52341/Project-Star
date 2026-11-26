@@ -60,6 +60,10 @@ fn send(job: Job) -> Result<(), Job> {
     }
 }
 
+/// The stack of each thread: what a desktop's main thread gets, so the
+/// calls [`crate::calls::MAX_CALL_DEPTH`] allows fit in it, even interpreted.
+const WORKER_STACK: usize = 8 * 1024 * 1024;
+
 /// Starts the threads, all taking jobs from one queue.
 fn start_threads() -> Option<Sender<Job>> {
     let count = thread::available_parallelism()
@@ -72,6 +76,7 @@ fn start_threads() -> Option<Sender<Job>> {
             let receiver = Arc::clone(&receiver);
             thread::Builder::new()
                 .name(THREAD_NAME.to_owned())
+                .stack_size(WORKER_STACK)
                 .spawn(move || work_on(&receiver))
                 .is_ok()
         })

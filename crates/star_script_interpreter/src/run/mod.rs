@@ -13,6 +13,7 @@ use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
 use star_script::semantic::BuiltinMethod;
+use star_script_runtime::calls::CallGuard;
 use star_script_runtime::try_index;
 
 use crate::error::RunError;
@@ -242,6 +243,9 @@ impl Machine {
         mut arguments: Vec<Value>,
     ) -> Result<Value, RunError> {
         let function = self.function(function)?;
+        // Counted as the generated Rust counts it: a call that never ends
+        // stops with the same runtime error.
+        let _depth = CallGuard::enter().map_err(RunError::Fault)?;
         arguments.resize(function.slots, Value::Null);
         match self.block(&function.body, &mut arguments)? {
             Flow::Return(value) => Ok(value),
