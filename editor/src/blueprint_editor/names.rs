@@ -4,6 +4,7 @@
 
 use star_blueprint::{Blueprint, Call, CallTarget, Literal};
 
+use super::library::EVENTS;
 use crate::texts;
 
 /// The names of a blueprint that nodes use.
@@ -11,6 +12,8 @@ pub(super) struct BlueprintNames {
     /// The class it extends, if any.
     pub(super) base: Option<String>,
     pub(super) variables: Vec<String>,
+    /// Its own methods that nodes may call: not the events the engine
+    /// calls itself (`start` calling `start` would never end).
     pub(super) methods: Vec<Call>,
 }
 
@@ -26,6 +29,7 @@ impl BlueprintNames {
             methods: blueprint
                 .graphs
                 .iter()
+                .filter(|graph| !EVENTS.contains(&graph.name.as_str()))
                 .map(|graph| Call {
                     target: CallTarget::OwnObject,
                     method: graph.name.clone(),
@@ -125,6 +129,37 @@ mod tests {
         assert_eq!(names.methods[0].arguments, ["amount"]);
         assert!(names.methods[0].returns_value);
         assert!(!names.methods[0].pure);
+    }
+
+    // Regression: a `start` graph that called `start` from this menu
+    // never ended.
+    #[test]
+    fn the_events_the_engine_calls_are_not_offered_as_calls() {
+        let graph = |name: &str| Graph {
+            name: name.to_owned(),
+            parameters: Vec::new(),
+            returns: None,
+            is_override: true,
+            private: false,
+            nodes: Vec::new(),
+            links: Vec::new(),
+        };
+        let blueprint = Blueprint {
+            class: "Star".to_owned(),
+            extends: Some("Node".to_owned()),
+            base_arguments: Vec::new(),
+            variables: Vec::new(),
+            graphs: vec![graph("start"), graph("update"), graph("spin")],
+        };
+
+        let names = BlueprintNames::of(&blueprint);
+
+        let methods: Vec<&str> = names
+            .methods
+            .iter()
+            .map(|call| call.method.as_str())
+            .collect();
+        assert_eq!(methods, ["spin"]);
     }
 
     #[test]
