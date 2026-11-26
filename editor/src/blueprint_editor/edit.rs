@@ -95,6 +95,13 @@ pub(super) fn disconnect(graph: &mut Graph, pin: &PinRef) {
         .retain(|link| link.from != *pin && link.to != *pin);
 }
 
+/// Removes the wire `link`. Returns whether it was there.
+pub(super) fn remove_link(graph: &mut Graph, link: &Link) -> bool {
+    let before = graph.links.len();
+    graph.links.retain(|kept| kept != link);
+    graph.links.len() != before
+}
+
 /// Whether `pin` has any wire.
 pub(super) fn is_connected(graph: &Graph, pin: &PinRef) -> bool {
     graph
@@ -372,6 +379,22 @@ mod tests {
         let left: Vec<NodeId> = graph.nodes.iter().map(|node| node.id).collect();
         assert_eq!(left, [NodeId(1), NodeId(4)]);
         assert!(!remove_nodes(&mut graph, &[NodeId(1)]), "only the entry");
+    }
+
+    #[test]
+    fn one_wire_is_removed_and_the_others_kept() {
+        let mut graph = graph();
+        connect(
+            &mut graph,
+            &pin(1, EXECUTION_OUTPUT),
+            &pin(2, EXECUTION_INPUT),
+        );
+        connect(&mut graph, &pin(2, BRANCH_TRUE), &pin(4, EXECUTION_INPUT));
+        let first = graph.links[0].clone();
+
+        assert!(remove_link(&mut graph, &first));
+        assert!(!remove_link(&mut graph, &first));
+        assert_eq!(links(&graph), [(2, BRANCH_TRUE, 4, EXECUTION_INPUT)]);
     }
 
     #[test]

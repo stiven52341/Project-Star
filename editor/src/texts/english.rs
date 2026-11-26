@@ -212,6 +212,7 @@ pub(super) static ENGLISH: Texts = Texts {
     delete_node: "Delete node",
     delete_nodes: "Delete nodes",
     entry_cannot_be_deleted: "Every graph needs its start node.",
+    remove_wire: "Remove wire",
     disconnect_pin: "Remove wires",
     bool_kind: "Boolean",
     int_kind: "Integer",

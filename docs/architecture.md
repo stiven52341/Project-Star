@@ -783,11 +783,14 @@ the left button selects (`selection.rs`): clicking a node selects it,
 dragging the background draws a box that selects the nodes it touches, and
 `Shift` or `Ctrl` add to the selection (clicking a selected node then
 leaves it out); dragging a selected node moves all the selected ones.
-Dragging from a pin to another joins them, whichever is the output; the
-right button opens a menu to add a node where it was opened (values,
-variables of the blueprint, calls to its own methods or to any other,
-ready-made “Functions”, operators, “If”, “Return”), to delete the selected nodes or to remove a
-pin's wires; `Delete` deletes the selected nodes. The entry cannot be deleted. The editor keeps only wires it
+Dragging from a pin to another joins them, whichever is the output, and
+clicking a wire selects it (drawn wider, in the selection's color; a wire
+and nodes are never selected together). The right button opens a menu to
+add a node where it was opened (values, variables of the blueprint, calls
+to its own methods or to any other, ready-made “Functions”, operators,
+“If”, “Return”), to delete the selected nodes, to remove the wire under it
+or to remove a pin's wires; `Delete` deletes the selected nodes or the
+selected wire. The entry cannot be deleted. The editor keeps only wires it
 can draw: from an output to an input of the same kind, on two nodes, and a
 pin that takes one wire (every input, and execution outputs) keeps the
 newest one. Everything else (unreachable nodes, cycles, inputs without a

@@ -4,12 +4,13 @@
 //!   touches; clicking a node selects it, and `Shift` or `Ctrl` add to the
 //!   selection (a click on a selected node then leaves it out);
 //! - dragging a selected node moves every selected node;
-//! - dragging from a pin to another one joins them with a wire;
+//! - dragging from a pin to another one joins them with a wire; clicking a
+//!   wire selects it;
 //! - dragging with the middle button, or scrolling with two fingers on a
 //!   touchpad, moves the view; the mouse wheel, `Ctrl` + wheel and pinching
 //!   zoom;
 //! - the right button opens a menu to add nodes, delete them or remove
-//!   wires; `Delete` deletes the selected nodes.
+//!   wires; `Delete` deletes the selected nodes or the selected wire.
 //!
 //! Nodes with mistakes found by “Compile” have a red border, and the
 //! pointer over them shows the mistakes.
@@ -22,7 +23,7 @@ use eframe::egui::{
 use star_blueprint::{Graph, NodeId, PinRef};
 
 use super::edit;
-use super::layout::{graph_layout, node_at, nodes_in, pin_at};
+use super::layout::{graph_layout, link_at, node_at, nodes_in, pin_at};
 use super::menus::{MenuTarget, show_menu};
 use super::names::BlueprintNames;
 use super::painting::Painting;
@@ -213,11 +214,15 @@ fn handle_pointer(
     if response.clicked()
         && let Some(pointer) = response.interact_pointer_pos()
     {
-        match (node_at(graph, &layouts, at(pointer)), adding) {
+        let point = at(pointer);
+        match (node_at(graph, &layouts, point), adding) {
             (Some(id), true) => state.selection.toggle(id),
             (Some(id), false) => state.selection = Selection::only(id),
             (None, true) => {}
-            (None, false) => state.selection.clear(),
+            (None, false) => {
+                state.selection = link_at(graph, &layouts, point)
+                    .map_or_else(Selection::default, Selection::only_wire);
+            }
         }
     }
     if response.secondary_clicked()
@@ -231,6 +236,9 @@ fn handle_pointer(
                 state.selection = Selection::only(id);
             }
             MenuTarget::Node(id)
+        } else if let Some(link) = link_at(graph, &layouts, point) {
+            state.selection = Selection::only_wire(link.clone());
+            MenuTarget::Wire(link)
         } else {
             MenuTarget::Background(point)
         });
@@ -294,16 +302,20 @@ fn scroll_of(unit: MouseWheelUnit, delta: Vec2, modifiers: Modifiers) -> Option<
     }
 }
 
-/// `Delete` deletes the selected nodes but the entry, which every graph
-/// needs, unless a text field is being typed in.
+/// `Delete` deletes the selected wire, or the selected nodes but the
+/// entry, which every graph needs, unless a text field is being typed in.
 fn delete_selected_on_key(ui: &egui::Ui, graph: &mut Graph, state: &mut CanvasState) -> bool {
     let pressed =
         !ui.ctx().egui_wants_keyboard_input() && ui.input(|input| input.key_pressed(Key::Delete));
-    if !pressed || !edit::remove_nodes(graph, state.selection.nodes()) {
+    if !pressed {
         return false;
     }
+    let removed = match state.selection.wire() {
+        Some(wire) => edit::remove_link(graph, &wire.clone()),
+        None => edit::remove_nodes(graph, state.selection.nodes()),
+    };
     state.selection.keep_existing(graph);
-    true
+    removed
 }
 
 fn paint(
@@ -322,7 +334,7 @@ fn paint(
     painting.paint_background();
     let layouts = graph_layout(graph);
     for link in &graph.links {
-        painting.paint_wire(&layouts, link);
+        painting.paint_wire(&layouts, link, state.selection.wire() == Some(link));
     }
     if let (Some(Drag::Wire(start)), Some(pointer)) = (&state.drag, response.interact_pointer_pos())
         && let Some(pin) = layouts

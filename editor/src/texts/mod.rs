@@ -296,6 +296,7 @@ pub(crate) struct Texts {
     pub(crate) delete_node: &'static str,
     pub(crate) delete_nodes: &'static str,
     pub(crate) entry_cannot_be_deleted: &'static str,
+    pub(crate) remove_wire: &'static str,
     pub(crate) disconnect_pin: &'static str,
     pub(crate) bool_kind: &'static str,
     pub(crate) int_kind: &'static str,

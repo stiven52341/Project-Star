@@ -1,8 +1,9 @@
 //! The menu of the canvas's right button: add a node where it was opened,
-//! delete the node under it or remove the wires of a pin.
+//! delete the node under it, remove the wire under it or the wires of a
+//! pin.
 
 use eframe::egui::{self, Pos2};
-use star_blueprint::{Call, CallTarget, Graph, NodeId, NodeKind, Operator, PinRef};
+use star_blueprint::{Call, CallTarget, Graph, Link, NodeId, NodeKind, Operator, PinRef};
 
 use super::edit;
 use super::library::{Library, ReadyMade};
@@ -20,6 +21,7 @@ const FUNCTION_LIST_HEIGHT: f32 = 360.0;
 pub(super) enum MenuTarget {
     Pin(PinRef),
     Node(NodeId),
+    Wire(Link),
     /// The empty canvas, at this point of the graph.
     Background(Pos2),
 }
@@ -45,6 +47,15 @@ pub(super) fn show_menu(
                 edit::disconnect(graph, pin);
                 ui.close();
                 return true;
+            }
+            false
+        }
+        MenuTarget::Wire(link) => {
+            if ui.button(texts::current().remove_wire).clicked() {
+                let removed = edit::remove_link(graph, link);
+                selection.clear();
+                ui.close();
+                return removed;
             }
             false
         }

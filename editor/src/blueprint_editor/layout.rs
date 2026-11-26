@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use eframe::egui::{Pos2, Rect, pos2, vec2};
-use star_blueprint::{Direction, Graph, Node, NodeId, Pin, PinRef};
+use star_blueprint::{Direction, Graph, Link, Node, NodeId, Pin, PinRef};
 
 /// Width of every node.
 pub(super) const NODE_WIDTH: f32 = 180.0;
@@ -16,6 +16,13 @@ pub(super) const ROW_HEIGHT: f32 = 22.0;
 const BOTTOM_PADDING: f32 = 6.0;
 /// How far from a pin the pointer still grabs it.
 const PIN_GRAB_RADIUS: f32 = 10.0;
+/// How far, at least, wires leave their pins straight before bending.
+const MIN_WIRE_BEND: f32 = 40.0;
+/// How far from a wire the pointer still picks it.
+const WIRE_GRAB_RADIUS: f32 = 6.0;
+/// Straight pieces a wire is split into to find how near the pointer is:
+/// enough for the gap to the real curve to stay well under the radius.
+const WIRE_PIECES: u16 = 24;
 
 /// A pin and where its wires end.
 pub(super) struct PlacedPin {
@@ -88,8 +95,73 @@ pub(super) fn pin_at(
         .map(|(id, placed, _)| PinRef::new(id, &placed.pin.name))
 }
 
-/// The node of `graph` under `point`: the one drawn last, on top, if
-/// several are.
+/// The control points of the curve of a wire from `start`, leaving to the
+/// right, to `end`, arriving from the left.
+pub(super) fn wire_curve(start: Pos2, end: Pos2) -> [Pos2; 4] {
+    let bend = ((end.x - start.x).abs() / 2.0).max(MIN_WIRE_BEND);
+    [start, start + vec2(bend, 0.0), end - vec2(bend, 0.0), end]
+}
+
+/// Where the wire `link` starts and ends, if both of its pins exist.
+pub(super) fn wire_ends(
+    layouts: &HashMap<NodeId, NodeLayout>,
+    link: &Link,
+) -> Option<(Pos2, Pos2)> {
+    let pin =
+        |reference: &PinRef| Some(layouts.get(&reference.node)?.pin(&reference.pin)?.position);
+    Some((pin(&link.from)?, pin(&link.to)?))
+}
+
+/// The wire of `graph` closest to `point`, if one is close enough to
+/// pick.
+pub(super) fn link_at(
+    graph: &Graph,
+    layouts: &HashMap<NodeId, NodeLayout>,
+    point: Pos2,
+) -> Option<Link> {
+    graph
+        .links
+        .iter()
+        .filter_map(|link| {
+            let (start, end) = wire_ends(layouts, link)?;
+            Some((link, distance_to_curve(wire_curve(start, end), point)))
+        })
+        .filter(|(_, distance)| *distance <= WIRE_GRAB_RADIUS)
+        .min_by(|first, second| first.1.total_cmp(&second.1))
+        .map(|(link, _)| link.clone())
+}
+
+/// How far `point` is from the cubic Bézier curve with `control` points.
+fn distance_to_curve(control: [Pos2; 4], point: Pos2) -> f32 {
+    let at = |step: u16| bezier_point(control, f32::from(step) / f32::from(WIRE_PIECES));
+    (0..WIRE_PIECES)
+        .map(|step| distance_to_segment(at(step), at(step + 1), point))
+        .fold(f32::INFINITY, f32::min)
+}
+
+/// The point of the cubic Bézier curve with `control` points at `t`, from
+/// 0 at its start to 1 at its end.
+fn bezier_point([p0, p1, p2, p3]: [Pos2; 4], t: f32) -> Pos2 {
+    let u = 1.0 - t;
+    let weights = [u * u * u, 3.0 * u * u * t, 3.0 * u * t * t, t * t * t];
+    let sum = p0.to_vec2() * weights[0]
+        + p1.to_vec2() * weights[1]
+        + p2.to_vec2() * weights[2]
+        + p3.to_vec2() * weights[3];
+    sum.to_pos2()
+}
+
+/// How far `point` is from the segment between `start` and `end`.
+fn distance_to_segment(start: Pos2, end: Pos2, point: Pos2) -> f32 {
+    let along = end - start;
+    let length_squared = along.length_sq();
+    if length_squared <= f32::EPSILON {
+        return start.distance(point);
+    }
+    let t = ((point - start).dot(along) / length_squared).clamp(0.0, 1.0);
+    (start + along * t).distance(point)
+}
+
 /// The nodes whose box touches `area` of the graph, in their order.
 pub(super) fn nodes_in(
     graph: &Graph,
@@ -108,6 +180,8 @@ pub(super) fn nodes_in(
         .collect()
 }
 
+/// The node of `graph` under `point`: the one drawn last, on top, if
+/// several are.
 pub(super) fn node_at(
     graph: &Graph,
     layouts: &HashMap<NodeId, NodeLayout>,
@@ -217,6 +291,48 @@ mod tests {
             Some(NodeId(1))
         );
         assert_eq!(node_at(&graph, &layouts, pos2(0.0, 0.0)), None);
+    }
+
+    #[test]
+    fn wires_are_picked_near_their_curve() {
+        let mut graph = graph_with(NodeKind::Branch);
+        graph.nodes.push(Node {
+            id: NodeId(2),
+            position: [500.0, 50.0],
+            kind: NodeKind::Return,
+        });
+        let link = Link {
+            from: PinRef::new(NodeId(1), BRANCH_TRUE),
+            to: PinRef::new(NodeId(2), EXECUTION_INPUT),
+        };
+        graph.links.push(link.clone());
+        let layouts = graph_layout(&graph);
+        let (start, end) = wire_ends(&layouts, &link).expect("both pins");
+        let middle = bezier_point(wire_curve(start, end), 0.5);
+
+        assert_eq!(
+            link_at(&graph, &layouts, middle + vec2(0.0, 4.0)),
+            Some(link)
+        );
+        assert_eq!(link_at(&graph, &layouts, middle + vec2(0.0, 20.0)), None);
+    }
+
+    #[test]
+    fn curves_start_and_end_at_their_pins() {
+        let control = wire_curve(pos2(0.0, 0.0), pos2(200.0, 100.0));
+
+        assert_eq!(bezier_point(control, 0.0), pos2(0.0, 0.0));
+        assert_eq!(bezier_point(control, 1.0), pos2(200.0, 100.0));
+        assert_eq!(control[1], pos2(100.0, 0.0), "they leave straight");
+    }
+
+    #[test]
+    fn the_distance_to_a_segment_is_to_its_closest_point() {
+        let (start, end) = (pos2(0.0, 0.0), pos2(10.0, 0.0));
+
+        assert_eq!(distance_to_segment(start, end, pos2(5.0, 3.0)), 3.0);
+        assert_eq!(distance_to_segment(start, end, pos2(14.0, 3.0)), 5.0);
+        assert_eq!(distance_to_segment(start, start, pos2(3.0, 4.0)), 5.0);
     }
 
     #[test]

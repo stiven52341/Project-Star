@@ -7,7 +7,7 @@ use eframe::egui::{
 };
 use star_blueprint::{Direction, Link, Node, NodeId, NodeKind, PinKind};
 
-use super::layout::{HEADER_HEIGHT, NodeLayout, PlacedPin};
+use super::layout::{HEADER_HEIGHT, NodeLayout, PlacedPin, wire_curve, wire_ends};
 use super::view::CanvasView;
 use crate::style::ERROR_COLOR;
 use crate::texts;
@@ -43,9 +43,8 @@ const DATA_COLOR: Color32 = Color32::from_rgb(120, 170, 230);
 const PIN_RADIUS: f32 = 5.0;
 /// Width of wires at zoom 1.
 const WIRE_WIDTH: f32 = 2.5;
-/// How far, at least, wires leave their pins straight before bending, at
-/// zoom 1.
-const MIN_WIRE_BEND: f32 = 40.0;
+/// Width of the selected wire at zoom 1.
+const SELECTED_WIRE_WIDTH: f32 = 4.0;
 const SELECTED_BORDER: Color32 = Color32::from_rgb(240, 190, 80);
 /// Inside of the selection box: the selection's color, see-through.
 const SELECTION_FILL: Color32 = Color32::from_rgba_premultiplied(48, 38, 16, 48);
@@ -93,39 +92,52 @@ impl Painting {
         }
     }
 
-    /// A curve from the output to the input of `link`, if both exist.
-    pub(super) fn paint_wire(&self, layouts: &HashMap<NodeId, NodeLayout>, link: &Link) {
-        let pin = |node, name: &str| layouts.get(&node)?.pin(name);
-        let (Some(from), Some(to)) = (
-            pin(link.from.node, &link.from.pin),
-            pin(link.to.node, &link.to.pin),
-        ) else {
+    /// A curve from the output to the input of `link`, if both exist; in
+    /// the selection's color if it is `selected`.
+    pub(super) fn paint_wire(
+        &self,
+        layouts: &HashMap<NodeId, NodeLayout>,
+        link: &Link,
+        selected: bool,
+    ) {
+        let Some((start, end)) = wire_ends(layouts, link) else {
             return;
         };
+        let kind = layouts
+            .get(&link.from.node)
+            .and_then(|layout| layout.pin(&link.from.pin))
+            .map_or(PinKind::Data, |placed| placed.pin.kind);
+        let stroke = if selected {
+            Stroke::new(self.scaled(SELECTED_WIRE_WIDTH), SELECTED_BORDER)
+        } else {
+            Stroke::new(self.scaled(WIRE_WIDTH), pin_color(kind))
+        };
         self.paint_curve(
-            self.screen(from.position),
-            self.screen(to.position),
-            from.pin.kind,
+            wire_curve(start, end).map(|point| self.screen(point)),
+            stroke,
         );
     }
 
     /// A wire being pulled from `pin`, which follows the pointer.
     pub(super) fn paint_pulled_wire(&self, pin: &PlacedPin, pointer: Pos2) {
-        let at_pin = self.screen(pin.position);
-        match pin.pin.direction {
-            Direction::Output => self.paint_curve(at_pin, pointer, pin.pin.kind),
-            Direction::Input => self.paint_curve(pointer, at_pin, pin.pin.kind),
-        }
+        let at_pin = pin.position;
+        let pointer = self.view.to_graph(self.rect.min, pointer);
+        let (start, end) = match pin.pin.direction {
+            Direction::Output => (at_pin, pointer),
+            Direction::Input => (pointer, at_pin),
+        };
+        let stroke = Stroke::new(self.scaled(WIRE_WIDTH), pin_color(pin.pin.kind));
+        self.paint_curve(
+            wire_curve(start, end).map(|point| self.screen(point)),
+            stroke,
+        );
     }
 
-    /// A wire from `start`, leaving to the right, to `end`, arriving from
-    /// the left.
-    fn paint_curve(&self, start: Pos2, end: Pos2, kind: PinKind) {
-        let bend = ((end.x - start.x).abs() / 2.0).max(self.scaled(MIN_WIRE_BEND));
-        let stroke = Stroke::new(self.scaled(WIRE_WIDTH), pin_color(kind));
+    /// A wire along the curve with `control` points, on the screen.
+    fn paint_curve(&self, control: [Pos2; 4], stroke: Stroke) {
         self.painter
             .add(egui::epaint::CubicBezierShape::from_points_stroke(
-                [start, start + vec2(bend, 0.0), end - vec2(bend, 0.0), end],
+                control,
                 false,
                 Color32::TRANSPARENT,
                 stroke,

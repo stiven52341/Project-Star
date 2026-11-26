@@ -212,6 +212,7 @@ pub(super) static SPANISH: Texts = Texts {
     delete_node: "Borrar nodo",
     delete_nodes: "Borrar nodos",
     entry_cannot_be_deleted: "Todo gráfico necesita su nodo de inicio.",
+    remove_wire: "Quitar cable",
     disconnect_pin: "Quitar cables",
     bool_kind: "Booleano",
     int_kind: "Entero",
