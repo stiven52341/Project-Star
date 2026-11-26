@@ -1320,10 +1320,38 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `tween_game` of `engine_game` and `window`.
   - [ ] 15e Transitions between animations: a state machine (idle → run →
         jump) with conditions, cross-fades and blends by a value (walk/run
-        by speed), editable as a graph like the blueprints.
-  - [ ] 15f Skeletons: 2D bones that bend sprites, and 3D skinned meshes;
-        3D skeletons need importing models with their animations (glTF,
-        the format of decision 48), which the engine does not do yet.
+        by speed), editable as a graph like the blueprints. Agreed with the
+        owner (2026-11-26): a `.states` file of the assets, named by an
+        `Animator`'s new field `states`, decides which animations of its
+        `.anim` file play; without it the animator plays as before. States
+        play one animation or blend several by a number; transitions go
+        from a state (or from any) to another, with conditions on values
+        the scripts set and a cross-fade; scripts use `set_value`,
+        `set_flag`, `trigger` and `state()`, and `play` jumps to a state.
+    - [ ] 15e.1 The `.states` file (`star_scene::AnimationStates`): values
+          (numbers, flags, triggers), the starting state, states (an
+          animation, or a blend of animations at points of a number) with
+          their place on the graph, and transitions (from, to, conditions,
+          fade, waiting for the end), validated when read.
+    - [ ] 15e.2 Cross-fades in the runtime: two animations' tracks applied
+          together by weights (decimals and colors blended, the rest
+          jumping halfway).
+    - [ ] 15e.3 The machine in the runtime and StarScript's API, compiled
+          and interpreted, with a conformance program and a game.
+    - [ ] 15e.4 Blends by a value (walk/run by speed), synced by phase.
+    - [ ] 15e.5 The editor: a graph tab for `.states` files, states as
+          boxes and transitions as arrows, edited in the inspector.
+  - [ ] 15f Skeletons (agreed with the owner, 2026-11-26: cut-out 2D
+        first, and the `gltf` crate to import 3D models):
+    - [ ] 15f.1 2D bones: bone nodes that sprites hang from (cut-out
+          characters), animated by the `.anim` tracks; sprites that bend
+          with weighted polygons may come later.
+    - [ ] 15f.2 Importing glTF models (meshes and materials), wrapped by
+          `star_assets`.
+    - [ ] 15f.3 3D skinned meshes: a model's skeleton moving its mesh on
+          the GPU.
+    - [ ] 15f.4 A model's animations played by an `Animator` (and its
+          states).
 - [ ] **Phase 16 — Ready-made nodes and tools** (owner's request,
       2026-11-25; mostly after Godot's nodes and templates). Each is an
       engine node or a class the editor offers, usable from StarScript and
