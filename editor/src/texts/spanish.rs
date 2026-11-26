@@ -235,6 +235,8 @@ pub(super) static SPANISH: Texts = Texts {
     entry_hint: "Da los parámetros del método.",
     graphs_menu: "Gráficos",
     new_graph: "Nuevo gráfico",
+    start_event_hint: "El motor lo ejecuta una vez, cuando el nodo entra al juego, antes del primer frame (aquí Time.delta() todavía es 0).",
+    update_event_hint: "El motor lo ejecuta en cada frame. Su entrada da delta, los segundos del frame: úsalo para mover y girar.",
     delete_graph: "Borrar este gráfico",
     variables: "Variables",
     name: "Nombre",

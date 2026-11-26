@@ -832,8 +832,11 @@ decorators: header, range with or without a step, tooltip and multiline)
 and the **signature** of the graph shown (name, parameters, return type,
 `override`, privacy) (`class_properties.rs`). Renaming a variable, a method
 or a parameter renames it in the nodes that use it (`edit.rs`), and a
-change that takes pins away takes their wires. “Graphs” in the tab adds a
-graph (with its entry) or deletes the one shown. “Create › Blueprint” in
+change that takes pins away takes their wires. Every graph has a tab under
+the blueprint's bar, all in sight (a list that hid the others made people
+miss `update`), and `start` and `update` say over their tab when the
+engine runs them. “Graphs” in the bar adds a graph (with its entry) or
+deletes the one shown. “Create › Blueprint” in
 the right-click menu of “Assets” asks for a class name and writes
 `<Class>.blueprint` in the folder shown (`creation.rs` gives the text,
 `workspace/asset_files.rs` writes it, never overwriting): a `Node` that

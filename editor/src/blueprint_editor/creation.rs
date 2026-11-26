@@ -8,8 +8,8 @@ use super::edit;
 /// The class new blueprints extend.
 const NEW_BLUEPRINT_BASE: &str = "Node";
 /// The events of a node, which new blueprints redefine to fill them in.
-const START_EVENT: &str = "start";
-const UPDATE_EVENT: &str = "update";
+pub(super) const START_EVENT: &str = "start";
+pub(super) const UPDATE_EVENT: &str = "update";
 const DELTA_PARAMETER: &str = "delta";
 const DELTA_TYPE: &str = "float";
 

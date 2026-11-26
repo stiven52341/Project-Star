@@ -321,6 +321,8 @@ pub(crate) struct Texts {
     pub(crate) entry_hint: &'static str,
     pub(crate) graphs_menu: &'static str,
     pub(crate) new_graph: &'static str,
+    pub(crate) start_event_hint: &'static str,
+    pub(crate) update_event_hint: &'static str,
     pub(crate) delete_graph: &'static str,
     pub(crate) variables: &'static str,
     pub(crate) name: &'static str,

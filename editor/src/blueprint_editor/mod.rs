@@ -25,6 +25,7 @@ use eframe::egui;
 use star_blueprint::{Blueprint, Origin};
 
 use self::canvas::{CanvasState, NodeMistakes};
+use self::creation::{START_EVENT, UPDATE_EVENT};
 pub(crate) use self::creation::{new_blueprint_text, new_script_text};
 use self::names::BlueprintNames;
 pub(crate) use self::templates::BlueprintTemplate;
@@ -179,15 +180,15 @@ impl BlueprintTab {
         ui.horizontal(|ui| {
             ui.strong(texts::class_heading(blueprint));
             ui.separator();
-            if !blueprint.graphs.is_empty() {
-                show_graph_selector(ui, blueprint, &mut self.graph, &mut self.canvas);
-            }
             if show_graphs_menu(ui, blueprint, &mut self.graph, &mut self.canvas) {
                 self.unsaved = true;
             }
             ui.separator();
             ui.weak(texts::current().canvas_controls);
         });
+        if !blueprint.graphs.is_empty() {
+            show_graph_tabs(ui, blueprint, &mut self.graph, &mut self.canvas);
+        }
         let current_graph = blueprint
             .graphs
             .get(self.graph)
@@ -254,30 +255,38 @@ impl BlueprintTab {
     }
 }
 
-/// The list of the blueprint's graphs; choosing another one shows it from
-/// the start.
-fn show_graph_selector(
+/// A tab for each graph of the blueprint, all in sight, wrapping onto
+/// more rows if they do not fit; choosing another one shows it from the
+/// start. The engine's events say when they run.
+fn show_graph_tabs(
     ui: &mut egui::Ui,
     blueprint: &Blueprint,
     selected: &mut usize,
     canvas: &mut CanvasState,
 ) {
-    let current = blueprint
-        .graphs
-        .get(*selected)
-        .map_or("", |graph| graph.name.as_str());
-    egui::ComboBox::from_id_salt("blueprint_graph")
-        .selected_text(current)
-        .show_ui(ui, |ui| {
-            for (index, graph) in blueprint.graphs.iter().enumerate() {
-                if ui
-                    .selectable_value(selected, index, graph.name.as_str())
-                    .changed()
-                {
-                    canvas.show_other_graph();
-                }
+    ui.horizontal_wrapped(|ui| {
+        for (index, graph) in blueprint.graphs.iter().enumerate() {
+            let mut tab = ui.selectable_label(index == *selected, graph.name.as_str());
+            if let Some(hint) = event_hint(&graph.name) {
+                tab = tab.on_hover_text(hint);
             }
-        });
+            if tab.clicked() && index != *selected {
+                *selected = index;
+                canvas.show_other_graph();
+            }
+        }
+    });
+    ui.separator();
+}
+
+/// When the engine runs the graph called `name`, if it is one of its
+/// events.
+fn event_hint(name: &str) -> Option<&'static str> {
+    match name {
+        START_EVENT => Some(texts::current().start_event_hint),
+        UPDATE_EVENT => Some(texts::current().update_event_hint),
+        _ => None,
+    }
 }
 
 /// “New graph” and “Delete this graph”. Returns whether the
@@ -327,6 +336,16 @@ mod tests {
     const ROCK: &str = "format = 1\nclass = \"Rock\"\n\n\
                         [[graph]]\nname = \"start\"\n\n\
                         [[graph.node]]\nid = 1\nkind = \"entry\"\n";
+
+    #[test]
+    fn the_engine_s_events_say_when_they_run() {
+        assert_eq!(event_hint("start"), Some(texts::current().start_event_hint));
+        assert_eq!(
+            event_hint("update"),
+            Some(texts::current().update_event_hint)
+        );
+        assert_eq!(event_hint("spin"), None);
+    }
 
     fn assets_with_rock(test_name: &str) -> TestDirectory {
         let assets = TestDirectory::new(test_name);
