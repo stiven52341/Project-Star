@@ -211,6 +211,12 @@ impl Machine {
             .map(drop)
     }
 
+    /// The function `object` runs for its method `name`, if an animation
+    /// can call it (decision 79).
+    pub(crate) fn callable(&self, object: &Value, name: &str) -> Option<FunctionId> {
+        self.class_of(object).ok()?.callable(name)
+    }
+
     /// Runs a method of the engine with `arguments` (the object first, for
     /// a method of objects): the script's version if it is called through
     /// an object whose class overrides it, else the engine's.

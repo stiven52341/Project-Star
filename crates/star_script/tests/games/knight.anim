@@ -24,3 +24,13 @@ keys = [[0.0, 0], [0.3, 9]]
 [[animation.track]]
 property = "visible"
 keys = [[0.0, true], [0.3, false]]
+
+# Calls of the knight's methods: halfway, and at the end, after the tracks
+# give it their last values.
+[[animation.call]]
+time = 0.15
+method = "swing"
+
+[[animation.call]]
+time = 0.3
+method = "strike"

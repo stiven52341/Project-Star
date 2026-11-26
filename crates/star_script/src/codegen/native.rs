@@ -587,6 +587,10 @@ impl ::star_script_runtime::nodes::Host for Host_ {
         crate::set_exported_field_(node, field, value)
     }
 
+    fn call_method(node: &Self::Node, method: &str) -> ::std::result::Result<(), ::std::string::String> {
+        crate::call_method_(node, method)
+    }
+
     fn new_body(fields: ::star_script_runtime::bodies::BodyFields<Self>) -> Self::Body {
         crate::classes::Body::of_(fields)
     }

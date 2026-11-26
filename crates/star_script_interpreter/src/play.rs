@@ -115,6 +115,34 @@ pub(crate) fn end() -> Result<(), RunError> {
     }
 }
 
+/// Runs the method `name` of `node`, which takes no arguments, for an
+/// animation (decision 79). A runtime error in it ends the game as one in
+/// a hook does.
+///
+/// # Errors
+///
+/// Why it cannot run: no game plays, or the node's class has no such
+/// method.
+pub(crate) fn call_method(node: &Rc<NodeObject>, name: &str) -> Result<(), String> {
+    let playing = PLAYING
+        .with(|playing| playing.try_borrow().ok()?.clone())
+        .ok_or_else(|| "methods are only called while a game runs".to_owned())?;
+    let object = Value::Node(Rc::clone(node));
+    let function = playing
+        .machine
+        .callable(&object, name)
+        .ok_or_else(|| format!("the node has no method `{name}` that takes no arguments"))?;
+    if !playing.machine.has_failed()
+        && let Err(error) = playing.machine.call(function, vec![object])
+    {
+        playing.machine.fail(error);
+    }
+    if playing.machine.has_failed() {
+        playing.game.engine.quit();
+    }
+    Ok(())
+}
+
 /// Runs `hook` of `object` (a node or the game). After a runtime error,
 /// here or in a coroutine, no more code runs and the game closes once the
 /// frame ends.

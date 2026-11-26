@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::Write as _;
 use std::rc::Rc;
 
-use crate::node_classes::AnimatorFields;
+use crate::node_classes::{AnimatorFields, BEFORE_START};
 use crate::nodes::{self, Host};
 use crate::properties::set_property;
 use crate::scene_fields::SceneValue;
@@ -208,6 +208,7 @@ pub fn play<H: Host>(node: &H::Node, name: &str) {
         if !same {
             animator.animation.set(name.to_owned());
             animator.time.set(0.0);
+            animator.shown.set(BEFORE_START);
             animator.playing.set(true);
         }
     });
@@ -238,11 +239,15 @@ struct Playing {
     index: usize,
     /// Seconds into the animation shown now.
     time: f32,
+    /// Seconds into the animation shown in the last frame.
+    shown: f32,
 }
 
 /// Moves the animation of `node`, if it is an animator playing one,
 /// `delta` seconds on: each property it changes gets the value it has at
-/// the time it is at. Called after the node's `update`, so an animation
+/// the time it is at, and the methods whose times it passed since the last
+/// frame run (once each, however many times a long frame went round a
+/// looping animation). Called after the node's `update`, so an animation
 /// played there shows its start in the same frame. When an animation that
 /// does not loop ends, the node's `animation_finished` runs with its name.
 pub fn advance<H: Host>(node: &H::Node, delta: f32) {
@@ -252,20 +257,30 @@ pub fn advance<H: Host>(node: &H::Node, delta: f32) {
     let Some(clip) = playing.file.animations.get(playing.index) else {
         return;
     };
-    if let Some(root) = nodes::parent::<H>(node) {
-        apply::<H>(&root, clip, playing.time);
+    let root = nodes::parent::<H>(node);
+    if let Some(root) = &root {
+        apply::<H>(root, clip, playing.time);
     }
-    let finished = H::with_animator(node, |animator| {
+    // The animator is moved on before any script runs, so a method called
+    // here can play another animation without this one undoing it.
+    let ended = H::with_animator(node, |animator| {
         let time = animator.time.get();
         let ended = !clip.looping && time >= clip.length;
         // A looping animation's time goes round its length, so it never
         // grows without end.
         let kept = if clip.looping { playing.time } else { time };
         animator.time.set(kept + delta);
-        ended.then(|| animator.playing.set(false))
+        animator.shown.set(playing.time);
+        if ended {
+            animator.playing.set(false);
+        }
+        ended
     })
-    .flatten();
-    if finished.is_some() {
+    .unwrap_or(false);
+    if let Some(root) = &root {
+        call::<H>(root, clip, playing.shown, playing.time);
+    }
+    if ended {
         H::animation_finished(node, &clip.name);
     }
 }
@@ -301,7 +316,36 @@ fn playing(animator: &AnimatorFields) -> Option<Playing> {
     } else {
         time.min(clip.length)
     };
-    Some(Playing { file, index, time })
+    let shown = animator.shown.get();
+    Some(Playing {
+        file,
+        index,
+        time,
+        shown,
+    })
+}
+
+/// Runs the methods `clip` calls after `shown` and up to `time`: past its
+/// end and from its start when it went round.
+fn call<H: Host>(root: &H::Node, clip: &TrackClip, shown: f32, time: f32) {
+    let passed = |at: f32| {
+        if time >= shown {
+            shown < at && at <= time
+        } else {
+            shown < at || at <= time
+        }
+    };
+    for method in clip.calls.iter().filter(|method| passed(method.time)) {
+        let called = find::<H>(root, &method.node)
+            .ok_or_else(|| format!("\"{}\" is not there", method.node))
+            .and_then(|target| H::call_method(&target, &method.method));
+        if let Err(reason) = called {
+            warn(&format!(
+                "the animation \"{}\" cannot call `{}`: {reason}",
+                clip.name, method.method
+            ));
+        }
+    }
 }
 
 /// Gives the properties `clip` changes, on `root` and the nodes under it,
@@ -483,7 +527,23 @@ mod tests {
                             key(1.0, SceneValue::Float(1.0)),
                         ],
                     )],
-                    calls: Vec::new(),
+                    calls: vec![
+                        TrackCall {
+                            node: String::new(),
+                            time: 0.0,
+                            method: "start".to_owned(),
+                        },
+                        TrackCall {
+                            node: "Arm".to_owned(),
+                            time: 0.5,
+                            method: "hit".to_owned(),
+                        },
+                        TrackCall {
+                            node: "Arm".to_owned(),
+                            time: 0.5,
+                            method: "missing".to_owned(),
+                        },
+                    ],
                 },
                 TrackClip {
                     name: "fade".to_owned(),
@@ -574,6 +634,36 @@ mod tests {
 
         assert!((arm.node.rotation.get() - 0.5).abs() < EPSILON);
         assert!(!is_playing::<TestHost>(&animator));
+    }
+
+    #[test]
+    fn methods_run_when_the_animation_passes_their_time_also_going_round() {
+        let (hero, arm, animator) = hero();
+
+        play::<TestHost>(&animator, "wave");
+        let mut calls = Vec::new();
+        for _ in 0..4 {
+            advance::<TestHost>(&animator, 0.4);
+            calls.push((hero.calls().len(), arm.calls().len()));
+        }
+
+        // At 0.0, 0.4, 0.8 (past the hit) and 0.2 (round to the start).
+        assert_eq!(calls, [(1, 0), (1, 0), (1, 1), (2, 1)]);
+        assert_eq!(hero.calls(), ["call start", "call start"]);
+        assert_eq!(arm.calls(), ["call hit"]);
+    }
+
+    #[test]
+    fn playing_again_calls_the_methods_at_the_start_again() {
+        let (hero, _arm, animator) = hero();
+
+        play::<TestHost>(&animator, "wave");
+        advance::<TestHost>(&animator, 0.1);
+        play::<TestHost>(&animator, "fade");
+        play::<TestHost>(&animator, "wave");
+        advance::<TestHost>(&animator, 0.1);
+
+        assert_eq!(hero.calls(), ["call start", "call start"]);
     }
 
     #[test]

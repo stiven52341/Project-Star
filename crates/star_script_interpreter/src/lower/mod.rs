@@ -12,7 +12,7 @@ use std::sync::Arc;
 use star_script::Span;
 use star_script::ast::{ClassDecl, Expr, MemberKind, MethodDecl, SourceFile, VariableKind};
 use star_script::semantic::{
-    Analysis, ClassId, ClassInfo, ClassOrigin, MemberRef, MethodInfo, Type,
+    Analysis, ClassId, ClassInfo, ClassOrigin, Execution, MemberRef, MethodInfo, Type,
 };
 
 use crate::error::{LowerError, LowerErrorKind};
@@ -220,6 +220,7 @@ fn class_table(
                 methods: methods.clone(),
                 ancestors: ancestors.clone(),
                 overrides: engine_overrides(analysis, tables, *id),
+                callable: callable_methods(analysis, tables, *id),
             })
         })
         .collect()
@@ -378,6 +379,41 @@ fn engine_overrides(
         }
     }
     overrides
+}
+
+/// The methods of objects of `class` that an animation can call, as
+/// compiled: public, not `static`, run at once, take no arguments and
+/// were introduced by a class of the program; each with the version its
+/// objects run.
+fn callable_methods(
+    analysis: &Analysis,
+    tables: &Tables,
+    class: ClassId,
+) -> Vec<(Arc<str>, FunctionId)> {
+    let table = analysis.classes();
+    let mut callable: Vec<(Arc<str>, FunctionId)> = Vec::new();
+    for ancestor in table.ancestors(class) {
+        let info = table.class(ancestor);
+        if info.origin == ClassOrigin::Native {
+            continue;
+        }
+        for method in &info.methods {
+            // An override is called through the method it overrides: an
+            // engine's (`start`, `update`) never is.
+            let eligible = !method.is_static
+                && !method.is_private
+                && !method.is_override
+                && method.execution == Execution::Direct
+                && method.parameters.is_empty();
+            if !eligible || callable.iter().any(|(name, _)| **name == *method.name) {
+                continue;
+            }
+            if let Some(function) = written_override(analysis, tables, class, &method.name) {
+                callable.push((Arc::from(method.name.as_str()), function));
+            }
+        }
+    }
+    callable
 }
 
 /// The method `name` of objects of `class` that a script wrote, in the

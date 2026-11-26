@@ -678,7 +678,16 @@ class Space extends Game {
   starts over; one that does not ends on its last values, `is_playing()`
   becomes `false` and the engine calls the animator's
   `animation_finished(name)`, as a sprite's. `stop()` leaves every
-  property as it is. A scene's animator names its file in its
+  property as it is.
+  A call runs a method of its node in the frame the animation passes its
+  time, after the tracks are applied (and before `animation_finished`):
+  one of the methods of the node's script class that is public, not
+  `static`, nor `async` or `parallel`, and takes no arguments; the
+  object's own version runs, as with any call. A call at the start runs in
+  the frame the animation is played; when a looping animation goes round,
+  the calls past its end and those from its start run. A frame long enough
+  to go round more than once runs each call once. A runtime error in the
+  method stops the game as anywhere else. A scene's animator names its file in its
   `[node.animator]` (`animations = "knight.anim"`, `animation = "idle"` to
   play from the start). A file that cannot be read, an animation it does
   not have, a node that is not there or a value that does not fit its

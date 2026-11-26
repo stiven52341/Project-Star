@@ -172,6 +172,10 @@ pub(crate) struct Class {
     /// (written in the class or a base), such as the `start` the engine
     /// calls once. Overrides of the engine's methods are never `async`.
     pub(crate) overrides: Vec<(EngineMethod, FunctionId)>,
+    /// The methods an animation can call by name: public methods of its
+    /// objects that run at once and take no arguments, each with the
+    /// function its objects run (decision 79).
+    pub(crate) callable: Vec<(Arc<str>, FunctionId)>,
 }
 
 impl Class {
@@ -180,6 +184,14 @@ impl Class {
         self.overrides
             .iter()
             .find(|(overridden, _)| *overridden == method)
+            .map(|(_, function)| *function)
+    }
+
+    /// The function an animation runs for the method `name`, if it can.
+    pub(crate) fn callable(&self, name: &str) -> Option<FunctionId> {
+        self.callable
+            .iter()
+            .find(|(callable, _)| &**callable == name)
             .map(|(_, function)| *function)
     }
 }

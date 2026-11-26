@@ -210,6 +210,9 @@ impl Default for Camera3dFields {
     }
 }
 
+/// The time an animator has shown before showing any: below every call's.
+pub(crate) const BEFORE_START: f32 = -1.0;
+
 /// The fields of an `Animator`: the `.anim` file of its animations, and
 /// the one it plays.
 pub struct AnimatorFields {
@@ -221,6 +224,9 @@ pub struct AnimatorFields {
     pub(crate) playing: Cell<bool>,
     /// Seconds `animation` has played.
     pub(crate) time: Cell<f32>,
+    /// The time of `animation` shown in the last frame, so the calls
+    /// between it and the next are made; below zero before the first.
+    pub(crate) shown: Cell<f32>,
 }
 
 impl AnimatorFields {
@@ -232,6 +238,7 @@ impl AnimatorFields {
             animation: Field::new(String::new()),
             playing: Cell::new(false),
             time: Cell::new(0.0),
+            shown: Cell::new(BEFORE_START),
         }
     }
 }

@@ -215,6 +215,15 @@ impl Host for TestHost {
         Self::set_exported(&class, node, &[(field.to_owned(), value.clone())])
     }
 
+    /// Records the call; only `missing` is not a method.
+    fn call_method(node: &Self::Node, method: &str) -> Result<(), String> {
+        if method == "missing" {
+            return Err(format!("no method `{method}`"));
+        }
+        node.calls.borrow_mut().push(format!("call {method}"));
+        Ok(())
+    }
+
     fn new_body(fields: BodyFields<Self>) -> Self::Body {
         Rc::new(fields)
     }

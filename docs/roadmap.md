@@ -1282,10 +1282,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           (the engine nodes' fields and the classes' `export` fields;
           compiled and interpreted, with a game of each `engine_game` and
           `window` play: `animator_game`, from a scene).
-    - [ ] 15b.4 Call tracks: the methods called as the playhead passes
+    - [x] 15b.4 Call tracks: the methods called as the playhead passes
           their times (also when a frame jumps over several, and when an
           animation loops), with a game of each `engine_game` and `window`
-          play.
+          play (`animator_game` calls the knight's `swing` and `strike`).
     - [ ] 15b.5 The editor: `Animator` among the nodes to add, its file and
           starting animation in the inspector, `.anim` among the assets
           (editing them is 15c's timeline).

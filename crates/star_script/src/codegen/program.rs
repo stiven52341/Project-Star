@@ -137,6 +137,7 @@ pub(super) fn generate(context: Context<'_>) -> Result<GeneratedProgram> {
     scene_classes(context, &mut out);
     super::scene_fields::scene_fields(context, &mut out);
     super::scene_fields::exported_field_setter(context, &mut out);
+    super::method_calls::method_caller(context, &mut out);
     let entry_point = entry_point(context, &mut out, &items, game)?;
     Ok(GeneratedProgram {
         code: out.finish(),

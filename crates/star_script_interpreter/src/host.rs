@@ -316,6 +316,10 @@ impl Host for Interpreted {
         run::set_exported_field(node, field, value)
     }
 
+    fn call_method(node: &Self::Node, method: &str) -> Result<(), String> {
+        play::call_method(node, method)
+    }
+
     fn new_body(fields: BodyFields<Self>) -> Self::Body {
         Rc::new(Object::new(EngineClass::Body.class(), Vec::new(), fields))
     }

@@ -1,12 +1,22 @@
 // A scene whose animator plays an animation of an `.anim` file from the
-// start: it turns and tints a child, counts an `export` field up and hides
-// its parent. Animations move on with the time of each frame, so the game
-// only prints where the animation ends.
+// start: it turns and tints a child, counts an `export` field up, hides
+// its parent and calls two of its methods. Animations move on with the
+// time of each frame, so the game only prints what does not depend on it.
 class Knight extends Sprite {
     export var power = 0
+    var swings = 0
 
     init() {
         super.init("Knight", "levels/none.png")
+    }
+
+    func swing() {
+        swings += 1
+        Debug.print("swing " + swings.to_string())
+    }
+
+    func strike() {
+        Debug.print("strike with " + power.to_string())
     }
 }
 

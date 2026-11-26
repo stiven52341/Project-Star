@@ -19,6 +19,7 @@ mod calls;
 mod constructor;
 mod conversions;
 mod expressions;
+mod method_calls;
 mod names;
 mod native;
 mod native_nodes;

@@ -117,6 +117,14 @@ pub trait Host: Sized + 'static {
     /// field, or the value does not fit it.
     fn set_exported_field(node: &Self::Node, field: &str, value: &SceneValue)
     -> Result<(), String>;
+    /// Runs the method `method` of `node`, which takes no arguments, as an
+    /// animation does: its script's version.
+    ///
+    /// # Errors
+    ///
+    /// Why it cannot run: the class of `node` has no such method, or it
+    /// takes arguments.
+    fn call_method(node: &Self::Node, method: &str) -> Result<(), String>;
     /// A new body with the fields `fields`.
     fn new_body(fields: BodyFields<Self>) -> Self::Body;
     /// Runs the `start` of `node`: its script's, or `Node`'s.
