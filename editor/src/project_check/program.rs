@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use star_blueprint::{Blueprint, BlueprintError, Origin, Translation, translate};
-use star_script::{CompileError, SourceSet};
+use star_script::{CompileError, SourceSet, parse_program};
 
 use super::Problem;
 
@@ -70,6 +70,17 @@ impl Program {
                     .collect()
             }
         }
+    }
+
+    /// The syntax mistakes of the files that could become StarScript.
+    /// They do not depend on other files, so they are found even when a
+    /// blueprint cannot be translated and the program cannot be checked.
+    pub(super) fn syntax_problems(&self) -> Vec<Problem> {
+        parse_program(&self.sources)
+            .err()
+            .map_or_else(Vec::new, |errors| {
+                errors.iter().map(|error| self.problem(error, "")).collect()
+            })
     }
 
     /// `error` in the file, line and column where it is; in a blueprint, in

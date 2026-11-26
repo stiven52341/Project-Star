@@ -986,7 +986,9 @@ comments written by hand in it are not kept.
   the compiler's mistakes in their code are reported on the blueprint's
   node, variable or graph (`Translation::origin`), not on lines of code the
   user never wrote. A blueprint that cannot be translated is reported
-  alone, since the rest of the program would only miss its class.
+  with only the syntax mistakes of the other files: their meaning is not
+  checked, since it would only miss the blueprint's class, but their
+  syntax does not depend on it (so the code editor still marks it).
 - Every `.scene` file of `assets/`: that it can be read and, if the project
   has scripts, that the classes its nodes name can build them
   (`ClassTable::scene_class`, the same rule the generated code follows).

@@ -237,6 +237,46 @@ fn compiler_mistakes_in_blueprints_name_their_node() {
     );
 }
 
+// Regression: a blueprint that could not be translated hid every mistake
+// of the scripts, so the code editor marked none.
+#[test]
+fn scripts_with_syntax_mistakes_are_reported_beside_broken_blueprints() {
+    let unwired_node = "kind = \"return\"";
+    let mover = "class Mover extends Node {\n  export speed: float\n}\n";
+    let directory = project(
+        "check_blueprint_broken_and_script",
+        &[
+            (MANIFEST_FILE_NAME, MANIFEST),
+            ("assets/mover.star", mover),
+            ("assets/rock.blueprint", &rock_blueprint(unwired_node)),
+        ],
+    );
+
+    let check = check_project_with(directory.path(), &OpenTexts::new(), CheckGoal::Writing);
+
+    let in_script: Vec<&Problem> = check
+        .problems
+        .iter()
+        .filter(|problem| problem.file == "assets/mover.star")
+        .collect();
+    assert_eq!(in_script.len(), 1, "{:?}", messages(&check));
+    assert_eq!(
+        in_script[0].position,
+        Some(Position {
+            line: 2,
+            column: 10
+        })
+    );
+    assert!(
+        check
+            .problems
+            .iter()
+            .any(|problem| problem.file == "assets/rock.blueprint"),
+        "{:?}",
+        messages(&check)
+    );
+}
+
 #[test]
 fn broken_blueprints_are_reported_alone() {
     let unwired_node = "kind = \"return\"";

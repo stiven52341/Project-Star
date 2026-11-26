@@ -134,8 +134,9 @@ pub(crate) enum CheckGoal {
 ///
 /// A project without scripts or a main scene is a game written in Rust: its
 /// scenes are not checked against StarScript classes, which such games
-/// ignore. If a blueprint cannot become StarScript, only its problems are
-/// given for the program: the rest would only miss its class.
+/// ignore. If a blueprint cannot become StarScript, only its problems and
+/// the syntax mistakes of the other files are given for the program: the
+/// rest would only miss its class.
 pub(crate) fn check_project_with(
     directory: &Path,
     open: &OpenTexts,
@@ -153,6 +154,9 @@ pub(crate) fn check_project_with(
     let (checked, generated) = if readable {
         check_program(&program, &settings, goal, &mut problems)
     } else {
+        if !program.is_complete() {
+            problems.extend(program.syntax_problems());
+        }
         (None, None)
     };
     if let Some(generated) = &generated
