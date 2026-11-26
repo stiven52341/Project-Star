@@ -117,6 +117,14 @@ pub trait Host: Sized + 'static {
     /// field, or the value does not fit it.
     fn set_exported_field(node: &Self::Node, field: &str, value: &SceneValue)
     -> Result<(), String>;
+    /// The value of the `export` field `field` of the class of `node`, as
+    /// a tween reads it.
+    ///
+    /// # Errors
+    ///
+    /// Why it cannot be read: the class of `node` has no such `export`
+    /// field.
+    fn exported_field(node: &Self::Node, field: &str) -> Result<SceneValue, String>;
     /// Runs the method `method` of `node`, which takes no arguments, as an
     /// animation does: its script's version.
     ///

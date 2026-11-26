@@ -104,12 +104,13 @@ pub(crate) enum EngineClass {
     Light,
     Camera3D,
     Animator,
+    TweenOptions,
 }
 
 impl EngineClass {
     /// Every engine class the interpreter knows, in the order of their
     /// places.
-    pub(crate) const ALL: [Self; 13] = [
+    pub(crate) const ALL: [Self; 14] = [
         Self::Color,
         Self::Node,
         Self::Camera2D,
@@ -123,6 +124,7 @@ impl EngineClass {
         Self::Light,
         Self::Camera3D,
         Self::Animator,
+        Self::TweenOptions,
     ];
 
     /// Its place among the classes.
@@ -146,6 +148,7 @@ impl EngineClass {
             Self::Light => "Light",
             Self::Camera3D => "Camera3D",
             Self::Animator => "Animator",
+            Self::TweenOptions => "TweenOptions",
         }
     }
 }
@@ -333,6 +336,10 @@ pub(crate) enum EngineField {
     /// `volume` and `looping` of `Sound`.
     Volume,
     Looping,
+    /// `delay`, `back` and `repeats` of `TweenOptions`.
+    Delay,
+    Back,
+    Repeats,
     /// `background`, `camera`, `camera_3d`, `ambient` and `ambient_2d` of
     /// `Game`.
     Background,
@@ -459,6 +466,8 @@ pub(crate) enum NodeMethod {
     SetGlobalPosition3D,
     Translate3D,
     TranslateGlobal3D,
+    /// `stop_tweens`.
+    StopTweens,
     /// `play`, `stop`, `is_playing`, `animation` and the event
     /// `animation_finished` of `Sprite` (the event of `Animator` too).
     Play,
@@ -498,6 +507,7 @@ impl NodeMethod {
             "set_global_position_3d" => Self::SetGlobalPosition3D,
             "translate_3d" => Self::Translate3D,
             "translate_global_3d" => Self::TranslateGlobal3D,
+            "stop_tweens" => Self::StopTweens,
             _ => return None,
         })
     }
@@ -786,6 +796,42 @@ pub(crate) enum Coroutine {
     Wait(Box<Expression>),
     /// `Time.next_frame()`.
     NextFrame,
+    /// A tween of a node (`tween`, `tween_by`, `tween_color` or
+    /// `tween_with`): the node, then the arguments of the method.
+    /// With `?.`, a `null` node starts nothing and the arguments do not
+    /// run.
+    Tween {
+        goal: TweenGoal,
+        receiver: Box<Expression>,
+        arguments: Vec<Expression>,
+        null_safe: bool,
+    },
+}
+
+/// Which tween method a [`Coroutine::Tween`] is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TweenGoal {
+    /// `tween`: to a decimal.
+    To,
+    /// `tween_by`: by a decimal.
+    By,
+    /// `tween_color`: to a color.
+    Color,
+    /// `tween_with`: to a decimal, with `TweenOptions`.
+    With,
+}
+
+impl TweenGoal {
+    /// The tween method called `name`, if it is one.
+    pub(crate) fn named(name: &str) -> Option<Self> {
+        Some(match name {
+            "tween" => Self::To,
+            "tween_by" => Self::By,
+            "tween_color" => Self::Color,
+            "tween_with" => Self::With,
+            _ => return None,
+        })
+    }
 }
 
 /// The number types of StarScript.

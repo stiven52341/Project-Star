@@ -38,6 +38,8 @@ pub(super) enum Ready {
     Wait(f32),
     /// `Time.next_frame()`.
     NextFrame,
+    /// A tween of a node, ready to run.
+    Tween(Task<()>),
 }
 
 impl Machine {
@@ -75,6 +77,20 @@ impl Machine {
             }
             Coroutine::Wait(seconds) => Ready::Wait(seconds_of(&self.evaluate(seconds, frame)?)?),
             Coroutine::NextFrame => Ready::NextFrame,
+            Coroutine::Tween {
+                goal,
+                receiver,
+                arguments,
+                null_safe,
+            } => {
+                let receiver = self.evaluate(receiver, frame)?;
+                if *null_safe && matches!(receiver, Value::Null) {
+                    return Ok(None);
+                }
+                let mut values = vec![receiver];
+                values.extend(self.evaluate_all(arguments, frame)?);
+                Ready::Tween(engine::tween(*goal, &values)?)
+            }
         }))
     }
 
@@ -113,6 +129,20 @@ impl Machine {
                 Ready::Wait(seconds_of(&self.value(seconds, frame).await?)?)
             }
             Coroutine::NextFrame => Ready::NextFrame,
+            Coroutine::Tween {
+                goal,
+                receiver,
+                arguments,
+                null_safe,
+            } => {
+                let receiver = self.value(receiver, frame).await?;
+                if *null_safe && matches!(receiver, Value::Null) {
+                    return Ok(None);
+                }
+                let mut values = vec![receiver];
+                values.extend(self.values(arguments, frame).await?);
+                Ready::Tween(engine::tween(*goal, &values)?)
+            }
         }))
     }
 
@@ -132,6 +162,7 @@ impl Machine {
         match ready {
             Ready::Wait(seconds) => tasks::start(tasks::wait(seconds)),
             Ready::NextFrame => tasks::start(tasks::next_frame()),
+            Ready::Tween(task) => tasks::start(task),
             // The analysis only lets `parallel` functions be awaited.
             Ready::Parallel(..) => return Err(PARALLEL_NOT_AWAITED),
             Ready::Function(function, arguments) | Ready::Method(function, arguments) => {
@@ -579,6 +610,10 @@ impl Machine {
             }
             Some(Ready::NextFrame) => {
                 tasks::next_frame().await;
+                Ok(Value::Null)
+            }
+            Some(Ready::Tween(task)) => {
+                task.await;
                 Ok(Value::Null)
             }
             None => Err(RunError::Internal("`await` through `?.`")),

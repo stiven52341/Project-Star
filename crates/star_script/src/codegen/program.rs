@@ -13,7 +13,7 @@ use crate::ast::{ClassDecl, ConstructorDecl, Expr, MemberKind, MethodDecl, Varia
 use crate::semantic::{
     ANIMATOR_CLASS, BODY_CLASS, CAMERA_3D_CLASS, CAMERA_CLASS, COLOR_CLASS, ClassId, ClassOrigin,
     GAME_CLASS, LIGHT_2D_CLASS, LIGHT_CLASS, MESH_CLASS, MethodInfo, NODE_3D_CLASS, NODE_CLASS,
-    ParameterInfo, SOUND_CLASS, SPRITE_CLASS, SceneClassError, Type,
+    ParameterInfo, SOUND_CLASS, SPRITE_CLASS, SceneClassError, TWEEN_OPTIONS_CLASS, Type,
 };
 
 /// The engine classes of nodes, which `Scene.load` creates itself.
@@ -45,7 +45,7 @@ const EXTENDABLE_NATIVE_CLASSES: [&str; 10] = [
 
 /// The engine classes that have objects, and so a module and a conversion
 /// in `AnyObject`.
-const NATIVE_OBJECT_CLASSES: [&str; 13] = [
+const NATIVE_OBJECT_CLASSES: [&str; 14] = [
     GAME_CLASS,
     COLOR_CLASS,
     BODY_CLASS,
@@ -59,6 +59,7 @@ const NATIVE_OBJECT_CLASSES: [&str; 13] = [
     CAMERA_3D_CLASS,
     ANIMATOR_CLASS,
     SOUND_CLASS,
+    TWEEN_OPTIONS_CLASS,
 ];
 
 /// Lints that generated code does not follow: it favors simple, uniform
@@ -137,6 +138,7 @@ pub(super) fn generate(context: Context<'_>) -> Result<GeneratedProgram> {
     scene_classes(context, &mut out);
     super::scene_fields::scene_fields(context, &mut out);
     super::scene_fields::exported_field_setter(context, &mut out);
+    super::scene_fields::exported_field_getter(context, &mut out);
     super::method_calls::method_caller(context, &mut out);
     let entry_point = entry_point(context, &mut out, &items, game)?;
     Ok(GeneratedProgram {

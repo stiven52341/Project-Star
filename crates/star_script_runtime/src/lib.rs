@@ -35,6 +35,7 @@ pub mod tasks;
 #[cfg(test)]
 mod test_host;
 pub mod tracks;
+pub mod tweens;
 
 pub use equality::StarEq;
 pub use fault::{RuntimeError, fault, proven};

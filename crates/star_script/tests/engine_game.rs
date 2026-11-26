@@ -28,6 +28,7 @@ const ANIMATION_GAME: &str = include_str!("games/animation_game.star");
 const HERO_FRAMES: &str = include_str!("games/hero.frames");
 const ANIMATOR_GAME: &str = include_str!("games/animator_game.star");
 const KNIGHT_SCENE: &str = include_str!("games/knight.scene");
+const TWEEN_GAME: &str = include_str!("games/tween_game.star");
 const KNIGHT_ANIMATIONS: &str = include_str!("games/knight.anim");
 const FLOOR_SCENE: &str = include_str!("games/floor.scene");
 const FLOOR_3D_SCENE: &str = include_str!("games/floor_3d.scene");
@@ -105,6 +106,9 @@ fn games_run_in_the_engine_until_they_quit() {
             compile_with("animator_game", ANIMATOR_GAME, &valid),
         )
         .expect("valid name");
+    package
+        .add_program("tween_game", compile_with("tween_game", TWEEN_GAME, &valid))
+        .expect("valid name");
     // Never quits by itself: played only with a scene it cannot load.
     let scene_only = GameSettings {
         main_scene: Some(MainScene {
@@ -153,6 +157,9 @@ fn games_run_in_the_engine_until_they_quit() {
     std::fs::write(levels.join("knight.anim"), KNIGHT_ANIMATIONS).expect("animations written");
     let (stdout, _) = play(&directory, "animator_game");
     assert_eq!(stdout, include_str!("games/animator_game.out"));
+
+    let (stdout, _) = play(&directory, "tween_game");
+    assert_eq!(stdout, include_str!("games/tween_game.out"));
 
     scene_only_games_need_their_scene(&directory);
 

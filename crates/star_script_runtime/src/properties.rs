@@ -1,6 +1,6 @@
-//! A node's properties changed by name, as an animation's tracks change
-//! them: the fields of the engine's node classes, and else the `export`
-//! fields of the node's script class.
+//! A node's properties read and changed by name, as an animation's tracks
+//! and tweens change them: the fields of the engine's node classes, and
+//! else the `export` fields of the node's script class.
 
 use crate::Field;
 use crate::node_classes::{LightFields, MeshFields, SpriteFields};
@@ -35,6 +35,113 @@ pub fn set_property<H: Host>(node: &H::Node, name: &str, value: &SceneValue) -> 
             })
         });
     engine.unwrap_or_else(|| H::set_exported_field(node, name, value))
+}
+
+/// The value of the property `name` of `node`.
+///
+/// # Errors
+///
+/// Why it cannot be read: the node has no such property.
+pub fn property<H: Host>(node: &H::Node, name: &str) -> Result<SceneValue, String> {
+    let engine = node_value(H::node(node), name)
+        .or_else(|| {
+            H::as_node_3d(node).and_then(|node_3d| node_3d_value(H::node_3d(&node_3d), name))
+        })
+        .or_else(|| H::with_sprite(node, |sprite| sprite_value::<H>(sprite, name)).flatten())
+        .or_else(|| H::with_mesh(node, |mesh| mesh_value::<H>(mesh, name)).flatten())
+        .or_else(|| H::with_light(node, |light| light_value::<H>(light, name)).flatten())
+        .or_else(|| H::with_light_2d(node, |light| light_value::<H>(light, name)).flatten())
+        .or_else(|| {
+            H::as_camera_2d(node).and_then(|camera| match name {
+                "view_height" => Some(float(&H::camera_2d(&camera).view_height)),
+                _ => None,
+            })
+        })
+        .or_else(|| {
+            H::as_camera_3d(node).and_then(|camera| match name {
+                "fov" => Some(float(&H::camera_3d(&camera).fov)),
+                _ => None,
+            })
+        });
+    engine.map_or_else(|| H::exported_field(node, name), Ok)
+}
+
+fn float(field: &Field<f32>) -> SceneValue {
+    SceneValue::Float(f64::from(field.get()))
+}
+
+fn whole(field: &Field<i32>) -> SceneValue {
+    SceneValue::Int(i64::from(field.get()))
+}
+
+fn color<H: Host>(field: &Field<H::Color>) -> SceneValue {
+    SceneValue::Color(field.read(|color| H::channels(color)))
+}
+
+fn node_value<H: Host>(node: &NodeFields<H>, name: &str) -> Option<SceneValue> {
+    let field = match name {
+        "x" => &node.x,
+        "y" => &node.y,
+        "rotation" => &node.rotation,
+        "scale_x" => &node.scale_x,
+        "scale_y" => &node.scale_y,
+        "visible" => return Some(SceneValue::Bool(node.visible.get())),
+        _ => return None,
+    };
+    Some(float(field))
+}
+
+fn node_3d_value(node: &Node3dFields, name: &str) -> Option<SceneValue> {
+    let field = match name {
+        "z" => &node.z,
+        "pitch" => &node.pitch,
+        "yaw" => &node.yaw,
+        "scale_z" => &node.scale_z,
+        _ => return None,
+    };
+    Some(float(field))
+}
+
+fn sprite_value<H: Host>(sprite: &SpriteFields<H>, name: &str) -> Option<SceneValue> {
+    Some(match name {
+        "texture" => SceneValue::Text(sprite.texture.get()),
+        "width" => float(&sprite.width),
+        "height" => float(&sprite.height),
+        "layer" => whole(&sprite.layer),
+        "pixelated" => SceneValue::Bool(sprite.pixelated.get()),
+        "color" => color::<H>(&sprite.color),
+        "columns" => whole(&sprite.columns),
+        "rows" => whole(&sprite.rows),
+        "frame" => whole(&sprite.frame),
+        _ => return None,
+    })
+}
+
+fn mesh_value<H: Host>(mesh: &MeshFields<H>, name: &str) -> Option<SceneValue> {
+    let field = match name {
+        "width" => &mesh.width,
+        "height" => &mesh.height,
+        "depth" => &mesh.depth,
+        "radius" => &mesh.radius,
+        "metallic" => &mesh.metallic,
+        "roughness" => &mesh.roughness,
+        "color" => return Some(color::<H>(&mesh.color)),
+        "pixelated" => return Some(SceneValue::Bool(mesh.pixelated.get())),
+        _ => return None,
+    };
+    Some(float(field))
+}
+
+fn light_value<H: Host>(light: &LightFields<H>, name: &str) -> Option<SceneValue> {
+    let field = match name {
+        "intensity" => &light.intensity,
+        "range" => &light.range,
+        "angle" => &light.angle,
+        "blend" => &light.blend,
+        "color" => return Some(color::<H>(&light.color)),
+        _ => return None,
+    };
+    Some(float(field))
 }
 
 /// The fields of `Node`; `None` if it has no field `name` an animation can
@@ -194,6 +301,27 @@ mod tests {
         assert!(error.contains("float"), "{error}");
         let error = set_property::<TestHost>(&hero, "z", &SceneValue::Float(1.0)).unwrap_err();
         assert!(error.contains("z`"), "2D nodes have no depth: {error}");
+    }
+
+    #[test]
+    fn engine_fields_are_read_by_name() {
+        let mut hero = TestNode::new("Hero");
+        hero.sprite = Some(SpriteFields::new("hero.png".to_owned()));
+        let hero = Rc::new(hero);
+        hero.node.x.set(1.5);
+        hero.sprite.as_ref().unwrap().frame.set(2);
+
+        assert_eq!(property::<TestHost>(&hero, "x"), Ok(SceneValue::Float(1.5)));
+        assert_eq!(property::<TestHost>(&hero, "frame"), Ok(SceneValue::Int(2)));
+        assert_eq!(
+            property::<TestHost>(&hero, "texture"),
+            Ok(SceneValue::Text("hero.png".to_owned()))
+        );
+        assert_eq!(
+            property::<TestHost>(&hero, "color"),
+            Ok(SceneValue::Color([1.0, 1.0, 1.0, 1.0]))
+        );
+        assert!(property::<TestHost>(&hero, "z").is_err());
     }
 
     #[test]

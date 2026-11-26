@@ -461,7 +461,7 @@ The engine provides them; their names cannot be used for other classes.
 |-------|---------|
 | `Debug` | `static print(message: string)`: writes a line to the output. It also takes a number of any type and writes it as its `to_string` does (`Debug.print(2.0)` writes `2.0`); anything else (a `bool`, a list, an object, a nullable number) is converted first with `.to_string()` if it has one. |
 | `Game` | fields `background: Color` (black), `camera: Camera2D?` (`null`), `camera_3d: Camera3D?` (`null`), `ambient: Color` (black: no ambient light), `ambient_2d: Color` (white: sprites show their own colors); `start()`, `update(delta: float)`, `quit()`, `add_child(node: Node)` |
-| `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `visible: bool` (`true`), `body: Body?` (`null`), `tags: [string]` (`[]`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?`, `has_tag(tag: string) -> bool`, `find_by_name(name: string) -> Node?`, `find_by_tag(tag: string) -> [Node]`, `global_x() -> float`, `global_y() -> float`, `global_rotation() -> float`, `set_global_position(x: float, y: float)`, `set_global_rotation(angle: float)`, `translate(x: float, y: float)`, `translate_global(x: float, y: float)`, `rotate(angle: float)` |
+| `Node` | `init(name: string)`; fields `name: string`, `x`, `y`, `rotation`, `scale_x`, `scale_y: float`, `visible: bool` (`true`), `body: Body?` (`null`), `tags: [string]` (`[]`); `start()`, `update(delta: float)`, `add_child(child: Node)`, `remove()`, `parent() -> Node?`, `children() -> [Node]`, `find_child(name: string) -> Node?`, `has_tag(tag: string) -> bool`, `find_by_name(name: string) -> Node?`, `find_by_tag(tag: string) -> [Node]`, `global_x() -> float`, `global_y() -> float`, `global_rotation() -> float`, `set_global_position(x: float, y: float)`, `set_global_rotation(angle: float)`, `translate(x: float, y: float)`, `translate_global(x: float, y: float)`, `rotate(angle: float)`; tweens (see below): `async tween(property: string, to: float, seconds: float, ease: string)`, `async tween_by(property: string, by: float, seconds: float, ease: string)`, `async tween_color(property: string, to: Color, seconds: float, ease: string)`, `async tween_with(property: string, to: float, seconds: float, ease: string, options: TweenOptions)`, `stop_tweens()` |
 | `Sprite` (extends `Node`) | `init(name: string, texture: string)`; fields `texture: string`, `width`, `height: float`, `layer: int`, `pixelated: bool`, `color: Color` (white: the image's own colors), `columns`, `rows: int` (1), `frame: int` (0): its sprite sheet; `frames: string` (`""`): its `.frames` file; `play(name: string)`, `stop()`, `is_playing() -> bool`, `animation() -> string`; the event `animation_finished(name: string)` |
 | `Light2D` (extends `Node`) | `init(name: string, kind: string)`; fields `kind: string`, `color: Color` (white), `intensity` (1.0), `range` (3.0), `angle` (about 0.524 radians: 30°), `blend: float` (0.2) |
 | `Animator` (extends `Node`) | `init(name: string)`; field `animations: string` (`""`): its `.anim` file; `play(name: string)`, `stop()`, `is_playing() -> bool`, `animation() -> string`; the event `animation_finished(name: string)` |
@@ -474,6 +474,7 @@ The engine provides them; their names cannot be used for other classes.
 | `Scene` | `static load(path: string) -> Node?`, `static find_by_name(name: string) -> Node?`, `static find_by_tag(tag: string) -> [Node]` |
 | `Sound` | no `init`: `static load(path: string) -> Sound?`; fields `volume: float` (1.0), `looping: bool` (`false`); `play()`, `stop()`, `is_playing() -> bool` |
 | `Audio` | `static volume() -> float`, `static set_volume(volume: float)` |
+| `TweenOptions` | `init()`; fields `delay: float` (0.0), `back: bool` (`false`), `repeats: int` (1; `-1` repeats forever): what `tween_with` does besides going to its value once |
 | `Time` | `static async wait(seconds: float)`, `static async next_frame()`: what coroutines wait for (section 7); `static now() -> float`: the seconds of the game so far (the sum of the frames' `delta`s, the clock `wait` counts with); `static delta() -> float`: the seconds of the frame going on, the same `delta` that `update` gets, for code away from `update` (0 before the first frame) |
 | `Decorator` | `before(method: string) -> bool` (`true`), `after(method: string)`: what the program's decorators redefine (see “Decorators”) |
 | `Body` | no `init`: `static circle(kind: string, radius: float) -> Body`, `static rectangle(kind: string, width: float, height: float) -> Body`, `static capsule(kind: string, height: float, radius: float) -> Body`, `static sphere(kind: string, radius: float) -> Body`, `static box(kind: string, width: float, height: float, depth: float) -> Body`; fields `kind`, `shape: string`, `radius` (0.5), `width`, `height`, `depth` (1.0), `gravity_scale` (1.0), `friction` (0.5), `bounciness` (0.0), `density` (1.0), `velocity_x`, `velocity_y`, `velocity_z: float` (0.0), `fixed_rotation`, `sensor: bool` (`false`); `apply_impulse(x: float, y: float)`, `apply_impulse_3d(x: float, y: float, z: float)`, `touching() -> [Node]`, `just_touched() -> [Node]`, `just_separated() -> [Node]` |
@@ -692,6 +693,40 @@ class Space extends Game {
   play from the start). A file that cannot be read, an animation it does
   not have, a node that is not there or a value that does not fit its
   property is a warning on the error output (once), and the rest goes on.
+- A **tween** takes one property of a node, named as a track names it
+  (above), from where it is to a value over some seconds, with an ease
+  (decision 80):
+
+  ```
+  await self.tween("x", 5.0, 0.5, "ease_out")      // until x is 5
+  self.tween_by("y", 2.0, 0.3, "linear")           // y + 2, without waiting
+  self.tween_color("color", Color(1.0, 0.0, 0.0, 1.0), 0.2, "linear")
+
+  const options = TweenOptions()
+  options.delay = 0.5      // waits half a second first
+  options.back = true      // then comes back, taking as long again
+  options.repeats = 3      // there and back three times; -1: forever
+  self.tween_with("x", 5.0, 0.5, "ease_in_out", options)
+  self.stop_tweens()
+  ```
+
+  The ease is one of the words of `.anim` interpolations: `step`,
+  `linear`, `ease_in`, `ease_out` or `ease_in_out`. Tweens are `async`
+  methods: `await` waits until the tween ends, and a call written alone
+  starts it as a coroutine and goes on (section 7). A tween reads where
+  its property is when it starts, after its delay, and changes it once per
+  frame, with the coroutines, after the nodes' `update`; it ends right on
+  its value (or back where it started, with `back`). `tween` and
+  `tween_with` go to a decimal, `tween_by` adds a decimal to where the
+  property starts, and `tween_color` goes to a color: the property must
+  hold a decimal (a field of the engine classes or an `export` field), or
+  a color for `tween_color`. A new tween of a property of a node takes the
+  place of the one it had: that one ends where it was, and its `await`
+  finishes. A tween also ends when its node leaves the game's tree, and
+  `stop_tweens()` ends every tween of the node. An unknown ease, a
+  property the node does not have or that holds another kind of value,
+  negative seconds or delay, and `repeats` below 1 other than `-1` are
+  runtime errors.
 - A `Color` has red, green, blue and opacity (`a`) from `0.0` to `1.0`, as
   image editors show them. A sprite's `color` multiplies its image: white
   keeps it as it is, `Color(1.0, 1.0, 1.0, 0.5)` makes it half transparent.

@@ -1,5 +1,7 @@
 //! `set_scene_fields_`, which `Scene.load` calls to give the `export`
-//! fields of a node's object the values its scene writes.
+//! fields of a node's object the values its scene writes, and
+//! `set_exported_field_` and `exported_field_`, which animations and tweens
+//! use to change and read one by name.
 
 use super::Context;
 use super::conversions::{RC, RUNTIME};
@@ -111,6 +113,78 @@ pub(super) fn exported_field_setter(context: Context<'_>, out: &mut Writer) {
         "::std::result::Result::Err({RUNTIME}::scene_fields::no_property({FIELD_ARGUMENT}))"
     ));
     out.close("}");
+}
+
+/// Writes `exported_field_`, which tweens call to read where a property
+/// starts: for each class of the program that declares `export` fields, a
+/// branch that reads the one named if the object is of that class.
+pub(super) fn exported_field_getter(context: Context<'_>, out: &mut Writer) {
+    let classes = context.analysis.classes();
+    out.line("");
+    out.line("/// The value of the `export` field named of an object of any class of the");
+    out.line("/// program; fails if its class has no such field.");
+    out.open(&format!(
+        "pub fn exported_field_(object_: &crate::classes::Node::Ref, {FIELD_ARGUMENT}: &str) -> ::std::result::Result<{RUNTIME}::scene_fields::SceneValue, ::std::string::String> {{"
+    ));
+    for (id, class) in classes.iter() {
+        if class.origin == ClassOrigin::Native {
+            continue;
+        }
+        let own: Vec<&FieldInfo> = class
+            .fields
+            .iter()
+            .filter(|field| field.is_exported)
+            .collect();
+        if own.is_empty() {
+            continue;
+        }
+        out.open(&format!(
+            "if let ::std::option::Option::Some({OBJECT}) = {}({RC}::clone(object_)) {{",
+            context.cast_function(id)
+        ));
+        out.open(&format!("match {FIELD_ARGUMENT} {{"));
+        for field in own {
+            out.line(&format!(
+                "{:?} => return ::std::result::Result::Ok({}),",
+                field.name,
+                field_value(context, id, field)
+            ));
+        }
+        out.line("_ => {}");
+        out.close("}");
+        out.close("}");
+    }
+    out.line(&format!(
+        "::std::result::Result::Err({RUNTIME}::scene_fields::no_property({FIELD_ARGUMENT}))"
+    ));
+    out.close("}");
+}
+
+/// The code that reads `field`, declared by `owner`, as a scene value.
+fn field_value(context: Context<'_>, owner: ClassId, field: &FieldInfo) -> String {
+    let classes = context.analysis.classes();
+    let target = format!(
+        "{}::HasFields::fields(&*{OBJECT}).{}",
+        context.class_path(owner),
+        ident(&field.name)
+    );
+    let value = format!("{RUNTIME}::scene_fields::SceneValue");
+    match &field.ty {
+        Type::Short | Type::Int | Type::BigInt => {
+            format!("{value}::Int(::std::primitive::i64::from({target}.get()))")
+        }
+        Type::Float => format!("{value}::Float(::std::primitive::f64::from({target}.get()))"),
+        Type::Double => format!("{value}::Float({target}.get())"),
+        Type::Bool => format!("{value}::Bool({target}.get())"),
+        Type::String => format!("{value}::Text({target}.get())"),
+        Type::Class(id) if classes.class(*id).name == COLOR_CLASS => format!(
+            "{value}::Color(<crate::classes::Host_ as {RUNTIME}::nodes::Host>::channels(&{target}.get()))"
+        ),
+        // Analysis lets only the types above be exported.
+        _ => format!(
+            "return ::std::result::Result::Err({RUNTIME}::scene_fields::no_property({FIELD_ARGUMENT}))"
+        ),
+    }
 }
 
 /// The `export` fields of `class` and its bases, each with the class that

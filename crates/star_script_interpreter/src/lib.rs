@@ -115,7 +115,10 @@ impl Program {
     /// When the program stops with a runtime error of StarScript, or its
     /// output cannot be written; [`RunError::WrongKind`] for a game.
     pub fn run(&self, output: &Output) -> Result<(), RunError> {
-        let result = run::Machine::new(Arc::clone(&self.code), Rc::clone(output)).run();
+        let machine = run::Machine::new(Arc::clone(&self.code), Rc::clone(output));
+        // The runtime's `Host` finds the program there, as a game's: a
+        // tween reads the `export` fields of the program's classes.
+        let result = play::loading_scenes(&machine, || machine.run());
         if result.is_err() {
             // The coroutines of a stopped program never go on.
             star_script_runtime::tasks::clear();

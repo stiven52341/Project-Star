@@ -10,7 +10,7 @@ use star_script_runtime::color::ColorFields;
 use star_script_runtime::game::GameFields;
 
 use crate::error::RunError;
-use crate::host::{BodyObject, Interpreted, NodeParts, SoundObject};
+use crate::host::{BodyObject, Interpreted, NodeParts, SoundObject, TweenOptionsObject};
 use crate::tree::ClassRef;
 
 /// The elements of a list, shared by every value that refers to it.
@@ -58,6 +58,8 @@ pub(crate) enum Value {
     Body(Rc<BodyObject>),
     /// A `Sound`, with the runtime's fields of sounds.
     Sound(Rc<SoundObject>),
+    /// A `TweenOptions`, with the runtime's fields of tween options.
+    TweenOptions(Rc<TweenOptionsObject>),
 }
 
 /// An object: its class, the fields its script classes declare, and the
@@ -181,6 +183,7 @@ impl Value {
             Self::Game(object) => Some(&**object),
             Self::Body(object) => Some(&**object),
             Self::Sound(object) => Some(&**object),
+            Self::TweenOptions(object) => Some(&**object),
             _ => None,
         }
     }
@@ -205,6 +208,7 @@ impl Value {
             (Self::Game(left), Self::Game(right)) => Rc::ptr_eq(left, right),
             (Self::Body(left), Self::Body(right)) => Rc::ptr_eq(left, right),
             (Self::Sound(left), Self::Sound(right)) => Rc::ptr_eq(left, right),
+            (Self::TweenOptions(left), Self::TweenOptions(right)) => Rc::ptr_eq(left, right),
             (Self::List(left), Self::List(right)) => {
                 if Rc::ptr_eq(left, right) {
                     return Ok(true);
@@ -241,7 +245,8 @@ impl Value {
             | Self::Node(_)
             | Self::Game(_)
             | Self::Body(_)
-            | Self::Sound(_) => {
+            | Self::Sound(_)
+            | Self::TweenOptions(_) => {
                 return Err(RunError::Internal("`to_string` of a value without text"));
             }
         })

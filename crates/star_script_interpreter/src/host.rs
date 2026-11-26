@@ -22,6 +22,7 @@ use star_script_runtime::node_classes::{
 use star_script_runtime::nodes::{Host, Node3dFields, NodeFields};
 use star_script_runtime::scene_fields::SceneValue;
 use star_script_runtime::scene_tree::NewNode;
+use star_script_runtime::tweens::TweenOptionsFields;
 
 use crate::play;
 use crate::run::{self, Hook};
@@ -45,6 +46,9 @@ pub type BodyObject = Object<BodyFields<Interpreted>>;
 
 /// A `Sound`: an object with the runtime's fields of sounds.
 pub type SoundObject = Object<SoundFields>;
+
+/// A `TweenOptions`: an object with the runtime's fields of tween options.
+pub type TweenOptionsObject = Object<TweenOptionsFields>;
 
 /// The runtime's fields of a node: those of `Node`, those of `Node3D` if
 /// it is a 3D node (kept apart, so they can be handed out on their own),
@@ -314,6 +318,10 @@ impl Host for Interpreted {
         value: &SceneValue,
     ) -> Result<(), String> {
         run::set_exported_field(node, field, value)
+    }
+
+    fn exported_field(node: &Self::Node, field: &str) -> Result<SceneValue, String> {
+        run::exported_field(node, field)
     }
 
     fn call_method(node: &Self::Node, method: &str) -> Result<(), String> {

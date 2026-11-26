@@ -23,7 +23,7 @@ struct Method {
 }
 
 /// The methods of `Node`, which every node class implements.
-const NODE_METHODS: [Method; 18] = [
+const NODE_METHODS: [Method; 23] = [
     Method {
         name: "start",
         parameters: "",
@@ -130,6 +130,36 @@ const NODE_METHODS: [Method; 18] = [
         name: "rotate",
         parameters: "angle: f32",
         arguments: "angle",
+        returns: "",
+    },
+    Method {
+        name: "tween",
+        parameters: "property: ::std::string::String, to: f32, seconds: f32, ease: ::std::string::String",
+        arguments: "property, to, seconds, ease",
+        returns: " -> ::star_script_runtime::Task<()>",
+    },
+    Method {
+        name: "tween_by",
+        parameters: "property: ::std::string::String, by: f32, seconds: f32, ease: ::std::string::String",
+        arguments: "property, by, seconds, ease",
+        returns: " -> ::star_script_runtime::Task<()>",
+    },
+    Method {
+        name: "tween_color",
+        parameters: "property: ::std::string::String, to: crate::classes::Color::Ref, seconds: f32, ease: ::std::string::String",
+        arguments: "property, to, seconds, ease",
+        returns: " -> ::star_script_runtime::Task<()>",
+    },
+    Method {
+        name: "tween_with",
+        parameters: "property: ::std::string::String, to: f32, seconds: f32, ease: ::std::string::String, options: crate::classes::TweenOptions::Ref",
+        arguments: "property, to, seconds, ease, options",
+        returns: " -> ::star_script_runtime::Task<()>",
+    },
+    Method {
+        name: "stop_tweens",
+        parameters: "",
+        arguments: "",
         returns: "",
     },
 ];

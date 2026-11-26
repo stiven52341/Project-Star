@@ -1311,8 +1311,13 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [x] 15c.5 Each track's interpolation, chosen with its curve drawn,
           and call tracks added from a menu of the methods an animation
           can call.
-  - [ ] 15d Tweens from code: a property animated to a value in some
-        seconds with an easing, awaitable from a coroutine.
+  - [x] 15d Tweens from code (designed with the owner, 2026-11-26,
+        decision 80): `tween`, `tween_by`, `tween_color` and `tween_with`
+        with `TweenOptions` (a delay, a way back, repeats), `async`
+        methods of `Node`, and `stop_tweens()`; a new tween of a property
+        takes the place of the old one. Compiled and interpreted, with the
+        conformance programs `tweens` and `tween_fault` and the game
+        `tween_game` of `engine_game` and `window`.
   - [ ] 15e Transitions between animations: a state machine (idle → run →
         jump) with conditions, cross-fades and blends by a value (walk/run
         by speed), editable as a graph like the blueprints.

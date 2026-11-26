@@ -107,6 +107,11 @@ fn mark_coroutine(coroutine: &mut Coroutine) -> bool {
             receiver,
             arguments,
             ..
+        }
+        | Coroutine::Tween {
+            receiver,
+            arguments,
+            ..
         } => mark(receiver) | mark_all(arguments),
         Coroutine::Wait(seconds) => mark(seconds),
         Coroutine::NextFrame => false,

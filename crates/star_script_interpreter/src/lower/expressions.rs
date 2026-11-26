@@ -13,7 +13,7 @@ use super::body::Body;
 use crate::error::LowerError;
 use crate::tree::{
     self, Arithmetic, BodyMethod, BodyShape, ClassRef, Comparison, Coroutine, EngineCall,
-    EngineMethod, Expression, MethodTarget, NodeMethod, NumberType, SoundMethod,
+    EngineMethod, Expression, MethodTarget, NodeMethod, NumberType, SoundMethod, TweenGoal,
 };
 
 /// The engine class with the game's clock.
@@ -393,6 +393,9 @@ impl Body<'_> {
                     )))))
                 }
                 (TIME_CLASS, "next_frame") => Ok(Expression::Start(Box::new(Coroutine::NextFrame))),
+                (NODE_CLASS, name) if TweenGoal::named(name).is_some() => {
+                    self.tween(callee, name, arguments)
+                }
                 (class, name) if method.is_static => {
                     let method = static_method(class, name).ok_or_else(|| {
                         LowerError::unsupported("this method of the engine", callee.span)
@@ -477,6 +480,29 @@ impl Body<'_> {
                 ));
             }
         })
+    }
+
+    /// A tween method of `Node` (`name`), as a coroutine that starts there
+    /// (or that `await` waits for).
+    fn tween(
+        &self,
+        callee: &Expr,
+        name: &str,
+        arguments: Vec<Expression>,
+    ) -> Result<Expression, LowerError> {
+        let goal = TweenGoal::named(name)
+            .ok_or_else(|| LowerError::internal("not a tween method", callee.span))?;
+        let (receiver, through) = self.receiver(callee)?;
+        let null_safe = match through {
+            Through::Object { null_safe } => null_safe,
+            Through::Super => false,
+        };
+        Ok(Expression::Start(Box::new(Coroutine::Tween {
+            goal,
+            receiver: Box::new(receiver),
+            arguments,
+            null_safe,
+        })))
     }
 
     /// A method of an object of an engine class (`class`), with its

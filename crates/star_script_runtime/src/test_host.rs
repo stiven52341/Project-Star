@@ -215,6 +215,14 @@ impl Host for TestHost {
         Self::set_exported(&class, node, &[(field.to_owned(), value.clone())])
     }
 
+    /// Only enemies have an `export` field: their `speed`, always 1.
+    fn exported_field(node: &Self::Node, field: &str) -> Result<SceneValue, String> {
+        match (node.node.name.get().as_str(), field) {
+            ("Enemy", "speed") => Ok(SceneValue::Float(1.0)),
+            _ => Err(crate::scene_fields::no_property(field)),
+        }
+    }
+
     /// Records the call; only `missing` is not a method.
     fn call_method(node: &Self::Node, method: &str) -> Result<(), String> {
         if method == "missing" {

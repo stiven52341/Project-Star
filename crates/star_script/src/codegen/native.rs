@@ -94,8 +94,8 @@ pub mod Game {
 }";
 
 /// How the generated classes are nodes for `star_script_runtime`, the
-/// modules of the engine classes `Color`, `Body`, `Node`, `Scene` and
-/// `Sound`, and those of the other node classes.
+/// modules of the engine classes `Color`, `Body`, `Node`, `Scene`, `Sound`
+/// and `TweenOptions`, and those of the other node classes.
 pub(super) fn node_modules(out: &mut Writer) {
     let modules = [
         HOST,
@@ -104,6 +104,7 @@ pub(super) fn node_modules(out: &mut Writer) {
         NODE_MODULE,
         SCENE_MODULE,
         SOUND_MODULE,
+        TWEEN_OPTIONS_MODULE,
     ];
     for (index, module) in modules.iter().enumerate() {
         if index > 0 {
@@ -292,6 +293,11 @@ pub mod Node {
         fn translate(self: ::std::rc::Rc<Self>, x: f32, y: f32);
         fn translate_global(self: ::std::rc::Rc<Self>, x: f32, y: f32);
         fn rotate(self: ::std::rc::Rc<Self>, angle: f32);
+        fn tween(self: ::std::rc::Rc<Self>, property: ::std::string::String, to: f32, seconds: f32, ease: ::std::string::String) -> ::star_script_runtime::Task<()>;
+        fn tween_by(self: ::std::rc::Rc<Self>, property: ::std::string::String, by: f32, seconds: f32, ease: ::std::string::String) -> ::star_script_runtime::Task<()>;
+        fn tween_color(self: ::std::rc::Rc<Self>, property: ::std::string::String, to: crate::classes::Color::Ref, seconds: f32, ease: ::std::string::String) -> ::star_script_runtime::Task<()>;
+        fn tween_with(self: ::std::rc::Rc<Self>, property: ::std::string::String, to: f32, seconds: f32, ease: ::std::string::String, options: crate::classes::TweenOptions::Ref) -> ::star_script_runtime::Task<()>;
+        fn stop_tweens(self: ::std::rc::Rc<Self>);
     }
 
     /// What nodes do unless a subclass overrides it: what
@@ -384,6 +390,41 @@ pub mod Node {
         pub fn rotate(this_: &Ref, angle: f32) {
             ::star_script_runtime::nodes::rotate::<crate::classes::Host_>(this_, angle);
         }
+
+        /// `async func tween`
+        pub fn tween(this_: &Ref, property: ::std::string::String, to: f32, seconds: f32, ease: ::std::string::String) -> ::star_script_runtime::Task<()> {
+            start_tween_(this_, ::star_script_runtime::tweens::Tween::new(property, ::star_script_runtime::tweens::Goal::To(to), seconds, ease))
+        }
+
+        /// `async func tween_by`
+        pub fn tween_by(this_: &Ref, property: ::std::string::String, by: f32, seconds: f32, ease: ::std::string::String) -> ::star_script_runtime::Task<()> {
+            start_tween_(this_, ::star_script_runtime::tweens::Tween::new(property, ::star_script_runtime::tweens::Goal::By(by), seconds, ease))
+        }
+
+        /// `async func tween_color`
+        pub fn tween_color(this_: &Ref, property: ::std::string::String, to: crate::classes::Color::Ref, seconds: f32, ease: ::std::string::String) -> ::star_script_runtime::Task<()> {
+            let channels_ = <crate::classes::Host_ as ::star_script_runtime::nodes::Host>::channels(&to);
+            start_tween_(this_, ::star_script_runtime::tweens::Tween::new(property, ::star_script_runtime::tweens::Goal::Color(channels_), seconds, ease))
+        }
+
+        /// `async func tween_with`
+        pub fn tween_with(this_: &Ref, property: ::std::string::String, to: f32, seconds: f32, ease: ::std::string::String, options: crate::classes::TweenOptions::Ref) -> ::star_script_runtime::Task<()> {
+            let tween_ = ::star_script_runtime::tweens::Tween::new(property, ::star_script_runtime::tweens::Goal::To(to), seconds, ease);
+            start_tween_(this_, tween_.with_options(crate::classes::TweenOptions::HasFields::fields(&*options)))
+        }
+
+        /// `func stop_tweens`
+        pub fn stop_tweens(this_: &Ref) {
+            ::star_script_runtime::tweens::stop::<crate::classes::Host_>(this_);
+        }
+    }
+
+    /// Starts `tween_` on `this_`, which goes on while the node is in the
+    /// game's tree; one that cannot be stops the game.
+    fn start_tween_(this_: &Ref, tween_: ::star_script_runtime::tweens::Tween) -> ::star_script_runtime::Task<()> {
+        let node_ = ::std::rc::Rc::clone(this_);
+        ::star_script_runtime::tweens::start::<crate::classes::Host_>(this_, tween_, move || in_tree_(&node_))
+            .unwrap_or_else(|error_| error_.stop())
     }
 
     /// The root of the game's tree; `None` without a game.
@@ -444,6 +485,11 @@ pub mod Node {
         fn translate(self: ::std::rc::Rc<Self>, x: f32, y: f32) { Methods::translate(&(self as Ref), x, y) }
         fn translate_global(self: ::std::rc::Rc<Self>, x: f32, y: f32) { Methods::translate_global(&(self as Ref), x, y) }
         fn rotate(self: ::std::rc::Rc<Self>, angle: f32) { Methods::rotate(&(self as Ref), angle) }
+        fn tween(self: ::std::rc::Rc<Self>, property: ::std::string::String, to: f32, seconds: f32, ease: ::std::string::String) -> ::star_script_runtime::Task<()> { Methods::tween(&(self as Ref), property, to, seconds, ease) }
+        fn tween_by(self: ::std::rc::Rc<Self>, property: ::std::string::String, by: f32, seconds: f32, ease: ::std::string::String) -> ::star_script_runtime::Task<()> { Methods::tween_by(&(self as Ref), property, by, seconds, ease) }
+        fn tween_color(self: ::std::rc::Rc<Self>, property: ::std::string::String, to: crate::classes::Color::Ref, seconds: f32, ease: ::std::string::String) -> ::star_script_runtime::Task<()> { Methods::tween_color(&(self as Ref), property, to, seconds, ease) }
+        fn tween_with(self: ::std::rc::Rc<Self>, property: ::std::string::String, to: f32, seconds: f32, ease: ::std::string::String, options: crate::classes::TweenOptions::Ref) -> ::star_script_runtime::Task<()> { Methods::tween_with(&(self as Ref), property, to, seconds, ease, options) }
+        fn stop_tweens(self: ::std::rc::Rc<Self>) { Methods::stop_tweens(&(self as Ref)) }
     }
 
     /// Prepares an object of this class: `make_` builds it from its fields.
@@ -587,6 +633,10 @@ impl ::star_script_runtime::nodes::Host for Host_ {
         crate::set_exported_field_(node, field, value)
     }
 
+    fn exported_field(node: &Self::Node, field: &str) -> ::std::result::Result<::star_script_runtime::scene_fields::SceneValue, ::std::string::String> {
+        crate::exported_field_(node, field)
+    }
+
     fn call_method(node: &Self::Node, method: &str) -> ::std::result::Result<(), ::std::string::String> {
         crate::call_method_(node, method)
     }
@@ -713,6 +763,43 @@ pub mod Sound {
     pub fn load(path: ::std::string::String) -> ::std::option::Option<Ref> {
         let fields_ = Fields::load(&path)?;
         ::std::option::Option::Some(::std::rc::Rc::new(Instance { Sound: fields_ }))
+    }
+}";
+
+const TWEEN_OPTIONS_MODULE: &str = "/// `class TweenOptions`, provided by the engine.
+pub mod TweenOptions {
+    /// A reference to an object of this class.
+    pub type Ref = ::std::rc::Rc<dyn Object>;
+
+    /// The fields of tween options: a delay, a way back and the repeats.
+    pub type Fields = ::star_script_runtime::tweens::TweenOptionsFields;
+
+    /// Gives access to the fields of this class.
+    pub trait HasFields {
+        fn fields(&self) -> &Fields;
+    }
+
+    /// Tween options have no methods.
+    pub trait Object: crate::AnyObject + HasFields {}
+
+    /// An object created as this class.
+    pub struct Instance {
+        pub TweenOptions: Fields,
+    }
+
+    impl HasFields for Instance {
+        fn fields(&self) -> &Fields { &self.TweenOptions }
+    }
+
+    impl crate::AnyObject for Instance {
+        fn TweenOptions(self: ::std::rc::Rc<Self>) -> ::std::option::Option<Ref> { ::std::option::Option::Some(self) }
+    }
+
+    impl Object for Instance {}
+
+    /// Creates an object of this class: no delay, no way back, once.
+    pub fn new() -> Ref {
+        ::std::rc::Rc::new(Instance { TweenOptions: Fields::new() })
     }
 }";
 

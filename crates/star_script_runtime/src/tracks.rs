@@ -102,6 +102,23 @@ impl Tracks {
 }
 
 impl Ease {
+    /// Every ease, with the word `.anim` files and tweens name it by.
+    pub const NAMES: [(&'static str, Self); 5] = [
+        ("step", Self::Step),
+        ("linear", Self::Linear),
+        ("ease_in", Self::In),
+        ("ease_out", Self::Out),
+        ("ease_in_out", Self::InOut),
+    ];
+
+    /// The ease called `name`, if one is.
+    #[must_use]
+    pub fn named(name: &str) -> Option<Self> {
+        Self::NAMES
+            .iter()
+            .find_map(|&(word, ease)| (word == name).then_some(ease))
+    }
+
     /// How far between two keys the value is, `0.0` to `1.0`, when the
     /// time is `progress` of the way.
     #[must_use]

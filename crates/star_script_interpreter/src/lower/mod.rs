@@ -662,6 +662,7 @@ mod tests {
     use star_script::semantic::ClassOrigin;
 
     use super::{body, expressions};
+    use crate::tree::TweenGoal;
 
     /// The engine's methods that lowering turns into something else than
     /// a call of the engine: `Debug.print` and the clock.
@@ -679,10 +680,12 @@ mod tests {
                 continue;
             }
             for method in &class.methods {
+                // Tweens are lowered as coroutines, as `Time.wait` is.
                 let known = if method.is_static {
                     expressions::static_method(&class.name, &method.name).is_some()
                 } else {
                     expressions::object_method(&class.name, &method.name).is_some()
+                        || TweenGoal::named(&method.name).is_some()
                 };
                 if !known {
                     missing.push(format!("{}.{}()", class.name, method.name));

@@ -123,7 +123,8 @@ fn send(value: &Value) -> Result<Sent, RunError> {
         | Value::Node(_)
         | Value::Game(_)
         | Value::Body(_)
-        | Value::Sound(_) => {
+        | Value::Sound(_)
+        | Value::TweenOptions(_) => {
             return Err(RunError::Internal(
                 "an object sent to a `parallel` function",
             ));

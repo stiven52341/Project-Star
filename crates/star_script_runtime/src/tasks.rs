@@ -161,6 +161,11 @@ pub fn run_until_finished_or(stop: impl Fn() -> bool) {
     }
 }
 
+/// How many turns of coroutines went by: each frame is one.
+pub(crate) fn turns() -> u64 {
+    FRAME.with(Cell::get)
+}
+
 /// `Time.now()`: the seconds of the game so far, the sum of the frames'
 /// `delta`s: the clock `Time.wait` counts with.
 #[must_use]

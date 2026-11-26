@@ -26,7 +26,7 @@ use crate::tree::{
 use crate::value::{Elements, Object, Value, read, write};
 
 use crate::{Output, ProgramKind};
-pub(crate) use scenes::{create, set_exported, set_exported_field};
+pub(crate) use scenes::{create, exported_field, set_exported, set_exported_field};
 
 /// What the engine calls on a node or the game.
 #[derive(Debug, Clone)]

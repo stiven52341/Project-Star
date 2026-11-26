@@ -78,6 +78,10 @@ pub const TIME_CLASS: &str = "Time";
 /// Name of the engine class of the physics bodies of nodes.
 pub const BODY_CLASS: &str = "Body";
 
+/// Name of the engine class of what a tween does besides going to its
+/// value once.
+pub const TWEEN_OPTIONS_CLASS: &str = "TweenOptions";
+
 /// The static methods of `Body` that make one, with the sizes of their
 /// shape after the kind: of 2D, of 3D, and the capsule of both.
 pub(super) const BODY_SHAPES: [(&str, &[&str]); 5] = [
@@ -167,6 +171,8 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     let color = add_color_class(classes);
     let body = add_body_class(classes);
     let node = add_node_class(classes, body);
+    let tween_options = add_tween_options_class(classes);
+    add_tween_methods(classes, node, color, tween_options);
     add_body_methods(classes, body, node);
     add_sprite_class(classes, node, color);
     let camera = add_camera_class(classes, node);
@@ -326,6 +332,51 @@ fn add_node_class(classes: &mut ClassTable, body: ClassId) -> ClassId {
     ];
     classes.class_mut(id).methods = methods.into();
     id
+}
+
+/// `TweenOptions`: what a tween started with `tween_with` does besides
+/// going to its value once: wait `delay` seconds first, come `back`, and
+/// play `repeats` times (`-1`: forever).
+fn add_tween_options_class(classes: &mut ClassTable) -> ClassId {
+    let mut options = ClassInfo::new(TWEEN_OPTIONS_CLASS.to_owned(), ClassOrigin::Native);
+    options.fields = vec![
+        native_field("delay", Type::Float),
+        native_field("back", Type::Bool),
+        native_field("repeats", Type::Int),
+    ];
+    options.constructor = Some(native_constructor(&[]));
+    classes.add(options)
+}
+
+/// The tweens of `Node` (decision 80): `async` methods that take one of
+/// its properties, by name, to a value over some seconds with an ease, and
+/// `stop_tweens`.
+fn add_tween_methods(classes: &mut ClassTable, node: ClassId, color: ClassId, options: ClassId) {
+    let tween = |name: &str, goal: (&str, Type), extra: Option<(&str, Type)>| {
+        let mut parameters = vec![
+            ("property", Type::String),
+            goal,
+            ("seconds", Type::Float),
+            ("ease", Type::String),
+        ];
+        parameters.extend(extra);
+        MethodInfo {
+            execution: Execution::Async,
+            ..native_method(name, &parameters, Type::Void, false)
+        }
+    };
+    let methods = [
+        tween("tween", ("to", Type::Float), None),
+        tween("tween_by", ("by", Type::Float), None),
+        tween("tween_color", ("to", Type::Class(color)), None),
+        tween(
+            "tween_with",
+            ("to", Type::Float),
+            Some(("options", Type::Class(options))),
+        ),
+        native_method("stop_tweens", &[], Type::Void, false),
+    ];
+    classes.class_mut(node).methods.extend(methods);
 }
 
 /// `Body`: the physics body of a node, made with `Body.circle`,

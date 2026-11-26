@@ -102,6 +102,45 @@ impl Machine {
         node.set_field(field.position, scene_value(field, value)?)
             .map_err(|error| error.to_string())
     }
+
+    /// The value of the `export` field `name` of `node`, an object of any
+    /// class of the program, as a tween reads it.
+    fn exported_field(&self, node: &Rc<NodeObject>, name: &str) -> Result<SceneValue, String> {
+        let field = self
+            .code
+            .classes
+            .get(node.class().0)
+            .and_then(|class| self.code.scene_classes.get(&*class.name))
+            .and_then(|class| class.exported.iter().find(|field| field.name == name))
+            .ok_or_else(|| scene_fields::no_property(name))?;
+        let value = node
+            .field(field.position)
+            .map_err(|error| error.to_string())?;
+        Ok(match value {
+            Value::Short(number) => SceneValue::Int(i64::from(number)),
+            Value::Int(number) => SceneValue::Int(i64::from(number)),
+            Value::BigInt(number) => SceneValue::Int(number),
+            Value::Float(number) => SceneValue::Float(f64::from(number)),
+            Value::Double(number) => SceneValue::Float(number),
+            Value::Bool(truth) => SceneValue::Bool(truth),
+            Value::String(text) => SceneValue::Text(text.to_string()),
+            Value::Color(color) => SceneValue::Color(Interpreted::channels(&color)),
+            _ => return Err(scene_fields::no_property(name)),
+        })
+    }
+}
+
+/// `Host::exported_field`: the value of the `export` field `name` of
+/// `node`, as a tween reads it.
+///
+/// # Errors
+///
+/// Why it cannot be read: the class of `node` has no such `export` field.
+pub(crate) fn exported_field(node: &Rc<NodeObject>, name: &str) -> Result<SceneValue, String> {
+    play::machine()
+        .or_else(play::scene_program)
+        .ok_or_else(|| NO_PROGRAM.to_owned())?
+        .exported_field(node, name)
 }
 
 /// `Host::set_exported_field`: gives the `export` field `name` of `node`

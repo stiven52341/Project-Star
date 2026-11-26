@@ -7,6 +7,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
+use star_script_runtime::Task;
 use star_script_runtime::audio::{self, SoundFields};
 use star_script_runtime::bodies::{BodyFields, Contact};
 use star_script_runtime::color::ColorFields;
@@ -16,6 +17,7 @@ use star_script_runtime::node_classes::{
     AnimatorFields, Camera2dFields, Camera3dFields, LightFields, MeshFields, SpriteFields,
 };
 use star_script_runtime::nodes::{self, Host as _, Node3dFields};
+use star_script_runtime::tweens::{self, Goal, Tween, TweenOptionsFields};
 use star_script_runtime::{Field, List};
 use star_script_runtime::{animations, tracks};
 
@@ -27,7 +29,7 @@ use crate::host::{
 use crate::play;
 use crate::tree::{
     BodyMethod, BodyShape, ClassRef, EngineClass, EngineField, EngineMethod, FieldRef, NodeMethod,
-    SoundMethod,
+    SoundMethod, TweenGoal,
 };
 use crate::value::{Object, Value};
 
@@ -116,6 +118,7 @@ fn slot(object: &Value, field: EngineField) -> Result<Slot<'_>, RunError> {
         Value::Game(game) => game_slot(&game.engine, field),
         Value::Body(body) => body_slot(&body.engine, field),
         Value::Sound(sound) => sound_slot(&sound.engine, field),
+        Value::TweenOptions(options) => tween_options_slot(&options.engine, field),
         _ => None,
     };
     slot.ok_or(MISSING_ENGINE_FIELD)
@@ -260,6 +263,15 @@ fn body_slot(body: &BodyFields<Interpreted>, field: EngineField) -> Option<Slot<
     })
 }
 
+fn tween_options_slot(options: &TweenOptionsFields, field: EngineField) -> Option<Slot<'_>> {
+    Some(match field {
+        EngineField::Delay => Slot::Float(&options.delay),
+        EngineField::Back => Slot::Bool(&options.back),
+        EngineField::Repeats => Slot::Int(&options.repeats),
+        _ => return None,
+    })
+}
+
 fn sound_slot(sound: &SoundFields, field: EngineField) -> Option<Slot<'_>> {
     Some(match field {
         EngineField::Volume => Slot::Float(&sound.volume),
@@ -314,6 +326,11 @@ pub(super) fn new_object(
             class,
             fields,
             node_parts(engine, arguments)?,
+        ))),
+        EngineClass::TweenOptions => Value::TweenOptions(Rc::new(Object::new(
+            class,
+            fields,
+            TweenOptionsFields::new(),
         ))),
         EngineClass::Body | EngineClass::Sound => {
             // Their `init` is private: only their static methods make them.
@@ -542,6 +559,10 @@ fn node_method(
             nodes::translate_global::<Runtime>(node, float(x)?, float(y)?);
             Value::Null
         }
+        (NodeMethod::StopTweens, []) => {
+            tweens::stop::<Runtime>(node);
+            Value::Null
+        }
         (NodeMethod::Rotate, [angle]) => {
             nodes::rotate::<Runtime>(node, float(angle)?);
             Value::Null
@@ -603,6 +624,49 @@ fn optional_node(node: Option<Rc<NodeObject>>) -> Value {
 /// made.
 fn node_list(nodes: &List<Rc<NodeObject>>) -> Value {
     Value::list(nodes.to_vec().into_iter().map(Value::Node).collect())
+}
+
+/// The tween a tween method of `Node` starts (`goal` tells which), from
+/// its arguments, the node first: it goes on while the node is in the
+/// game's tree, as compiled.
+///
+/// # Errors
+///
+/// The runtime error of a tween that cannot be (see `tweens::start`).
+pub(super) fn tween(goal: TweenGoal, arguments: &[Value]) -> Result<Task<()>, RunError> {
+    let (node, property, to, seconds, ease, options) = match arguments {
+        [Value::Node(node), property, to, seconds, ease] => {
+            (node, property, to, seconds, ease, None)
+        }
+        [
+            Value::Node(node),
+            property,
+            to,
+            seconds,
+            ease,
+            Value::TweenOptions(options),
+        ] => (node, property, to, seconds, ease, Some(options)),
+        _ => return Err(RunError::Internal("a tween without its node and values")),
+    };
+    let target = match (goal, to) {
+        (TweenGoal::To | TweenGoal::With, to) => Goal::To(float(to)?),
+        (TweenGoal::By, by) => Goal::By(float(by)?),
+        (TweenGoal::Color, Value::Color(color)) => Goal::Color(Interpreted::channels(color)),
+        (TweenGoal::Color, _) => return Err(RunError::Internal("a color tween without a color")),
+    };
+    let mut started = Tween::new(
+        text(property)?.to_owned(),
+        target,
+        float(seconds)?,
+        text(ease)?.to_owned(),
+    );
+    if let Some(options) = options {
+        started = started.with_options(&options.engine);
+    }
+    let owner = Rc::clone(node);
+    Ok(tweens::start::<Interpreted>(node, started, move || {
+        play::in_tree(&owner)
+    })?)
 }
 
 fn float(value: &Value) -> Result<f32, RunError> {
