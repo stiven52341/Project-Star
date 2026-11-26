@@ -302,7 +302,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         `global_x`/`global_y`/`global_rotation` (`global_z` in 3D), their
         setters, `translate`, `translate_global` and `rotate` (and their
         3D versions), also under “Transform” in blueprints.
-- [ ] **Owner's requests (2026-11-24)**:
+- [x] **Owner's requests (2026-11-24)**:
   - [x] One main camera per scene: the cameras' flag is `main`, a scene
         with two is an error, and the editor keeps only one marked.
   - [x] Playing without scripts: the project's main scene (`main_scene`
@@ -352,10 +352,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         editor that opens the main scene, so they play without Cargo
         (decision 63): the warm-up builds the scene player, and “Play”
         only lets Cargo check it (0.26 s) before running it.
-  - [ ] f. Running StarScript without Rust while editing (an
+  - [x] f. Running StarScript without Rust while editing (an
         interpreter), for instant “Play” and hot reload: decided by the
         owner (decision 64) and planned as Phase 14. Before it:
-    - [ ] f1. Move the engine classes and the game loop out of the text
+    - [x] f1. Move the engine classes and the game loop out of the text
           templates of `codegen/native.rs` into real Rust, built once with
           the engine instead of inside every game. They name the classes
           generated for each program (`crate::classes`, 175 times), so
