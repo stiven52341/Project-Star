@@ -1328,11 +1328,11 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
         from a state (or from any) to another, with conditions on values
         the scripts set and a cross-fade; scripts use `set_value`,
         `set_flag`, `trigger` and `state()`, and `play` jumps to a state.
-    - [ ] 15e.1 The `.states` file (`star_scene::AnimationStates`): values
+    - [x] 15e.1 The `.states` file (`star_scene::AnimationStates`): values
           (numbers, flags, triggers), the starting state, states (an
           animation, or a blend of animations at points of a number) with
           their place on the graph, and transitions (from, to, conditions,
-          fade, waiting for the end), validated when read.
+          fade, waiting for the end), validated when read (decision 81).
     - [ ] 15e.2 Cross-fades in the runtime: two animations' tracks applied
           together by weights (decimals and colors blended, the rest
           jumping halfway).

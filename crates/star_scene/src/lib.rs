@@ -17,6 +17,7 @@
 //! many times as needed; its [`SceneOutline`] describes the file's nodes
 //! without loading their images.
 
+mod animation_states;
 mod animator_node;
 mod body_data;
 mod body_node;
@@ -38,6 +39,10 @@ mod track_sampling;
 mod transform;
 mod visibility;
 
+pub use animation_states::{
+    AnimationState, AnimationStates, BlendPoint, Condition, Motion, STATES_EXTENSION,
+    StateTransition, StateValue, Test, ValueKind,
+};
 pub use animator_node::AnimatorOutline;
 pub use body_node::{Body2D, Body3D, NodeBody};
 pub use camera_node::{Camera2dNode, Camera3dNode};
