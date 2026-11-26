@@ -13,6 +13,7 @@ impl Texts {
             NewAsset::Blueprint => self.pick("Blueprint", "Blueprint"),
             NewAsset::Script => self.pick("StarScript script", "Script de StarScript"),
             NewAsset::Rust => self.pick("Rust script", "Script de Rust"),
+            NewAsset::Keyframes => self.pick("Keyframe animations", "Animaciones de keyframes"),
             NewAsset::Template(template) => template.name(),
         }
     }
@@ -61,6 +62,10 @@ impl Texts {
             }
             NewAsset::Script => self.pick("New StarScript script:", "Script de StarScript nuevo:"),
             NewAsset::Rust => self.pick("New Rust script:", "Script de Rust nuevo:"),
+            NewAsset::Keyframes => self.pick(
+                "New keyframe animations:",
+                "Animaciones de keyframes nuevas:",
+            ),
         }
     }
 

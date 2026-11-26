@@ -5,6 +5,7 @@
 //! it. Changes are kept until the scene is saved, and can be undone.
 
 mod animation_rows;
+mod animator_rows;
 mod body_drawing;
 mod class_choice;
 mod class_drop;

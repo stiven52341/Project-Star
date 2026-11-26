@@ -14,13 +14,15 @@ use star_engine::star_scene::{FrameClip, SpriteFrames, SpriteOutline};
 
 use crate::texts;
 
-/// The `.frames` files of the assets folder, to choose from.
+/// The `.frames` and `.anim` files of the assets folder, to choose from.
 #[derive(Clone, Copy)]
 pub(crate) struct AnimationFiles<'files> {
     /// The assets folder.
     pub(crate) folder: &'files Path,
-    /// The files, as paths inside it.
+    /// The `.frames` files, for sprites, as paths inside it.
     pub(crate) paths: &'files [String],
+    /// The `.anim` files, for animators, as paths inside it.
+    pub(crate) keyframes: &'files [String],
 }
 
 impl AnimationFiles<'_> {

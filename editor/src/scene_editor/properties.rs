@@ -16,6 +16,7 @@ use star_engine::star_scene::{
 };
 
 use super::animation_rows::{AnimationFiles, animation_rows};
+use super::animator_rows::edit_animator;
 use super::components::{
     DEFAULT_CAPSULE_HEIGHT, DEFAULT_RADIUS, LightKind, add_component_menu, new_light, new_light_2d,
 };
@@ -36,7 +37,8 @@ use crate::texts;
 pub(super) struct NodeContext<'context> {
     pub(super) dimension: ProjectDimension,
     pub(super) images: &'context [String],
-    /// The `.frames` files of the assets folder, for sprites.
+    /// The `.frames` files of the assets folder, for sprites, and its
+    /// `.anim` files, for animators.
     pub(super) animations: AnimationFiles<'context>,
     /// The classes of the scripts, once checked, for `export` fields.
     pub(super) classes: Option<&'context ClassTable>,
@@ -80,8 +82,14 @@ pub(super) fn edit_node(
     changed |= optional_section(ui, texts.body_3d_section, &mut node.body_3d, edit_body_3d);
     changed |= optional_section(ui, texts.camera_2d, &mut node.camera, edit_camera_2d);
     changed |= optional_section(ui, texts.camera_3d, &mut node.camera_3d, edit_camera_3d);
+    changed |= optional_section(
+        ui,
+        texts.animator_section(),
+        &mut node.animator,
+        |ui, animator| edit_animator(ui, animator, context.animations),
+    );
     ui.separator();
-    changed | add_component_menu(ui, node, context.dimension, context.images)
+    changed | add_component_menu(ui, node, context)
 }
 
 /// The `export` fields of the node's class, if the scripts are checked and

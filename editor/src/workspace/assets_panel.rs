@@ -18,8 +18,8 @@ use super::thumbnails::Thumbnails;
 use crate::blueprint_editor::BlueprintTemplate;
 use crate::file_tree::{FileNode, file_paths, scan_directory};
 use crate::project::{
-    ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, FRAMES_EXTENSION, ProjectDimension, SCENE_EXTENSION,
-    SCRIPT_EXTENSION, read_main_scene, set_main_scene,
+    ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, FRAMES_EXTENSION, KEYFRAMES_EXTENSION, ProjectDimension,
+    SCENE_EXTENSION, SCRIPT_EXTENSION, read_main_scene, set_main_scene,
 };
 use crate::scene_editor::{ClassDrop, ImageDrop};
 use crate::style::ERROR_COLOR;
@@ -116,6 +116,8 @@ pub(crate) struct AssetsPanel {
     images: Vec<String>,
     /// The `.frames` files among the contents, as paths inside the folder.
     animations: Vec<String>,
+    /// The `.anim` files among the contents, as paths inside the folder.
+    keyframes: Vec<String>,
     /// Naming files and asking before deleting them.
     actions: AssetActions,
     /// The size of the icons, in percent.
@@ -136,7 +138,8 @@ impl AssetsPanel {
             project_directory: project_directory.to_path_buf(),
             main_scene: read_main_scene(project_directory),
             images: image_paths(&contents),
-            animations: animation_paths(&contents),
+            animations: paths_ending_with(&contents, FRAMES_EXTENSION),
+            keyframes: paths_ending_with(&contents, KEYFRAMES_EXTENSION),
             thumbnails: Thumbnails::new(&directory),
             directory,
             contents,
@@ -168,7 +171,8 @@ impl AssetsPanel {
     fn refresh(&mut self) {
         self.contents = scan_directory(&self.directory);
         self.images = image_paths(&self.contents);
-        self.animations = animation_paths(&self.contents);
+        self.animations = paths_ending_with(&self.contents, FRAMES_EXTENSION);
+        self.keyframes = paths_ending_with(&self.contents, KEYFRAMES_EXTENSION);
         self.thumbnails.clear();
     }
 
@@ -182,6 +186,12 @@ impl AssetsPanel {
     /// when it was last listed.
     pub(crate) fn animations(&self) -> &[String] {
         &self.animations
+    }
+
+    /// The `.anim` files of the folder, as paths inside it, as they were
+    /// when it was last listed.
+    pub(crate) fn keyframes(&self) -> &[String] {
+        &self.keyframes
     }
 
     /// The folder it lists.
@@ -673,14 +683,15 @@ fn image_paths(contents: &io::Result<Vec<FileNode>>) -> Vec<String> {
         .collect()
 }
 
-/// The paths of the `.frames` files among `contents`.
-fn animation_paths(contents: &io::Result<Vec<FileNode>>) -> Vec<String> {
+/// The paths of the files among `contents` whose names end with
+/// `extension`.
+fn paths_ending_with(contents: &io::Result<Vec<FileNode>>, extension: &str) -> Vec<String> {
     let Ok(nodes) = contents else {
         return Vec::new();
     };
     file_paths(nodes)
         .into_iter()
-        .filter(|path| path.ends_with(FRAMES_EXTENSION))
+        .filter(|path| path.ends_with(extension))
         .collect()
 }
 

@@ -791,6 +791,13 @@ sprite, so the scene view shows the frame it starts on without reading the
 file while drawing; the file is read only when one is chosen, or while the
 list of its clips is open.
 
+Keyframe animations (`.anim`, decision 79) have no tab of their own yet
+(the timeline is step 15c): the assets panel creates one (Create >
+Keyframe animations) with an example written in comments, to edit by
+hand. A node's “Animator” part (`scene_editor/animator_rows.rs`) chooses
+its `.anim` file and its starting animation, read only while that list is
+open; the part is offered once the folder has an `.anim` file.
+
 The **blueprint editor** (`blueprint_editor/`) draws a graph of the open
 blueprint on a canvas of its own, painted with egui's painter (no node
 editor library: the model, its pins and its rules are `star_blueprint`'s).

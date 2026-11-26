@@ -15,6 +15,8 @@ use star_engine::star_scene::{
     Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
 };
 
+use super::animator_rows::new_animator;
+use super::properties::NodeContext;
 use crate::project::ProjectDimension;
 use crate::texts;
 
@@ -37,9 +39,9 @@ pub(super) const DEFAULT_LAMP_RANGE_2D: f32 = 3.0;
 pub(super) fn add_component_menu(
     ui: &mut egui::Ui,
     node: &mut NodeOutline,
-    dimension: ProjectDimension,
-    images: &[String],
+    context: &NodeContext<'_>,
 ) -> bool {
+    let (dimension, images) = (context.dimension, context.images);
     let texts = texts::current();
     let mut added = false;
     ui.menu_button(texts.add_component, |ui| {
@@ -110,6 +112,18 @@ pub(super) fn add_component_menu(
                 offer(ui, node.camera_3d.is_none(), texts.camera_3d, &mut || {
                     node.camera_3d = Some(Camera3dNode::default());
                 });
+            }
+        }
+        // Animators play on 2D and 3D nodes alike.
+        if node.animator.is_none() {
+            match new_animator(context.animations) {
+                Some(animator) => offer(ui, true, texts.animator_section(), &mut || {
+                    node.animator = Some(animator.clone());
+                }),
+                None => {
+                    ui.add_enabled(false, egui::Button::new(texts.animator_section()))
+                        .on_disabled_hover_text(texts.no_keyframes_hint());
+                }
             }
         }
     });

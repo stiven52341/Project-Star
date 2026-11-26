@@ -1252,7 +1252,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           its own for `.frames` files, made from an image's menu (“New
           animations”); choosing a sprite's file copies its image, cells
           and first frame into the sprite, so the scene shows it.
-  - [ ] 15b Keyframe tracks: any property of a node and its children
+  - [x] 15b Keyframe tracks: any property of a node and its children
         (position, rotation, scale, color, visibility, exported fields) over
         time, with interpolation (step, linear, eased) and calls to methods
         at given times; one animation file read by the scene's node. Agreed
@@ -1286,9 +1286,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           their times (also when a frame jumps over several, and when an
           animation loops), with a game of each `engine_game` and `window`
           play (`animator_game` calls the knight's `swing` and `strike`).
-    - [ ] 15b.5 The editor: `Animator` among the nodes to add, its file and
+    - [x] 15b.5 The editor: `Animator` among the nodes to add, its file and
           starting animation in the inspector, `.anim` among the assets
-          (editing them is 15c's timeline).
+          (created from Create > Keyframe animations with an example in
+          comments; editing them is 15c's timeline).
   - [ ] 15c The editor's timeline: a panel with tracks and keys, the
         playhead, playing in the scene view, adding a key from the
         inspector's value, moving and deleting keys, curves for easing.

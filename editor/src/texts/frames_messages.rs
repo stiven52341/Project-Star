@@ -115,4 +115,34 @@ impl Texts {
     pub(crate) const fn no_starting_clip(&self) -> &'static str {
         self.pick("None", "Ninguno")
     }
+
+    /// The section of a node's animator, and the part the inspector adds.
+    pub(crate) const fn animator_section(&self) -> &'static str {
+        self.pick("Animator", "Animador")
+    }
+
+    /// Why a node cannot get an animator yet.
+    pub(crate) const fn no_keyframes_hint(&self) -> &'static str {
+        self.pick(
+            "Create an .anim file first: Create > Keyframe animations, in the assets panel.",
+            "Crea antes un archivo .anim: Crear > Animaciones de keyframes, en el panel de assets.",
+        )
+    }
+
+    /// The `.anim` file of an animator, in the inspector.
+    pub(crate) const fn keyframes(&self) -> &'static str {
+        self.pick("Animations", "Animaciones")
+    }
+
+    pub(crate) const fn keyframes_hint(&self) -> &'static str {
+        self.pick(
+            "An .anim file: the animator plays its animations on its parent and the nodes under it.",
+            "Un archivo .anim: el animador reproduce sus animaciones en su padre y los nodos bajo él.",
+        )
+    }
+
+    /// The animation a scene's animator plays from the start.
+    pub(crate) const fn starting_animation(&self) -> &'static str {
+        self.pick("Starting animation", "Animación inicial")
+    }
 }

@@ -12,8 +12,8 @@ use super::project_classes::is_class_taken;
 use crate::blueprint_editor::{BlueprintTemplate, new_blueprint_text, new_script_text};
 use crate::frames_editor::new_frames_text;
 use crate::project::{
-    BLUEPRINT_EXTENSION, FRAMES_EXTENSION, MAX_NAME_LENGTH, ProjectDimension, RUST_EXTENSION,
-    SCENE_EXTENSION, SCRIPT_EXTENSION, add_missing_actions,
+    BLUEPRINT_EXTENSION, FRAMES_EXTENSION, KEYFRAMES_EXTENSION, MAX_NAME_LENGTH, ProjectDimension,
+    RUST_EXTENSION, SCENE_EXTENSION, SCRIPT_EXTENSION, add_missing_actions,
 };
 
 /// The scene new scenes start from: a root, placed in the project's space.
@@ -30,18 +30,21 @@ pub(crate) enum NewAsset {
     Blueprint,
     Script,
     Rust,
+    /// An animator's keyframe animations (`.anim`).
+    Keyframes,
     /// A copy of a ready-made blueprint.
     Template(BlueprintTemplate),
 }
 
 impl NewAsset {
     /// Every kind, in the order the menu lists them.
-    pub(super) const ALL: [Self; 5] = [
+    pub(super) const ALL: [Self; 6] = [
         Self::Folder,
         Self::Scene,
         Self::Blueprint,
         Self::Script,
         Self::Rust,
+        Self::Keyframes,
     ];
 
     /// The name a new one is given until the user changes it.
@@ -52,6 +55,7 @@ impl NewAsset {
             Self::Blueprint => "NewBlueprint",
             Self::Script => "NewScript",
             Self::Rust => "new_module",
+            Self::Keyframes => "NewAnimations",
             Self::Template(template) => template.name(),
         }
     }
@@ -68,6 +72,7 @@ impl NewAsset {
             Self::Blueprint | Self::Template(_) => BLUEPRINT_EXTENSION,
             Self::Script => SCRIPT_EXTENSION,
             Self::Rust => RUST_EXTENSION,
+            Self::Keyframes => KEYFRAMES_EXTENSION,
         }
     }
 }
@@ -219,8 +224,32 @@ fn contents(
             }
             Ok(format!("//! {stem}: Rust code of the game.\n"))
         }
+        NewAsset::Keyframes => Ok(NEW_KEYFRAMES.to_owned()),
     }
 }
+
+/// A new `.anim` file: no animations yet, and an example of one to write,
+/// until the editor has a timeline for them.
+const NEW_KEYFRAMES: &str = r#"format = 1
+
+# Keyframe animations, which an Animator plays on its parent and the nodes
+# under it. Write them as in this example (without the `#`):
+#
+# [[animation]]
+# name = "idle"
+# length = 1.0
+# looping = true
+#
+# [[animation.track]]
+# node = ""                      # "" is the animator's parent; "Arm" its child
+# property = "y"
+# interpolation = "ease_in_out"  # step, linear, ease_in, ease_out, ease_in_out
+# keys = [[0.0, 0.0], [0.5, 0.1], [1.0, 0.0]]
+#
+# [[animation.call]]
+# time = 0.5
+# method = "step"
+"#;
 
 /// A scene with only its root, named `stem`.
 fn new_scene(stem: &str, dimension: ProjectDimension) -> Result<String, AssetFileError> {
@@ -329,6 +358,8 @@ fn is_code_name(stem: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use star_engine::star_scene::TrackAnimations;
+
     use super::*;
     use crate::project::TestDirectory;
 
@@ -383,6 +414,18 @@ mod tests {
             let path = create_in(&assets, kind, kind.default_name());
             assert!(assets.path().join(path).exists());
         }
+    }
+
+    #[test]
+    fn new_keyframe_animations_are_valid_and_empty() {
+        let assets = assets("asset_files_keyframes");
+
+        let path = create_in(&assets, NewAsset::Keyframes, "Knight");
+
+        assert!(path.ends_with("Knight.anim"), "{path}");
+        let text = fs::read_to_string(assets.path().join(path)).unwrap();
+        let animations = TrackAnimations::from_text(&text).unwrap();
+        assert_eq!(animations, TrackAnimations::default());
     }
 
     #[test]

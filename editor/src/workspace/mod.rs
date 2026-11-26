@@ -215,6 +215,7 @@ impl EditorWindow {
                     AnimationFiles {
                         folder: self.assets.directory(),
                         paths: self.assets.animations(),
+                        keyframes: self.assets.keyframes(),
                     },
                     self.live_check.outline().map(|outline| &outline.classes),
                 ),

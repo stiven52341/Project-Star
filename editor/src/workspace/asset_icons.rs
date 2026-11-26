@@ -7,7 +7,8 @@ use star_engine::prelude::AssetPath;
 use star_engine::star_assets::{ImageFormat, SoundFormat};
 
 use crate::project::{
-    BLUEPRINT_EXTENSION, FRAMES_EXTENSION, RUST_EXTENSION, SCENE_EXTENSION, SCRIPT_EXTENSION,
+    BLUEPRINT_EXTENSION, FRAMES_EXTENSION, KEYFRAMES_EXTENSION, RUST_EXTENSION, SCENE_EXTENSION,
+    SCRIPT_EXTENSION,
 };
 
 /// Most letters of an extension shown on a page's tag.
@@ -24,6 +25,7 @@ const SCRIPT_COLOR: egui::Color32 = egui::Color32::from_rgb(70, 170, 100);
 const RUST_COLOR: egui::Color32 = egui::Color32::from_rgb(210, 110, 55);
 const IMAGE_COLOR: egui::Color32 = egui::Color32::from_rgb(200, 80, 140);
 const FRAMES_COLOR: egui::Color32 = egui::Color32::from_rgb(225, 150, 40);
+const KEYFRAMES_COLOR: egui::Color32 = egui::Color32::from_rgb(200, 90, 160);
 const SOUND_COLOR: egui::Color32 = egui::Color32::from_rgb(40, 160, 170);
 const OTHER_COLOR: egui::Color32 = egui::Color32::from_rgb(120, 122, 130);
 
@@ -48,6 +50,7 @@ pub(super) enum AssetKind {
     Script,
     Rust,
     Frames,
+    Keyframes,
     Image,
     Sound,
     Other,
@@ -68,6 +71,8 @@ impl AssetKind {
             Self::Rust
         } else if lower.ends_with(FRAMES_EXTENSION) {
             Self::Frames
+        } else if lower.ends_with(KEYFRAMES_EXTENSION) {
+            Self::Keyframes
         } else if path
             .as_ref()
             .is_ok_and(|path| ImageFormat::of(path).is_ok())
@@ -91,6 +96,7 @@ impl AssetKind {
             Self::Script => SCRIPT_COLOR,
             Self::Rust => RUST_COLOR,
             Self::Frames => FRAMES_COLOR,
+            Self::Keyframes => KEYFRAMES_COLOR,
             Self::Image => IMAGE_COLOR,
             Self::Sound => SOUND_COLOR,
             Self::Other => OTHER_COLOR,

@@ -10,3 +10,5 @@ pub(crate) const SCENE_EXTENSION: &str = ".scene";
 pub(crate) const RUST_EXTENSION: &str = ".rs";
 /// Extension of the files of a sprite's animations (`.frames`).
 pub(crate) const FRAMES_EXTENSION: &str = star_engine::star_scene::FRAMES_EXTENSION;
+/// Extension of the files of an animator's keyframe animations (`.anim`).
+pub(crate) const KEYFRAMES_EXTENSION: &str = star_engine::star_scene::ANIMATIONS_EXTENSION;
