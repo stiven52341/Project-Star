@@ -1216,4 +1216,78 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
   - [x] A script with mistakes dragged onto a node said that none of its
         classes extends another; it now says it has mistakes, and the
         first one.
+- [ ] **Phase 15 — Animation editor, 2D and 3D** (owner's request,
+      2026-11-25; done part by part, each designed with the owner first).
+      Ideas taken from Godot's `AnimationPlayer`, `AnimatedSprite2D` and
+      `AnimationTree`, and Unity's Animator, without copying them:
+  - [ ] 15a Frame animations for 2D: named clips of sprite sheet cells
+        (frames per second, loop), played by a node from StarScript
+        (`play`, `stop`, the clip that ends), saved in the project.
+  - [ ] 15b Keyframe tracks: any property of a node and its children
+        (position, rotation, scale, color, visibility, exported fields) over
+        time, with interpolation (step, linear, eased) and calls to methods
+        at given times; one animation file read by the scene's node.
+  - [ ] 15c The editor's timeline: a panel with tracks and keys, the
+        playhead, playing in the scene view, adding a key from the
+        inspector's value, moving and deleting keys, curves for easing.
+  - [ ] 15d Tweens from code: a property animated to a value in some
+        seconds with an easing, awaitable from a coroutine.
+  - [ ] 15e Transitions between animations: a state machine (idle → run →
+        jump) with conditions, cross-fades and blends by a value (walk/run
+        by speed), editable as a graph like the blueprints.
+  - [ ] 15f Skeletons: 2D bones that bend sprites, and 3D skinned meshes;
+        3D skeletons need importing models with their animations (glTF,
+        the format of decision 48), which the engine does not do yet.
+- [ ] **Phase 16 — Ready-made nodes and tools** (owner's request,
+      2026-11-25; mostly after Godot's nodes and templates). Each is an
+      engine node or a class the editor offers, usable from StarScript and
+      blueprints, and editable like any other:
+  - [ ] 16a Character controllers: a body that moves and slides along
+        walls and floors (Godot's `CharacterBody2D`/`3D` and
+        `move_and_slide`), knowing if it is on the floor, a wall or the
+        ceiling, with slopes and steps.
+  - [ ] 16b Ready players: `Player2D` (top-down and platformer, with
+        jump, gravity and the project's actions) and `Player3D` (first and
+        third person, with a mouse/stick camera), each with physics or
+        without (moving the transform), as nodes or as script and
+        blueprint templates.
+  - [ ] 16c Cameras that help: following a node with smoothing, limits and
+        a dead zone, screen shake; a 3D orbit camera.
+  - [ ] 16d Detection and queries: areas that report what enters and
+        leaves (sensors as nodes), ray casts and shape casts as nodes,
+        visible-on-screen notifiers.
+  - [ ] 16e Gameplay helpers: timers, paths with followers, spawners,
+        health/damage, a pool of reusable objects.
+  - [ ] 16f Worlds: tile maps for 2D (a tile set, painting in the editor,
+        collisions per tile), parallax backgrounds, 3D grid maps.
+  - [ ] 16g Navigation: walkable areas and agents that find paths around
+        obstacles, 2D and 3D.
+  - [ ] 16h Interface nodes for games: labels, buttons, bars, panels and
+        containers, anchored to the screen.
+- [ ] **Phase 17 — Ready-made optimization** (owner's request,
+      2026-11-25), above all for 3D, from the techniques most used in the
+      industry. Each is measured on an example before and after, and kept
+      only if it pays off (as the faster “Play” steps were):
+  - [ ] 17a Frustum culling: what is out of the camera's view is not drawn
+        (bounding boxes and spheres per mesh, 2D and 3D).
+  - [ ] 17b Occlusion culling: what is hidden behind walls is not drawn
+        (occluders placed or baked, or a depth pre-pass), for 3D indoors.
+  - [ ] 17c Level of detail (LOD): simpler meshes far from the camera,
+        generated or given, with visibility ranges per node, and impostors
+        (billboards) for the farthest.
+  - [ ] 17d Batching and instancing: many copies of one mesh in one draw
+        (GPU instancing, Godot's `MultiMesh`), static meshes merged into
+        one, and fewer state changes by sorting draws by material.
+  - [ ] 17e Texture atlases: small images packed into one texture by the
+        editor, so sprites and materials share draws.
+  - [ ] 17f Textures: mipmaps, GPU compressed formats per platform (BC on
+        desktops, ASTC/ETC2 on mobiles) and size limits on export.
+  - [ ] 17g Baking: lightmaps and ambient occlusion baked into textures for
+        static scenes, reflection probes, and baking materials into simple
+        textures.
+  - [ ] 17h Shadows and lights within budget: shadow cascades and
+        distances, lights culled per object or clustered (decision 48 left
+        room for them behind `Frame`).
+  - [ ] 17i Profiling in the editor: frame time, draws, triangles and
+        memory, so the right technique can be chosen.
 - [ ] **Future — Consoles** (PlayStation, Xbox).
