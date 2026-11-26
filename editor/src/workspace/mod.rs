@@ -47,7 +47,7 @@ use crate::game_run::{EngineWarmUp, PlayMode, PlayRequest};
 use crate::last_scenes::LastSceneStore;
 use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, Project, SCRIPT_EXTENSION};
 use crate::project_check::Problem;
-use crate::scene_editor::{AnimationFiles, SceneDocument};
+use crate::scene_editor::{AssetFiles, SceneDocument};
 use crate::style::ERROR_COLOR;
 use crate::texts::{self, Language};
 
@@ -214,11 +214,12 @@ impl EditorWindow {
                     &self.project,
                     self.documents.scene_mut(),
                     self.assets.images(),
-                    AnimationFiles {
+                    AssetFiles {
                         folder: self.assets.directory(),
                         paths: self.assets.animations(),
                         keyframes: self.assets.keyframes(),
                         states: self.assets.states(),
+                        models: self.assets.models(),
                     },
                     self.live_check.outline().map(|outline| &outline.classes),
                 ),

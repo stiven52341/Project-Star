@@ -21,7 +21,7 @@ use super::viewport_tools::{paint_handles, show_toolbar, tool_from_keys};
 use crate::drag_drop::released;
 use crate::project::ProjectDimension;
 use crate::scene_editor::{
-    BodyMarks, ClassDrop, Drag, HandleShape, ImageDrop, Lens, Marks, Ray, SceneDocument, Tool,
+    AssetDrop, BodyMarks, ClassDrop, Drag, HandleShape, Lens, Marks, Ray, SceneDocument, Tool,
     bone_lines, cone_lines, cross_lines, cube_lines, handle_at, pyramid_lines, ray_lines,
     reach_lines, shapes, square_lines, view_lines,
 };
@@ -151,7 +151,7 @@ impl SceneViewport {
         let handles = self.handles(scene.as_deref(), lens.as_ref());
         let active = self.drag.map(|drag| drag.handle).or(hovered);
         paint_handles(&painter, rect, &handles, active);
-        if response.dnd_hover_payload::<ImageDrop>().is_some()
+        if response.dnd_hover_payload::<AssetDrop>().is_some()
             || self.class_lands(&response, rect, scene.as_deref())
         {
             painter.rect_stroke(
@@ -263,7 +263,7 @@ impl SceneViewport {
     /// Adds to `scene` a node showing the image dropped on the view, if
     /// one was, where it was dropped.
     fn drop_image(&self, response: &egui::Response, rect: egui::Rect, scene: &mut SceneDocument) {
-        let Some(image) = released::<ImageDrop>(response) else {
+        let Some(image) = released::<AssetDrop>(response) else {
             return;
         };
         if let Some(ray) = self.pointer_ray(response, rect) {

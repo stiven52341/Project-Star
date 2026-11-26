@@ -9,12 +9,12 @@ use eframe::egui;
 use star_engine::prelude::AssetPath;
 use star_engine::star_scene::{AnimatorOutline, TrackAnimations};
 
-use super::animation_rows::AnimationFiles;
+use super::animation_rows::AssetFiles;
 use crate::texts;
 
 /// An animator of the first `.anim` file of `files`, playing nothing yet;
 /// `None` if there is none.
-pub(super) fn new_animator(files: AnimationFiles<'_>) -> Option<AnimatorOutline> {
+pub(super) fn new_animator(files: AssetFiles<'_>) -> Option<AnimatorOutline> {
     let animations = files
         .keyframes
         .iter()
@@ -31,18 +31,14 @@ pub(super) fn new_animator(files: AnimationFiles<'_>) -> Option<AnimatorOutline>
 pub(super) fn edit_animator(
     ui: &mut egui::Ui,
     animator: &mut AnimatorOutline,
-    files: AnimationFiles<'_>,
+    files: AssetFiles<'_>,
 ) -> bool {
     file_row(ui, animator, files)
         | starting_animation_row(ui, animator, files)
         | states_row(ui, animator, files)
 }
 
-fn states_row(
-    ui: &mut egui::Ui,
-    animator: &mut AnimatorOutline,
-    files: AnimationFiles<'_>,
-) -> bool {
+fn states_row(ui: &mut egui::Ui, animator: &mut AnimatorOutline, files: AssetFiles<'_>) -> bool {
     let texts = texts::current();
     ui.weak(texts.animator_states())
         .on_hover_text(texts.animator_states_hint());
@@ -73,7 +69,7 @@ fn states_row(
     true
 }
 
-fn file_row(ui: &mut egui::Ui, animator: &mut AnimatorOutline, files: AnimationFiles<'_>) -> bool {
+fn file_row(ui: &mut egui::Ui, animator: &mut AnimatorOutline, files: AssetFiles<'_>) -> bool {
     let texts = texts::current();
     ui.weak(texts.keyframes())
         .on_hover_text(texts.keyframes_hint());
@@ -101,7 +97,7 @@ fn file_row(ui: &mut egui::Ui, animator: &mut AnimatorOutline, files: AnimationF
 fn starting_animation_row(
     ui: &mut egui::Ui,
     animator: &mut AnimatorOutline,
-    files: AnimationFiles<'_>,
+    files: AssetFiles<'_>,
 ) -> bool {
     let texts = texts::current();
     ui.weak(texts.starting_animation());
@@ -136,7 +132,7 @@ fn starting_animation_row(
 
 /// The names of the animations of the file at `path`; none if it cannot
 /// be read (the reason is logged).
-fn animation_names(files: AnimationFiles<'_>, path: &AssetPath) -> Vec<String> {
+fn animation_names(files: AssetFiles<'_>, path: &AssetPath) -> Vec<String> {
     fs::read_to_string(files.folder.join(path.as_str()))
         .map_err(|error| error.to_string())
         .and_then(|text| TrackAnimations::from_text(&text).map_err(|error| error.to_string()))
@@ -159,18 +155,19 @@ mod tests {
     #[test]
     fn new_animators_take_the_first_file_and_play_nothing() {
         let keyframes = ["knight.anim".to_owned(), "door.anim".to_owned()];
-        let files = AnimationFiles {
+        let files = AssetFiles {
             folder: Path::new("assets"),
             paths: &[],
             keyframes: &keyframes,
             states: &[],
+            models: &[],
         };
 
         let animator = new_animator(files).unwrap();
 
         assert_eq!(animator.animations.as_str(), "knight.anim");
         assert_eq!(animator.animation, None);
-        let none = AnimationFiles {
+        let none = AssetFiles {
             keyframes: &[],
             ..files
         };

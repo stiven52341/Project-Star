@@ -1,6 +1,8 @@
 //! Drawing an open scene in the view: where each node ends up, what it
 //! shows, and a mark on the node selected.
 
+use std::sync::Arc;
+
 use star_engine::MeshFile;
 use star_engine::prelude::{
     Affine2, AmbientLight, Camera, Color, DirectionalLight, Frame, GlobalTransform2D,
@@ -9,6 +11,7 @@ use star_engine::prelude::{
 };
 use star_engine::star_assets::AssetPath;
 use star_engine::star_platform::WindowConfig;
+use star_engine::star_render::ModelMeshPart;
 use star_engine::star_scene::{
     Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, LightNode, NodeOutline, SpriteOutline,
 };
@@ -38,6 +41,8 @@ const CAMERA_PYRAMID_DEPTH: f32 = 1.0;
 pub(crate) trait SceneGpu {
     fn texture(&mut self, path: &AssetPath, filter: TextureFilter) -> Option<TextureId>;
     fn mesh(&mut self, unit: MeshShape) -> Option<Mesh3dId>;
+    /// The parts of the 3D model of `file`, read and uploaded once.
+    fn model(&mut self, file: &AssetPath) -> Option<Arc<[ModelMeshPart]>>;
 }
 
 /// The line meshes that mark the node selected, made once by the view.
@@ -154,6 +159,7 @@ fn draw_shown(
         }
         if let Some(global) = place.solid {
             draw_mesh(node, global, gpu, frame);
+            draw_model(node, global, gpu, frame);
             if let Some(light) = node.light
                 && frame.lights().len() < MAX_LIGHTS
             {
@@ -289,6 +295,17 @@ fn draw_mesh(node: &NodeOutline, global: Mat4, gpu: &mut impl SceneGpu, frame: &
         roughness: outline.roughness,
     };
     frame.draw_mesh_3d(mesh, material, global * Mat4::from_scale(scale));
+}
+
+/// Every part of the model `node` shows, if it shows one, placed at
+/// `global`.
+fn draw_model(node: &NodeOutline, global: Mat4, gpu: &mut impl SceneGpu, frame: &mut Frame) {
+    let Some(parts) = node.model.as_ref().and_then(|model| gpu.model(&model.file)) else {
+        return;
+    };
+    for part in parts.iter() {
+        frame.draw_mesh_3d(part.mesh, part.material, global * part.transform);
+    }
 }
 
 /// The shape of the game's window, width over height: the one it opens
@@ -626,6 +643,15 @@ mod tests {
             self.meshes.push(unit);
             Some(Mesh3dId::from_index(self.meshes.len()))
         }
+
+        fn model(&mut self, file: &AssetPath) -> Option<Arc<[ModelMeshPart]>> {
+            let part = ModelMeshPart {
+                mesh: Mesh3dId::from_index(0),
+                material: Material::default(),
+                transform: Mat4::IDENTITY,
+            };
+            (file.as_str() == "knight.glb").then(|| Arc::from(vec![part, part]))
+        }
     }
 
     const MARKS: Marks = Marks {
@@ -843,6 +869,22 @@ mod tests {
             "a circle, and a circle and two edges"
         );
         assert_eq!(frame.lights_2d(), []);
+    }
+
+    #[test]
+    fn models_draw_every_part_of_them() {
+        let models = "[[node]]\nname = \"Knight\"\n[node.transform_3d]\n\
+                      [node.model]\nfile = \"knight.glb\"\n\
+                      [[node]]\nname = \"Ghost\"\nparent = 0\n[node.transform_3d]\n\
+                      [node.model]\nfile = \"missing.glb\"\n";
+
+        let (frame, _) = draw(&outline(models), None);
+
+        assert_eq!(
+            frame.mesh_3d_count(),
+            2,
+            "the knight's two parts, and nothing for the missing one"
+        );
     }
 
     #[test]

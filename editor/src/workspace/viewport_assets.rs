@@ -1,11 +1,13 @@
 //! The textures and meshes the view has made for the open scene, each
-//! made once: the images of the project's assets folder and the meshes of
-//! unit shapes.
+//! made once: the images of the project's assets folder, the meshes of
+//! unit shapes and the 3D models.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use star_engine::prelude::{AssetFolder, AssetPath, Mesh3dId, MeshShape, TextureFilter, TextureId};
 use star_render::interop::OffscreenRenderer;
+use star_render::{ModelMeshPart, upload_model};
 
 use crate::scene_editor::SceneGpu;
 
@@ -15,6 +17,7 @@ pub(crate) struct ViewportAssets {
     folder: AssetFolder,
     textures: Vec<(AssetPath, TextureFilter, Option<TextureId>)>,
     meshes: Vec<(MeshShape, Option<Mesh3dId>)>,
+    models: Vec<(AssetPath, Option<Arc<[ModelMeshPart]>>)>,
 }
 
 impl ViewportAssets {
@@ -24,6 +27,7 @@ impl ViewportAssets {
             folder: AssetFolder::new(assets),
             textures: Vec::new(),
             meshes: Vec::new(),
+            models: Vec::new(),
         }
     }
 
@@ -76,5 +80,33 @@ impl SceneGpu for Loader<'_> {
             .ok();
         meshes.push((unit, mesh));
         mesh
+    }
+
+    fn model(&mut self, file: &AssetPath) -> Option<Arc<[ModelMeshPart]>> {
+        if let Some((_, parts)) = self.assets.models.iter().find(|(read, _)| read == file) {
+            return parts.clone();
+        }
+        // Both closures need the renderer, one after the other.
+        let renderer = std::cell::RefCell::new(&mut *self.renderer);
+        let parts = self
+            .assets
+            .folder
+            .load_model(file)
+            .and_then(|model| {
+                upload_model(
+                    &model,
+                    |image| {
+                        renderer
+                            .borrow_mut()
+                            .create_texture(image, TextureFilter::Smooth)
+                    },
+                    |mesh| renderer.borrow_mut().create_mesh_3d(mesh),
+                )
+            })
+            .map(Arc::from)
+            .inspect_err(|error| log::warn!("{error}"))
+            .ok();
+        self.assets.models.push((file.clone(), parts.clone()));
+        parts
     }
 }

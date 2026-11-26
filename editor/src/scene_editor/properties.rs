@@ -12,10 +12,11 @@ use star_engine::star_render::{
     MIN_SPHERE_SEGMENTS, SpriteSheet,
 };
 use star_engine::star_scene::{
-    Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
+    Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, ModelNode, NodeOutline,
+    SpriteOutline,
 };
 
-use super::animation_rows::{AnimationFiles, animation_rows};
+use super::animation_rows::{AssetFiles, animation_rows};
 use super::animator_rows::edit_animator;
 use super::components::{
     DEFAULT_CAPSULE_HEIGHT, DEFAULT_RADIUS, LightKind, add_component_menu, new_light, new_light_2d,
@@ -40,7 +41,7 @@ pub(super) struct NodeContext<'context> {
     pub(super) images: &'context [String],
     /// The `.frames` files of the assets folder, for sprites, and its
     /// `.anim` files, for animators.
-    pub(super) animations: AnimationFiles<'context>,
+    pub(super) animations: AssetFiles<'context>,
     /// The classes of the scripts, once checked, for `export` fields.
     pub(super) classes: Option<&'context ClassTable>,
     /// The key buttons of the node's properties, while the timeline of
@@ -95,6 +96,9 @@ pub(super) fn edit_node(
     });
     changed |= optional_section(ui, texts.camera_3d, &mut node.camera_3d, |ui, camera| {
         edit_camera_3d(ui, camera, keys)
+    });
+    changed |= optional_section(ui, texts.model_section(), &mut node.model, |ui, model| {
+        edit_model(ui, model, context.animations.models)
     });
     changed |= optional_section(ui, texts.bone_2d(), &mut node.bone, |ui, bone| {
         edit_bone(ui, bone, keys)
@@ -534,6 +538,29 @@ fn edit_camera_2d(ui: &mut egui::Ui, camera: &mut Camera2dNode, keys: Option<&Ke
         &mut camera.main,
         texts.main_camera_hint,
     )
+}
+
+/// The model's file, among the `models` of the assets folder.
+fn edit_model(ui: &mut egui::Ui, model: &mut ModelNode, models: &[String]) -> bool {
+    let texts = texts::current();
+    ui.weak(texts.model_file());
+    let mut chosen = None;
+    egui::ComboBox::from_id_salt("model_file")
+        .selected_text(model.file.as_str())
+        .show_ui(ui, |ui| {
+            for path in models {
+                let current = model.file.as_str() == path;
+                if ui.selectable_label(current, path).clicked() && !current {
+                    chosen = AssetPath::new(path).ok();
+                }
+            }
+        });
+    ui.end_row();
+    let Some(file) = chosen else {
+        return false;
+    };
+    model.file = file;
+    true
 }
 
 fn edit_bone(ui: &mut egui::Ui, bone: &mut Bone2dNode, keys: Option<&KeyButtons>) -> bool {

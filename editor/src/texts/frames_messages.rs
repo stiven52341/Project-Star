@@ -116,6 +116,23 @@ impl Texts {
         self.pick("None", "Ninguno")
     }
 
+    /// The section of a node's 3D model, and the part the inspector adds.
+    pub(crate) const fn model_section(&self) -> &'static str {
+        self.pick("Model", "Modelo")
+    }
+
+    pub(crate) const fn model_file(&self) -> &'static str {
+        self.pick("File", "Archivo")
+    }
+
+    /// Why a node cannot get a model yet.
+    pub(crate) const fn no_models_hint(&self) -> &'static str {
+        self.pick(
+            "Put a .glb or .gltf model in the assets folder first.",
+            "Primero pon un modelo .glb o .gltf en la carpeta de assets.",
+        )
+    }
+
     /// The section of a node's bone, the part the inspector adds and the
     /// node “Create” makes.
     pub(crate) const fn bone_2d(&self) -> &'static str {

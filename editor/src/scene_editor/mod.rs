@@ -36,7 +36,7 @@ use star_engine::star_scene::NodeOutline;
 use star_script::semantic::ClassTable;
 
 use self::animating::write_animations;
-pub(crate) use self::animation_rows::AnimationFiles;
+pub(crate) use self::animation_rows::AssetFiles;
 pub(crate) use self::body_drawing::BodyMarks;
 use self::class_choice::{ChoiceOutcome, ClassChoice};
 pub(crate) use self::class_drop::ClassDrop;
@@ -46,7 +46,7 @@ pub(crate) use self::drawing::{
     Marks, SceneGpu, bone_lines, cone_lines, cross_lines, cube_lines, game_aspect_ratio,
     pyramid_lines, ray_lines, reach_lines, square_lines, view_lines,
 };
-pub(crate) use self::dropping::ImageDrop;
+pub(crate) use self::dropping::AssetDrop;
 pub(crate) use self::gizmo::{
     Drag, Handle, HandleShape, Lens, Target, Tip, Tool, handle_at, shapes,
 };
@@ -231,14 +231,14 @@ impl SceneDocument {
 
     /// Adds a node showing `image` under the root, where `ray` meets the
     /// scene, and selects it.
-    pub(crate) fn drop_image_at(&mut self, image: &ImageDrop, ray: Ray) {
+    pub(crate) fn drop_image_at(&mut self, image: &AssetDrop, ray: Ray) {
         let world = dropping::drop_point(ray, self.dimension);
         self.add_image(image, ROOT, Some(world));
     }
 
     /// Adds a node showing `image` under `parent`, at its parent's place
     /// (or at `world`, if given), and selects it.
-    fn add_image(&mut self, image: &ImageDrop, parent: usize, world: Option<Vec3>) {
+    fn add_image(&mut self, image: &AssetDrop, parent: usize, world: Option<Vec3>) {
         let Ok(outline) = &mut self.content else {
             return;
         };
@@ -452,7 +452,7 @@ impl SceneDocument {
         &mut self,
         ui: &mut egui::Ui,
         images: &[String],
-        animations: AnimationFiles<'_>,
+        animations: AssetFiles<'_>,
         classes: Option<&ClassTable>,
     ) -> bool {
         let keys = self.key_buttons();

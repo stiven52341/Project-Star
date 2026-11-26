@@ -13,7 +13,7 @@ use star_scene::{
 };
 
 use crate::mesh_file::MeshFile;
-use crate::model_library::{ModelLibrary, upload_model};
+use crate::model_library::{ModelLibrary, upload_to};
 use crate::sound_library::SoundLibrary;
 use crate::sprite_file::SpriteFile;
 use crate::texture_library::TextureLibrary;
@@ -165,9 +165,9 @@ impl GameAssets {
             if !is_shown(world, entity) {
                 return;
             }
-            let parts = self.models.load(&self.folder, &node.file, |model| {
-                upload_model(renderer, model)
-            });
+            let parts = self
+                .models
+                .load(&self.folder, &node.file, |model| upload_to(renderer, model));
             for part in parts.iter().flat_map(|parts| parts.iter()) {
                 frame.draw_mesh_3d(part.mesh, part.material, global.matrix() * part.transform);
             }

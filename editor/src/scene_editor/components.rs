@@ -12,7 +12,8 @@ use star_engine::star_render::{
     DEFAULT_SPOT_BLEND, SpriteSheet,
 };
 use star_engine::star_scene::{
-    Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, NodeOutline, SpriteOutline,
+    Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, ModelNode, NodeOutline,
+    SpriteOutline,
 };
 
 use super::animator_rows::new_animator;
@@ -129,8 +130,28 @@ pub(super) fn add_component_menu(
                 }
             }
         }
+        if dimension == ProjectDimension::ThreeD && node.model.is_none() {
+            added |= model_entry(ui, node, context.animations.models);
+        }
     });
     added
+}
+
+/// The entry that gives `node` a model of the first of `models`, or a
+/// disabled one saying why it cannot. Returns whether it gave one.
+fn model_entry(ui: &mut egui::Ui, node: &mut NodeOutline, models: &[String]) -> bool {
+    let texts = texts::current();
+    let Some(file) = models.first().and_then(|path| AssetPath::new(path).ok()) else {
+        ui.add_enabled(false, egui::Button::new(texts.model_section()))
+            .on_disabled_hover_text(texts.no_models_hint());
+        return false;
+    };
+    if !ui.button(texts.model_section()).clicked() {
+        return false;
+    }
+    node.model = Some(ModelNode { file });
+    ui.close();
+    true
 }
 
 /// What “Create” in the menus of the scene's tree adds: a node that shows

@@ -17,7 +17,7 @@ use star_engine::star_scene::NodeOutline;
 use super::ROOT;
 use super::class_drop::ClassDrop;
 use super::components::{BodyTemplate, NodeTemplate};
-use super::dropping::ImageDrop;
+use super::dropping::AssetDrop;
 use super::tree::{can_move, children_of};
 use crate::drag_drop::released;
 use crate::project::ProjectDimension;
@@ -155,7 +155,7 @@ struct NodeDrag(usize);
 #[derive(Default)]
 pub(super) struct TreeOutcome {
     /// An image dropped on a row, with that row's node.
-    pub(super) dropped: Option<(usize, Arc<ImageDrop>)>,
+    pub(super) dropped: Option<(usize, Arc<AssetDrop>)>,
     /// A script or blueprint dropped on a row, with that row's node and
     /// where it was dropped.
     pub(super) class_dropped: Option<(usize, Arc<ClassDrop>, egui::Pos2)>,
@@ -280,7 +280,7 @@ impl<'scene> TreeView<'scene> {
         let node_lands = response
             .dnd_hover_payload::<NodeDrag>()
             .is_some_and(|drag| fits(&drag));
-        let image_held = is_row && response.dnd_hover_payload::<ImageDrop>().is_some();
+        let image_held = is_row && response.dnd_hover_payload::<AssetDrop>().is_some();
         let class_held = is_row
             && response
                 .dnd_hover_payload::<ClassDrop>()
@@ -450,7 +450,7 @@ impl<'scene> TreeView<'scene> {
             response.dnd_set_drag_payload(NodeDrag(index));
         }
         self.drop_target(ui, &response, index, true);
-        if let Some(image) = released::<ImageDrop>(&response) {
+        if let Some(image) = released::<AssetDrop>(&response) {
             self.outcome.dropped = Some((index, image));
         }
         if selected && self.state.reveal {

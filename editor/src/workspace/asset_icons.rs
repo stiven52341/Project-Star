@@ -4,7 +4,7 @@
 
 use eframe::egui;
 use star_engine::prelude::AssetPath;
-use star_engine::star_assets::{ImageFormat, SoundFormat};
+use star_engine::star_assets::{ImageFormat, ModelFormat, SoundFormat};
 
 use crate::project::{
     BLUEPRINT_EXTENSION, FRAMES_EXTENSION, KEYFRAMES_EXTENSION, RUST_EXTENSION, SCENE_EXTENSION,
@@ -27,6 +27,7 @@ const IMAGE_COLOR: egui::Color32 = egui::Color32::from_rgb(200, 80, 140);
 const FRAMES_COLOR: egui::Color32 = egui::Color32::from_rgb(225, 150, 40);
 const KEYFRAMES_COLOR: egui::Color32 = egui::Color32::from_rgb(200, 90, 160);
 const STATES_COLOR: egui::Color32 = egui::Color32::from_rgb(120, 110, 220);
+const MODEL_COLOR: egui::Color32 = egui::Color32::from_rgb(90, 170, 210);
 const SOUND_COLOR: egui::Color32 = egui::Color32::from_rgb(40, 160, 170);
 const OTHER_COLOR: egui::Color32 = egui::Color32::from_rgb(120, 122, 130);
 
@@ -53,6 +54,8 @@ pub(super) enum AssetKind {
     Frames,
     Keyframes,
     States,
+    /// A 3D model: `.glb` or `.gltf`.
+    Model,
     Image,
     Sound,
     Other,
@@ -79,6 +82,11 @@ impl AssetKind {
             Self::States
         } else if path
             .as_ref()
+            .is_ok_and(|path| ModelFormat::of(path).is_ok())
+        {
+            Self::Model
+        } else if path
+            .as_ref()
             .is_ok_and(|path| ImageFormat::of(path).is_ok())
         {
             Self::Image
@@ -102,6 +110,7 @@ impl AssetKind {
             Self::Frames => FRAMES_COLOR,
             Self::Keyframes => KEYFRAMES_COLOR,
             Self::States => STATES_COLOR,
+            Self::Model => MODEL_COLOR,
             Self::Image => IMAGE_COLOR,
             Self::Sound => SOUND_COLOR,
             Self::Other => OTHER_COLOR,

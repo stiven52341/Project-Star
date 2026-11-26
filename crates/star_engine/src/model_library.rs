@@ -6,16 +6,7 @@ use std::sync::Arc;
 
 use star_assets::{AssetFolder, AssetPath};
 use star_core::{EngineResult, Model};
-use star_math::Mat4;
-use star_render::{Color, Material, Mesh3dId, MeshData, Renderer, TextureFilter, TextureId};
-
-/// A mesh of a model on the GPU, with its material and place in the model.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct ShownPart {
-    pub(crate) mesh: Mesh3dId,
-    pub(crate) material: Material,
-    pub(crate) transform: Mat4,
-}
+use star_render::{ModelMeshPart as ShownPart, Renderer, TextureFilter, upload_model};
 
 /// Remembers the models already uploaded, and those that failed, so a
 /// model is read once and a broken file warns once.
@@ -52,32 +43,18 @@ impl ModelLibrary {
 /// # Errors
 ///
 /// Why a mesh or an image could not be uploaded.
-pub(crate) fn upload_model(renderer: &mut Renderer, model: &Model) -> EngineResult<Vec<ShownPart>> {
-    let textures = model
-        .images()
-        .iter()
-        .map(|image| renderer.create_texture(image, TextureFilter::Smooth))
-        .collect::<EngineResult<Vec<TextureId>>>()?;
-    model
-        .parts()
-        .iter()
-        .map(|part| {
-            let [r, g, b, a] = part.material.base_color;
-            Ok(ShownPart {
-                mesh: renderer.create_mesh_3d(&MeshData::from_model_part(part)?)?,
-                material: Material {
-                    base_color: Color::from_linear(Color::rgba(r, g, b, a)),
-                    base_color_texture: part
-                        .material
-                        .texture
-                        .and_then(|index| textures.get(index).copied()),
-                    metallic: part.material.metallic,
-                    roughness: part.material.roughness,
-                },
-                transform: Mat4::from_columns(part.transform),
-            })
-        })
-        .collect()
+pub(crate) fn upload_to(renderer: &mut Renderer, model: &Model) -> EngineResult<Vec<ShownPart>> {
+    // Both closures need the renderer, one after the other.
+    let renderer = std::cell::RefCell::new(renderer);
+    upload_model(
+        model,
+        |image| {
+            renderer
+                .borrow_mut()
+                .create_texture(image, TextureFilter::Smooth)
+        },
+        |mesh| renderer.borrow_mut().create_mesh_3d(mesh),
+    )
 }
 
 #[cfg(test)]

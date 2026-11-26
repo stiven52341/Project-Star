@@ -1,13 +1,14 @@
-//! Images dragged from the assets panel and dropped on the scene: each
-//! becomes a new node that shows it, where it was dropped. In 2D it is a
-//! sprite on the `z = 0` plane; in 3D, a plane on the ground (`y = 0`)
-//! with the image as its texture.
+//! Images and 3D models dragged from the assets panel and dropped on the
+//! scene: each becomes a new node that shows it, where it was dropped. In
+//! 2D an image is a sprite on the `z = 0` plane; in 3D, a plane on the
+//! ground (`y = 0`) with the image as its texture. A model is a `Model`
+//! on the ground, in 3D only.
 
 use star_engine::prelude::{
     Affine2, Mat4, MeshShape, TextureFilter, Transform2D, Transform3D, Vec2, Vec3,
 };
-use star_engine::star_assets::AssetPath;
-use star_engine::star_scene::{MeshOutline, NodeOutline};
+use star_engine::star_assets::{AssetPath, ModelFormat};
+use star_engine::star_scene::{MeshOutline, ModelNode, NodeOutline};
 
 use super::components::{new_mesh, new_node, sprite_of};
 use super::picking::Ray;
@@ -21,16 +22,17 @@ const DISTANCE_OFF_THE_GROUND: f32 = 10.0;
 /// Rays closer than this to lying on a plane never meet it.
 const PARALLEL_EPSILON: f32 = 1e-6;
 
-/// What the assets panel carries while an image of it is dragged.
+/// What the assets panel carries while an image or a 3D model of it is
+/// dragged.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct ImageDrop {
+pub(crate) struct AssetDrop {
     /// Where it is inside the assets folder.
     pub(crate) path: String,
-    /// Its width over its height, if it is known.
+    /// An image's width over its height, if it is known.
     pub(crate) aspect: Option<f32>,
 }
 
-impl ImageDrop {
+impl AssetDrop {
     /// The name of a node that shows it: its file's name without the
     /// extension.
     pub(super) fn node_name(&self) -> &str {
@@ -48,9 +50,10 @@ impl ImageDrop {
         Vec2::new(DROPPED_HEIGHT * aspect, DROPPED_HEIGHT)
     }
 
-    /// A node named `name` showing the image, at `world` for a parent that
-    /// places its children at `parent`. `None` if the path is not valid or
-    /// the parent cannot be undone (a scale of zero).
+    /// A node named `name` showing the image or model, at `world` for a
+    /// parent that places its children at `parent`. `None` if the path is
+    /// not valid, the parent cannot be undone (a scale of zero) or it is a
+    /// model in 2D.
     pub(super) fn node(
         &self,
         name: String,
@@ -60,6 +63,17 @@ impl ImageDrop {
     ) -> Option<NodeOutline> {
         let texture = AssetPath::new(&self.path).ok()?;
         let mut node = new_node(name, dimension);
+        if ModelFormat::of(&texture).is_ok() {
+            if dimension == ProjectDimension::TwoD {
+                return None;
+            }
+            node.transform_3d = Some(Transform3D {
+                position: parent.1.inverse()?.transform_point(world),
+                ..Transform3D::IDENTITY
+            });
+            node.model = Some(ModelNode { file: texture });
+            return Some(node);
+        }
         match dimension {
             ProjectDimension::TwoD => {
                 let position = parent
@@ -105,8 +119,8 @@ pub(super) fn drop_point(ray: Ray, dimension: ProjectDimension) -> Vec3 {
 mod tests {
     use super::*;
 
-    fn drop(path: &str, aspect: Option<f32>) -> ImageDrop {
-        ImageDrop {
+    fn drop(path: &str, aspect: Option<f32>) -> AssetDrop {
+        AssetDrop {
             path: path.to_owned(),
             aspect,
         }
@@ -157,6 +171,32 @@ mod tests {
         let mesh = node.mesh.unwrap();
         assert_eq!(mesh.shape, MeshShape::Plane { size: Vec2::ONE });
         assert!(mesh.texture.is_some());
+    }
+
+    #[test]
+    fn models_become_model_nodes_in_three_d_only() {
+        let model = drop("chars/knight.glb", None);
+        let place = Vec3::new(1.0, 0.0, 2.0);
+
+        let node = model
+            .node(
+                "knight".to_owned(),
+                ProjectDimension::ThreeD,
+                place,
+                NO_PARENT,
+            )
+            .unwrap();
+
+        assert_eq!(node.transform_3d.unwrap().position, place);
+        assert_eq!(node.model.unwrap().file.as_str(), "chars/knight.glb");
+        assert_eq!(node.mesh, None);
+        let flat = model.node(
+            "knight".to_owned(),
+            ProjectDimension::TwoD,
+            place,
+            NO_PARENT,
+        );
+        assert!(flat.is_none());
     }
 
     #[test]

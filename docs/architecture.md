@@ -838,6 +838,14 @@ scene's history (`history::KeyframeFiles`), so one undo goes back through
 scene and animation changes in order, and saving the scene writes the
 files that changed since they were read or written.
 
+3D models (`.glb`, `.gltf`, decision 83) are assets of their own kind:
+dragged onto the scene of a 3D project they become a node with a
+`[node.model]` where they land (`dropping.rs`, whose `AssetDrop` carries
+images and models), the inspector's “Model” section chooses its file and
+“Add component” gives one, and the view draws every part of it
+(`SceneGpu::model`, read and uploaded once per file through
+`star_render::upload_model`, which the engine uses too).
+
 The **states editor** (`states_editor/`, decision 81) opens a `.states`
 file, made from Create > State machine (one state, `idle`), in a tab of its
 own. The middle draws its graph on a canvas that pans and zooms as the

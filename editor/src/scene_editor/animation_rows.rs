@@ -14,10 +14,10 @@ use star_engine::star_scene::{FrameClip, SpriteFrames, SpriteOutline};
 
 use crate::texts;
 
-/// The `.frames`, `.anim` and `.states` files of the assets folder, to
-/// choose from.
+/// The `.frames`, `.anim` and `.states` files and the 3D models of the
+/// assets folder, to choose from.
 #[derive(Clone, Copy)]
-pub(crate) struct AnimationFiles<'files> {
+pub(crate) struct AssetFiles<'files> {
     /// The assets folder.
     pub(crate) folder: &'files Path,
     /// The `.frames` files, for sprites, as paths inside it.
@@ -27,9 +27,11 @@ pub(crate) struct AnimationFiles<'files> {
     /// The `.states` files, for animators' state machines, as paths
     /// inside it.
     pub(crate) states: &'files [String],
+    /// The 3D models (`.glb`, `.gltf`), for `Model` nodes.
+    pub(crate) models: &'files [String],
 }
 
-impl AnimationFiles<'_> {
+impl AssetFiles<'_> {
     /// The animations of the file at `path`; `None` if it cannot be read
     /// (the reason is logged).
     fn read(&self, path: &AssetPath) -> Option<SpriteFrames> {
@@ -46,7 +48,7 @@ impl AnimationFiles<'_> {
 pub(super) fn animation_rows(
     ui: &mut egui::Ui,
     sprite: &mut SpriteOutline,
-    files: AnimationFiles<'_>,
+    files: AssetFiles<'_>,
 ) -> bool {
     let mut changed = frames_row(ui, sprite, files);
     if sprite.frames.is_some() {
@@ -55,7 +57,7 @@ pub(super) fn animation_rows(
     changed
 }
 
-fn frames_row(ui: &mut egui::Ui, sprite: &mut SpriteOutline, files: AnimationFiles<'_>) -> bool {
+fn frames_row(ui: &mut egui::Ui, sprite: &mut SpriteOutline, files: AssetFiles<'_>) -> bool {
     let texts = texts::current();
     ui.weak(texts.animations())
         .on_hover_text(texts.animations_hint());
@@ -99,11 +101,7 @@ fn frames_row(ui: &mut egui::Ui, sprite: &mut SpriteOutline, files: AnimationFil
     true
 }
 
-fn starting_clip_row(
-    ui: &mut egui::Ui,
-    sprite: &mut SpriteOutline,
-    files: AnimationFiles<'_>,
-) -> bool {
+fn starting_clip_row(ui: &mut egui::Ui, sprite: &mut SpriteOutline, files: AssetFiles<'_>) -> bool {
     let texts = texts::current();
     ui.weak(texts.starting_clip());
     let mut changed = false;

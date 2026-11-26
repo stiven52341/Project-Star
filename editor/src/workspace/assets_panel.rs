@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use eframe::egui;
 use star_engine::prelude::AssetPath;
-use star_engine::star_assets::ImageFormat;
+use star_engine::star_assets::{ImageFormat, ModelFormat};
 
 use super::asset_actions::{AssetActions, Choice, Outcome, Target};
 use super::asset_files::NewAsset;
@@ -21,7 +21,7 @@ use crate::project::{
     ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, FRAMES_EXTENSION, KEYFRAMES_EXTENSION, ProjectDimension,
     SCENE_EXTENSION, SCRIPT_EXTENSION, STATES_EXTENSION, read_main_scene, set_main_scene,
 };
-use crate::scene_editor::{ClassDrop, ImageDrop};
+use crate::scene_editor::{AssetDrop, ClassDrop};
 use crate::style::ERROR_COLOR;
 use crate::texts;
 
@@ -123,6 +123,9 @@ pub(crate) struct AssetsPanel {
     keyframes: Vec<String>,
     /// The `.states` files among the contents, as paths inside the folder.
     states: Vec<String>,
+    /// The 3D models (`.glb`, `.gltf`) among the contents, as paths inside
+    /// the folder.
+    models: Vec<String>,
     /// Naming files and asking before deleting them.
     actions: AssetActions,
     /// The size of the icons, in percent.
@@ -146,6 +149,7 @@ impl AssetsPanel {
             animations: paths_ending_with(&contents, FRAMES_EXTENSION),
             keyframes: paths_ending_with(&contents, KEYFRAMES_EXTENSION),
             states: paths_ending_with(&contents, STATES_EXTENSION),
+            models: model_paths(&contents),
             thumbnails: Thumbnails::new(&directory),
             directory,
             contents,
@@ -180,6 +184,7 @@ impl AssetsPanel {
         self.animations = paths_ending_with(&self.contents, FRAMES_EXTENSION);
         self.keyframes = paths_ending_with(&self.contents, KEYFRAMES_EXTENSION);
         self.states = paths_ending_with(&self.contents, STATES_EXTENSION);
+        self.models = model_paths(&self.contents);
         self.thumbnails.clear();
     }
 
@@ -205,6 +210,12 @@ impl AssetsPanel {
     /// when it was last listed.
     pub(crate) fn states(&self) -> &[String] {
         &self.states
+    }
+
+    /// The 3D models of the folder, as paths inside it, as they were when
+    /// it was last listed.
+    pub(crate) fn models(&self) -> &[String] {
+        &self.models
     }
 
     /// The folder it lists.
@@ -385,7 +396,7 @@ impl AssetsPanel {
     /// name follow the pointer.
     fn show_dragged_image(&mut self, ui: &egui::Ui) {
         let ctx = ui.ctx();
-        let Some(image) = egui::DragAndDrop::payload::<ImageDrop>(ctx) else {
+        let Some(image) = egui::DragAndDrop::payload::<AssetDrop>(ctx) else {
             return;
         };
         let Some(cursor) = ctx.pointer_latest_pos() else {
@@ -461,8 +472,8 @@ impl AssetsPanel {
             .then(|| self.thumbnails.get(ui.ctx(), &entry.path))
             .flatten()
             .map(|texture| (texture.id(), texture.size_vec2()));
-        if entry.kind == AssetKind::Image {
-            response.dnd_set_drag_payload(ImageDrop {
+        if matches!(entry.kind, AssetKind::Image | AssetKind::Model) {
+            response.dnd_set_drag_payload(AssetDrop {
                 path: entry.path.clone(),
                 aspect: thumbnail.map(|(_, size)| size.x / size.y),
             });
@@ -688,6 +699,21 @@ fn create_menu(ui: &mut egui::Ui, dimension: ProjectDimension, choice: &mut Opti
 }
 
 /// The paths of the images among `contents`.
+/// The 3D models of `contents`, as paths inside the assets folder.
+fn model_paths(contents: &io::Result<Vec<FileNode>>) -> Vec<String> {
+    let Ok(nodes) = contents else {
+        return Vec::new();
+    };
+    file_paths(nodes)
+        .into_iter()
+        .filter(|path| {
+            AssetPath::new(path)
+                .and_then(|path| ModelFormat::of(&path))
+                .is_ok()
+        })
+        .collect()
+}
+
 fn image_paths(contents: &io::Result<Vec<FileNode>>) -> Vec<String> {
     let Ok(nodes) = contents else {
         return Vec::new();

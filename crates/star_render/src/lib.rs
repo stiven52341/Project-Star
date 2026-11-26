@@ -24,6 +24,7 @@ mod material;
 mod mesh;
 mod mesh_data;
 mod mesh_pipeline;
+mod model_mesh;
 mod renderer;
 mod scene_renderer;
 mod sprite;
@@ -50,6 +51,7 @@ pub use mesh_data::{
     DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MAX_SPHERE_DIVISIONS, MIN_SPHERE_RINGS,
     MIN_SPHERE_SEGMENTS, MeshData, MeshShape, MeshVertex,
 };
+pub use model_mesh::{ModelMeshPart, upload_model};
 pub use renderer::{Renderer, RendererConfig};
 pub use sprite::{Sprite, SpriteSheet, TextureRegion};
 pub use star_core::Image;

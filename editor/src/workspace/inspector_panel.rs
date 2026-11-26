@@ -9,7 +9,7 @@ use crate::drag_drop::released;
 use star_script::semantic::ClassTable;
 
 use crate::project::Project;
-use crate::scene_editor::{AnimationFiles, ClassDrop, SceneDocument};
+use crate::scene_editor::{AssetFiles, ClassDrop, SceneDocument};
 use crate::style::{PROPERTY_SPACING, property_row};
 use crate::texts;
 
@@ -25,7 +25,7 @@ pub(crate) fn show_inspector(
     project: &Project,
     mut scene: Option<&mut SceneDocument>,
     images: &[String],
-    animations: AnimationFiles<'_>,
+    animations: AssetFiles<'_>,
     classes: Option<&ClassTable>,
 ) {
     let area = ui.max_rect();
