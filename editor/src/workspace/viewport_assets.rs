@@ -6,8 +6,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use star_engine::prelude::{AssetFolder, AssetPath, Mesh3dId, MeshShape, TextureFilter, TextureId};
+use star_engine::star_scene::ShownModel;
 use star_render::interop::OffscreenRenderer;
-use star_render::{ModelMeshPart, upload_model};
+use star_render::upload_model;
 
 use crate::scene_editor::SceneGpu;
 
@@ -17,7 +18,7 @@ pub(crate) struct ViewportAssets {
     folder: AssetFolder,
     textures: Vec<(AssetPath, TextureFilter, Option<TextureId>)>,
     meshes: Vec<(MeshShape, Option<Mesh3dId>)>,
-    models: Vec<(AssetPath, Option<Arc<[ModelMeshPart]>>)>,
+    models: Vec<(AssetPath, Option<Arc<ShownModel>>)>,
 }
 
 impl ViewportAssets {
@@ -82,13 +83,13 @@ impl SceneGpu for Loader<'_> {
         mesh
     }
 
-    fn model(&mut self, file: &AssetPath) -> Option<Arc<[ModelMeshPart]>> {
-        if let Some((_, parts)) = self.assets.models.iter().find(|(read, _)| read == file) {
-            return parts.clone();
+    fn model(&mut self, file: &AssetPath) -> Option<Arc<ShownModel>> {
+        if let Some((_, shown)) = self.assets.models.iter().find(|(read, _)| read == file) {
+            return shown.clone();
         }
         // Both closures need the renderer, one after the other.
         let renderer = std::cell::RefCell::new(&mut *self.renderer);
-        let parts = self
+        let shown = self
             .assets
             .folder
             .load_model(file)
@@ -102,11 +103,11 @@ impl SceneGpu for Loader<'_> {
                     },
                     |mesh| renderer.borrow_mut().create_mesh_3d(mesh),
                 )
+                .map(|parts| Arc::new(ShownModel::new(&model, parts)))
             })
-            .map(Arc::from)
             .inspect_err(|error| log::warn!("{error}"))
             .ok();
-        self.assets.models.push((file.clone(), parts.clone()));
-        parts
+        self.assets.models.push((file.clone(), shown.clone()));
+        shown
     }
 }

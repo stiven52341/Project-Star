@@ -247,7 +247,13 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   draw up to `MAX_JOINTS` (128) joint matrices, uploaded into one slot per
   skinned draw of a uniform buffer and picked with a dynamic offset, as the
   draws' own uniforms are (every backend, OpenGL included, runs it); the
-  surface shader's `vs_skinned` mixes them by the weights.
+  surface shader's `vs_skinned` mixes them by the weights. A model is
+  posed in `star_scene` (`model_pose.rs`, no GPU): each joint where the
+  `ClipAt`s of a node's `ModelPose` put it (channels sampled between their
+  keys, rotations the short way round, clips mixed by their weights) or at
+  rest, then each joint's matrix down the skeleton times its inverse bind
+  matrix; `ShownModel::draw` (engine and editor alike) draws the skinned
+  parts with those matrices and the others where the model puts them.
   Bones are an optional `[node.bone]` (`length`, 0.5 if left out) on 2D
   nodes (decision 82); the editor draws each one as a diamond from its
   node along its rotation, picks it by clicking it, and starts the nodes

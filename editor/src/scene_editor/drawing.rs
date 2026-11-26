@@ -11,10 +11,10 @@ use star_engine::prelude::{
 };
 use star_engine::star_assets::AssetPath;
 use star_engine::star_platform::WindowConfig;
-use star_engine::star_render::ModelMeshPart;
 use star_engine::star_scene::{
     Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, LightNode, NodeOutline, SpriteOutline,
 };
+use star_engine::star_scene::{ModelDrawing, ShownModel};
 
 use super::body_drawing::{BodyMarks, draw_body_2d, draw_body_3d};
 
@@ -41,8 +41,8 @@ const CAMERA_PYRAMID_DEPTH: f32 = 1.0;
 pub(crate) trait SceneGpu {
     fn texture(&mut self, path: &AssetPath, filter: TextureFilter) -> Option<TextureId>;
     fn mesh(&mut self, unit: MeshShape) -> Option<Mesh3dId>;
-    /// The parts of the 3D model of `file`, read and uploaded once.
-    fn model(&mut self, file: &AssetPath) -> Option<Arc<[ModelMeshPart]>>;
+    /// The 3D model of `file`, read and uploaded once.
+    fn model(&mut self, file: &AssetPath) -> Option<Arc<ShownModel>>;
 }
 
 /// The line meshes that mark the node selected, made once by the view.
@@ -298,13 +298,13 @@ fn draw_mesh(node: &NodeOutline, global: Mat4, gpu: &mut impl SceneGpu, frame: &
 }
 
 /// Every part of the model `node` shows, if it shows one, placed at
-/// `global`.
+/// `global` and at rest: the editor plays no animations.
 fn draw_model(node: &NodeOutline, global: Mat4, gpu: &mut impl SceneGpu, frame: &mut Frame) {
-    let Some(parts) = node.model.as_ref().and_then(|model| gpu.model(&model.file)) else {
+    let Some(model) = node.model.as_ref().and_then(|model| gpu.model(&model.file)) else {
         return;
     };
-    for part in parts.iter() {
-        frame.draw_mesh_3d(part.mesh, part.material, global * part.transform);
+    if let Err(error) = model.draw(global, &[], &mut ModelDrawing::default(), frame) {
+        log::warn!("{error}");
     }
 }
 
@@ -644,13 +644,20 @@ mod tests {
             Some(Mesh3dId::from_index(self.meshes.len()))
         }
 
-        fn model(&mut self, file: &AssetPath) -> Option<Arc<[ModelMeshPart]>> {
-            let part = ModelMeshPart {
+        fn model(&mut self, file: &AssetPath) -> Option<Arc<ShownModel>> {
+            let part = star_engine::star_render::ModelMeshPart {
                 mesh: Mesh3dId::from_index(0),
                 material: Material::default(),
                 transform: Mat4::IDENTITY,
+                skinned: false,
             };
-            (file.as_str() == "knight.glb").then(|| Arc::from(vec![part, part]))
+            (file.as_str() == "knight.glb").then(|| {
+                Arc::new(ShownModel {
+                    parts: vec![part, part],
+                    skeleton: None,
+                    animations: Vec::new(),
+                })
+            })
         }
     }
 

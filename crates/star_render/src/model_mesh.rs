@@ -13,8 +13,11 @@ pub struct ModelMeshPart {
     pub mesh: Mesh3dId,
     /// How its surface looks.
     pub material: Material,
-    /// Where it is in the model: drawn at `node's matrix × transform`.
+    /// Where it is in the model: drawn at `node's matrix × transform`,
+    /// unless it is skinned.
     pub transform: Mat4,
+    /// Whether the model's skeleton bends it (then its joints place it).
+    pub skinned: bool,
 }
 
 /// Uploads the images of `model` with `texture` and its meshes with
@@ -51,6 +54,7 @@ pub fn upload_model(
                     roughness: part.material.roughness,
                 },
                 transform: Mat4::from_columns(part.transform),
+                skinned: part.skinned,
             })
         })
         .collect()

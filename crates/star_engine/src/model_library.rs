@@ -6,31 +6,32 @@ use std::sync::Arc;
 
 use star_assets::{AssetFolder, AssetPath};
 use star_core::{EngineResult, Model};
-use star_render::{ModelMeshPart as ShownPart, Renderer, TextureFilter, upload_model};
+use star_render::{Renderer, TextureFilter, upload_model};
+use star_scene::ShownModel;
 
 /// Remembers the models already uploaded, and those that failed, so a
 /// model is read once and a broken file warns once.
 #[derive(Debug, Default)]
 pub(crate) struct ModelLibrary {
-    loaded: HashMap<AssetPath, Option<Arc<[ShownPart]>>>,
+    loaded: HashMap<AssetPath, Option<Arc<ShownModel>>>,
 }
 
 impl ModelLibrary {
-    /// The parts of the model at `path` of `folder`, read and given to
-    /// `upload` the first time; `None` if it cannot be (warned once).
+    /// The model at `path` of `folder`, read and given to `upload` the
+    /// first time; `None` if it cannot be (warned once).
     pub(crate) fn load(
         &mut self,
         folder: &AssetFolder,
         path: &AssetPath,
-        upload: impl FnOnce(&Model) -> EngineResult<Vec<ShownPart>>,
-    ) -> Option<Arc<[ShownPart]>> {
+        upload: impl FnOnce(&Model) -> EngineResult<ShownModel>,
+    ) -> Option<Arc<ShownModel>> {
         if let Some(known) = self.loaded.get(path) {
             return known.clone();
         }
         let parts = folder
             .load_model(path)
             .and_then(|model| upload(&model))
-            .map(Arc::from)
+            .map(Arc::new)
             .inspect_err(|error| log::warn!("Cannot show the model \"{path}\": {error}"))
             .ok();
         self.loaded.insert(path.clone(), parts.clone());
@@ -43,10 +44,10 @@ impl ModelLibrary {
 /// # Errors
 ///
 /// Why a mesh or an image could not be uploaded.
-pub(crate) fn upload_to(renderer: &mut Renderer, model: &Model) -> EngineResult<Vec<ShownPart>> {
+pub(crate) fn upload_to(renderer: &mut Renderer, model: &Model) -> EngineResult<ShownModel> {
     // Both closures need the renderer, one after the other.
     let renderer = std::cell::RefCell::new(renderer);
-    upload_model(
+    let parts = upload_model(
         model,
         |image| {
             renderer
@@ -54,7 +55,8 @@ pub(crate) fn upload_to(renderer: &mut Renderer, model: &Model) -> EngineResult<
                 .create_texture(image, TextureFilter::Smooth)
         },
         |mesh| renderer.borrow_mut().create_mesh_3d(mesh),
-    )
+    )?;
+    Ok(ShownModel::new(model, parts))
 }
 
 #[cfg(test)]

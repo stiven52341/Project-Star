@@ -1374,7 +1374,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
             and Add component > Model, drawn in the view and the camera
             preview; models are picked as plain 3D nodes, by their
             position.
-    - [ ] 15f.3 3D skinned meshes: a model's skeleton moving its mesh on
+    - [x] 15f.3 3D skinned meshes: a model's skeleton moving its mesh on
           the GPU. Agreed with the owner (2026-11-26): the joints stay
           inside the model (they are not nodes of the scene), and the
           model's animations are played by an `Animator` whose
@@ -1385,7 +1385,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
             from glTF into `star_core::Model`.
       - [x] 15f.3b Skinning on the GPU: a skinned variant of the 3D
             pipeline, with each draw's joint matrices.
-      - [ ] 15f.3c The engine poses a model: its joints from the rest pose
+      - [x] 15f.3c The engine poses a model: its joints from the rest pose
             or from animations at times and weights, and draws its skinned
             parts with them.
     - [ ] 15f.4 A model's animations played by an `Animator` (and its

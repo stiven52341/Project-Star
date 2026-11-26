@@ -9,7 +9,8 @@ use star_ecs::World;
 use star_math::Mat4;
 use star_render::{Frame, Mesh3dId, MeshShape, Renderer, TextureFilter, TextureId};
 use star_scene::{
-    GlobalTransform2D, GlobalTransform3D, ModelNode, Scene, SceneAssets, SpriteNode, is_shown,
+    GlobalTransform2D, GlobalTransform3D, ModelDrawing, ModelNode, ModelPose, Scene, SceneAssets,
+    SpriteNode, is_shown,
 };
 
 use crate::mesh_file::MeshFile;
@@ -27,6 +28,8 @@ pub(crate) struct GameAssets {
     /// Every shape's mesh, built once; few shapes are used, so a list.
     meshes: Vec<(MeshShape, Mesh3dId)>,
     models: ModelLibrary,
+    /// Where posed models are worked out, kept between frames.
+    model_drawing: ModelDrawing,
 }
 
 impl GameAssets {
@@ -38,6 +41,7 @@ impl GameAssets {
             sounds: SoundLibrary::default(),
             meshes: Vec::new(),
             models: ModelLibrary::default(),
+            model_drawing: ModelDrawing::default(),
         }
     }
 
@@ -165,11 +169,16 @@ impl GameAssets {
             if !is_shown(world, entity) {
                 return;
             }
-            let parts = self
+            let Some(model) = self
                 .models
-                .load(&self.folder, &node.file, |model| upload_to(renderer, model));
-            for part in parts.iter().flat_map(|parts| parts.iter()) {
-                frame.draw_mesh_3d(part.mesh, part.material, global.matrix() * part.transform);
+                .load(&self.folder, &node.file, |model| upload_to(renderer, model))
+            else {
+                return;
+            };
+            let pose = world.get::<ModelPose>(entity);
+            let clips = pose.as_ref().map_or(&[][..], |pose| pose.clips.as_slice());
+            if let Err(error) = model.draw(global.matrix(), clips, &mut self.model_drawing, frame) {
+                log::warn!("the model \"{}\" is not drawn whole: {error}", node.file);
             }
         })
     }
