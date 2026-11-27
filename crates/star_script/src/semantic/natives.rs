@@ -125,6 +125,8 @@ pub(super) const INPUT_POINTER_METHODS: [(&str, Type); 3] = [
 pub const DEBUG_CLASS: &str = "Debug";
 /// `Debug.print`, which takes a `string` or a number.
 pub const PRINT_METHOD: &str = "print";
+/// `Debug.show_fps`, which shows or hides the frames per second.
+pub const SHOW_FPS_METHOD: &str = "show_fps";
 
 /// Whether `method` of the class `class` is `Debug.print`.
 #[must_use]
@@ -147,6 +149,12 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     debug.methods.push(native_method(
         PRINT_METHOD,
         &[("message", Type::String)],
+        Type::Void,
+        true,
+    ));
+    debug.methods.push(native_method(
+        SHOW_FPS_METHOD,
+        &[("shown", Type::Bool)],
         Type::Void,
         true,
     ));

@@ -18,6 +18,7 @@ pub mod color;
 mod equality;
 mod fault;
 mod field;
+pub mod fps;
 pub mod game;
 pub mod input;
 mod list;

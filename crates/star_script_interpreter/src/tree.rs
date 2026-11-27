@@ -413,6 +413,8 @@ pub(crate) enum EngineMethod {
     Volume,
     /// `Audio.set_volume(volume)`.
     SetVolume,
+    /// `Debug.show_fps(shown)`.
+    ShowFps,
 }
 
 /// The shape a static method of `Body` makes a body of.

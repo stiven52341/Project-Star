@@ -26,6 +26,7 @@ class MeshGame extends Game {
     var landed = 0
 
     override func start() {
+        Debug.show_fps(true)
         const floor = Mesh("Floor", "cube")
         floor.scale_x = 10.0
         floor.scale_z = 10.0

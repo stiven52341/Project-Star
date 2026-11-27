@@ -1493,7 +1493,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
             over everything in a pass of their own.
       - [x] b. `star_engine`: the counter, its font and the overlay, F3,
             `App::with_fps_shown`.
-      - [ ] c. StarScript `Debug.show_fps(shown: bool)`, compiled and
+      - [x] c. StarScript `Debug.show_fps(shown: bool)`, compiled and
             interpreted.
       - [ ] d. `show_fps` in `project.toml`, honored by Play, Play
             compiled and exported games, and the Project menu.

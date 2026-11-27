@@ -297,6 +297,7 @@ fn with_receiver(receiver: String, arguments: &str) -> String {
 fn native_call(class: &str, method: &str, arguments: &str) -> Option<String> {
     match (class, method) {
         ("Debug", "print") => Some(format!("{RUNTIME}::print(&({arguments}))")),
+        ("Debug", "show_fps") => Some(format!("{RUNTIME}::fps::show_fps({arguments})")),
         ("Scene", "load" | "find_by_name" | "find_by_tag") => {
             Some(format!("crate::classes::Scene::{method}({arguments})"))
         }

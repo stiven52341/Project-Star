@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use star_engine::EngineWorld as _;
+use star_engine::FpsDisplay;
 use star_engine::app::App;
 use star_engine::game::{Game, GameContext};
 use star_engine::script_nodes::ScriptNodes;
@@ -105,6 +106,11 @@ impl<H: Host, S: FnMut(f32) + 'static> Game for EngineGame<H, S> {
         star_script_runtime::tasks::frame_started(delta);
         star_script_runtime::game::run_frame::<H>(&self.game, delta, &mut self.nodes);
         star_script_runtime::tasks::resume();
+        if let Some(shown) = star_script_runtime::fps::take_request()
+            && let Some(mut display) = world.resource_mut::<FpsDisplay>()
+        {
+            display.shown = shown;
+        }
         mirror_nodes::<H>(world, &mut self.mirror, &root, &mut self.pending);
     }
 

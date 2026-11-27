@@ -38,6 +38,8 @@ const BODY_CLASS: &str = "Body";
 const SOUND_CLASS: &str = "Sound";
 /// The engine class with the volume of every sound.
 const AUDIO_CLASS: &str = "Audio";
+/// The engine class that prints and shows the frames per second.
+const DEBUG_CLASS: &str = "Debug";
 
 /// How a method is called on its object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -614,6 +616,7 @@ pub(super) fn static_method(class: &str, name: &str) -> Option<EngineMethod> {
         (SOUND_CLASS, "load") => EngineMethod::LoadSound,
         (AUDIO_CLASS, "volume") => EngineMethod::Volume,
         (AUDIO_CLASS, "set_volume") => EngineMethod::SetVolume,
+        (DEBUG_CLASS, "show_fps") => EngineMethod::ShowFps,
         _ => return None,
     })
 }

@@ -1,5 +1,6 @@
 // `Debug.print` writes texts, and numbers of every type as their
-// `to_string` writes them.
+// `to_string` writes them. `Debug.show_fps` asks for the frames per second,
+// which a console program does not show.
 class Main {
     const LIVES = 3
 
@@ -8,6 +9,7 @@ class Main {
     }
 
     static func main() {
+        Debug.show_fps(true)
         Debug.print("text")
         Debug.print(42)
         Debug.print(-7 as short)

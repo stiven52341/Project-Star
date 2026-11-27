@@ -468,6 +468,10 @@ pub(super) fn call(method: EngineMethod, arguments: &[Value]) -> Result<Value, R
             audio::set_volume(float(volume)?);
             Value::Null
         }
+        (EngineMethod::ShowFps, [Value::Bool(shown)]) => {
+            star_script_runtime::fps::show_fps(*shown);
+            Value::Null
+        }
         _ => return Err(RunError::Internal("engine method with other arguments")),
     })
 }
