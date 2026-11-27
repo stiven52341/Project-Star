@@ -835,6 +835,12 @@ pub(super) fn game_entry_point(
     settings: &GameSettings,
 ) {
     action_declarations(out, &settings.actions);
+    let sound_groups: Vec<String> = settings
+        .sound_groups
+        .iter()
+        .map(|(group, volume)| format!("({group:?}.to_owned(), {volume:?}_f32)"))
+        .collect();
+    let sound_groups = sound_groups.join(", ");
     let fps_shown = match settings.show_fps {
         ShowFps::Editor => "::star_engine::app::played_from_editor()",
         ShowFps::Always => "true",
@@ -859,7 +865,8 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
     let app_ = ::star_engine::app::App::new()
         .with_title({title})
         .with_actions(actions_)
-        .with_fps_shown({fps_shown});
+        .with_fps_shown({fps_shown})
+        .with_sound_groups(::std::vec![{sound_groups}]);
     {SCRIPT_ENGINE}::game::run::<crate::classes::Host_>(app_, &ACTION_NAMES_, || {{
         let game_: crate::classes::Game::Ref = {new_game};
         ::std::result::Result::Ok(game_)

@@ -129,7 +129,8 @@ fn play_game(
         .with_title(program.title().unwrap_or_default())
         .with_actions(action_map)
         .with_asset_folder(project.assets_folder())
-        .with_fps_shown(fps_shown);
+        .with_fps_shown(fps_shown)
+        .with_sound_groups(project.settings().sound_groups.clone());
     // A runtime error while the game is created is the game's, not the
     // engine's: it is printed as a compiled game prints it.
     let mut failed_start = None;

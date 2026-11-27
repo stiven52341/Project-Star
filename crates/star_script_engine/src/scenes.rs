@@ -97,6 +97,7 @@ fn scene_node(node: NodeOutline) -> SceneNode {
             volume: player.volume,
             looping: player.looping,
             play_on_start: player.play_on_start,
+            group: player.group.clone().unwrap_or_default(),
         }),
         bone: node.bone.map(|bone| SceneBone {
             length: bone.length,

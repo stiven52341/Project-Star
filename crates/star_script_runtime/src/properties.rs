@@ -35,6 +35,7 @@ pub fn set_property<H: Host>(node: &H::Node, name: &str, value: &SceneValue) -> 
                 "volume" => Some(set_float(&player.volume, name, value)),
                 "looping" => Some(set_bool(&player.looping, name, value)),
                 "play_on_start" => Some(set_bool(&player.play_on_start, name, value)),
+                "group" => Some(set_text(&player.group, name, value)),
                 _ => None,
             })
             .flatten()
@@ -88,6 +89,7 @@ pub fn property<H: Host>(node: &H::Node, name: &str) -> Result<SceneValue, Strin
                 "volume" => Some(float(&player.volume)),
                 "looping" => Some(SceneValue::Bool(player.looping.get())),
                 "play_on_start" => Some(SceneValue::Bool(player.play_on_start.get())),
+                "group" => Some(SceneValue::Text(player.group.get())),
                 _ => None,
             })
             .flatten()

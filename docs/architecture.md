@@ -440,6 +440,16 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   the runtime's audio backend instead: the frame a player starts, before
   its `start()`, if it plays on start; `remove()` stops the sounds of the
   players under the node. Scenes give StarScript a `SceneSoundPlayer`.
+- **Groups of sounds** (decision 87): a `Mixer` keeps up to `MAX_GROUPS`
+  (32) named groups, each with a volume (`Mixer::group`, `group_volume`,
+  `set_group_volume`; `Audio` the same); a voice played with
+  `PlaySettings::group` is scaled by its group's volume, then the master
+  one. Players (`[node.sound_player] group = "music"`), StarScript's
+  `Sound` and `SoundPlayer` (`group`) play in a group;
+  `Audio.set_group_volume` changes one. `[audio.groups]` of
+  `project.toml` (`music = 0.8`) gives the volumes groups start at
+  (`GameSettings::sound_groups`, `App::with_sound_groups`, for compiled
+  games, “Play” and exported games alike).
 
 ## Physics
 

@@ -416,6 +416,7 @@ pub(super) fn engine_field(class: &str, field: &str) -> Option<EngineField> {
         ("Model", "file") => EngineField::ModelFile,
         ("SoundPlayer", "sound") => EngineField::SoundFile,
         ("SoundPlayer", "play_on_start") => EngineField::PlayOnStart,
+        ("Sound" | "SoundPlayer", "group") => EngineField::SoundGroup,
         ("Node", "body") => EngineField::Body,
         ("Node3D", "z") => EngineField::Z,
         ("Node3D", "pitch") => EngineField::Pitch,

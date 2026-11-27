@@ -15,6 +15,16 @@ struct ScriptSettingsFile {
     project: ProjectSection,
     #[serde(default)]
     input: InputSection,
+    #[serde(default)]
+    audio: AudioSection,
+}
+
+/// `[audio]`
+#[derive(Debug, Default, Deserialize)]
+struct AudioSection {
+    /// `[audio.groups]`: `music = 0.8`, the volume each group starts at.
+    #[serde(default)]
+    groups: BTreeMap<String, f32>,
 }
 
 /// `[project]`: only what scripts need of it.
@@ -71,16 +81,38 @@ pub fn read_game_settings(text: &str) -> Result<GameSettings, String> {
         .project
         .main_scene
         .map(|path| MainScene { path, title });
+    if let Some((group, volume)) = file
+        .audio
+        .groups
+        .iter()
+        .find(|(_, volume)| !(volume.is_finite() && **volume >= 0.0))
+    {
+        return Err(format!(
+            "the sound group \"{group}\" cannot start at a volume of {volume}"
+        ));
+    }
     Ok(GameSettings {
         actions,
         main_scene,
         show_fps,
+        sound_groups: file.audio.groups.into_iter().collect(),
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sound_groups_start_at_their_volume() {
+        let settings = read_game_settings("[audio.groups]\nmusic = 0.5\neffects = 1.0\n").unwrap();
+
+        assert_eq!(
+            settings.sound_groups,
+            [("effects".to_owned(), 1.0), ("music".to_owned(), 0.5)]
+        );
+        assert!(read_game_settings("[audio.groups]\nmusic = -1.0\n").is_err());
+    }
 
     #[test]
     fn the_fps_are_shown_as_the_project_says() {

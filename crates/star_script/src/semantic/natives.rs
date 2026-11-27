@@ -208,13 +208,7 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     add_scene_class(classes, node);
 
     add_sound_class(classes);
-    // The volume every sound is scaled by.
-    let mut audio = ClassInfo::new(AUDIO_CLASS.to_owned(), ClassOrigin::Native);
-    audio.methods = vec![
-        native_method("volume", &[], Type::Float, true),
-        native_method("set_volume", &[("volume", Type::Float)], Type::Void, true),
-    ];
-    classes.add(audio);
+    add_audio_class(classes);
 
     // What coroutines wait for (seconds of the game, or the next frame),
     // and the game's clock.
@@ -625,6 +619,7 @@ fn add_sound_player_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
         native_field("volume", Type::Float),
         native_field("looping", Type::Bool),
         native_field("play_on_start", Type::Bool),
+        native_field("group", Type::String),
     ];
     player.constructor = Some(native_constructor(&[
         ("name", Type::String),
@@ -732,11 +727,35 @@ fn add_camera_3d_class(classes: &mut ClassTable, node_3d: ClassId) -> ClassId {
 /// `Sound`: a sound file of the asset folder, loaded with `Sound.load`
 /// (there is no `init`). Each `play` starts it once more, at its `volume`,
 /// looping if `looping`; `stop` stops every playing it started.
+/// `Audio`: the volume every sound is scaled by, and those of the groups
+/// of sounds (decision 87).
+fn add_audio_class(classes: &mut ClassTable) {
+    let mut audio = ClassInfo::new(AUDIO_CLASS.to_owned(), ClassOrigin::Native);
+    audio.methods = vec![
+        native_method("volume", &[], Type::Float, true),
+        native_method("set_volume", &[("volume", Type::Float)], Type::Void, true),
+        native_method(
+            "group_volume",
+            &[("group", Type::String)],
+            Type::Float,
+            true,
+        ),
+        native_method(
+            "set_group_volume",
+            &[("group", Type::String), ("volume", Type::Float)],
+            Type::Void,
+            true,
+        ),
+    ];
+    classes.add(audio);
+}
+
 fn add_sound_class(classes: &mut ClassTable) -> ClassId {
     let mut sound = ClassInfo::new(SOUND_CLASS.to_owned(), ClassOrigin::Native);
     sound.fields = vec![
         native_field("volume", Type::Float),
         native_field("looping", Type::Bool),
+        native_field("group", Type::String),
     ];
     sound.constructor = Some(ConstructorInfo {
         parameters: Vec::new(),

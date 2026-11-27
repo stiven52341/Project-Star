@@ -21,6 +21,9 @@ pub struct SoundPlayerNode {
     pub looping: bool,
     /// Whether it plays as soon as the node appears.
     pub play_on_start: bool,
+    /// The group of sounds whose volume also scales it (music, effects…),
+    /// if any.
+    pub group: Option<String>,
 }
 
 impl SoundPlayerNode {
@@ -32,6 +35,7 @@ impl SoundPlayerNode {
             volume: DEFAULT_PLAYER_VOLUME,
             looping: false,
             play_on_start: true,
+            group: None,
         }
     }
 }
@@ -47,6 +51,8 @@ pub(crate) struct SoundPlayerData {
     looping: bool,
     #[serde(default = "playing_on_start", skip_serializing_if = "is_true")]
     play_on_start: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    group: Option<String>,
 }
 
 const fn playing_on_start() -> bool {
@@ -91,6 +97,7 @@ impl SoundPlayerData {
             volume,
             looping: self.looping,
             play_on_start: self.play_on_start,
+            group: self.group.clone().filter(|group| !group.is_empty()),
         })
     }
 
@@ -102,6 +109,7 @@ impl SoundPlayerData {
             volume,
             looping: player.looping,
             play_on_start: player.play_on_start,
+            group: player.group.clone(),
         }
     }
 }
@@ -153,6 +161,7 @@ mod tests {
 
         player.volume = 0.25;
         player.play_on_start = false;
+        player.group = Some("effects".to_owned());
         let text = toml::to_string(&SoundPlayerData::from_player(&player)).unwrap();
 
         assert_eq!(

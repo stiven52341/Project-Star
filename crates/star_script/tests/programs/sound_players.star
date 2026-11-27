@@ -1,5 +1,5 @@
-// Sound players in a console program: their sound, volume, looping and
-// play on start, changed by the script. Without a game nothing is heard,
+// Sound players in a console program: their sound, volume, looping, play
+// on start and group, changed by the script. Without a game nothing is heard,
 // so they never count as playing.
 class Music extends SoundPlayer {
     init() {
@@ -21,5 +21,9 @@ class Main {
         hit.sound = "sounds/punch.wav"
         music.add_child(hit)
         Debug.print(hit.sound + " " + hit.play_on_start.to_string() + " in " + (hit.parent()?.name ?? "nothing"))
+        hit.group = "effects"
+        Audio.set_group_volume("effects", 0.5)
+        // Without a game the groups are not kept: every one is at full volume.
+        Debug.print(music.group + "|" + hit.group + " " + Audio.group_volume("effects").to_string())
     }
 }

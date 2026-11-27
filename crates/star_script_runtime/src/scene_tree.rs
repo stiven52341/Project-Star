@@ -332,6 +332,7 @@ fn sound<H: Host>(object: &H::Node, node: &SceneNode, class: &str) -> Result<(),
         fields.volume.set(player.volume);
         fields.looping.set(player.looping);
         fields.play_on_start.set(player.play_on_start);
+        fields.group.set(player.group.clone());
     })
     .ok_or_else(|| format!("it plays a sound, but `{class}` is not a `SoundPlayer`"))
 }

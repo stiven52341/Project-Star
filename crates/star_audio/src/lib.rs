@@ -15,6 +15,6 @@ mod voice;
 
 pub use audio::Audio;
 pub use audio_output::AudioOutput;
-pub use mixer::{MAX_VOICES, Mixer, VoiceId};
+pub use mixer::{GroupId, MAX_GROUPS, MAX_VOICES, Mixer, VoiceId};
 pub use output_format::OutputFormat;
 pub use voice::PlaySettings;

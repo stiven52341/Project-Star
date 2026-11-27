@@ -5,6 +5,7 @@ use std::sync::Arc;
 use star_core::Sound;
 
 use crate::OutputFormat;
+use crate::mixer::GroupId;
 
 /// How a sound is played.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -14,6 +15,9 @@ pub struct PlaySettings {
     pub volume: f32,
     /// Whether the sound starts again when it ends (music, engines…).
     pub looping: bool,
+    /// The group whose volume also scales it (see [`Mixer::group`](crate::Mixer::group)),
+    /// if any.
+    pub group: Option<GroupId>,
 }
 
 impl Default for PlaySettings {
@@ -21,6 +25,7 @@ impl Default for PlaySettings {
         Self {
             volume: 1.0,
             looping: false,
+            group: None,
         }
     }
 }
@@ -45,6 +50,7 @@ pub(crate) struct Voice {
     step: f64,
     volume: f32,
     looping: bool,
+    group: Option<GroupId>,
 }
 
 impl Voice {
@@ -56,11 +62,17 @@ impl Voice {
             step,
             volume: sanitized_volume(settings.volume),
             looping: settings.looping,
+            group: settings.group,
         }
     }
 
     pub(crate) fn set_volume(&mut self, volume: f32) {
         self.volume = sanitized_volume(volume);
+    }
+
+    /// The group whose volume scales it, if any.
+    pub(crate) const fn group(&self) -> Option<GroupId> {
+        self.group
     }
 
     /// Adds this voice to the interleaved `output`, scaled by `master`

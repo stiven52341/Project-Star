@@ -50,6 +50,10 @@ impl SoundPlayers {
                     let settings = PlaySettings {
                         volume: player.volume,
                         looping: player.looping,
+                        group: player
+                            .group
+                            .as_deref()
+                            .and_then(|group| audio.group(group).ok()),
                     };
                     load(player)
                         .and_then(|sound| audio.play(sound, settings))

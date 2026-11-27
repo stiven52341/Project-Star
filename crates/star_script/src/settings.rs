@@ -56,7 +56,7 @@ impl ShowFps {
 }
 
 /// Project settings that change how scripts are compiled.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct GameSettings {
     /// The input actions of the game.
     pub actions: Vec<InputAction>,
@@ -64,6 +64,9 @@ pub struct GameSettings {
     pub main_scene: Option<MainScene>,
     /// When the game shows its frames per second from the start.
     pub show_fps: ShowFps,
+    /// The groups of sounds and their volumes when the game starts
+    /// (decision 87), by name.
+    pub sound_groups: Vec<(String, f32)>,
 }
 
 impl GameSettings {

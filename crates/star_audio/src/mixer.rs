@@ -11,6 +11,14 @@ use crate::voice::{PlaySettings, Voice, sanitized_volume};
 /// starting one never allocates while the output is being filled.
 pub const MAX_VOICES: usize = 128;
 
+/// Most groups a mixer keeps: music, effects, voices… a game has a few.
+pub const MAX_GROUPS: usize = 32;
+
+/// A group of sounds whose volume is changed together (decision 87):
+/// music, effects… made by [`Mixer::group`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct GroupId(usize);
+
 /// Names a sound started by [`Mixer::play`], to change or stop it later.
 /// Ids are never reused, so an old id never names a newer sound.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -40,6 +48,8 @@ pub struct Mixer {
     voices: Vec<(VoiceId, Voice)>,
     next_id: u64,
     volume: f32,
+    /// Each group's name and volume, by its id.
+    groups: Vec<(String, f32)>,
 }
 
 impl Mixer {
@@ -51,6 +61,7 @@ impl Mixer {
             voices: Vec::with_capacity(MAX_VOICES),
             next_id: 0,
             volume: 1.0,
+            groups: Vec::with_capacity(MAX_GROUPS),
         }
     }
 
@@ -126,6 +137,49 @@ impl Mixer {
         self.volume = sanitized_volume(volume);
     }
 
+    /// The group called `name`, made at full volume the first time.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EngineError::CapacityExceeded`] if [`MAX_GROUPS`] groups
+    /// already exist.
+    pub fn group(&mut self, name: &str) -> EngineResult<GroupId> {
+        if let Some(index) = self.groups.iter().position(|(group, _)| group == name) {
+            return Ok(GroupId(index));
+        }
+        if self.groups.len() >= MAX_GROUPS {
+            return Err(EngineError::CapacityExceeded {
+                resource: "audio groups",
+            });
+        }
+        self.groups.push((name.to_owned(), 1.0));
+        Ok(GroupId(self.groups.len() - 1))
+    }
+
+    /// The volume of the group called `name`: 1 for a group never made.
+    #[must_use]
+    pub fn group_volume(&self, name: &str) -> f32 {
+        self.groups
+            .iter()
+            .find(|(group, _)| group == name)
+            .map_or(1.0, |(_, volume)| *volume)
+    }
+
+    /// Changes the volume of the group called `name`, which scales the
+    /// sounds played in it (see [`PlaySettings::volume`]); the group is
+    /// made if it does not exist yet.
+    ///
+    /// # Errors
+    ///
+    /// As [`Mixer::group`].
+    pub fn set_group_volume(&mut self, name: &str, volume: f32) -> EngineResult<()> {
+        let GroupId(index) = self.group(name)?;
+        if let Some((_, group_volume)) = self.groups.get_mut(index) {
+            *group_volume = sanitized_volume(volume);
+        }
+        Ok(())
+    }
+
     /// Fills `output`, interleaved by the format's channels, with the next
     /// samples of every sound; sounds that end are forgotten. Samples are
     /// kept from -1 to 1, so loud mixes clip instead of overflowing.
@@ -133,8 +187,14 @@ impl Mixer {
         output.fill(0.0);
         let channels = self.format.channels();
         let volume = self.volume;
-        self.voices
-            .retain_mut(|(_, voice)| voice.mix_into(output, channels, volume));
+        let groups = &self.groups;
+        self.voices.retain_mut(|(_, voice)| {
+            let group = voice
+                .group()
+                .and_then(|GroupId(index)| groups.get(index))
+                .map_or(1.0, |(_, group_volume)| *group_volume);
+            voice.mix_into(output, channels, volume * group)
+        });
         for sample in output.iter_mut() {
             *sample = sample.clamp(-1.0, 1.0);
         }
@@ -224,6 +284,38 @@ mod tests {
 
         assert_eq!(mixed(&mut mixer, 1), [0.2]);
         assert!((mixer.volume() - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn groups_scale_the_sounds_played_in_them() {
+        let mut mixer = mixer();
+        let music = mixer.group("music").unwrap();
+        mixer.set_group_volume("music", 0.5).unwrap();
+        let settings = PlaySettings {
+            group: Some(music),
+            ..PlaySettings::default()
+        };
+        mixer.play(sound(vec![0.4; 4]), settings).unwrap();
+        mixer
+            .play(sound(vec![0.1; 4]), PlaySettings::default())
+            .unwrap();
+
+        let out = mixed(&mut mixer, 1);
+
+        assert!((out[0] - 0.3).abs() < 1e-6, "{out:?}");
+        assert_eq!(mixer.group("music").unwrap(), music, "one group per name");
+        assert!((mixer.group_volume("music") - 0.5).abs() < f32::EPSILON);
+        assert!((mixer.group_volume("voices") - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn a_mixer_keeps_a_few_groups() {
+        let mut mixer = mixer();
+        for index in 0..MAX_GROUPS {
+            mixer.group(&index.to_string()).unwrap();
+        }
+
+        assert!(mixer.group("one too many").is_err());
     }
 
     #[test]

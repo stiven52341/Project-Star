@@ -191,6 +191,7 @@ fn class_slot(class: &ClassParts, field: EngineField) -> Option<Slot<'_>> {
             EngineField::Volume => Some(Slot::Float(&player.volume)),
             EngineField::Looping => Some(Slot::Bool(&player.looping)),
             EngineField::PlayOnStart => Some(Slot::Bool(&player.play_on_start)),
+            EngineField::SoundGroup => Some(Slot::Text(&player.group)),
             _ => None,
         },
         ClassParts::Bone2D(bone) => match field {
@@ -297,6 +298,7 @@ fn sound_slot(sound: &SoundFields, field: EngineField) -> Option<Slot<'_>> {
     Some(match field {
         EngineField::Volume => Slot::Float(&sound.volume),
         EngineField::Looping => Slot::Bool(&sound.looping),
+        EngineField::SoundGroup => Slot::Text(&sound.group),
         _ => return None,
     })
 }
@@ -479,6 +481,11 @@ pub(super) fn call(method: EngineMethod, arguments: &[Value]) -> Result<Value, R
         (EngineMethod::Volume, []) => Value::Float(audio::volume()),
         (EngineMethod::SetVolume, [volume]) => {
             audio::set_volume(float(volume)?);
+            Value::Null
+        }
+        (EngineMethod::GroupVolume, [group]) => Value::Float(audio::group_volume(text(group)?)),
+        (EngineMethod::SetGroupVolume, [group, volume]) => {
+            audio::set_group_volume(text(group)?, float(volume)?);
             Value::Null
         }
         (EngineMethod::ShowFps, [Value::Bool(shown)]) => {

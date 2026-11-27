@@ -42,6 +42,7 @@ pub struct App {
     gravity: Vec2,
     platform: TargetPlatform,
     fps_shown: bool,
+    sound_groups: Vec<(String, f32)>,
 }
 
 impl App {
@@ -59,6 +60,7 @@ impl App {
             gravity: DEFAULT_GRAVITY,
             platform: TargetPlatform::current(),
             fps_shown: false,
+            sound_groups: Vec::new(),
         }
     }
 
@@ -68,6 +70,14 @@ impl App {
     #[must_use]
     pub const fn with_fps_shown(mut self, shown: bool) -> Self {
         self.fps_shown = shown;
+        self
+    }
+
+    /// Starts each group of sounds of `groups` (a name and a volume) at its
+    /// volume (decision 87).
+    #[must_use]
+    pub fn with_sound_groups(mut self, groups: Vec<(String, f32)>) -> Self {
+        self.sound_groups = groups;
         self
     }
 
@@ -231,6 +241,11 @@ impl App {
         let audio = audio_output
             .as_ref()
             .map_or_else(Audio::silent, AudioOutput::audio);
+        for (group, volume) in &self.sound_groups {
+            if let Err(error) = audio.set_group_volume(group, *volume) {
+                log::warn!("The sound group \"{group}\" starts at full volume: {error}");
+            }
+        }
         let mut world = engine_world(input, audio, self.gravity);
         world.insert_resource(crate::FpsDisplay {
             shown: self.fps_shown,

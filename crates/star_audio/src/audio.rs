@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use star_core::{EngineResult, Sound};
 
-use crate::{Mixer, OutputFormat, PlaySettings, VoiceId};
+use crate::{GroupId, Mixer, OutputFormat, PlaySettings, VoiceId};
 
 /// Plays sounds on the game's audio output. Copies share the same output,
 /// so systems and the game can each keep one.
@@ -83,6 +83,31 @@ impl Audio {
     /// Changes the volume of the sound `id`; nothing happens if it ended.
     pub fn set_voice_volume(&self, id: VoiceId, volume: f32) {
         self.mixer().set_voice_volume(id, volume);
+    }
+
+    /// The group called `name` (see [`Mixer::group`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`Mixer::group`].
+    pub fn group(&self, name: &str) -> EngineResult<GroupId> {
+        self.mixer().group(name)
+    }
+
+    /// The volume of the group called `name` (see [`Mixer::group_volume`]).
+    #[must_use]
+    pub fn group_volume(&self, name: &str) -> f32 {
+        self.mixer().group_volume(name)
+    }
+
+    /// Changes the volume of the group called `name` (see
+    /// [`Mixer::set_group_volume`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`Mixer::group`].
+    pub fn set_group_volume(&self, name: &str, volume: f32) -> EngineResult<()> {
+        self.mixer().set_group_volume(name, volume)
     }
 
     /// The volume every sound is scaled by.

@@ -618,6 +618,8 @@ pub(super) fn static_method(class: &str, name: &str) -> Option<EngineMethod> {
         (SOUND_CLASS, "load") => EngineMethod::LoadSound,
         (AUDIO_CLASS, "volume") => EngineMethod::Volume,
         (AUDIO_CLASS, "set_volume") => EngineMethod::SetVolume,
+        (AUDIO_CLASS, "group_volume") => EngineMethod::GroupVolume,
+        (AUDIO_CLASS, "set_group_volume") => EngineMethod::SetGroupVolume,
         (DEBUG_CLASS, "show_fps") => EngineMethod::ShowFps,
         _ => return None,
     })

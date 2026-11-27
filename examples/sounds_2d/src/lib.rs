@@ -65,6 +65,7 @@ impl SoundsGame {
         let settings = PlaySettings {
             volume: MUSIC_VOLUME,
             looping: true,
+            ..PlaySettings::default()
         };
         match audio.play(Arc::clone(music), settings) {
             Ok(melody) => self.melody = Some(melody),

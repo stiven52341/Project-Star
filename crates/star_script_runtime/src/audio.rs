@@ -32,13 +32,23 @@ pub trait AudioBackend {
     /// The reason, for the warning the game writes.
     fn load(&mut self, path: &str) -> Result<SoundId, String>;
 
-    /// Starts playing `sound` at `volume` (1 as recorded), again and again
-    /// if `looping`.
+    /// Starts playing `sound` as `how` says.
     ///
     /// # Errors
     ///
     /// The reason it cannot play now (too many sounds at once).
-    fn play(&mut self, sound: SoundId, volume: f32, looping: bool) -> Result<VoiceId, String>;
+    fn play(&mut self, sound: SoundId, how: Playing<'_>) -> Result<VoiceId, String>;
+
+    /// The volume of the group of sounds called `group`: 1 for one never
+    /// changed.
+    fn group_volume(&self, group: &str) -> f32;
+
+    /// Changes the volume of the group of sounds called `group`.
+    ///
+    /// # Errors
+    ///
+    /// The reason it cannot (too many groups).
+    fn set_group_volume(&mut self, group: &str, volume: f32) -> Result<(), String>;
 
     /// Stops `voice`, if it still plays.
     fn stop(&mut self, voice: VoiceId);
@@ -51,6 +61,17 @@ pub trait AudioBackend {
 
     /// Changes the volume every sound is scaled by.
     fn set_volume(&mut self, volume: f32);
+}
+
+/// How a sound is played.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Playing<'a> {
+    /// 1 as recorded, 0 silent.
+    pub volume: f32,
+    /// Whether it starts again when it ends.
+    pub looping: bool,
+    /// The group of sounds whose volume also scales it; empty for none.
+    pub group: &'a str,
 }
 
 /// Master volume while no backend is set.
@@ -96,20 +117,17 @@ pub fn load(path: &str) -> Option<SoundId> {
     loaded
 }
 
-/// Starts playing `sound`; `None` if it cannot play now (the reason is
-/// written to the error output).
+/// Starts playing `sound` as `how` says; `None` if it cannot play now
+/// (the reason is written to the error output).
 #[must_use]
-pub fn play(sound: SoundId, volume: f32, looping: bool) -> Option<VoiceId> {
-    with_backend(
-        |backend| backend.play(sound, volume, looping),
-        || Err(String::new()),
-    )
-    .inspect_err(|reason| {
-        if !reason.is_empty() {
-            warn(&format!("cannot play a sound: {reason}"));
-        }
-    })
-    .ok()
+pub fn play(sound: SoundId, how: Playing<'_>) -> Option<VoiceId> {
+    with_backend(|backend| backend.play(sound, how), || Err(String::new()))
+        .inspect_err(|reason| {
+            if !reason.is_empty() {
+                warn(&format!("cannot play a sound: {reason}"));
+            }
+        })
+        .ok()
 }
 
 /// Stops `voice`, if it still plays.
@@ -121,6 +139,25 @@ pub fn stop(voice: VoiceId) {
 #[must_use]
 pub fn is_playing(voice: VoiceId) -> bool {
     with_backend(|backend| backend.is_playing(voice), || false)
+}
+
+/// `Audio.group_volume`: the volume of the group of sounds `group`.
+#[must_use]
+pub fn group_volume(group: impl AsRef<str>) -> f32 {
+    let group = group.as_ref();
+    with_backend(|backend| backend.group_volume(group), || DEFAULT_VOLUME)
+}
+
+/// `Audio.set_group_volume`: changes the volume of the group of sounds
+/// `group`.
+pub fn set_group_volume(group: impl AsRef<str>, volume: f32) {
+    let group = group.as_ref();
+    let changed = with_backend(|backend| backend.set_group_volume(group, volume), || Ok(()));
+    if let Err(reason) = changed {
+        warn(&format!(
+            "cannot change the volume of the group \"{group}\": {reason}"
+        ));
+    }
 }
 
 /// The volume every sound is scaled by.
@@ -141,6 +178,9 @@ pub struct SoundFields {
     pub volume: Field<f32>,
     /// `looping`
     pub looping: Field<bool>,
+    /// `group`: the group of sounds whose volume also scales it; empty for
+    /// none.
+    pub group: Field<String>,
     sound: SoundId,
     voices: RefCell<Vec<VoiceId>>,
 }
@@ -154,6 +194,7 @@ impl SoundFields {
         Some(Self {
             volume: Field::new(DEFAULT_VOLUME),
             looping: Field::new(false),
+            group: Field::new(String::new()),
             sound: load(path)?,
             voices: RefCell::new(Vec::new()),
         })
@@ -163,7 +204,17 @@ impl SoundFields {
     pub fn play(&self) {
         let mut voices = self.voices.borrow_mut();
         voices.retain(|voice| is_playing(*voice));
-        if let Some(voice) = play(self.sound, self.volume.get(), self.looping.get()) {
+        let voice = self.group.read(|group| {
+            play(
+                self.sound,
+                Playing {
+                    volume: self.volume.get(),
+                    looping: self.looping.get(),
+                    group,
+                },
+            )
+        });
+        if let Some(voice) = voice {
             voices.push(voice);
         }
     }
@@ -229,7 +280,16 @@ mod tests {
             }
         }
 
-        fn play(&mut self, _: SoundId, _: f32, _: bool) -> Result<VoiceId, String> {
+        fn group_volume(&self, _: &str) -> f32 {
+            self.volume
+        }
+
+        fn set_group_volume(&mut self, _: &str, volume: f32) -> Result<(), String> {
+            self.volume = volume;
+            Ok(())
+        }
+
+        fn play(&mut self, _: SoundId, _: Playing<'_>) -> Result<VoiceId, String> {
             let voice = VoiceId(self.next_voice);
             self.next_voice += 1;
             self.playing.push(voice);
@@ -257,7 +317,12 @@ mod tests {
     fn without_a_game_nothing_loads_or_plays() {
         // Each test runs on its own thread, so no backend is set here.
         assert_eq!(load("sounds/jump.wav"), None);
-        assert_eq!(play(SoundId(0), 1.0, false), None);
+        let how = Playing {
+            volume: 1.0,
+            looping: false,
+            group: "",
+        };
+        assert_eq!(play(SoundId(0), how), None);
         assert!(!is_playing(VoiceId(0)));
         assert!((volume() - DEFAULT_VOLUME).abs() < f32::EPSILON);
     }
@@ -285,7 +350,12 @@ mod tests {
         set_backend(FakeBackend::default());
         let sound = load("sounds/jump.wav").unwrap();
 
-        let voice = play(sound, 1.0, true).unwrap();
+        let how = Playing {
+            volume: 1.0,
+            looping: true,
+            group: "",
+        };
+        let voice = play(sound, how).unwrap();
         assert!(is_playing(voice));
 
         stop(voice);

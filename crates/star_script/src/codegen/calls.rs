@@ -309,6 +309,10 @@ fn native_call(class: &str, method: &str, arguments: &str) -> Option<String> {
         ("Body", "box") => Some(format!("crate::classes::Body::box_({arguments})")),
         ("Audio", "volume") => Some(format!("{RUNTIME}::audio::volume()")),
         ("Audio", "set_volume") => Some(format!("{RUNTIME}::audio::set_volume({arguments})")),
+        ("Audio", "group_volume") => Some(format!("{RUNTIME}::audio::group_volume({arguments})")),
+        ("Audio", "set_group_volume") => {
+            Some(format!("{RUNTIME}::audio::set_group_volume({arguments})"))
+        }
         ("Time", "wait") => Some(format!("{RUNTIME}::tasks::wait({arguments})")),
         ("Time", "now") => Some(format!("{RUNTIME}::tasks::now()")),
         ("Time", "delta") => Some(format!("{RUNTIME}::tasks::delta()")),

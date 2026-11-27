@@ -301,6 +301,8 @@ pub(crate) enum EngineField {
     SoundFile,
     /// `play_on_start` of `SoundPlayer`.
     PlayOnStart,
+    /// `group` of `Sound` and `SoundPlayer`: the group of sounds it plays in.
+    SoundGroup,
     /// `body` of `Node`.
     Body,
     /// `view_height` and `main` of `Camera2D` (`main` of `Camera3D` too).
@@ -422,6 +424,9 @@ pub(crate) enum EngineMethod {
     SetVolume,
     /// `Debug.show_fps(shown)`.
     ShowFps,
+    /// `Audio.group_volume(group)` and `Audio.set_group_volume(group, volume)`.
+    GroupVolume,
+    SetGroupVolume,
 }
 
 /// The shape a static method of `Body` makes a body of.

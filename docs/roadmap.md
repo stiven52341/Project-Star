@@ -1526,6 +1526,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       - [ ] c. Groups and a mixer: groups of sounds (music, effects…)
             with their volume, in a mixer tab; each sound and player
             belongs to one; StarScript `Audio.set_group_volume`.
+        - [x] c1. Groups in the mixer, players, StarScript (`group`,
+              `Audio.group_volume`, `set_group_volume`, compiled and
+              interpreted) and `[audio.groups]` of `project.toml`.
+        - [ ] c2. The editor: the mixer tab and a player's group.
       - [ ] d. 2D and 3D sound: players sound quieter with their distance
             to the camera (between a near and a far distance), and from
             the left or the right.

@@ -6,7 +6,7 @@
 use std::cell::Cell;
 
 use crate::Field;
-use crate::audio::{VoiceId, is_playing, load, play, stop};
+use crate::audio::{Playing, VoiceId, is_playing, load, play, stop};
 use crate::nodes::Host;
 
 /// The volume of a new player: as recorded.
@@ -22,6 +22,9 @@ pub struct SoundPlayerFields {
     pub looping: Field<bool>,
     /// `play_on_start`: whether it plays when it starts.
     pub play_on_start: Field<bool>,
+    /// `group`: the group of sounds whose volume also scales it; empty for
+    /// none.
+    pub group: Field<String>,
     voice: Cell<Option<VoiceId>>,
 }
 
@@ -34,6 +37,7 @@ impl SoundPlayerFields {
             volume: Field::new(DEFAULT_VOLUME),
             looping: Field::new(false),
             play_on_start: Field::new(true),
+            group: Field::new(String::new()),
             voice: Cell::new(None),
         }
     }
@@ -43,10 +47,18 @@ impl SoundPlayerFields {
     /// silent.
     pub fn play(&self) {
         self.stop();
-        let voice = self
-            .sound
-            .read(|path| load(path))
-            .and_then(|sound| play(sound, self.volume.get(), self.looping.get()));
+        let voice = self.sound.read(|path| load(path)).and_then(|sound| {
+            self.group.read(|group| {
+                play(
+                    sound,
+                    Playing {
+                        volume: self.volume.get(),
+                        looping: self.looping.get(),
+                        group,
+                    },
+                )
+            })
+        });
         self.voice.set(voice);
     }
 

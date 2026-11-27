@@ -220,6 +220,8 @@ pub struct SceneSoundPlayer {
     pub looping: bool,
     /// Whether it plays when it starts.
     pub play_on_start: bool,
+    /// The group of sounds it plays in; empty for none.
+    pub group: String,
 }
 
 /// The physics body of a [`SceneNode`], with the words and values of
