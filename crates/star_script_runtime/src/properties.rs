@@ -36,6 +36,9 @@ pub fn set_property<H: Host>(node: &H::Node, name: &str, value: &SceneValue) -> 
                 "looping" => Some(set_bool(&player.looping, name, value)),
                 "play_on_start" => Some(set_bool(&player.play_on_start, name, value)),
                 "group" => Some(set_text(&player.group, name, value)),
+                "spatial" => Some(set_bool(&player.spatial, name, value)),
+                "near" => Some(set_float(&player.near, name, value)),
+                "far" => Some(set_float(&player.far, name, value)),
                 _ => None,
             })
             .flatten()
@@ -90,6 +93,9 @@ pub fn property<H: Host>(node: &H::Node, name: &str) -> Result<SceneValue, Strin
                 "looping" => Some(SceneValue::Bool(player.looping.get())),
                 "play_on_start" => Some(SceneValue::Bool(player.play_on_start.get())),
                 "group" => Some(SceneValue::Text(player.group.get())),
+                "spatial" => Some(SceneValue::Bool(player.spatial.get())),
+                "near" => Some(float(&player.near)),
+                "far" => Some(float(&player.far)),
                 _ => None,
             })
             .flatten()

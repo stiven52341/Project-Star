@@ -303,6 +303,10 @@ pub(crate) enum EngineField {
     PlayOnStart,
     /// `group` of `Sound` and `SoundPlayer`: the group of sounds it plays in.
     SoundGroup,
+    /// `spatial`, `near` and `far` of `SoundPlayer`.
+    Spatial,
+    Near,
+    Far,
     /// `body` of `Node`.
     Body,
     /// `view_height` and `main` of `Camera2D` (`main` of `Camera3D` too).

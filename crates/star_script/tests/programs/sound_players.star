@@ -1,5 +1,5 @@
 // Sound players in a console program: their sound, volume, looping, play
-// on start and group, changed by the script. Without a game nothing is heard,
+// on start, group and reach, changed by the script. Without a game nothing is heard,
 // so they never count as playing.
 class Music extends SoundPlayer {
     init() {
@@ -25,5 +25,8 @@ class Main {
         Audio.set_group_volume("effects", 0.5)
         // Without a game the groups are not kept: every one is at full volume.
         Debug.print(music.group + "|" + hit.group + " " + Audio.group_volume("effects").to_string())
+        hit.spatial = true
+        hit.far = 8.0
+        Debug.print(music.spatial.to_string() + " " + hit.spatial.to_string() + " " + hit.near.to_string() + " " + hit.far.to_string())
     }
 }

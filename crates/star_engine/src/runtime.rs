@@ -188,7 +188,9 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
         self.advance_time();
         self.reload_changed_assets();
         self.simulate()?;
-        self.assets.play_sound_players(&self.world)?;
+        // Heard from where the camera was last drawn from.
+        let camera = *self.frame.camera();
+        self.assets.play_sound_players(&self.world, &camera)?;
         self.frame.begin(self.clear_color);
         draw_sprite_nodes(&self.world, &mut self.frame)?;
         draw_3d_nodes(&self.world, &mut self.frame)?;

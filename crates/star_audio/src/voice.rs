@@ -30,6 +30,9 @@ impl Default for PlaySettings {
     }
 }
 
+/// The channels of a stereo output, the only one panned.
+const STEREO: u16 = 2;
+
 /// A volume the mixer can use: a finite number, at least 0.
 pub(crate) fn sanitized_volume(volume: f32) -> f32 {
     if volume.is_finite() && volume > 0.0 {
@@ -51,6 +54,8 @@ pub(crate) struct Voice {
     volume: f32,
     looping: bool,
     group: Option<GroupId>,
+    /// From -1 (only the left) to 1 (only the right), on stereo outputs.
+    pan: f32,
 }
 
 impl Voice {
@@ -63,11 +68,22 @@ impl Voice {
             volume: sanitized_volume(settings.volume),
             looping: settings.looping,
             group: settings.group,
+            pan: 0.0,
         }
     }
 
     pub(crate) fn set_volume(&mut self, volume: f32) {
         self.volume = sanitized_volume(volume);
+    }
+
+    /// Moves it to the left (-1) or the right (1) of a stereo output;
+    /// 0 is the middle, where it is as loud on both sides.
+    pub(crate) fn set_pan(&mut self, pan: f32) {
+        self.pan = if pan.is_finite() {
+            pan.clamp(-1.0, 1.0)
+        } else {
+            0.0
+        };
     }
 
     /// The group whose volume scales it, if any.
@@ -79,12 +95,19 @@ impl Voice {
     /// volume; returns whether the voice still has something to play.
     pub(crate) fn mix_into(&mut self, output: &mut [f32], channels: u16, master: f32) -> bool {
         let gain = self.volume * master;
+        // The side it leans to keeps its loudness, the other fades.
+        let sides = if channels == STEREO {
+            [(1.0 - self.pan).min(1.0), (1.0 + self.pan).min(1.0)]
+        } else {
+            [1.0, 1.0]
+        };
         for frame in output.chunks_exact_mut(usize::from(channels)) {
             if !self.is_playing() {
                 return false;
             }
             for (channel, sample) in (0..channels).zip(frame.iter_mut()) {
-                *sample += self.sample(channel, channels) * gain;
+                let side = sides.get(usize::from(channel)).copied().unwrap_or(1.0);
+                *sample += self.sample(channel, channels) * gain * side;
             }
             self.advance();
         }
@@ -308,5 +331,16 @@ mod tests {
 
         assert_eq!(output, [0.0, 0.0]);
         assert!(!playing);
+    }
+
+    #[test]
+    fn panned_voices_lean_to_one_side_of_stereo_outputs() {
+        let mut left = voice(sound(1, RATE, vec![0.5; 4]), PlaySettings::default(), 2);
+        left.set_pan(-1.0);
+        let mut half = voice(sound(1, RATE, vec![0.5; 4]), PlaySettings::default(), 2);
+        half.set_pan(0.5);
+
+        assert_eq!(mixed(&mut left, 1, 2).0, [0.5, 0.0]);
+        assert_eq!(mixed(&mut half, 1, 2).0, [0.25, 0.5]);
     }
 }

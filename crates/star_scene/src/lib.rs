@@ -67,7 +67,7 @@ pub use node_physics_3d::step_node_physics_3d;
 pub use scene::{Scene, SceneAssets, SceneSources};
 pub use scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
 pub use shown_model::{ModelDrawing, ShownModel};
-pub use sound_player_node::{DEFAULT_PLAYER_VOLUME, SoundPlayerNode};
+pub use sound_player_node::{DEFAULT_FAR, DEFAULT_NEAR, DEFAULT_PLAYER_VOLUME, SoundPlayerNode};
 pub use sprite_body::{SpriteLook, shaped_by_sprite};
 pub use sprite_frames::{DEFAULT_CLIP_SPEED, FRAMES_EXTENSION, FrameClip, SpriteFrames};
 pub use sprite_node::{SpriteNode, draw_sprite_nodes};

@@ -333,6 +333,10 @@ fn sound<H: Host>(object: &H::Node, node: &SceneNode, class: &str) -> Result<(),
         fields.looping.set(player.looping);
         fields.play_on_start.set(player.play_on_start);
         fields.group.set(player.group.clone());
+        fields.spatial.set(player.spatial);
+        let [near, far] = player.reach;
+        fields.near.set(near);
+        fields.far.set(far);
     })
     .ok_or_else(|| format!("it plays a sound, but `{class}` is not a `SoundPlayer`"))
 }

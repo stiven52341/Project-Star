@@ -5,10 +5,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use star_audio::{Audio, PlaySettings, VoiceId};
+use star_audio::{Audio, Listener, PlaySettings, Reach, VoiceId, hear};
 use star_core::{EngineResult, Sound};
 use star_ecs::{Entity, World};
-use star_scene::SoundPlayerNode;
+use star_math::Vec3;
+use star_render::Camera;
+use star_scene::{GlobalTransform2D, GlobalTransform3D, SoundPlayerNode};
 
 /// The players the engine has seen, and the sound each one plays.
 #[derive(Debug, Default)]
@@ -66,6 +68,54 @@ impl SoundPlayers {
             seen.insert(entity, voice);
         })
     }
+
+    /// Makes the sounds of the spatial players of `world` as `listener`
+    /// hears them from where their nodes are: quieter with the distance,
+    /// and from their side.
+    pub(crate) fn place(&self, world: &World, audio: &Audio, listener: &Listener) {
+        for (&entity, voice) in &self.seen {
+            let (Some(voice), Some(player)) = (voice, world.get::<SoundPlayerNode>(entity)) else {
+                continue;
+            };
+            if !player.spatial {
+                continue;
+            }
+            let Some(source) = position_of(world, entity) else {
+                continue;
+            };
+            let reach = Reach {
+                near: player.near,
+                far: player.far,
+            };
+            let (volume, pan) = hear(listener, source, reach);
+            audio.set_voice_volume(*voice, player.volume * volume);
+            audio.set_voice_pan(*voice, pan);
+        }
+    }
+}
+
+/// Where `entity` is in the world, if it is placed in 2D or 3D.
+fn position_of(world: &World, entity: Entity) -> Option<[f32; 3]> {
+    if let Some(global) = world.get::<GlobalTransform3D>(entity) {
+        let position = global.position();
+        return Some([position.x, position.y, position.z]);
+    }
+    let position = world.get::<GlobalTransform2D>(entity)?.position();
+    Some([position.x, position.y, 0.0])
+}
+
+/// Who hears the game: its camera, its right being the screen's.
+#[must_use]
+pub fn listener_of(camera: &Camera) -> Listener {
+    let ahead = camera.target - camera.position;
+    let right = ahead
+        .cross(Vec3::new(0.0, 1.0, 0.0))
+        .normalized()
+        .unwrap_or(Vec3::new(1.0, 0.0, 0.0));
+    Listener {
+        position: [camera.position.x, camera.position.y, camera.position.z],
+        right: [right.x, right.y, right.z],
+    }
 }
 
 #[cfg(test)]
@@ -115,5 +165,14 @@ mod tests {
 
         assert!(!players.seen.contains_key(&music), "its sound is stopped");
         assert!(players.seen.contains_key(&later));
+    }
+
+    #[test]
+    fn cameras_hear_with_the_screen_s_right() {
+        let flat = listener_of(&Camera::new_2d(10.0));
+        let turned = listener_of(&Camera::new_3d(Vec3::ZERO, Vec3::new(1.0, 0.0, 0.0)));
+
+        assert_eq!(flat.right, [1.0, 0.0, 0.0]);
+        assert!((turned.right[2] - 1.0).abs() < 1e-6, "{:?}", turned.right);
     }
 }

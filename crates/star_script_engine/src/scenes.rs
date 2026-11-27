@@ -98,6 +98,8 @@ fn scene_node(node: NodeOutline) -> SceneNode {
             looping: player.looping,
             play_on_start: player.play_on_start,
             group: player.group.clone().unwrap_or_default(),
+            spatial: player.spatial,
+            reach: [player.near, player.far],
         }),
         bone: node.bone.map(|bone| SceneBone {
             length: bone.length,

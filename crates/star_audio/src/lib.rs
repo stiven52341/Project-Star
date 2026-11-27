@@ -9,12 +9,14 @@
 
 mod audio;
 mod audio_output;
+mod hearing;
 mod mixer;
 mod output_format;
 mod voice;
 
 pub use audio::Audio;
 pub use audio_output::AudioOutput;
+pub use hearing::{Listener, Reach, hear};
 pub use mixer::{GroupId, MAX_GROUPS, MAX_VOICES, Mixer, VoiceId};
 pub use output_format::OutputFormat;
 pub use voice::PlaySettings;

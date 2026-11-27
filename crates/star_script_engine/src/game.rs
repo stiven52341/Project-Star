@@ -9,7 +9,8 @@ use star_engine::FpsDisplay;
 use star_engine::app::App;
 use star_engine::game::{Game, GameContext};
 use star_engine::script_nodes::ScriptNodes;
-use star_engine::star_audio::Audio;
+use star_engine::sound_players::listener_of;
+use star_engine::star_audio::{Audio, Reach, VoiceId, hear};
 use star_engine::star_core::EngineResult;
 use star_engine::star_ecs::World;
 use star_engine::star_render::{AmbientLight, Camera, Frame};
@@ -112,6 +113,7 @@ impl<H: Host, S: FnMut(f32) + 'static> Game for EngineGame<H, S> {
             display.shown = shown;
         }
         mirror_nodes::<H>(world, &mut self.mirror, &root, &mut self.pending);
+        self.place_sounds(world, &root);
     }
 
     fn draw(&self, world: &World, frame: &mut Frame) {
@@ -130,6 +132,20 @@ impl<H: Host, S: FnMut(f32) + 'static> Game for EngineGame<H, S> {
 }
 
 impl<H: Host, S> EngineGame<H, S> {
+    /// Makes the sounds of the spatial players under `root` heard from the
+    /// game's camera: quieter with their distance, and from their side.
+    fn place_sounds(&self, world: &World, root: &H::Node) {
+        let listener = listener_of(&self.view(world));
+        let audio = self.audio.borrow();
+        star_script_runtime::sound_players::spatial_voices::<H>(root, &mut |spatial| {
+            let [near, far] = spatial.reach;
+            let (volume, pan) = hear(&listener, spatial.position, Reach { near, far });
+            let voice = VoiceId::from_bits(spatial.voice.0);
+            audio.set_voice_volume(voice, spatial.volume * volume);
+            audio.set_voice_pan(voice, pan);
+        });
+    }
+
     /// The engine's camera that shows the game from its `camera_3d`, or
     /// else from its `camera`.
     fn view(&self, world: &World) -> Camera {

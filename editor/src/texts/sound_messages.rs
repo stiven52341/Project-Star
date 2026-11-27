@@ -14,6 +14,18 @@ impl Texts {
         self.pick("Stop", "Detener")
     }
 
+    pub(crate) const fn spatial_sound(&self) -> &'static str {
+        self.pick("Heard from where it is", "Se oye desde donde está")
+    }
+
+    pub(crate) const fn near_distance(&self) -> &'static str {
+        self.pick("Full volume within", "Volumen completo hasta")
+    }
+
+    pub(crate) const fn far_distance(&self) -> &'static str {
+        self.pick("Silent beyond", "En silencio desde")
+    }
+
     pub(crate) const fn mixer(&self) -> &'static str {
         self.pick("Mixer", "Mezclador")
     }

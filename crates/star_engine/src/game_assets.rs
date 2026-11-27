@@ -9,7 +9,7 @@ use star_core::{EngineResult, Sound};
 use star_ecs::{Entity, World};
 use star_math::Mat4;
 use star_physics::ShapeKind3d;
-use star_render::{Frame, Mesh3dId, MeshShape, Renderer, TextureFilter, TextureId};
+use star_render::{Camera, Frame, Mesh3dId, MeshShape, Renderer, TextureFilter, TextureId};
 use star_scene::{
     Body3D, CollisionMesh, GlobalTransform2D, GlobalTransform3D, MeshNode, ModelDrawing, ModelNode,
     ModelPose, Name, Scene, SceneAssets, SpriteNode, is_shown,
@@ -19,7 +19,7 @@ use crate::EngineWorld as _;
 use crate::mesh_file::MeshFile;
 use crate::model_library::{ModelLibrary, upload_to};
 use crate::sound_library::SoundLibrary;
-use crate::sound_players::SoundPlayers;
+use crate::sound_players::{SoundPlayers, listener_of};
 use crate::sprite_file::SpriteFile;
 use crate::texture_library::TextureLibrary;
 
@@ -93,7 +93,11 @@ impl GameAssets {
     ///
     /// [`EngineError::Ecs`](star_core::EngineError::Ecs) if a running query
     /// holds the players.
-    pub(crate) fn play_sound_players(&mut self, world: &World) -> EngineResult<()> {
+    pub(crate) fn play_sound_players(
+        &mut self,
+        world: &World,
+        camera: &Camera,
+    ) -> EngineResult<()> {
         let audio = world.audio();
         let Self {
             folder,
@@ -103,7 +107,9 @@ impl GameAssets {
         } = self;
         sound_players.update(world, &audio, |player| {
             sounds.load(folder, player.sound.clone())
-        })
+        })?;
+        sound_players.place(world, &audio, &listener_of(camera));
+        Ok(())
     }
 
     /// The sound at `path`, decoded the first time.

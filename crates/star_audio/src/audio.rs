@@ -85,6 +85,12 @@ impl Audio {
         self.mixer().set_voice_volume(id, volume);
     }
 
+    /// Moves the sound `id` to the left or the right (see
+    /// [`Mixer::set_voice_pan`]).
+    pub fn set_voice_pan(&self, id: VoiceId, pan: f32) {
+        self.mixer().set_voice_pan(id, pan);
+    }
+
     /// The group called `name` (see [`Mixer::group`]).
     ///
     /// # Errors

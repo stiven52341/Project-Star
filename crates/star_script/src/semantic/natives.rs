@@ -620,6 +620,9 @@ fn add_sound_player_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
         native_field("looping", Type::Bool),
         native_field("play_on_start", Type::Bool),
         native_field("group", Type::String),
+        native_field("spatial", Type::Bool),
+        native_field("near", Type::Float),
+        native_field("far", Type::Float),
     ];
     player.constructor = Some(native_constructor(&[
         ("name", Type::String),

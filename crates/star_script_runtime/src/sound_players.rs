@@ -11,6 +11,10 @@ use crate::nodes::Host;
 
 /// The volume of a new player: as recorded.
 const DEFAULT_VOLUME: f32 = 1.0;
+/// Within this distance a new spatial player is as loud as it plays.
+const DEFAULT_NEAR: f32 = 1.0;
+/// Beyond this distance a new spatial player is not heard.
+const DEFAULT_FAR: f32 = 20.0;
 
 /// The fields of a `SoundPlayer`, and the sound it plays.
 pub struct SoundPlayerFields {
@@ -25,6 +29,13 @@ pub struct SoundPlayerFields {
     /// `group`: the group of sounds whose volume also scales it; empty for
     /// none.
     pub group: Field<String>,
+    /// `spatial`: whether it is heard from where it is, quieter with its
+    /// distance to the camera and from its side.
+    pub spatial: Field<bool>,
+    /// `near`: within it, a spatial player is as loud as it plays.
+    pub near: Field<f32>,
+    /// `far`: beyond it, a spatial player is not heard.
+    pub far: Field<f32>,
     voice: Cell<Option<VoiceId>>,
 }
 
@@ -38,6 +49,9 @@ impl SoundPlayerFields {
             looping: Field::new(false),
             play_on_start: Field::new(true),
             group: Field::new(String::new()),
+            spatial: Field::new(false),
+            near: Field::new(DEFAULT_NEAR),
+            far: Field::new(DEFAULT_FAR),
             voice: Cell::new(None),
         }
     }
@@ -73,6 +87,39 @@ impl SoundPlayerFields {
     #[must_use]
     pub fn is_playing(&self) -> bool {
         self.voice.get().is_some_and(is_playing)
+    }
+}
+
+/// A spatial player playing its sound, for the game to make it heard from
+/// where it is.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpatialVoice {
+    /// The sound it plays.
+    pub voice: VoiceId,
+    /// Its `volume`.
+    pub volume: f32,
+    /// Its `near` and `far`.
+    pub reach: [f32; 2],
+    /// Where it is in the world.
+    pub position: [f32; 3],
+}
+
+/// Calls `visit` with each spatial player under `node`, itself included,
+/// that plays its sound.
+pub fn spatial_voices<H: Host>(node: &H::Node, visit: &mut impl FnMut(SpatialVoice)) {
+    H::with_sound_player(node, |player| {
+        let voice = player.voice.get().filter(|voice| is_playing(*voice));
+        if let (true, Some(voice)) = (player.spatial.get(), voice) {
+            visit(SpatialVoice {
+                voice,
+                volume: player.volume.get(),
+                reach: [player.near.get(), player.far.get()],
+                position: crate::nodes::heard_position::<H>(node),
+            });
+        }
+    });
+    for child in H::node(node).children().iter() {
+        spatial_voices::<H>(child, visit);
     }
 }
 

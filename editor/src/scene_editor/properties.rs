@@ -610,7 +610,14 @@ fn edit_sound_player(
     changed |= number_from_row(ui, texts.volume(), &mut player.volume, 0.0);
     changed |= checkbox_row(ui, texts.looping(), &mut player.looping);
     changed |= checkbox_row(ui, texts.play_on_start(), &mut player.play_on_start);
-    changed | group_row(ui, &mut player.group, assets)
+    changed |= group_row(ui, &mut player.group, assets);
+    changed |= checkbox_row(ui, texts.spatial_sound(), &mut player.spatial);
+    if player.spatial {
+        changed |= number_from_row(ui, texts.near_distance(), &mut player.near, 0.0);
+        let near = player.near;
+        changed |= number_from_row(ui, texts.far_distance(), &mut player.far, near);
+    }
+    changed
 }
 
 /// The group a player plays in, chosen among the groups of the project

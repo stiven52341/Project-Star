@@ -222,6 +222,10 @@ pub struct SceneSoundPlayer {
     pub play_on_start: bool,
     /// The group of sounds it plays in; empty for none.
     pub group: String,
+    /// Whether it is heard from where it is.
+    pub spatial: bool,
+    /// Its `near` and `far`.
+    pub reach: [f32; 2],
 }
 
 /// The physics body of a [`SceneNode`], with the words and values of

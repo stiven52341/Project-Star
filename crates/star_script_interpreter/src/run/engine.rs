@@ -192,6 +192,9 @@ fn class_slot(class: &ClassParts, field: EngineField) -> Option<Slot<'_>> {
             EngineField::Looping => Some(Slot::Bool(&player.looping)),
             EngineField::PlayOnStart => Some(Slot::Bool(&player.play_on_start)),
             EngineField::SoundGroup => Some(Slot::Text(&player.group)),
+            EngineField::Spatial => Some(Slot::Bool(&player.spatial)),
+            EngineField::Near => Some(Slot::Float(&player.near)),
+            EngineField::Far => Some(Slot::Float(&player.far)),
             _ => None,
         },
         ClassParts::Bone2D(bone) => match field {

@@ -450,6 +450,20 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   `project.toml` (`music = 0.8`) gives the volumes groups start at
   (`GameSettings::sound_groups`, `App::with_sound_groups`, for compiled
   games, “Play” and exported games alike).
+- **2D and 3D sound** (decision 87): a voice has a pan, from -1 (only the
+  left) to 1 (only the right) of a stereo output, the side it leans to
+  keeping its loudness (`Mixer::set_voice_pan`, `Audio` the same).
+  `star_audio::hear(listener, source, reach)` gives how a sound is heard:
+  as loud as it plays within `Reach::near`, silent beyond `far`, fading
+  linearly between them, and panned by how far it is along the
+  listener's right, over `far`. The listener is the camera
+  (`star_engine::sound_players::listener_of`: its position, and its right
+  across the screen). Spatial players (`spatial`, `near`, `far` in
+  `[node.sound_player]` and StarScript's `SoundPlayer`) are placed every
+  frame: the engine's from their node's global place and the last camera
+  drawn, StarScript's from `star_script_runtime::sound_players::spatial_voices`
+  (a player that is not a `Node3D` under `Node3D`s sounds from their 3D
+  space) and the game's camera.
 
 ## Physics
 

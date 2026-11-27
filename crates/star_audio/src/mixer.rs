@@ -126,6 +126,14 @@ impl Mixer {
         }
     }
 
+    /// Moves the sound `id` to the left (-1) or the right (1) of a stereo
+    /// output; nothing happens if it already ended.
+    pub fn set_voice_pan(&mut self, id: VoiceId, pan: f32) {
+        if let Some((_, voice)) = self.voices.iter_mut().find(|(voice_id, _)| *voice_id == id) {
+            voice.set_pan(pan);
+        }
+    }
+
     /// The volume every sound is scaled by.
     #[must_use]
     pub const fn volume(&self) -> f32 {

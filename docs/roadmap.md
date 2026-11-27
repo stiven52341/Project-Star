@@ -1511,7 +1511,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
             interpreted, a window game) and the physics of nodes.
       - [x] c. The editor: the images offered to sprites, “Create > 2D >
             Square / Circle”, the body's shape shown as the sprite's.
-    - [ ] An audio editor, to manage a project's sounds (after Unity's).
+    - [x] An audio editor, to manage a project's sounds (after Unity's).
           Plan agreed with the owner (2026-11-27, decision 87), in parts:
       - [x] a. A sound's tab: its waveform, length, channels and rate, and
             “Play” / “Stop” to hear it in the editor; the assets' menu
@@ -1530,7 +1530,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
               `Audio.group_volume`, `set_group_volume`, compiled and
               interpreted) and `[audio.groups]` of `project.toml`.
         - [x] c2. The editor: the mixer tab and a player's group.
-      - [ ] d. 2D and 3D sound: players sound quieter with their distance
+      - [x] d. 2D and 3D sound: players sound quieter with their distance
             to the camera (between a near and a far distance), and from
             the left or the right.
     - [ ] A sprite editor (after Godot's).

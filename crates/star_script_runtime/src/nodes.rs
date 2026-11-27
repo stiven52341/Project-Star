@@ -397,6 +397,18 @@ pub fn global_position<H: Host>(node: &H::Node) -> [f32; 3] {
     [x, y, 0.0]
 }
 
+/// Where `node` sounds from: as [`global_position`] says, but a node that
+/// is not a `Node3D` under `Node3D`s is placed in their 3D space, at their
+/// depth.
+#[must_use]
+pub fn heard_position<H: Host>(node: &H::Node) -> [f32; 3] {
+    if !is_3d::<H>(node) && ancestors::<H>(node).iter().any(is_3d::<H>) {
+        let fields = H::node(node);
+        return parent_place_3d::<H>(node).point([fields.x.get(), fields.y.get(), 0.0]);
+    }
+    global_position::<H>(node)
+}
+
 /// `func global_rotation`: how much the node is turned in the world: its
 /// `rotation` and those of its ancestors placed as it is (in 2D, or in 3D
 /// for a `Node3D`, where it is its roll).

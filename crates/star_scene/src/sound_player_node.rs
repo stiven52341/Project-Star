@@ -9,6 +9,11 @@ use star_core::{EngineError, EngineResult};
 
 /// The volume of a player that does not say: as recorded.
 pub const DEFAULT_PLAYER_VOLUME: f32 = 1.0;
+/// Within this distance a spatial player is as loud as it plays, in world
+/// units, unless it says.
+pub const DEFAULT_NEAR: f32 = 1.0;
+/// Beyond this distance a spatial player is not heard, unless it says.
+pub const DEFAULT_FAR: f32 = 20.0;
 
 /// Plays a sound at a node.
 #[derive(Debug, Clone, PartialEq)]
@@ -24,6 +29,13 @@ pub struct SoundPlayerNode {
     /// The group of sounds whose volume also scales it (music, effects…),
     /// if any.
     pub group: Option<String>,
+    /// Whether it is heard from where it is: quieter the farther it is from
+    /// the camera, and from its side.
+    pub spatial: bool,
+    /// Within this distance it is as loud as it plays.
+    pub near: f32,
+    /// Beyond this distance it is not heard.
+    pub far: f32,
 }
 
 impl SoundPlayerNode {
@@ -36,6 +48,9 @@ impl SoundPlayerNode {
             looping: false,
             play_on_start: true,
             group: None,
+            spatial: false,
+            near: DEFAULT_NEAR,
+            far: DEFAULT_FAR,
         }
     }
 }
@@ -53,6 +68,12 @@ pub(crate) struct SoundPlayerData {
     play_on_start: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     group: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    spatial: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    near: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    far: Option<f32>,
 }
 
 const fn playing_on_start() -> bool {
@@ -92,12 +113,22 @@ impl SoundPlayerData {
                 "the volume of a sound player cannot be {volume}"
             )));
         }
+        let near = self.near.unwrap_or(DEFAULT_NEAR);
+        let far = self.far.unwrap_or(DEFAULT_FAR);
+        if !(near.is_finite() && far.is_finite() && near >= 0.0 && far >= near) {
+            return Err(EngineError::Scene(format!(
+                "a sound player is heard from {near} to {far}, which is no reach"
+            )));
+        }
         Ok(SoundPlayerNode {
             sound,
             volume,
             looping: self.looping,
             play_on_start: self.play_on_start,
             group: self.group.clone().filter(|group| !group.is_empty()),
+            spatial: self.spatial,
+            near,
+            far,
         })
     }
 
@@ -110,6 +141,10 @@ impl SoundPlayerData {
             looping: player.looping,
             play_on_start: player.play_on_start,
             group: player.group.clone(),
+            spatial: player.spatial,
+            // Only reaches exactly the default are left out.
+            near: (player.near != DEFAULT_NEAR).then_some(player.near),
+            far: (player.far != DEFAULT_FAR).then_some(player.far),
         }
     }
 }
@@ -145,6 +180,7 @@ mod tests {
             "sound = \"hit.png\"",
             "sound = \"../hit.wav\"",
             "sound = \"hit.wav\"\nvolume = -1.0",
+            "sound = \"hit.wav\"\nnear = 5.0\nfar = 2.0",
             "volume = 1.0",
         ] {
             assert!(player(text).is_err(), "{text}");
@@ -162,6 +198,8 @@ mod tests {
         player.volume = 0.25;
         player.play_on_start = false;
         player.group = Some("effects".to_owned());
+        player.spatial = true;
+        player.far = 8.0;
         let text = toml::to_string(&SoundPlayerData::from_player(&player)).unwrap();
 
         assert_eq!(

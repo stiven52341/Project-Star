@@ -2,3 +2,4 @@ music/theme.ogg 0.5 true true
 playing false
 sounds/punch.wav false in Music
 |effects 1.0
+false true 1.0 8.0
