@@ -1512,5 +1512,18 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       - [x] c. The editor: the images offered to sprites, “Create > 2D >
             Square / Circle”, the body's shape shown as the sprite's.
     - [ ] An audio editor, to manage a project's sounds (after Unity's).
+          Plan agreed with the owner (2026-11-27, decision 87), in parts:
+      - [x] a. A sound's tab: its waveform, length, channels and rate, and
+            “Play” / “Stop” to hear it in the editor; the assets' menu
+            plays a sound too.
+      - [ ] b. A `SoundPlayer` node (as Unity's audio source): its sound,
+            volume, looping and “play on start”, in the inspector, scenes
+            and StarScript (`play`, `stop`, compiled and interpreted).
+      - [ ] c. Groups and a mixer: groups of sounds (music, effects…)
+            with their volume, in a mixer tab; each sound and player
+            belongs to one; StarScript `Audio.set_group_volume`.
+      - [ ] d. 2D and 3D sound: players sound quieter with their distance
+            to the camera (between a near and a far distance), and from
+            the left or the right.
     - [ ] A sprite editor (after Godot's).
 - [ ] **Future — Consoles** (PlayStation, Xbox).

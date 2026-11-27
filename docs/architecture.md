@@ -142,6 +142,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 84 | **Body shapes follow the scale of their node; 3D bodies can take the shape of their mesh** | Agreed with the owner (2026-11-26), as in Unity. A shape is stretched by its node's scale in the world, in 2D and 3D: boxes and rectangles along each axis, spheres and circles by the largest factor (they stay round), capsules with their height by `y` and their radius by the largest of the others (they stay upright and at least as high as their round ends); mirroring is ignored. The engine remakes the shape when the scale changes while playing, and the editor draws it stretched. A `mesh` shape (15f follow-up b) takes the triangles of the node's `Mesh` or `Model`: exact triangles for static and kinematic bodies, the convex hull for dynamic ones, which need a volume to fall and roll; a skinned model gives its rest pose. The inspector's “Fit” sizes a box, sphere or capsule to the bounds of the node's mesh or model |
 | 85 | **Frames per second shown in the game's window, with a digit font of the engine's own** | Agreed with the owner (2026-11-26). A small counter in a corner of the game's window (frames per second and milliseconds per frame), so it is seen in full screen and on phones too, unlike the window's title or the editor. The engine cannot draw text yet (fonts come with the interface nodes, 16h), so the counter's few characters are a tiny pixel font written in code, drawn as overlays (`Frame::draw_overlay`): no dependency. `show_fps` in `project.toml` says when it is shown: `"editor"` (the default: when played from the editor), `"always"` or `"never"`; F3 shows or hides it while playing, and StarScript's `Debug.show_fps(shown)` too |
 | 86 | **2D shapes are sprites of images the engine brings; their bodies take their shape** | Agreed with the owner (2026-11-26), over a new `Shape2D` node. `@square` and `@circle` (`star_assets::BuiltinImage`) are asset paths no file takes by chance; `AssetFolder::load_image` makes their pixels (a white square, a white circle smooth at its edge) without reading anything, so they work in games, in “Play”, exported, packaged and in the editor alike. A `Sprite` shows one in its color, scaled as any sprite. A 2D body on a node whose sprite shows one always takes its shape and the sprite's size: a rectangle of the square, a circle as wide as the circle's largest side (keeping the body's offset); its own shape is not used. `visible = false` already hides a node without touching its body |
+| 87 | **An audio editor in parts, after Unity's** | Agreed with the owner (2026-11-27): (a) a tab of each sound, with its waveform and details, heard in the editor through an output of its own; (b) a `SoundPlayer` node, as Unity's audio source: a sound, its volume, looping and playing on start, in scenes and StarScript; (c) groups of sounds with their volume, in a mixer; (d) 2D and 3D sound, quieter with the distance to the camera and panned left or right. Each part comes with its tests, compiled and interpreted where StarScript reaches it |
 
 ## ECS
 
@@ -921,6 +922,17 @@ the file has none, an animation. The `.anim` files read are part of the
 scene's history (`history::KeyframeFiles`), so one undo goes back through
 scene and animation changes in order, and saving the scene writes the
 files that changed since they were read or written.
+
+**Sounds** (decision 87): a sound of the assets (`.wav`, `.ogg`, `.mp3`,
+`.flac`) opens in a tab of its own (`sound_editor/`), read once through
+`AssetFolder::load_sound`: its waveform (`Waveform`: the lowest and
+highest sample of 4096 slices of its length, its channels mixed, drawn at
+any width), its length as minutes and seconds, its channels and rate, and
+“Play” / “Stop”, with a line where it plays. The editor's own sound output
+(`editor_audio.rs`, `EditorAudio`) opens the system's device the first
+time something plays, and keeps it; without one the editor stays silent,
+warned once. Closing the tab stops its sound. The assets' menu of a sound
+has “Play” too, which plays it in place of the last one it played.
 
 3D models (`.glb`, `.gltf`, decision 83) are assets of their own kind:
 dragged onto the scene of a 3D project they become a node with a

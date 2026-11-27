@@ -11,6 +11,7 @@ mod frames_messages;
 mod messages;
 mod scene_messages;
 mod script_messages;
+mod sound_messages;
 mod spanish;
 mod states_messages;
 mod timeline_messages;

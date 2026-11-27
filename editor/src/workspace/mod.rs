@@ -42,6 +42,7 @@ use self::output_panel::OutputPanel;
 use self::problems_panel::{CheckEnd, ProblemsPanel};
 use self::unsaved_dialog::{UnsavedChoice, show_unsaved_dialog};
 use self::viewport::SceneViewport;
+use crate::editor_audio::EditorAudio;
 use crate::editor_log::LogHistory;
 use crate::game_run::{EngineWarmUp, PlayMode, PlayRequest};
 use crate::last_scenes::LastSceneStore;
@@ -124,6 +125,8 @@ pub(crate) struct EditorWindow {
     quit_confirmed: bool,
     /// The engine view, or why it could not be created.
     viewport: Result<SceneViewport, String>,
+    /// The editor's sound output, to hear the project's sounds.
+    audio: EditorAudio,
     about_open: bool,
     /// When the game shows its frames per second, as `project.toml` says.
     show_fps: ShowFps,
@@ -178,6 +181,7 @@ impl EditorWindow {
             leaving: None,
             quit_confirmed: false,
             viewport,
+            audio: EditorAudio::default(),
             about_open: false,
             show_fps,
             icon_size_chosen: None,
@@ -238,6 +242,11 @@ impl EditorWindow {
                     ui.strong(texts::current().inspector);
                     ui.separator();
                     ui.weak(texts::current().script_inspector_hint());
+                }
+                ActiveDocument::Sound(_) => {
+                    ui.strong(texts::current().inspector);
+                    ui.separator();
+                    ui.weak(texts::current().sound_inspector_hint());
                 }
                 ActiveDocument::Frames(tab) => {
                     ui.strong(texts::current().inspector);
@@ -342,7 +351,8 @@ impl EditorWindow {
             ActiveDocument::Blueprint(_)
             | ActiveDocument::Script(_)
             | ActiveDocument::Frames(_)
-            | ActiveDocument::States(_) => None,
+            | ActiveDocument::States(_)
+            | ActiveDocument::Sound(_) => None,
         }
     }
 
@@ -508,6 +518,7 @@ impl EditorWindow {
             ActiveDocument::Blueprint(tab) => tab.show(ui, self.problems.problems()),
             ActiveDocument::Frames(tab) => tab.show(ui, self.assets.images()),
             ActiveDocument::States(tab) => tab.show(ui, self.assets.keyframes()),
+            ActiveDocument::Sound(tab) => tab.show(ui, &mut self.audio),
             ActiveDocument::Script(tab) => {
                 let edited = tab.show(ui, self.live_check.problems(), self.live_check.outline());
                 if edited.changed {
@@ -566,6 +577,12 @@ impl EditorWindow {
                 }
                 Some(AssetEvent::Opened(OpenedAsset::Frames(path))) => {
                     self.documents.open_frames(self.assets.directory(), path);
+                }
+                Some(AssetEvent::Opened(OpenedAsset::Sound(path))) => {
+                    self.documents.open_sound(self.assets.directory(), path);
+                }
+                Some(AssetEvent::Listen(path)) => {
+                    self.audio.listen(self.assets.directory(), &path);
                 }
                 Some(AssetEvent::Gone(path)) => self.forget(&path),
                 Some(AssetEvent::Renamed { from, to }) => {

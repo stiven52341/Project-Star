@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use eframe::egui;
 use star_engine::prelude::AssetPath;
-use star_engine::star_assets::{ImageFormat, ModelFormat};
+use star_engine::star_assets::{ImageFormat, ModelFormat, SoundFormat};
 
 use super::asset_actions::{AssetActions, Choice, Outcome, Target};
 use super::asset_files::NewAsset;
@@ -32,6 +32,7 @@ pub(crate) enum OpenedAsset {
     Script(String),
     Frames(String),
     States(String),
+    Sound(String),
 }
 
 impl OpenedAsset {
@@ -47,6 +48,8 @@ impl OpenedAsset {
             Some(Self::Frames(path))
         } else if path.ends_with(STATES_EXTENSION) {
             Some(Self::States(path))
+        } else if AssetPath::new(&path).is_ok_and(|asset| SoundFormat::of(&asset).is_ok()) {
+            Some(Self::Sound(path))
         } else {
             None
         }
@@ -64,11 +67,14 @@ pub(crate) enum AssetEvent {
     Renamed { from: String, to: String },
     /// Chose the size of the icons, in percent, to remember it.
     IconSizeChosen(u16),
+    /// Asked to hear the sound at this path.
+    Listen(String),
 }
 
 /// What the user chose in a menu or with a key.
 enum MenuChoice {
     Open(Entry),
+    Listen(String),
     Act(Choice),
     Refresh,
     /// Show the file or folder at this path, inside the assets folder, in
@@ -326,6 +332,7 @@ impl AssetsPanel {
     fn carry_out(&mut self, choice: MenuChoice) -> Option<AssetEvent> {
         match choice {
             MenuChoice::Open(entry) => self.open(&entry).map(AssetEvent::Opened),
+            MenuChoice::Listen(path) => Some(AssetEvent::Listen(path)),
             MenuChoice::Act(choice) => {
                 self.actions.choose(choice);
                 None
@@ -629,6 +636,9 @@ fn tile_menu(
         if set.clicked() {
             *choice = Some(MenuChoice::SetMainScene(entry.path.clone()));
         }
+    }
+    if entry.kind == AssetKind::Sound && ui.button(texts.play_sound()).clicked() {
+        *choice = Some(MenuChoice::Listen(entry.path.clone()));
     }
     if entry.kind == AssetKind::Image
         && ui

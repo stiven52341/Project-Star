@@ -13,6 +13,7 @@ use crate::project::ProjectDimension;
 use crate::project_check::OpenTexts;
 use crate::scene_editor::SceneDocument;
 use crate::script_editor::ScriptTab;
+use crate::sound_editor::SoundTab;
 use crate::states_editor::StatesTab;
 use crate::texts;
 
@@ -31,6 +32,7 @@ enum Tab {
     Script(ScriptTab),
     Frames(FramesTab),
     States(StatesTab),
+    Sound(SoundTab),
 }
 
 impl Tab {
@@ -40,6 +42,7 @@ impl Tab {
             Self::Script(tab) => tab.path(),
             Self::Frames(tab) => tab.path(),
             Self::States(tab) => tab.path(),
+            Self::Sound(tab) => tab.path(),
         }
     }
 
@@ -49,6 +52,7 @@ impl Tab {
             Self::Script(tab) => tab.title(),
             Self::Frames(tab) => tab.title(),
             Self::States(tab) => tab.title(),
+            Self::Sound(tab) => tab.title(),
         }
     }
 
@@ -58,6 +62,7 @@ impl Tab {
             Self::Script(tab) => tab.is_unsaved(),
             Self::Frames(tab) => tab.is_unsaved(),
             Self::States(tab) => tab.is_unsaved(),
+            Self::Sound(_) => false,
         }
     }
 
@@ -67,6 +72,7 @@ impl Tab {
             Self::Script(tab) => tab.save(),
             Self::Frames(tab) => tab.save(),
             Self::States(tab) => tab.save(),
+            Self::Sound(_) => true,
         }
     }
 }
@@ -78,6 +84,7 @@ pub(crate) enum ActiveDocument<'documents> {
     Script(&'documents mut ScriptTab),
     Frames(&'documents mut FramesTab),
     States(&'documents mut StatesTab),
+    Sound(&'documents mut SoundTab),
 }
 
 impl Documents {
@@ -115,6 +122,12 @@ impl Documents {
         self.show_or_open(path, |path| Tab::States(StatesTab::open(assets, path)));
     }
 
+    /// Shows the sound at `path` of the `assets` folder, opening it if it
+    /// is not open yet.
+    pub(crate) fn open_sound(&mut self, assets: &Path, path: String) {
+        self.show_or_open(path, |path| Tab::Sound(SoundTab::open(assets, path)));
+    }
+
     /// The texts of the open scripts, by their path inside the assets
     /// folder, saved or not.
     pub(crate) fn open_texts(&self) -> OpenTexts {
@@ -124,7 +137,7 @@ impl Documents {
                 Tab::Script(script) => script
                     .text()
                     .map(|text| (script.path().to_owned(), text.to_owned())),
-                Tab::Blueprint(_) | Tab::Frames(_) | Tab::States(_) => None,
+                Tab::Blueprint(_) | Tab::Frames(_) | Tab::States(_) | Tab::Sound(_) => None,
             })
             .collect()
     }
@@ -221,6 +234,7 @@ impl Documents {
                 Tab::Script(_) => Tab::Script(ScriptTab::open(assets, path)),
                 Tab::Frames(_) => Tab::Frames(FramesTab::open(assets, path)),
                 Tab::States(_) => Tab::States(StatesTab::open(assets, path)),
+                Tab::Sound(_) => Tab::Sound(SoundTab::open(assets, path)),
             };
         }
     }
@@ -292,6 +306,7 @@ impl Documents {
             Some(Tab::Script(tab)) => ActiveDocument::Script(tab),
             Some(Tab::Frames(tab)) => ActiveDocument::Frames(tab),
             Some(Tab::States(tab)) => ActiveDocument::States(tab),
+            Some(Tab::Sound(tab)) => ActiveDocument::Sound(tab),
             None => ActiveDocument::Scene,
         }
     }
@@ -344,7 +359,23 @@ mod tests {
             ActiveDocument::Script(tab) => Some(tab.path().to_owned()),
             ActiveDocument::Frames(tab) => Some(tab.path().to_owned()),
             ActiveDocument::States(tab) => Some(tab.path().to_owned()),
+            ActiveDocument::Sound(tab) => Some(tab.path().to_owned()),
         }
+    }
+
+    #[test]
+    fn sounds_open_in_tabs_that_need_no_saving() {
+        let assets = TestDirectory::new("documents_sound");
+        let mut documents = Documents::new();
+
+        documents.open_sound(assets.path(), "sounds/missing.wav".to_owned());
+
+        assert_eq!(
+            active_path(&mut documents).as_deref(),
+            Some("sounds/missing.wav")
+        );
+        assert!(!documents.tabs[0].is_unsaved());
+        assert!(documents.tabs[0].save());
     }
 
     fn documents_with(paths: &[&str]) -> (TestDirectory, Documents) {
