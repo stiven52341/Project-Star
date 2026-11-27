@@ -7,7 +7,7 @@
 use super::conversions::RUNTIME;
 use super::native_nodes;
 use super::writer::Writer;
-use crate::InputAction;
+use crate::{GameSettings, InputAction, ShowFps};
 
 /// The crate that connects StarScript's runtime with the engine.
 const SCRIPT_ENGINE: &str = "::star_script_engine";
@@ -819,16 +819,22 @@ pub mod TweenOptions {
 }";
 
 /// `fn main` that runs the game `class_path` in a window of the engine, with
-/// the input `actions` of the project.
+/// the input actions of the project's `settings`, showing the frames per
+/// second from the start as they say.
 /// `new_game` and `title` are Rust expressions, run inside `run_`: the
 /// game and the title of its window.
 pub(super) fn game_entry_point(
     out: &mut Writer,
     new_game: &str,
     title: &str,
-    actions: &[InputAction],
+    settings: &GameSettings,
 ) {
-    action_declarations(out, actions);
+    action_declarations(out, &settings.actions);
+    let fps_shown = match settings.show_fps {
+        ShowFps::Editor => "::star_engine::app::played_from_editor()",
+        ShowFps::Always => "true",
+        ShowFps::Never => "false",
+    };
     let main = format!(
         "
 /// Starts the program: runs the game in a window of the engine.
@@ -847,7 +853,8 @@ fn run_() -> ::star_engine::star_core::EngineResult<()> {{
     {RUNTIME}::input::declare_actions(&ACTION_NAMES_);
     let app_ = ::star_engine::app::App::new()
         .with_title({title})
-        .with_actions(actions_);
+        .with_actions(actions_)
+        .with_fps_shown({fps_shown});
     {SCRIPT_ENGINE}::game::run::<crate::classes::Host_>(app_, &ACTION_NAMES_, || {{
         let game_: crate::classes::Game::Ref = {new_game};
         ::std::result::Result::Ok(game_)

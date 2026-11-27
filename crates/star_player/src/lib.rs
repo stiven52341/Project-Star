@@ -25,10 +25,10 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::rc::Rc;
 
-use star_engine::app::App;
+use star_engine::app::{App, played_from_editor};
 use star_engine::star_core::{EngineError, EngineResult};
 use star_engine::star_input::{ActionMap, Binding};
-use star_script::InputAction;
+use star_script::{InputAction, ShowFps};
 use star_script_interpreter::host::Interpreted;
 use star_script_interpreter::{Output, Program, ProgramKind, RunError, end_game, reload};
 
@@ -120,10 +120,16 @@ fn play_game(
     let action_map = action_map(actions)?;
     let names: Vec<&str> = actions.iter().map(|action| action.name.as_str()).collect();
     star_script_runtime::input::declare_actions(&names);
+    let fps_shown = match project.settings().show_fps {
+        ShowFps::Editor => played_from_editor(),
+        ShowFps::Always => true,
+        ShowFps::Never => false,
+    };
     let app = App::new()
         .with_title(program.title().unwrap_or_default())
         .with_actions(action_map)
-        .with_asset_folder(project.assets_folder());
+        .with_asset_folder(project.assets_folder())
+        .with_fps_shown(fps_shown);
     // A runtime error while the game is created is the game's, not the
     // engine's: it is printed as a compiled game prints it.
     let mut failed_start = None;

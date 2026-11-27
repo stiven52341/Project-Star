@@ -141,6 +141,7 @@ fn game_settings(script: &Path) -> Result<GameSettings, String> {
     Ok(GameSettings {
         actions,
         main_scene: None,
+        ..Default::default()
     })
 }
 

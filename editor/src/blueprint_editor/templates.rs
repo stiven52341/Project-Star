@@ -133,6 +133,7 @@ mod tests {
         GameSettings {
             actions,
             main_scene: None,
+            ..Default::default()
         }
     }
 

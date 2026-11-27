@@ -91,6 +91,7 @@ fn settings(program: &Path) -> GameSettings {
             })
             .collect(),
         main_scene: None,
+        ..Default::default()
     }
 }
 

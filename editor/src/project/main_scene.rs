@@ -11,9 +11,8 @@ use std::path::Path;
 use serde::Deserialize;
 
 use super::MANIFEST_FILE_NAME;
+use super::project_table::{invalid, with_project_key};
 
-/// The header of the table the main scene is in.
-const PROJECT_HEADER: &str = "[project]";
 /// The key of the main scene.
 const MAIN_SCENE_KEY: &str = "main_scene";
 
@@ -62,39 +61,7 @@ fn main_scene_of(text: &str) -> Option<String> {
 /// `text` with `path` as its main scene: in place of the one it had, or
 /// at the end of its `[project]` table.
 fn with_main_scene(text: &str, path: &str) -> io::Result<String> {
-    let line = format!(
-        "{MAIN_SCENE_KEY} = {}",
-        toml::Value::String(path.to_owned())
-    );
-    let mut lines: Vec<&str> = text.lines().collect();
-    let header = lines
-        .iter()
-        .position(|line| line.trim() == PROJECT_HEADER)
-        .ok_or_else(|| {
-            invalid(format!(
-                "{MANIFEST_FILE_NAME} has no {PROJECT_HEADER} table"
-            ))
-        })?;
-    let table_end = lines[header + 1..]
-        .iter()
-        .position(|line| line.trim_start().starts_with('['))
-        .map_or(lines.len(), |end| header + 1 + end);
-    let existing = lines[header + 1..table_end]
-        .iter()
-        .position(|line| is_main_scene_line(line))
-        .map(|at| header + 1 + at);
-    if let Some(at) = existing {
-        lines[at] = &line;
-    } else {
-        // After the table's last line, not after the blank lines that
-        // separate it from the next one.
-        let last = lines[header..table_end]
-            .iter()
-            .rposition(|line| !line.trim().is_empty())
-            .map_or(header, |at| header + at);
-        lines.insert(last + 1, &line);
-    }
-    let new_text = lines.join("\n") + "\n";
+    let new_text = with_project_key(text, MAIN_SCENE_KEY, &toml::Value::String(path.to_owned()))?;
     if main_scene_of(&new_text).as_deref() == Some(path) {
         Ok(new_text)
     } else {
@@ -102,15 +69,6 @@ fn with_main_scene(text: &str, path: &str) -> io::Result<String> {
             "the main scene could not be written in {MANIFEST_FILE_NAME}"
         )))
     }
-}
-
-fn is_main_scene_line(line: &str) -> bool {
-    line.split_once('=')
-        .is_some_and(|(key, _)| key.trim() == MAIN_SCENE_KEY)
-}
-
-fn invalid(message: String) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, message)
 }
 
 #[cfg(test)]

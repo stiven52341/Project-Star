@@ -137,6 +137,7 @@ fn programs_without_a_game_play_the_main_scene() {
             path: "scenes/level.scene".to_owned(),
             title: "Space Game".to_owned(),
         }),
+        ..Default::default()
     };
 
     let empty = crate::compile_source_with("", &settings).expect("valid program");
@@ -193,6 +194,7 @@ fn game_with_jump_action() -> super::GeneratedProgram {
             bindings: vec!["Space".into(), "GamepadSouth".into()],
         }],
         main_scene: None,
+        ..Default::default()
     };
     crate::compile_source_with(
         "class G extends Game {\n override func update(delta: float) {\n \

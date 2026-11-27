@@ -1,6 +1,7 @@
 //! Top menu of the editor window.
 
 use eframe::egui;
+use star_script::ShowFps;
 
 use crate::language_menu::show_language_menu;
 use crate::texts::{self, Language};
@@ -35,6 +36,8 @@ pub(crate) enum MenuAction {
     Stop,
     ShowAbout,
     ChangeLanguage(Language),
+    /// Changes when the game shows its frames per second.
+    SetShowFps(ShowFps),
 }
 
 /// Whether the scene shown has changes to undo and to redo.
@@ -55,6 +58,8 @@ pub(crate) struct MenuState {
     pub(crate) compiling: bool,
     /// The game is being built or played: “Stop” stops it.
     pub(crate) playing: bool,
+    /// When the game shows its frames per second.
+    pub(crate) show_fps: ShowFps,
 }
 
 /// The menu, with its entries enabled as `state` allows.
@@ -64,6 +69,7 @@ pub(crate) fn show_menu_bar(ui: &mut egui::Ui, state: MenuState) -> Option<MenuA
         compiling,
         playing,
         steps,
+        show_fps,
     } = state;
     let mut action = None;
     egui::MenuBar::new().ui(ui, |ui| {
@@ -94,6 +100,10 @@ pub(crate) fn show_menu_bar(ui: &mut egui::Ui, state: MenuState) -> Option<MenuA
             if let Some(chosen) = project_buttons(ui, compiling, playing) {
                 action = Some(chosen);
             }
+            ui.separator();
+            if let Some(chosen) = show_fps_menu(ui, show_fps) {
+                action = Some(MenuAction::SetShowFps(chosen));
+            }
         });
         ui.menu_button(texts::current().menu_help, |ui| {
             if ui.button(texts::current().about).clicked() {
@@ -106,6 +116,25 @@ pub(crate) fn show_menu_bar(ui: &mut egui::Ui, state: MenuState) -> Option<MenuA
         }
     });
     action
+}
+
+/// The choices of when the game shows its frames per second, `current`
+/// marked. Returns the one clicked, if it is another.
+fn show_fps_menu(ui: &mut egui::Ui, current: ShowFps) -> Option<ShowFps> {
+    let texts = texts::current();
+    let mut chosen = None;
+    ui.menu_button(texts.show_fps(), |ui| {
+        for choice in ShowFps::ALL {
+            if ui
+                .radio(choice == current, texts.show_fps_choice(choice))
+                .clicked()
+                && choice != current
+            {
+                chosen = Some(choice);
+            }
+        }
+    });
+    chosen
 }
 
 /// “Undo” and “Redo”, enabled as `steps` allows. Returns the one clicked.

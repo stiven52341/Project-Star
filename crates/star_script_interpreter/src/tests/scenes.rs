@@ -151,6 +151,7 @@ fn main_scene_program(path: &str) -> Program {
             path: path.to_owned(),
             title: "Fleet".to_owned(),
         }),
+        ..Default::default()
     };
     let source = "class Drone extends Node {\n export var speed = 1.0\n init() {\n super.init(\"Drone\")\n }\n \
                   override func start() {\n Debug.print(\"drone \" + speed.to_string() + \" \" + (Scene.find_by_name(\"Fleet\") != null).to_string())\n }\n}\n";

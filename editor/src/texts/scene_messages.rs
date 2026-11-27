@@ -1,6 +1,7 @@
 //! Texts about scenes and the values of their nodes, in each language.
 
 use star_engine::prelude::{BodyKind, TextureFilter};
+use star_script::ShowFps;
 
 use super::{Language, Texts};
 use crate::scene_editor::{LightKind, Tool};
@@ -55,6 +56,22 @@ impl Texts {
         match self.language {
             Language::English => format!("Could not save the scene: {reason}"),
             Language::Spanish => format!("No se pudo guardar la escena: {reason}"),
+        }
+    }
+
+    /// The Project menu's entry of when the game shows its frames per
+    /// second.
+    pub(crate) const fn show_fps(&self) -> &'static str {
+        self.pick("Show FPS", "Mostrar FPS")
+    }
+
+    pub(crate) const fn show_fps_choice(&self, choice: ShowFps) -> &'static str {
+        match choice {
+            ShowFps::Editor => self.pick("When played from the editor", "Al jugar desde el editor"),
+            ShowFps::Always => {
+                self.pick("Always, exported games too", "Siempre, también exportado")
+            }
+            ShowFps::Never => self.pick("Never (F3 shows them)", "Nunca (F3 los muestra)"),
         }
     }
 

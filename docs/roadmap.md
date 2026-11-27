@@ -1481,7 +1481,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
               `Body`, compiled and interpreted).
         - [x] c2. The “Fit” button: sizes and offset from the bounds.
   - To do:
-    - [ ] Frames per second shown while a game runs. Plan agreed with the
+    - [x] Frames per second shown while a game runs. Plan agreed with the
           owner (decision 85): a small counter in a corner of the game's
           window (frames per second and milliseconds per frame), drawn
           with a tiny digit font of the engine's own, no dependencies;
@@ -1495,7 +1495,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
             `App::with_fps_shown`.
       - [x] c. StarScript `Debug.show_fps(shown: bool)`, compiled and
             interpreted.
-      - [ ] d. `show_fps` in `project.toml`, honored by Play, Play
+      - [x] d. `show_fps` in `project.toml`, honored by Play, Play
             compiled and exported games, and the Project menu.
     - [ ] Basic 2D bodies: shape nodes for 2D (a box, for example) that
           can be scaled, given collisions and used as a floor, and hidden

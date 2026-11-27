@@ -35,7 +35,7 @@ mod token;
 pub use diagnostic::CompileError;
 pub use lexer::{LexError, LexErrorKind, Scan, scan, tokenize};
 pub use parser::{ParseError, ParseErrorKind, parse};
-pub use settings::{GameSettings, InputAction, MainScene};
+pub use settings::{GameSettings, InputAction, MainScene, ShowFps};
 pub use source::{LineIndex, Position, Span};
 pub use source_set::{SourceLocation, SourceSet};
 pub use token::{Keyword, Token, TokenKind};

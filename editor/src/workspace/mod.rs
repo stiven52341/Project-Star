@@ -24,7 +24,7 @@ mod viewport_tools;
 
 use eframe::{egui, egui_wgpu};
 use star_engine::prelude::{ENGINE_NAME, ENGINE_VERSION};
-use star_script::Span;
+use star_script::{ShowFps, Span};
 
 pub(crate) use self::asset_files::{AssetFileError, NewAsset};
 use self::assets_panel::{AssetEvent, AssetsPanel, OpenedAsset};
@@ -45,7 +45,9 @@ use self::viewport::SceneViewport;
 use crate::editor_log::LogHistory;
 use crate::game_run::{EngineWarmUp, PlayMode, PlayRequest};
 use crate::last_scenes::LastSceneStore;
-use crate::project::{ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, Project, SCRIPT_EXTENSION};
+use crate::project::{
+    ASSETS_DIRECTORY, BLUEPRINT_EXTENSION, Project, SCRIPT_EXTENSION, read_show_fps, set_show_fps,
+};
 use crate::project_check::Problem;
 use crate::scene_editor::{AssetFiles, SceneDocument};
 use crate::style::ERROR_COLOR;
@@ -123,6 +125,8 @@ pub(crate) struct EditorWindow {
     /// The engine view, or why it could not be created.
     viewport: Result<SceneViewport, String>,
     about_open: bool,
+    /// When the game shows its frames per second, as `project.toml` says.
+    show_fps: ShowFps,
     /// A size of the icons chosen this frame, to hand to the preferences.
     icon_size_chosen: Option<u16>,
 }
@@ -154,6 +158,7 @@ impl EditorWindow {
         // for the `export` fields of the nodes.
         let mut live_check = LiveCheck::new();
         live_check.request();
+        let show_fps = read_show_fps(project.directory());
         let mut documents = Documents::new();
         if let Some(scene) = last_scene.scene(assets.directory()) {
             documents.open_scene(assets.directory(), scene, dimension);
@@ -174,6 +179,7 @@ impl EditorWindow {
             quit_confirmed: false,
             viewport,
             about_open: false,
+            show_fps,
             icon_size_chosen: None,
         }
     }
@@ -285,6 +291,7 @@ impl EditorWindow {
             steps,
             compiling: self.problems.is_compiling(),
             playing: self.output.is_playing(),
+            show_fps: self.show_fps,
         };
         let mut action = None;
         egui::Panel::top("menu_bar").show(ui, |ui| {
@@ -315,6 +322,12 @@ impl EditorWindow {
                 Some(MenuAction::ShowAbout) => self.about_open = true,
                 Some(MenuAction::ChangeLanguage(language)) => {
                     action = Some(EditorAction::ChangeLanguage(language));
+                }
+                Some(MenuAction::SetShowFps(choice)) => {
+                    match set_show_fps(self.project.directory(), choice) {
+                        Ok(()) => self.show_fps = choice,
+                        Err(error) => log::warn!("{error}"),
+                    }
                 }
                 None => {}
             }

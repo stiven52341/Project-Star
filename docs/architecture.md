@@ -623,7 +623,17 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
   corner over a translucent dark box, its characters cut from a 3 x 5
   pixel font written in code (digits, `.`, `F`, `P`, `S`, `m`, `s`),
   uploaded once as a pixelated texture and scaled 3 times. F3 shows or
-  hides it while playing.
+  hides it while playing. `show_fps` in `[project]` of `project.toml`
+  says whether a game starts with it shown: `"editor"` (the default:
+  when the editor plays it), `"always"` or `"never"` (`star_script::ShowFps`,
+  read by `star_player::read_game_settings`). Compiled games call
+  `App::with_fps_shown` with `true`, `false` or
+  `star_engine::app::played_from_editor()`, which looks for the
+  `PROJECTSTAR_PLAYED_FROM_EDITOR` variable the editor gives every game
+  it plays (“Play” and “Play compiled”); the player does the same. The
+  editor's Project menu chooses it (“Show FPS”), writing the line into
+  the user's file (`project/show_fps.rs`, over `project_table.rs`, which
+  the main scene shares).
 - **Sprite batching**: every frame, the sprites are sorted (unstable sort by
   layer and position: no allocation), their 4 corners written to one shared
   vertex buffer, and consecutive sprites with the same texture drawn by a
@@ -1208,6 +1218,7 @@ engine_version = "0.1.0"
 dimension = "3d"
 platforms = ["windows", "linux", "android"]
 main_scene = "scenes/level.scene"
+show_fps = "editor"
 ```
 
 The main scene is chosen with a right click on a scene in the assets

@@ -27,6 +27,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 
+use star_engine::app::PLAYED_FROM_EDITOR_VARIABLE;
 use star_script::codegen::GeneratedProgram;
 
 use self::process::{Ended, Events};
@@ -206,7 +207,8 @@ fn build_and_play(request: &PlayRequest, events: &Events, stop: &AtomicBool) -> 
     }
     events.send(RunEvent::Phase(RunPhase::Running));
     let mut game = Command::new(binary(output, &program));
-    game.current_dir(&request.directory);
+    game.current_dir(&request.directory)
+        .env(PLAYED_FROM_EDITOR_VARIABLE, "1");
     match process::run(game, OutputKind::Game, events, stop) {
         Ok(Ended::Exited(status)) => RunEnd::Closed {
             success: status.success(),

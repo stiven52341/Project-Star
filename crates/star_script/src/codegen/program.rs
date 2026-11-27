@@ -323,7 +323,7 @@ fn entry_point(
         out,
         &format!("{path}::new()"),
         &format!("{:?}", class.name),
-        &context.analysis.settings().actions,
+        context.analysis.settings(),
     );
     Ok(kind)
 }
@@ -340,7 +340,7 @@ fn main_scene_entry_point(context: Context<'_>, out: &mut Writer) -> EntryPoint 
         out,
         &format!("main_scene_game_({:?})?", scene.path),
         &format!("{:?}", scene.title),
-        &settings.actions,
+        settings,
     );
     native::main_scene_game(out);
     EntryPoint::MainScene

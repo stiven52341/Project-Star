@@ -126,6 +126,7 @@ fn checked_code(blueprint: &Blueprint) -> String {
             bindings: vec!["ShiftLeft".to_owned()],
         }],
         main_scene: None,
+        ..Default::default()
     };
     if let Err(errors) = check_source_with(&source, &settings) {
         panic!("{source}\n{errors:?}");

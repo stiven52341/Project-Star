@@ -17,6 +17,17 @@ use crate::game::{EmptyGame, Game};
 use crate::game_assets::GameAssets;
 use crate::runtime::{Runtime, engine_world};
 
+/// The environment variable the editor gives the games it plays (“Play”
+/// and “Play compiled”), so they know they are not exported.
+pub const PLAYED_FROM_EDITOR_VARIABLE: &str = "PROJECTSTAR_PLAYED_FROM_EDITOR";
+
+/// Whether the editor started this game: what shows its frames per second
+/// by default (decision 85).
+#[must_use]
+pub fn played_from_editor() -> bool {
+    std::env::var_os(PLAYED_FROM_EDITOR_VARIABLE).is_some()
+}
+
 /// A game application, configured with a builder and started with
 /// [`App::run_game`] (or [`App::run`] for an empty window).
 #[derive(Debug)]

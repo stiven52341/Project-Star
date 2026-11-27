@@ -273,6 +273,7 @@ fn play(game: &Game) -> EngineResult<()> {
             path: path.to_owned(),
             title: game.name.to_owned(),
         }),
+        ..Default::default()
     };
     let checked = check_source_with(game.source, &settings).expect("a valid game");
     let program = Program::lower(&checked).expect("a game the interpreter runs");

@@ -49,6 +49,7 @@ fn settings(bindings: &[&str]) -> GameSettings {
             bindings: bindings.iter().map(|&binding| binding.to_owned()).collect(),
         }],
         main_scene: None,
+        ..Default::default()
     }
 }
 

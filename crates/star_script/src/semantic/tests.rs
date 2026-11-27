@@ -903,6 +903,7 @@ fn errors_with_jump_action(source: &str) -> Vec<SemanticErrorKind> {
             bindings: vec!["Space".into()],
         }],
         main_scene: None,
+        ..Default::default()
     };
     match check_with(&parse_source(source).expect("valid syntax"), &settings) {
         Ok(_) => Vec::new(),
@@ -1144,6 +1145,7 @@ fn the_documented_bodies_are_valid() {
             })
             .into(),
         main_scene: None,
+        ..Default::default()
     };
     let source = r#"
 class Ball extends Sprite {
