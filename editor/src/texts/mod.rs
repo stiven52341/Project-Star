@@ -218,6 +218,8 @@ pub(crate) struct Texts {
     pub(crate) filter: &'static str,
     pub(crate) anchor: &'static str,
     pub(crate) region: &'static str,
+    pub(crate) region_size: &'static str,
+    pub(crate) region_hint: &'static str,
     pub(crate) sheet_columns: &'static str,
     pub(crate) sheet_rows: &'static str,
     pub(crate) sheet_frame: &'static str,

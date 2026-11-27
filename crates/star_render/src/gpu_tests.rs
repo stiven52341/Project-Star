@@ -135,6 +135,16 @@ fn full_screen(texture: TextureId) -> Sprite {
 
 #[test]
 #[ignore = "needs a GPU"]
+fn textures_know_their_size_in_pixels() {
+    let mut gpu = Gpu::new();
+    let texture = gpu.texture(2, 1, &[[0, 0, 0, 255], [255, 255, 255, 255]]);
+
+    assert_eq!(gpu.scene.texture_size(texture), Some([2, 1]));
+    assert_eq!(gpu.scene.texture_size(TextureId(99)), None);
+}
+
+#[test]
+#[ignore = "needs a GPU"]
 fn sprites_are_tinted_by_their_color() {
     let mut gpu = Gpu::new();
     let white = gpu.texture(1, 1, &[[255; 4]]);

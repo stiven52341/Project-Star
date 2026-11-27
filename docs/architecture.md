@@ -226,8 +226,9 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   it when written again), the position of its `parent` in the
   list (parents come first; the first node is the only root), an optional
   transform (`position`, `rotation`, `scale`), an optional
-  `[node.sprite]` (`texture` as an asset path, `filter`, `size`, `region`,
-  `anchor`, `color`, `layer`) and an optional `[node.body]` (see
+  `[node.sprite]` (`texture` as an asset path, `filter`, `size`, `region`
+  as `[x, y, width, height]` in pixels from the image's top-left corner,
+  decision 88, `anchor`, `color`, `layer`) and an optional `[node.body]` (see
   [Physics](#physics)). 3D nodes have an optional `[node.transform_3d]`
   (`position`, `rotation` as pitch, yaw and roll in radians, `scale`), an
   optional `[node.mesh]` (`shape` `cube` with a `size` of three numbers,

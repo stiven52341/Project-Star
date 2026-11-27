@@ -9,7 +9,9 @@ use star_core::{EngineResult, Sound};
 use star_ecs::{Entity, World};
 use star_math::Mat4;
 use star_physics::ShapeKind3d;
-use star_render::{Camera, Frame, Mesh3dId, MeshShape, Renderer, TextureFilter, TextureId};
+use star_render::{
+    Camera, Frame, Mesh3dId, MeshShape, Renderer, TextureFilter, TextureId, TextureRegion,
+};
 use star_scene::{
     Body3D, CollisionMesh, GlobalTransform2D, GlobalTransform3D, MeshNode, ModelDrawing, ModelNode,
     ModelPose, Name, Scene, SceneAssets, SpriteNode, is_shown,
@@ -152,7 +154,12 @@ impl GameAssets {
                 |error| log::warn!("{error}"),
             );
             if let Some(texture) = texture {
+                let region = match (file.region, renderer.texture_size(texture)) {
+                    (Some(region), Some(size)) => region.in_texture(size),
+                    _ => TextureRegion::FULL,
+                };
                 let sprite = SpriteNode::new(texture, file.size)
+                    .with_region(region)
                     .with_layer(file.layer)
                     .with_color(file.color)
                     .with_sheet(file.sheet);
@@ -309,6 +316,10 @@ impl SceneAssets for SceneLoader<'_> {
     fn texture(&mut self, path: &AssetPath, filter: TextureFilter) -> EngineResult<TextureId> {
         self.assets
             .load_texture(self.renderer, path.clone(), filter)
+    }
+
+    fn texture_size(&self, texture: TextureId) -> Option<[u32; 2]> {
+        self.renderer.texture_size(texture)
     }
 
     fn mesh(&mut self, shape: MeshShape) -> EngineResult<Mesh3dId> {

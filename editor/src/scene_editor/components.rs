@@ -4,7 +4,7 @@
 use eframe::egui;
 use star_engine::prelude::{
     BodyKind, BodySettings, Color, LightNode, MeshShape, Shape2d, Shape3d, Sprite, TextureFilter,
-    TextureRegion, Transform2D, Transform3D, Vec2, Vec3,
+    Transform2D, Transform3D, Vec2, Vec3,
 };
 use star_engine::star_assets::{AssetPath, BuiltinImage};
 use star_engine::star_render::{
@@ -412,7 +412,7 @@ pub(super) const fn sprite_of(texture: AssetPath, size: Vec2) -> SpriteOutline {
         texture,
         filter: TextureFilter::Smooth,
         size,
-        region: TextureRegion::FULL,
+        region: None,
         anchor: Sprite::CENTER,
         color: Color::WHITE,
         layer: 0,

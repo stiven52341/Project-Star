@@ -6,7 +6,9 @@ use star_assets::AssetPath;
 use star_core::{EngineError, EngineResult};
 use star_ecs::{Entity, World};
 use star_physics::{BodySettings, Shape3d};
-use star_render::{Material, Mesh3dId, MeshShape, TextureFilter, TextureId};
+use star_render::{
+    Material, Mesh3dId, MeshShape, PixelRegion, TextureFilter, TextureId, TextureRegion,
+};
 
 use crate::animator_node::AnimatorOutline;
 use crate::bone_node::Bone2dNode;
@@ -74,6 +76,10 @@ pub trait SceneAssets {
     /// Whatever keeps the texture from being loaded.
     fn texture(&mut self, path: &AssetPath, filter: TextureFilter) -> EngineResult<TextureId>;
 
+    /// Width and height in pixels of `texture`, given by
+    /// [`texture`](Self::texture): what a sprite's region is cut from.
+    fn texture_size(&self, texture: TextureId) -> Option<[u32; 2]>;
+
     /// The 3D mesh of `shape`.
     ///
     /// # Errors
@@ -88,6 +94,10 @@ pub trait SceneSources {
     /// The image and filter `texture` was loaded from, if it came from a
     /// file.
     fn texture_source(&self, texture: TextureId) -> Option<(AssetPath, TextureFilter)>;
+
+    /// Width and height in pixels of `texture`, so the part of it a sprite
+    /// shows is saved in pixels.
+    fn texture_size(&self, texture: TextureId) -> Option<[u32; 2]>;
 
     /// The shape `mesh` was built from, if it came from one.
     fn mesh_source(&self, mesh: Mesh3dId) -> Option<MeshShape>;
@@ -256,9 +266,13 @@ fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResul
         .as_ref()
         .map(|sprite| {
             let texture = assets.texture(&sprite.texture, sprite.filter)?;
+            let region = match (sprite.region, assets.texture_size(texture)) {
+                (Some(region), Some(size)) => region.in_texture(size),
+                _ => TextureRegion::FULL,
+            };
             Ok(SpriteNode {
                 texture,
-                region: sprite.region,
+                region,
                 size: sprite.size,
                 anchor: sprite.anchor,
                 color: sprite.color,
@@ -365,11 +379,19 @@ fn outline_sprite(sprite: SpriteNode, sources: &impl SceneSources) -> EngineResu
     let (texture, filter) = sources
         .texture_source(sprite.texture)
         .ok_or_else(|| not_from_a_file("texture"))?;
+    let region = if sprite.region == TextureRegion::FULL {
+        None
+    } else {
+        let size = sources
+            .texture_size(sprite.texture)
+            .ok_or_else(|| EngineError::Scene("a sprite's texture has no known size".to_owned()))?;
+        Some(PixelRegion::of_texture(sprite.region, size))
+    };
     Ok(SpriteOutline {
         texture,
         filter,
         size: sprite.size,
-        region: sprite.region,
+        region,
         anchor: sprite.anchor,
         color: sprite.color,
         layer: sprite.layer,
@@ -484,6 +506,9 @@ mod tests {
         bounciness = 0.5
     "#;
 
+    /// The width and height of every image of the tests, in pixels.
+    const IMAGE_SIZE: [u32; 2] = [64, 32];
+
     /// Gives textures and meshes in the order they are asked for, and
     /// remembers them.
     #[derive(Default)]
@@ -497,6 +522,10 @@ mod tests {
             let mut loaded = self.textures.borrow_mut();
             loaded.push((path.clone(), filter));
             Ok(TextureId::from_index(loaded.len() - 1))
+        }
+
+        fn texture_size(&self, _texture: TextureId) -> Option<[u32; 2]> {
+            Some(IMAGE_SIZE)
         }
 
         fn mesh(&mut self, shape: MeshShape) -> EngineResult<Mesh3dId> {
@@ -513,6 +542,10 @@ mod tests {
                 .find_map(|(index, source)| {
                     (TextureId::from_index(index) == id).then(|| source.clone())
                 })
+        }
+
+        fn texture_size(&self, _texture: TextureId) -> Option<[u32; 2]> {
+            Some(IMAGE_SIZE)
         }
 
         fn mesh_source(&self, id: Mesh3dId) -> Option<MeshShape> {
@@ -637,6 +670,25 @@ mod tests {
         assert!(text.contains("texture = \"sprites/hero.png\""), "{text}");
         assert!(!text.contains("region"), "{text}");
         assert!(text.contains("[node.body]"), "{text}");
+    }
+
+    #[test]
+    fn sprite_regions_are_read_and_saved_in_pixels() {
+        let text = "format = 1\n[[node]]\nname = \"Coin\"\n[node.sprite]\n\
+                    texture = \"items.png\"\nsize = [1.0, 1.0]\nregion = [16, 8, 32, 8]\n";
+        let textures = Textures::default();
+        let scene = read(text, &textures).unwrap();
+        let mut world = World::new();
+        let root = scene.instantiate(&mut world, None).unwrap();
+        let sprite = *world.get::<SpriteNode>(root).unwrap();
+
+        assert_eq!(sprite.region.min, Vec2::new(0.25, 0.25));
+        assert_eq!(sprite.region.max, Vec2::new(0.75, 0.5));
+        let saved = Scene::capture(&world, root)
+            .unwrap()
+            .to_text(&textures)
+            .unwrap();
+        assert!(saved.contains("region = [16, 8, 32, 8]"), "{saved}");
     }
 
     #[test]

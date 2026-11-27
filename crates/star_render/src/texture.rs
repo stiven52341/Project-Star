@@ -34,6 +34,8 @@ impl TextureId {
 /// A texture together with the way it is sampled, as the shaders bind it.
 pub(crate) struct GpuTexture {
     pub(crate) bind_group: wgpu::BindGroup,
+    /// Width and height in pixels.
+    pub(crate) size: [u32; 2],
 }
 
 /// What every texture shares: how shaders see it, its samplers and its format.
@@ -134,7 +136,10 @@ impl TextureBindings {
                 },
             ],
         });
-        GpuTexture { bind_group }
+        GpuTexture {
+            bind_group,
+            size: [pixels.width, pixels.height],
+        }
     }
 }
 

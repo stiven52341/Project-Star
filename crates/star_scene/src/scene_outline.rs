@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use star_assets::{AssetFolder, AssetPath};
 use star_core::{EngineError, EngineResult};
 use star_math::Vec2;
-use star_render::{Color, Sprite, SpriteSheet, TextureFilter, TextureRegion};
+use star_render::{Color, PixelRegion, Sprite, SpriteSheet, TextureFilter};
 
 use star_physics::{BodySettings, Shape3d};
 
@@ -98,8 +98,8 @@ pub struct SpriteOutline {
     pub filter: TextureFilter,
     /// Width and height in world units, before the node's scale.
     pub size: Vec2,
-    /// Part of the image shown.
-    pub region: TextureRegion,
+    /// Part of the image shown, in pixels; `None` for all of it.
+    pub region: Option<PixelRegion>,
     /// Point of the sprite placed at the node, from `(0, 0)` (bottom-left
     /// corner) to `(1, 1)` (top-right corner).
     pub anchor: Vec2,
@@ -443,9 +443,7 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
 fn read_sprite(sprite: &SpriteData) -> EngineResult<SpriteOutline> {
     let region = sprite
         .region
-        .map_or(TextureRegion::FULL, |[min_x, min_y, max_x, max_y]| {
-            TextureRegion::new(Vec2::new(min_x, min_y), Vec2::new(max_x, max_y))
-        });
+        .map(|[x, y, width, height]| PixelRegion::new(x, y, width, height));
     Ok(SpriteOutline {
         texture: AssetPath::new(&sprite.texture)?,
         filter: sprite.filter.into(),
@@ -502,12 +500,7 @@ fn write_sprite(sprite: &SpriteOutline) -> SpriteData {
         texture: sprite.texture.as_str().to_owned(),
         filter: sprite.filter.into(),
         size: array(sprite.size),
-        region: (region != TextureRegion::FULL).then_some([
-            region.min.x,
-            region.min.y,
-            region.max.x,
-            region.max.y,
-        ]),
+        region: region.map(|region| [region.x, region.y, region.width, region.height]),
         anchor: (sprite.anchor != Sprite::CENTER).then(|| array(sprite.anchor)),
         color: (color != Color::WHITE).then_some([color.r, color.g, color.b, color.a]),
         layer: sprite.layer,
@@ -709,7 +702,7 @@ mod tests {
         let sprite = hero.sprite.as_ref().unwrap();
         assert_eq!(sprite.texture.as_str(), "sprites/hero.png");
         assert_eq!(sprite.filter, TextureFilter::Pixelated);
-        assert_eq!(sprite.region, TextureRegion::FULL);
+        assert_eq!(sprite.region, None);
         assert_eq!(sprite.anchor, Sprite::CENTER);
         assert_eq!(sprite.color, Color::rgba(1.0, 0.5, 0.5, 1.0));
         assert_eq!(sprite.sheet, SpriteSheet::SINGLE);

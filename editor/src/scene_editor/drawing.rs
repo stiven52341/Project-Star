@@ -7,7 +7,7 @@ use star_engine::MeshFile;
 use star_engine::prelude::{
     Affine2, AmbientLight, Camera, Color, DirectionalLight, Frame, GlobalTransform2D,
     GlobalTransform3D, MAX_LIGHTS, Mat4, Material, Mesh3dId, MeshId, MeshShape, SceneOutline,
-    SpriteNode, TextureFilter, TextureId, Vec2, Vec3, Vertex,
+    SpriteNode, TextureFilter, TextureId, TextureRegion, Vec2, Vec3, Vertex,
 };
 use star_engine::star_assets::AssetPath;
 use star_engine::star_platform::WindowConfig;
@@ -40,6 +40,8 @@ const CAMERA_PYRAMID_DEPTH: f32 = 1.0;
 /// the node is then drawn without them.
 pub(crate) trait SceneGpu {
     fn texture(&mut self, path: &AssetPath, filter: TextureFilter) -> Option<TextureId>;
+    /// Width and height in pixels of `texture`, given by [`Self::texture`].
+    fn texture_size(&self, texture: TextureId) -> Option<[u32; 2]>;
     fn mesh(&mut self, unit: MeshShape) -> Option<Mesh3dId>;
     /// The 3D model of `file`, read and uploaded once.
     fn model(&mut self, file: &AssetPath) -> Option<Arc<ShownModel>>;
@@ -276,8 +278,12 @@ fn draw_sprite(
     let Some(texture) = gpu.texture(&sprite.texture, sprite.filter) else {
         return;
     };
+    let region = match (sprite.region, gpu.texture_size(texture)) {
+        (Some(region), Some(size)) => region.in_texture(size),
+        _ => TextureRegion::FULL,
+    };
     let node = SpriteNode::new(texture, sprite.size)
-        .with_region(sprite.region)
+        .with_region(region)
         .with_anchor(sprite.anchor)
         .with_color(sprite.color)
         .with_layer(sprite.layer)
@@ -649,6 +655,10 @@ mod tests {
             })
         }
 
+        fn texture_size(&self, _texture: TextureId) -> Option<[u32; 2]> {
+            Some([64, 32])
+        }
+
         fn mesh(&mut self, unit: MeshShape) -> Option<Mesh3dId> {
             self.meshes.push(unit);
             Some(Mesh3dId::from_index(self.meshes.len()))
@@ -711,6 +721,22 @@ mod tests {
         };
         assert!((planet.position - Vec2::new(7.0, 0.0)).length() < EPSILON);
         assert!((planet.size - Vec2::new(2.0, 2.0)).length() < EPSILON);
+    }
+
+    #[test]
+    fn sprites_show_their_region_of_the_image() {
+        let scene = outline(
+            "[[node]]\nname = \"Coin\"\nposition = [0.0, 0.0]\n\
+             [node.sprite]\ntexture = \"items.png\"\nsize = [1.0, 1.0]\nregion = [16, 8, 32, 8]\n",
+        );
+
+        let (frame, _) = draw(&scene, None);
+
+        let [coin] = frame.sprites() else {
+            panic!("the coin is drawn");
+        };
+        assert_eq!(coin.region.min, Vec2::new(0.25, 0.25));
+        assert_eq!(coin.region.max, Vec2::new(0.75, 0.5));
     }
 
     #[test]

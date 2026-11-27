@@ -328,6 +328,12 @@ impl SceneRenderer {
             .ok_or_else(|| EngineError::Rendering(format!("unknown 3D mesh {id:?}")))
     }
 
+    /// Width and height in pixels of the texture `id`, if it is one of
+    /// this renderer.
+    pub(crate) fn texture_size(&self, id: TextureId) -> Option<[u32; 2]> {
+        self.textures.get(id.0).map(|texture| texture.size)
+    }
+
     fn texture(&self, id: TextureId) -> EngineResult<&GpuTexture> {
         self.textures
             .get(id.0)

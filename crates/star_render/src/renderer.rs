@@ -146,6 +146,14 @@ impl Renderer {
         self.scene.replace_texture(id, image, filter)
     }
 
+    /// Width and height in pixels of the texture `id`, if it is one of
+    /// this renderer: what [`PixelRegion`](crate::PixelRegion)s are cut
+    /// from.
+    #[must_use]
+    pub fn texture_size(&self, id: TextureId) -> Option<[u32; 2]> {
+        self.scene.texture_size(id)
+    }
+
     /// Adapts the render target to a new window size.
     pub fn resize(&mut self, size: WindowSize) {
         if size.is_empty() {

@@ -128,6 +128,8 @@ pub(super) static ENGLISH: Texts = Texts {
     filter: "Filter",
     anchor: "Anchor",
     region: "Region",
+    region_size: "Region size",
+    region_hint: "The part of the image shown, in pixels from its top-left corner. A width or height of 0 shows the whole image.",
     sheet_columns: "Columns",
     sheet_rows: "Rows",
     sheet_frame: "Frame",

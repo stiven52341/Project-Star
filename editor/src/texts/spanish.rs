@@ -128,6 +128,8 @@ pub(super) static SPANISH: Texts = Texts {
     filter: "Filtro",
     anchor: "Ancla",
     region: "Región",
+    region_size: "Tamaño de región",
+    region_hint: "La parte de la imagen que se muestra, en píxeles desde su esquina superior izquierda. Un ancho o alto de 0 muestra la imagen entera.",
     sheet_columns: "Columnas",
     sheet_rows: "Filas",
     sheet_frame: "Fotograma",

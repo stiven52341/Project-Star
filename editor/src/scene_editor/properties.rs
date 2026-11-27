@@ -11,7 +11,7 @@ use star_engine::prelude::{
 use star_engine::star_assets::{AssetPath, BuiltinImage};
 use star_engine::star_render::{
     DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MAX_SPHERE_DIVISIONS, MIN_SPHERE_RINGS,
-    MIN_SPHERE_SEGMENTS, SpriteSheet,
+    MIN_SPHERE_SEGMENTS, PixelRegion, SpriteSheet,
 };
 use star_engine::star_scene::{
     Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, ModelNode, NodeOutline,
@@ -306,8 +306,7 @@ fn edit_sprite(
         &mut sprite.size,
     );
     changed |= vec2_row(ui, texts.anchor, &mut sprite.anchor);
-    changed |= vec2_row(ui, texts.region, &mut sprite.region.min);
-    changed |= vec2_row(ui, "", &mut sprite.region.max);
+    changed |= region_rows(ui, &mut sprite.region);
     changed |= sheet_rows(ui, &mut sprite.sheet, keys);
     changed |= color_row(ui, keyed(keys, texts.color, &["color"]), &mut sprite.color);
     changed
@@ -317,6 +316,37 @@ fn edit_sprite(
             &mut sprite.layer,
             i32::MIN..=i32::MAX,
         )
+}
+
+/// The part of the image a sprite shows, in pixels: its corner, then its
+/// size, where a width or height of 0 is the whole image (`None`).
+fn region_rows(ui: &mut egui::Ui, region: &mut Option<PixelRegion>) -> bool {
+    let texts = texts::current();
+    let mut pixels = region.unwrap_or(PixelRegion::new(0, 0, 0, 0));
+    let mut changed = pixel_pair_row(ui, texts.region, [&mut pixels.x, &mut pixels.y]);
+    changed |= pixel_pair_row(
+        ui,
+        texts.region_size,
+        [&mut pixels.width, &mut pixels.height],
+    );
+    if changed {
+        *region = (pixels.width > 0 && pixels.height > 0).then_some(pixels);
+    }
+    changed
+}
+
+/// Two whole numbers of pixels side by side, explained by the region's hint.
+fn pixel_pair_row(ui: &mut egui::Ui, name: &str, values: [&mut u32; 2]) -> bool {
+    ui.label(name).on_hover_text(texts::current().region_hint);
+    let changed = ui
+        .horizontal(|ui| {
+            values.into_iter().fold(false, |changed, value| {
+                changed | ui.add(egui::DragValue::new(value)).changed()
+            })
+        })
+        .inner;
+    ui.end_row();
+    changed
 }
 
 /// How a sprite's region is cut into cells, and the one it shows.

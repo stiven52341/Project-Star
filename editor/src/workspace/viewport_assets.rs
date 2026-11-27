@@ -69,6 +69,10 @@ impl SceneGpu for Loader<'_> {
         texture
     }
 
+    fn texture_size(&self, texture: TextureId) -> Option<[u32; 2]> {
+        self.renderer.texture_size(texture)
+    }
+
     fn mesh(&mut self, unit: MeshShape) -> Option<Mesh3dId> {
         let meshes = &mut self.assets.meshes;
         if let Some((_, mesh)) = meshes.iter().find(|(built, _)| *built == unit) {

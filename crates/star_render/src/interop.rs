@@ -145,6 +145,14 @@ impl OffscreenRenderer {
         self.scene.create_texture(image, filter)
     }
 
+    /// Width and height in pixels of the texture `id`, if it is one of
+    /// this renderer: what [`PixelRegion`](crate::PixelRegion)s are cut
+    /// from.
+    #[must_use]
+    pub fn texture_size(&self, id: TextureId) -> Option<[u32; 2]> {
+        self.scene.texture_size(id)
+    }
+
     /// Draws `frame` into the color texture and submits the work to the queue.
     ///
     /// # Errors

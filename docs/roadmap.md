@@ -1533,5 +1533,28 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       - [x] d. 2D and 3D sound: players sound quieter with their distance
             to the camera (between a near and a far distance), and from
             the left or the right.
-    - [ ] A sprite editor (after Godot's).
+    - [ ] A sprite editor (after Godot's). Plan agreed with the owner
+          (2026-11-27, decision 88): four parts, done one by one, in this
+          order:
+      - [ ] A. Regions: the part of an image a sprite shows, in pixels.
+        - [x] A1. The engine: `star_render::PixelRegion`, made a
+              `TextureRegion` once the texture's size is known
+              (`Renderer::texture_size`); scenes keep `region` as
+              `[x, y, width, height]` in pixels; `SpriteFile` has one; the
+              inspector edits it in pixels (a width or height of 0 is the
+              whole image).
+        - [ ] A2. StarScript: `region_x`, `region_y`, `region_width` and
+              `region_height` of `Sprite`, in pixels (a width of 0 is the
+              whole image), compiled and interpreted; scenes loaded by
+              scripts keep their sprites' regions.
+        - [ ] A3. The editor: “Edit region…” in the sprite's inspector
+              opens a window with the image (zoom, pan), where a rectangle
+              is dragged, snapped to pixels or to the sheet's cells.
+      - [ ] D. Import settings of each image (filter, pixels per unit,
+            default anchor), kept in a file beside it.
+      - [ ] B. Slices: an image cut into named rectangles of any size, by
+            hand, by a grid with margin and spacing, or found by
+            transparency; regions and frames may name them.
+      - [ ] C. Painting pixels: pencil, eraser, fill, picker and color, with
+            undo, saved to the same PNG.
 - [ ] **Future — Consoles** (PlayStation, Xbox).

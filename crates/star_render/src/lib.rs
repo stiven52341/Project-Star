@@ -55,7 +55,7 @@ pub use mesh_data::{
 pub use model_mesh::{ModelMeshPart, upload_model};
 pub use renderer::{Renderer, RendererConfig};
 pub use skinning::MAX_JOINTS;
-pub use sprite::{Sprite, SpriteSheet, TextureRegion};
+pub use sprite::{PixelRegion, Sprite, SpriteSheet, TextureRegion};
 pub use star_core::Image;
 pub use texture::{TextureFilter, TextureId};
 pub use vertex::Vertex;

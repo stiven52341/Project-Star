@@ -3,7 +3,7 @@
 use star_assets::AssetPath;
 use star_core::EngineResult;
 use star_math::Vec2;
-use star_render::{Color, SpriteSheet, TextureFilter, TextureId};
+use star_render::{Color, PixelRegion, SpriteSheet, TextureFilter, TextureId};
 
 use crate::texture_slot::TextureSlot;
 
@@ -20,6 +20,8 @@ pub struct SpriteFile {
     pub filter: TextureFilter,
     /// Width and height in world units, before the node's scale.
     pub size: Vec2,
+    /// The part of the image shown, in pixels; `None` for all of it.
+    pub region: Option<PixelRegion>,
     /// Sprites in higher layers are drawn on top of lower ones.
     pub layer: i32,
     /// Multiplied by the image's colors.
@@ -38,6 +40,7 @@ impl SpriteFile {
             path,
             filter: TextureFilter::Smooth,
             size,
+            region: None,
             layer: 0,
             color: Color::WHITE,
             sheet: SpriteSheet::SINGLE,
@@ -49,6 +52,13 @@ impl SpriteFile {
     #[must_use]
     pub fn with_filter(mut self, filter: TextureFilter) -> Self {
         self.filter = filter;
+        self
+    }
+
+    /// The same sprite showing only `region` of its image.
+    #[must_use]
+    pub fn with_region(mut self, region: PixelRegion) -> Self {
+        self.region = Some(region);
         self
     }
 

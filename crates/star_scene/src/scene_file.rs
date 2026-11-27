@@ -94,9 +94,10 @@ pub(crate) struct SpriteData {
     #[serde(default)]
     pub(crate) filter: FilterData,
     pub(crate) size: [f32; 2],
-    /// Top-left and bottom-right corners: `[min_x, min_y, max_x, max_y]`.
+    /// The part of the image shown, in pixels: `[x, y, width, height]`
+    /// from its top-left corner.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) region: Option<[f32; 4]>,
+    pub(crate) region: Option<[u32; 4]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) anchor: Option<[f32; 2]>,
     /// Red, green, blue and alpha, from 0 to 1, in sRGB.
@@ -226,7 +227,7 @@ mod tests {
                     texture: "hero.png".to_owned(),
                     filter: FilterData::Smooth,
                     size: [1.0, 1.0],
-                    region: Some([0.0, 0.0, 0.5, 1.0]),
+                    region: Some([0, 0, 16, 32]),
                     anchor: None,
                     color: None,
                     layer: 3,
