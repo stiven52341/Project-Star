@@ -946,6 +946,10 @@ any width), its length as minutes and seconds, its channels and rate, and
 time something plays, and keeps it; without one the editor stays silent,
 warned once. Closing the tab stops its sound. The assets' menu of a sound
 has “Play” too, which plays it in place of the last one it played.
+A node gets a sound player from the inspector's “Add” (the first sound of
+the assets), or by dropping a sound on the scene, where it lands; its
+section chooses the sound among those of the assets, its volume, “Loop”
+and “Play on start”.
 
 3D models (`.glb`, `.gltf`, decision 83) are assets of their own kind:
 dragged onto the scene of a 3D project they become a node with a

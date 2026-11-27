@@ -230,6 +230,7 @@ impl EditorWindow {
                         keyframes: self.assets.keyframes(),
                         states: self.assets.states(),
                         models: self.assets.models(),
+                        sounds: self.assets.sounds(),
                     },
                     self.live_check.outline().map(|outline| &outline.classes),
                 ),

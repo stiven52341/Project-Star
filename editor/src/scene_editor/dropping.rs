@@ -7,8 +7,8 @@
 use star_engine::prelude::{
     Affine2, Mat4, MeshShape, TextureFilter, Transform2D, Transform3D, Vec2, Vec3,
 };
-use star_engine::star_assets::{AssetPath, ModelFormat};
-use star_engine::star_scene::{MeshOutline, ModelNode, NodeOutline};
+use star_engine::star_assets::{AssetPath, ModelFormat, SoundFormat};
+use star_engine::star_scene::{MeshOutline, ModelNode, NodeOutline, SoundPlayerNode};
 
 use super::components::{new_mesh, new_node, sprite_of};
 use super::picking::Ray;
@@ -63,6 +63,26 @@ impl AssetDrop {
     ) -> Option<NodeOutline> {
         let texture = AssetPath::new(&self.path).ok()?;
         let mut node = new_node(name, dimension);
+        if SoundFormat::of(&texture).is_ok() {
+            // A sound plays from where it is dropped.
+            match dimension {
+                ProjectDimension::TwoD => {
+                    let position = parent
+                        .0
+                        .inverse()?
+                        .transform_point(Vec2::new(world.x, world.y));
+                    node.transform = Some(Transform2D::from_position(position));
+                }
+                ProjectDimension::ThreeD => {
+                    node.transform_3d = Some(Transform3D {
+                        position: parent.1.inverse()?.transform_point(world),
+                        ..Transform3D::IDENTITY
+                    });
+                }
+            }
+            node.sound_player = Some(SoundPlayerNode::new(texture));
+            return Some(node);
+        }
         if ModelFormat::of(&texture).is_ok() {
             if dimension == ProjectDimension::TwoD {
                 return None;
@@ -171,6 +191,29 @@ mod tests {
         let mesh = node.mesh.unwrap();
         assert_eq!(mesh.shape, MeshShape::Plane { size: Vec2::ONE });
         assert!(mesh.texture.is_some());
+    }
+
+    #[test]
+    fn sounds_become_players_where_they_land() {
+        let place = Vec3::new(1.0, 2.0, 0.0);
+
+        let flat = drop("sounds/hit.wav", None)
+            .node("hit".to_owned(), ProjectDimension::TwoD, place, NO_PARENT)
+            .unwrap();
+        let solid = drop("music/theme.ogg", None)
+            .node(
+                "theme".to_owned(),
+                ProjectDimension::ThreeD,
+                place,
+                NO_PARENT,
+            )
+            .unwrap();
+
+        assert_eq!(flat.transform.unwrap().position, Vec2::new(1.0, 2.0));
+        assert_eq!(flat.sound_player.unwrap().sound.as_str(), "sounds/hit.wav");
+        assert!(flat.sprite.is_none());
+        assert!(solid.transform_3d.is_some() && solid.sound_player.is_some());
+        assert!(solid.mesh.is_none());
     }
 
     #[test]

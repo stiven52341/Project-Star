@@ -129,6 +129,8 @@ pub(crate) struct AssetsPanel {
     keyframes: Vec<String>,
     /// The `.states` files among the contents, as paths inside the folder.
     states: Vec<String>,
+    /// The sounds among the contents, as paths inside the assets folder.
+    sounds: Vec<String>,
     /// The 3D models (`.glb`, `.gltf`) among the contents, as paths inside
     /// the folder.
     models: Vec<String>,
@@ -156,6 +158,7 @@ impl AssetsPanel {
             keyframes: paths_ending_with(&contents, KEYFRAMES_EXTENSION),
             states: paths_ending_with(&contents, STATES_EXTENSION),
             models: model_paths(&contents),
+            sounds: sound_paths(&contents),
             thumbnails: Thumbnails::new(&directory),
             directory,
             contents,
@@ -191,6 +194,7 @@ impl AssetsPanel {
         self.keyframes = paths_ending_with(&self.contents, KEYFRAMES_EXTENSION);
         self.states = paths_ending_with(&self.contents, STATES_EXTENSION);
         self.models = model_paths(&self.contents);
+        self.sounds = sound_paths(&self.contents);
         self.thumbnails.clear();
     }
 
@@ -216,6 +220,12 @@ impl AssetsPanel {
     /// when it was last listed.
     pub(crate) fn states(&self) -> &[String] {
         &self.states
+    }
+
+    /// The sounds of the folder, as paths inside it, as they were when it
+    /// was last listed.
+    pub(crate) fn sounds(&self) -> &[String] {
+        &self.sounds
     }
 
     /// The 3D models of the folder, as paths inside it, as they were when
@@ -479,7 +489,10 @@ impl AssetsPanel {
             .then(|| self.thumbnails.get(ui.ctx(), &entry.path))
             .flatten()
             .map(|texture| (texture.id(), texture.size_vec2()));
-        if matches!(entry.kind, AssetKind::Image | AssetKind::Model) {
+        if matches!(
+            entry.kind,
+            AssetKind::Image | AssetKind::Model | AssetKind::Sound
+        ) {
             response.dnd_set_drag_payload(AssetDrop {
                 path: entry.path.clone(),
                 aspect: thumbnail.map(|(_, size)| size.x / size.y),
@@ -709,6 +722,21 @@ fn create_menu(ui: &mut egui::Ui, dimension: ProjectDimension, choice: &mut Opti
 }
 
 /// The paths of the images among `contents`.
+/// The sounds of `contents`, as paths inside the assets folder.
+fn sound_paths(contents: &io::Result<Vec<FileNode>>) -> Vec<String> {
+    let Ok(nodes) = contents else {
+        return Vec::new();
+    };
+    file_paths(nodes)
+        .into_iter()
+        .filter(|path| {
+            AssetPath::new(path)
+                .and_then(|path| SoundFormat::of(&path))
+                .is_ok()
+        })
+        .collect()
+}
+
 /// The 3D models of `contents`, as paths inside the assets folder.
 fn model_paths(contents: &io::Result<Vec<FileNode>>) -> Vec<String> {
     let Ok(nodes) = contents else {

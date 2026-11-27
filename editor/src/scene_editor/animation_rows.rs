@@ -29,6 +29,8 @@ pub(crate) struct AssetFiles<'files> {
     pub(crate) states: &'files [String],
     /// The 3D models (`.glb`, `.gltf`), for `Model` nodes.
     pub(crate) models: &'files [String],
+    /// The sounds, for sound players.
+    pub(crate) sounds: &'files [String],
 }
 
 impl AssetFiles<'_> {

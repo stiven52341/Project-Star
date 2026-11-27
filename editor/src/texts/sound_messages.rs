@@ -14,6 +14,33 @@ impl Texts {
         self.pick("Stop", "Detener")
     }
 
+    pub(crate) const fn sound_player_section(&self) -> &'static str {
+        self.pick("Sound player", "Reproductor de sonido")
+    }
+
+    pub(crate) const fn sound_file(&self) -> &'static str {
+        self.pick("Sound", "Sonido")
+    }
+
+    pub(crate) const fn volume(&self) -> &'static str {
+        self.pick("Volume", "Volumen")
+    }
+
+    pub(crate) const fn looping(&self) -> &'static str {
+        self.pick("Loop", "Repetir")
+    }
+
+    pub(crate) const fn play_on_start(&self) -> &'static str {
+        self.pick("Play on start", "Sonar al empezar")
+    }
+
+    pub(crate) const fn no_sounds_hint(&self) -> &'static str {
+        self.pick(
+            "Copy a sound (.wav, .ogg, .mp3 or .flac) into the assets folder first.",
+            "Copia antes un sonido (.wav, .ogg, .mp3 o .flac) en la carpeta assets.",
+        )
+    }
+
     pub(crate) const fn sound_inspector_hint(&self) -> &'static str {
         self.pick(
             "A sound of the project. Play it to hear it; scripts load it with Sound.load.",

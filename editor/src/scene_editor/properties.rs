@@ -15,7 +15,7 @@ use star_engine::star_render::{
 };
 use star_engine::star_scene::{
     Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, ModelNode, NodeOutline,
-    SpriteLook, SpriteOutline, shaped_by_sprite,
+    SoundPlayerNode, SpriteLook, SpriteOutline, shaped_by_sprite,
 };
 
 use super::animation_rows::{AssetFiles, animation_rows};
@@ -128,6 +128,12 @@ pub(super) fn edit_node(
     changed |= optional_section(ui, texts.camera_3d, &mut node.camera_3d, |ui, camera| {
         edit_camera_3d(ui, camera, keys)
     });
+    changed |= optional_section(
+        ui,
+        texts.sound_player_section(),
+        &mut node.sound_player,
+        |ui, player| edit_sound_player(ui, player, context.animations.sounds),
+    );
     changed |= optional_section(ui, texts.model_section(), &mut node.model, |ui, model| {
         edit_model(ui, model, context.animations.models)
     });
@@ -571,6 +577,27 @@ fn edit_camera_2d(ui: &mut egui::Ui, camera: &mut Camera2dNode, keys: Option<&Ke
         &mut camera.main,
         texts.main_camera_hint,
     )
+}
+
+/// The rows of a sound player: its sound, among the `sounds` of the
+/// assets folder, its volume, and whether it loops and plays on start.
+fn edit_sound_player(ui: &mut egui::Ui, player: &mut SoundPlayerNode, sounds: &[String]) -> bool {
+    let texts = texts::current();
+    let current = player.sound.as_str().to_owned();
+    let mut chosen = Some(current.as_str());
+    let choices: Vec<(Option<&str>, &str)> = std::iter::once(current.as_str())
+        .filter(|current| !sounds.iter().any(|sound| sound == current))
+        .chain(sounds.iter().map(String::as_str))
+        .map(|sound| (Some(sound), sound))
+        .collect();
+    let mut changed = choice_row(ui, texts.sound_file(), &mut chosen, &choices);
+    if changed && let Some(sound) = chosen.and_then(|path| AssetPath::new(path).ok()) {
+        player.sound = sound;
+    }
+    changed |= number_from_row(ui, texts.volume(), &mut player.volume, 0.0);
+    changed |= checkbox_row(ui, texts.looping(), &mut player.looping);
+    changed |= checkbox_row(ui, texts.play_on_start(), &mut player.play_on_start);
+    changed
 }
 
 /// The model's file, among the `models` of the assets folder.

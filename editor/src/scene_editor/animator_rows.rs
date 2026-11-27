@@ -179,6 +179,7 @@ mod tests {
             keyframes: &keyframes,
             states: &[],
             models: &[],
+            sounds: &[],
         };
 
         let animator = new_animator(files).unwrap();

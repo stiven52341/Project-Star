@@ -13,7 +13,7 @@ use star_engine::star_render::{
 };
 use star_engine::star_scene::{
     Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, ModelNode, NodeOutline,
-    SpriteOutline,
+    SoundPlayerNode, SpriteOutline,
 };
 
 use super::animator_rows::new_animator;
@@ -133,6 +133,9 @@ pub(super) fn add_component_menu(
         if dimension == ProjectDimension::ThreeD && node.model.is_none() {
             added |= model_entry(ui, node, context.animations.models);
         }
+        if node.sound_player.is_none() {
+            added |= sound_player_entry(ui, node, context.animations.sounds);
+        }
     });
     added
 }
@@ -150,6 +153,23 @@ fn model_entry(ui: &mut egui::Ui, node: &mut NodeOutline, models: &[String]) -> 
         return false;
     }
     node.model = Some(ModelNode { file });
+    ui.close();
+    true
+}
+
+/// The entry that gives `node` a player of the first of `sounds`, or a
+/// disabled one saying why it cannot. Returns whether it gave one.
+fn sound_player_entry(ui: &mut egui::Ui, node: &mut NodeOutline, sounds: &[String]) -> bool {
+    let texts = texts::current();
+    let Some(sound) = sounds.first().and_then(|path| AssetPath::new(path).ok()) else {
+        ui.add_enabled(false, egui::Button::new(texts.sound_player_section()))
+            .on_disabled_hover_text(texts.no_sounds_hint());
+        return false;
+    };
+    if !ui.button(texts.sound_player_section()).clicked() {
+        return false;
+    }
+    node.sound_player = Some(SoundPlayerNode::new(sound));
     ui.close();
     true
 }
