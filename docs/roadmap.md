@@ -1459,6 +1459,20 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           simple shape (a capsule), and also an automatic one that fits
           every polygon of the model (a triangle mesh): costly, but the
           engine is a tool and must spare the developer that work.
+          Plan agreed with the owner (decision 84):
+      - [x] a. Shapes follow the global scale of their node, in 2D and
+            3D (as in Unity): boxes and rectangles along each axis,
+            spheres and circles by the largest one, capsules with their
+            height by y and their radius by the largest of the others; a
+            scale that changes while playing rebuilds the shape, and the
+            editor draws it scaled.
+      - [ ] b. A `mesh` shape for 3D bodies, made from the node's `Mesh`
+            or `Model` (a skinned model in its rest pose): its exact
+            triangles for static and kinematic bodies, its convex hull for
+            dynamic ones (triangles have no volume to fall and roll with).
+      - [ ] c. A “Fit” button in the body's inspector section that sizes
+            its box, sphere or capsule to the bounds of the node's mesh or
+            model.
   - To do:
     - [ ] Frames per second shown while a game runs.
     - [ ] Basic 2D bodies: shape nodes for 2D (a box, for example) that

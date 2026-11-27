@@ -3,7 +3,7 @@
 use star_core::{EngineError, EngineResult};
 use star_math::Vec3;
 
-use crate::shape::check_size;
+use crate::shape::{check_size, scale_factor};
 
 /// The volume of a 3D body, centered on it, in world units.
 ///
@@ -84,6 +84,31 @@ impl Shape3d {
         })
     }
 
+    /// The shape stretched by `scale`, the scale of its node in the world
+    /// (mirroring is ignored): a box along each axis, a sphere by the
+    /// largest one, and a capsule with its height by `y` and its radius by
+    /// the larger of `x` and `z`, kept at least as high as its half
+    /// spheres. A factor smaller than
+    /// [`MIN_SHAPE_SCALE`](crate::MIN_SHAPE_SCALE) counts as that one.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Physics`] if a factor is not finite.
+    pub fn scaled(self, scale: Vec3) -> EngineResult<Self> {
+        let [x, y, z] = [scale.x, scale.y, scale.z].map(scale_factor);
+        let (x, y, z) = (x?, y?, z?);
+        match self.kind {
+            ShapeKind3d::Sphere { radius } => Self::sphere(radius * x.max(y).max(z)),
+            ShapeKind3d::Box { size } => {
+                Self::cuboid(Vec3::new(size.x * x, size.y * y, size.z * z))
+            }
+            ShapeKind3d::Capsule { height, radius } => {
+                let radius = radius * x.max(z);
+                Self::capsule((height * y).max(2.0 * radius), radius)
+            }
+        }
+    }
+
     /// What the shape is, with its sizes.
     #[must_use]
     pub const fn kind(&self) -> ShapeKind3d {
@@ -117,6 +142,39 @@ mod tests {
         assert!(Shape3d::cuboid(Vec3::new(1.0, 1.0, -1.0)).is_err());
         assert!(Shape3d::cuboid(Vec3::new(1.0, f32::INFINITY, 1.0)).is_err());
         assert!(Shape3d::capsule(1.0, 0.0).is_err());
+    }
+
+    #[test]
+    fn shapes_stretch_with_their_nodes() {
+        let scale = Vec3::new(3.0, 1.0, -2.0);
+
+        assert_eq!(
+            Shape3d::cuboid(Vec3::ONE).unwrap().scaled(scale).unwrap(),
+            Shape3d::cuboid(Vec3::new(3.0, 1.0, 2.0)).unwrap()
+        );
+        assert_eq!(
+            Shape3d::sphere(0.5).unwrap().scaled(scale).unwrap(),
+            Shape3d::sphere(1.5).unwrap()
+        );
+        assert_eq!(
+            Shape3d::capsule(2.0, 0.5)
+                .unwrap()
+                .scaled(Vec3::new(1.0, 2.0, 1.5))
+                .unwrap(),
+            Shape3d::capsule(4.0, 0.75).unwrap()
+        );
+        assert_eq!(
+            Shape3d::capsule(2.0, 0.5).unwrap().scaled(scale).unwrap(),
+            Shape3d::capsule(3.0, 1.5).unwrap(),
+            "the capsule keeps room for its half spheres"
+        );
+        assert!(Shape3d::sphere(1.0).unwrap().scaled(Vec3::ZERO).is_ok());
+        assert!(
+            Shape3d::sphere(1.0)
+                .unwrap()
+                .scaled(Vec3::new(1.0, f32::INFINITY, 1.0))
+                .is_err()
+        );
     }
 
     #[test]

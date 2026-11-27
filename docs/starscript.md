@@ -931,7 +931,10 @@ class Hero extends Sprite {
   `sensor`): the engine then replaces the body. Only the sizes of the
   shape are used: `radius` for circles, `width` and `height` for
   rectangles, `height` (half circles included) and `radius` for capsules.
-  Shapes are not scaled with the node.
+  Shapes are stretched by the node's scale in the world (decision 84):
+  rectangles and boxes along each axis, circles and spheres by the
+  largest factor, capsules with their height by `y` and their radius by
+  the others; a scale changed while playing remakes the shape.
 - A body that cannot be simulated (an unknown kind or shape, a size that is
   not positive, a negative friction) is left out, and the reason is written
   once to the error output; the node goes on without a body.

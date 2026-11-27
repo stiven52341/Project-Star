@@ -173,6 +173,15 @@ impl Mat4 {
         Vec3::new(x, y, z)
     }
 
+    /// How much the matrix stretches each of its axes: the lengths of its
+    /// first three columns. Mirroring is not told apart from stretching.
+    #[must_use]
+    pub fn scale(self) -> Vec3 {
+        let length = |[x, y, z, _]: [f32; 4]| Vec3::new(x, y, z).length();
+        let [x_axis, y_axis, z_axis, _] = self.columns;
+        Vec3::new(length(x_axis), length(y_axis), length(z_axis))
+    }
+
     /// The matrix with its rows as columns.
     #[must_use]
     pub fn transposed(self) -> Self {
@@ -301,6 +310,17 @@ mod tests {
             Vec3::new(0.0, 2.0, 5.0),
         );
         assert_eq!(transform.translation(), Vec3::new(0.0, 0.0, 5.0));
+    }
+
+    #[test]
+    fn the_scale_survives_rotations() {
+        let transform = Mat4::from_scale_rotation_translation(
+            Vec3::new(2.0, 3.0, 0.5),
+            Quat::from_rotation_y(0.7) * Quat::from_rotation_x(1.1),
+            Vec3::new(4.0, 0.0, 1.0),
+        );
+
+        assert_close(transform.scale(), Vec3::new(2.0, 3.0, 0.5));
     }
 
     #[test]

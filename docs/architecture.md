@@ -139,6 +139,7 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
 | 81 | **Transitions between animations are a state machine of a `.states` file, named by the `Animator`** | Agreed with the owner (2026-11-26). A `.states` file (TOML, `star_scene::AnimationStates`) holds the values scripts set (numbers, flags and triggers, which last one frame), the starting state, states that play one animation of the animator's `.anim` file or blend several by where a number is between their points (walk and run by speed), each with its place on the editor's graph, and transitions tried in order: from a state (or, left out, from any other), to a state, with conditions that all must hold (`above`/`below` a number, a flag `is` a value, a trigger set), a fade in seconds and whether to wait for the animation's end. An `Animator` names it in a field of its own, `states`, so the machine reuses the animations of its `.anim` and an animator without it plays as before; one file serves every scene. Validated when read: names of their own, a start among the states, values of the right kind for blends and conditions, transitions between two different states. Rejected: the machine inside the `.anim` file (animations are reused without a machine, and the editor edits each in its own tab) and conditions as written expressions (a parser of their own, and harder to edit on a graph) |
 | 82 | **2D skeletons are cut-out: `Bone2D` nodes that sprites hang from** | Agreed with the owner (2026-11-26: cut-out first). A cut-out character is a tree of `Bone2D` nodes (StarScript's class, `[node.bone]` in scenes, `star_scene::Bone2dNode`) whose sprites are their children, so turning a bone turns everything under it with the transforms the engine already propagates, and `.anim` tracks and tweens animate bones' `rotation` (and `length`) as any other property, compiled and interpreted. A bone has only a `length`, along its +x: it is not drawn while a game plays, and the editor draws and picks it and starts the bones added under it at its end, so a skeleton is built by adding bone under bone. Rejected for now: sprites bent by weighted polygons (meshes and weights to paint in the editor; they may come later over the same bones) and inverse kinematics (YAGNI until a game needs it) |
 | 83 | **3D models are glTF files read by `star_assets` through the `gltf` crate (MIT/Apache-2.0), shown by a `Model` node** | Agreed with the owner (2026-11-26). glTF 2.0 is the open format every modeling tool exports, with the materials of decision 48 (metallic-roughness), skeletons and animations (for 15f.3 and 15f.4). `gltf` (the `gltf-rs` crates, maintained, pure Rust) only parses the file, with its `utils` feature for reading buffers; its own image decoding and fetching of URIs are left off, so images go through the engine's PNG and JPEG decoders and a `.gltf`'s other files through the `AssetFolder` (`load_model`), on every platform. A model in memory is `star_core::Model` (dependency-free, like `Image`): its parts, each a mesh with its material and place in the model, and the images they show, kept once each. Read: the default scene (or the first one), the triangles of every mesh, their normals (made from the faces if missing) and first texture coordinates, base color, metalness, roughness and base color texture. Data kept inside URIs is rejected (export as `.glb`). Scenes and StarScript show a model with a new node class `Model`, which extends `Node3D` and names its file (owner's choice over a shape of `Mesh`, which has one material, and over importing a model as a scene) |
+| 84 | **Body shapes follow the scale of their node; 3D bodies can take the shape of their mesh** | Agreed with the owner (2026-11-26), as in Unity. A shape is stretched by its node's scale in the world, in 2D and 3D: boxes and rectangles along each axis, spheres and circles by the largest factor (they stay round), capsules with their height by `y` and their radius by the largest of the others (they stay upright and at least as high as their round ends); mirroring is ignored. The engine remakes the shape when the scale changes while playing, and the editor draws it stretched. A `mesh` shape (15f follow-up b) takes the triangles of the node's `Mesh` or `Model`: exact triangles for static and kinematic bodies, the convex hull for dynamic ones, which need a volume to fall and roll; a skinned model gives its rest pose. The inspector's “Fit” sizes a box, sphere or capsule to the bounds of the node's mesh or model |
 
 ## ECS
 
@@ -265,8 +266,8 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   node along its rotation, picks it by clicking it, and starts the nodes
   added under a bone at its end.
   The editor also draws the shape of every body (`[node.body]`,
-  `[node.body_3d]`), placed and turned as its node but not scaled, as the
-  physics has it; its “Physics” menu creates static, rigid and kinematic
+  `[node.body_3d]`), placed, turned and stretched as its node, as the
+  physics has it (decision 84); its “Physics” menu creates static, rigid and kinematic
   bodies and areas (static sensors, which detect every kind of body).
   Nodes may have `tags = ["enemy", …]` (the `Tags` component in worlds).
   Unknown fields are errors, so typos are not silently ignored. Scenes keep
@@ -458,8 +459,11 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   advances the simulation by the frame's time, writes the dynamic and
   kinematic bodies back into their nodes' `Transform2D` (in the space of
   the closest ancestor with a global transform), and turns the bodies'
-  contacts into `NodeContact`s between nodes. Shapes are not scaled with
-  their nodes. Cloning a `Body2D` gives a new body, so copied nodes never
+  contacts into `NodeContact`s between nodes. Shapes are stretched by
+  their node's scale in the world (`Shape2d::scaled`, decision 84), and
+  remade (`Physics2d::set_shape`) when that scale changes by more than
+  `SCALE_TOLERANCE`; a factor under `MIN_SHAPE_SCALE` counts as that one,
+  so a node shrunk to nothing keeps a tiny body. Cloning a `Body2D` gives a new body, so copied nodes never
   share one.
 - Scenes keep bodies: a `[node.body]` table has the `kind` (`dynamic` by
   default, `static`, `kinematic`), the `shape` (`circle` with `radius`,

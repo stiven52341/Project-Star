@@ -4,9 +4,9 @@
 use star_core::EngineResult;
 use star_ecs::{Entity, World};
 use star_math::{Mat4, Quat};
-use star_physics::{BodyKind, Physics3d};
+use star_physics::{BodyKind, BodySettings, Physics3d};
 
-use crate::node_physics::named_error;
+use crate::node_physics::{named_error, rescaled};
 use crate::{Body3D, GlobalTransform3D, Parent, PhysicsNodes3d, Transform3D};
 
 /// Runs the 3D physics of the nodes for a frame that took `elapsed`
@@ -61,27 +61,52 @@ fn place_bodies(
 ) -> EngineResult<()> {
     let mut failure = None;
     world.each::<(&mut Body3D, &Transform3D)>(|node, (body, local)| {
-        if failure.is_some() || !body.was_moved(local) {
+        if failure.is_some() {
             return;
         }
         let global = parent_global(world, node) * local.to_mat4();
+        let scale = global.scale();
+        let rescaled = rescaled(
+            body.shaped_scale().map(|old| [old.x, old.y, old.z]),
+            [scale.x, scale.y, scale.z],
+        );
+        if !rescaled && !body.was_moved(local) {
+            return;
+        }
+        let shape = match body.settings().shape.scaled(scale) {
+            Ok(shape) => shape,
+            Err(error) => {
+                failure = Some(named_error(world, node, &error));
+                return;
+            }
+        };
         let position = global.translation();
         // A node scaled to nothing keeps no rotation.
         let rotation = Quat::from_mat4(global).unwrap_or(Quat::IDENTITY);
-        match body.id() {
-            Some(id) => {
-                physics.set_position(id, position);
-                physics.set_rotation(id, rotation);
-                body.wrote(*local);
+        if let Some(id) = body.id() {
+            physics.set_position(id, position);
+            physics.set_rotation(id, rotation);
+            if rescaled {
+                physics.set_shape(id, &shape);
             }
-            None => match physics.add_body(body.settings(), position, rotation) {
+            body.wrote(*local);
+        } else {
+            let settings = BodySettings {
+                shape,
+                ..*body.settings()
+            };
+            match physics.add_body(&settings, position, rotation) {
                 Ok(id) => {
                     body.placed(id, *local);
                     nodes.add(id, node);
                 }
-                Err(error) => failure = Some(named_error(world, node, &error)),
-            },
+                Err(error) => {
+                    failure = Some(named_error(world, node, &error));
+                    return;
+                }
+            }
         }
+        body.shaped(scale);
     })?;
     failure.map_or(Ok(()), Err)
 }
@@ -147,7 +172,7 @@ mod tests {
     use std::f32::consts::FRAC_PI_2;
 
     use star_math::Vec3;
-    use star_physics::{BodySettings, ContactPhase, Shape3d};
+    use star_physics::{ContactPhase, Shape3d};
 
     use super::*;
     use crate::{Hierarchy, NodeContact, TransformPropagation};
@@ -226,6 +251,49 @@ mod tests {
         }));
         // The crate rests on the floor: 0.5 + 0.5 above its center.
         assert!((position(&world, crate_node).y - 1.0).abs() < 0.05);
+    }
+
+    #[test]
+    fn shapes_stretch_with_their_nodes() {
+        let mut world = world();
+        let floor = body_node(&mut world, "Floor", BodyKind::Static, Vec3::ZERO);
+        world.get_mut::<Transform3D>(floor).unwrap().scale = Vec3::new(10.0, 1.0, 10.0);
+        // Over the stretched floor, far from where an unscaled one ends.
+        let crate_node = body_node(
+            &mut world,
+            "Crate",
+            BodyKind::Dynamic,
+            Vec3::new(3.0, 2.0, -3.0),
+        );
+
+        frames(&mut world, 60);
+
+        assert!((position(&world, crate_node).y - 1.0).abs() < 0.05);
+    }
+
+    #[test]
+    fn shapes_follow_the_scale_of_their_parents() {
+        let mut world = world();
+        let level = world.spawn_node("Level", None).unwrap();
+        world.insert(level, Transform3D::IDENTITY).unwrap();
+        let floor = body_node(&mut world, "Floor", BodyKind::Static, Vec3::ZERO);
+        world.set_parent(floor, Some(level)).unwrap();
+        let crate_node = body_node(
+            &mut world,
+            "Crate",
+            BodyKind::Dynamic,
+            Vec3::new(0.0, 3.0, 0.0),
+        );
+        frames(&mut world, 60);
+        let resting = position(&world, crate_node).y;
+
+        // Wider than the crate, so it is pushed out upwards.
+        world.get_mut::<Transform3D>(level).unwrap().scale = Vec3::new(4.0, 3.0, 4.0);
+        frames(&mut world, 60);
+
+        assert!((resting - 1.0).abs() < 0.05, "{resting}");
+        let risen = position(&world, crate_node).y;
+        assert!((risen - 2.0).abs() < 0.05, "{risen}");
     }
 
     #[test]

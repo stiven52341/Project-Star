@@ -2,7 +2,7 @@
 
 use rapier3d::prelude::{
     ActiveCollisionTypes, ActiveEvents, ColliderBuilder, ColliderHandle, PhysicsWorld, Pose,
-    RigidBodyBuilder, RigidBodyHandle, Rotation, Vector,
+    RigidBodyBuilder, RigidBodyHandle, Rotation, SharedShape, Vector,
 };
 use star_core::EngineResult;
 use star_math::{Quat, Vec3};
@@ -167,6 +167,20 @@ impl Physics3d {
         }
     }
 
+    /// Gives `body` another shape, keeping where it is and how it moves:
+    /// the shape of a node whose scale changed. Its mass follows the new
+    /// shape.
+    pub fn set_shape(&mut self, body: BodyId3d, shape: &Shape3d) {
+        let Some(rigid_body) = self.world.bodies.get(body.0) else {
+            return;
+        };
+        for &collider in rigid_body.colliders() {
+            if let Some(collider) = self.world.colliders.get_mut(collider) {
+                collider.set_shape(shared_shape(shape));
+            }
+        }
+    }
+
     /// Simulates `elapsed` seconds more, in [`FIXED_STEP`]s, and gives how
     /// many steps ran. Time shorter than a step waits for the next call;
     /// at most [`MAX_STEPS_PER_ADVANCE`](crate::MAX_STEPS_PER_ADVANCE)
@@ -208,16 +222,7 @@ fn body_builder(settings: &BodySettings<Shape3d>) -> RigidBodyBuilder {
 }
 
 fn collider_builder(settings: &BodySettings<Shape3d>) -> ColliderBuilder {
-    let builder = match settings.shape.kind() {
-        ShapeKind3d::Sphere { radius } => ColliderBuilder::ball(radius),
-        ShapeKind3d::Box { size } => {
-            ColliderBuilder::cuboid(size.x / 2.0, size.y / 2.0, size.z / 2.0)
-        }
-        ShapeKind3d::Capsule { height, radius } => {
-            ColliderBuilder::capsule_y(height / 2.0 - radius, radius)
-        }
-    };
-    builder
+    ColliderBuilder::new(shared_shape(&settings.shape))
         .friction(settings.friction)
         .restitution(settings.bounciness)
         .density(settings.density)
@@ -226,6 +231,17 @@ fn collider_builder(settings: &BodySettings<Shape3d>) -> ColliderBuilder {
         // Every pair is reported, so a kinematic character also notices
         // static sensors (coins, doors); only dynamic bodies are pushed.
         .active_collision_types(ActiveCollisionTypes::all())
+}
+
+/// The collider shape of `shape`.
+fn shared_shape(shape: &Shape3d) -> SharedShape {
+    match shape.kind() {
+        ShapeKind3d::Sphere { radius } => SharedShape::ball(radius),
+        ShapeKind3d::Box { size } => SharedShape::cuboid(size.x / 2.0, size.y / 2.0, size.z / 2.0),
+        ShapeKind3d::Capsule { height, radius } => {
+            SharedShape::capsule_y(height / 2.0 - radius, radius)
+        }
+    }
 }
 
 fn to_vector(vector: Vec3) -> Vector {

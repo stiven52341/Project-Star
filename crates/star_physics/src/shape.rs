@@ -81,10 +81,49 @@ impl Shape2d {
         })
     }
 
+    /// The shape stretched by `scale`, the scale of its node in the world
+    /// (mirroring is ignored): a rectangle along each axis, a circle by
+    /// the larger one, and a capsule with its height by `y` and its radius
+    /// by `x`, kept at least as high as its half circles. A factor smaller
+    /// than [`MIN_SHAPE_SCALE`] counts as that one, so a node shrunk to
+    /// nothing keeps a tiny body.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Physics`] if a factor is not finite.
+    pub fn scaled(self, scale: Vec2) -> EngineResult<Self> {
+        let [x, y] = [scale.x, scale.y].map(scale_factor);
+        let (x, y) = (x?, y?);
+        match self.kind {
+            ShapeKind::Circle { radius } => Self::circle(radius * x.max(y)),
+            ShapeKind::Rectangle { size } => Self::rectangle(Vec2::new(size.x * x, size.y * y)),
+            ShapeKind::Capsule { height, radius } => {
+                let radius = radius * x;
+                Self::capsule((height * y).max(2.0 * radius), radius)
+            }
+        }
+    }
+
     /// What the shape is, with its sizes.
     #[must_use]
     pub const fn kind(&self) -> ShapeKind {
         self.kind
+    }
+}
+
+/// The smallest factor shapes are scaled by: a node scaled to nothing
+/// still has a body, too small to be met.
+pub const MIN_SHAPE_SCALE: f32 = 1e-3;
+
+/// A factor of a node's scale as shapes are stretched by it: without its
+/// sign, and at least [`MIN_SHAPE_SCALE`].
+pub(crate) fn scale_factor(factor: f32) -> EngineResult<f32> {
+    if factor.is_finite() {
+        Ok(factor.abs().max(MIN_SHAPE_SCALE))
+    } else {
+        Err(EngineError::Physics(format!(
+            "a body cannot be scaled by {factor}"
+        )))
     }
 }
 
@@ -125,6 +164,39 @@ mod tests {
         assert!(Shape2d::circle(f32::NAN).is_err());
         assert!(Shape2d::rectangle(Vec2::new(1.0, f32::INFINITY)).is_err());
         assert!(Shape2d::capsule(1.0, 0.0).is_err());
+    }
+
+    #[test]
+    fn shapes_stretch_with_their_nodes() {
+        let scale = Vec2::new(3.0, -2.0);
+
+        assert_eq!(
+            Shape2d::rectangle(Vec2::ONE)
+                .unwrap()
+                .scaled(scale)
+                .unwrap(),
+            Shape2d::rectangle(Vec2::new(3.0, 2.0)).unwrap()
+        );
+        assert_eq!(
+            Shape2d::circle(0.5).unwrap().scaled(scale).unwrap(),
+            Shape2d::circle(1.5).unwrap()
+        );
+        assert_eq!(
+            Shape2d::capsule(2.0, 0.5).unwrap().scaled(scale).unwrap(),
+            Shape2d::capsule(4.0, 1.5).unwrap()
+        );
+    }
+
+    #[test]
+    fn scaled_shapes_stay_valid() {
+        let capsule = Shape2d::capsule(1.0, 0.5).unwrap();
+
+        let flattened = capsule.scaled(Vec2::new(1.0, 0.1)).unwrap();
+        let vanished = capsule.scaled(Vec2::ZERO).unwrap();
+
+        assert_eq!(flattened, Shape2d::capsule(1.0, 0.5).unwrap());
+        assert!(matches!(vanished.kind(), ShapeKind::Capsule { radius, .. } if radius > 0.0));
+        assert!(capsule.scaled(Vec2::new(f32::NAN, 1.0)).is_err());
     }
 
     #[test]

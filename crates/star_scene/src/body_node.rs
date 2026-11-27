@@ -23,8 +23,9 @@ pub type Body3D = NodeBody<Shape3d, BodyId3d, Transform3D, Vec3>;
 /// [`Transform3D`]). The engine adds the body where the node is the first
 /// frame it sees it, and from then on writes where the simulation moved
 /// it into the node's transform; a game that changes that transform
-/// itself moves the body there at once. The body's shape is not scaled
-/// with the node. Removing the component or the node removes the body. A
+/// itself moves the body there at once. The body's shape is stretched by
+/// the node's scale in the world ([`Shape2d::scaled`],
+/// [`Shape3d::scaled`]), and made again when that scale changes. Removing the component or the node removes the body. A
 /// clone is a new body, added again where its node is, at rest.
 ///
 /// Its velocity can be set and impulses given through it even before the
@@ -43,6 +44,8 @@ pub struct NodeBody<Shape, Id, Transform, Vector> {
     new_velocity: Option<Vector>,
     /// The impulses the game gave it, added up, still to pass on.
     impulse: Vector,
+    /// The node's scale in the world the body's shape was stretched by.
+    shaped_scale: Option<Vector>,
 }
 
 impl<Shape, Id, Transform, Vector> Clone for NodeBody<Shape, Id, Transform, Vector>
@@ -73,6 +76,7 @@ where
             velocity: Vector::default(),
             new_velocity: None,
             impulse: Vector::default(),
+            shaped_scale: None,
         }
     }
 
@@ -126,6 +130,15 @@ where
     pub(crate) const fn placed(&mut self, body: Id, transform: Transform) {
         self.body = Some(body);
         self.written = Some(transform);
+    }
+
+    /// The node's scale in the world the body's shape was last made for.
+    pub(crate) const fn shaped_scale(&self) -> Option<Vector> {
+        self.shaped_scale
+    }
+
+    pub(crate) const fn shaped(&mut self, scale: Vector) {
+        self.shaped_scale = Some(scale);
     }
 
     pub(crate) const fn wrote(&mut self, transform: Transform) {

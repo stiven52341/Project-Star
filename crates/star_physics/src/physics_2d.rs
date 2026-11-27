@@ -2,7 +2,7 @@
 
 use rapier2d::prelude::{
     ActiveCollisionTypes, ActiveEvents, ColliderBuilder, ColliderHandle, PhysicsWorld,
-    RigidBodyBuilder, RigidBodyHandle, Rotation, Vector,
+    RigidBodyBuilder, RigidBodyHandle, Rotation, SharedShape, Vector,
 };
 use star_core::EngineResult;
 use star_math::Vec2;
@@ -11,7 +11,7 @@ use crate::body::check_finite;
 use crate::contact::ContactLog;
 use crate::shape::ShapeKind;
 use crate::step_clock::StepClock;
-use crate::{BodyKind, BodySettings, Contact, FIXED_STEP};
+use crate::{BodyKind, BodySettings, Contact, FIXED_STEP, Shape2d};
 
 /// Gravity of a new [`Physics2d`]: Earth's, downwards, taking a world unit
 /// as a meter.
@@ -157,6 +157,20 @@ impl Physics2d {
         }
     }
 
+    /// Gives `body` another shape, keeping where it is and how it moves:
+    /// the shape of a node whose scale changed. Its mass follows the new
+    /// shape.
+    pub fn set_shape(&mut self, body: BodyId, shape: &Shape2d) {
+        let Some(rigid_body) = self.world.bodies.get(body.0) else {
+            return;
+        };
+        for &collider in rigid_body.colliders() {
+            if let Some(collider) = self.world.colliders.get_mut(collider) {
+                collider.set_shape(shared_shape(shape));
+            }
+        }
+    }
+
     /// Simulates `elapsed` seconds more, in [`FIXED_STEP`]s, and gives how
     /// many steps ran. Time shorter than a step waits for the next call;
     /// at most [`MAX_STEPS_PER_ADVANCE`](crate::MAX_STEPS_PER_ADVANCE)
@@ -198,14 +212,7 @@ fn body_builder(settings: &BodySettings) -> RigidBodyBuilder {
 }
 
 fn collider_builder(settings: &BodySettings) -> ColliderBuilder {
-    let builder = match settings.shape.kind() {
-        ShapeKind::Circle { radius } => ColliderBuilder::ball(radius),
-        ShapeKind::Rectangle { size } => ColliderBuilder::cuboid(size.x / 2.0, size.y / 2.0),
-        ShapeKind::Capsule { height, radius } => {
-            ColliderBuilder::capsule_y(height / 2.0 - radius, radius)
-        }
-    };
-    builder
+    ColliderBuilder::new(shared_shape(&settings.shape))
         .friction(settings.friction)
         .restitution(settings.bounciness)
         .density(settings.density)
@@ -214,6 +221,17 @@ fn collider_builder(settings: &BodySettings) -> ColliderBuilder {
         // Every pair is reported, so a kinematic character also notices
         // static sensors (coins, doors); only dynamic bodies are pushed.
         .active_collision_types(ActiveCollisionTypes::all())
+}
+
+/// The collider shape of `shape`.
+fn shared_shape(shape: &Shape2d) -> SharedShape {
+    match shape.kind() {
+        ShapeKind::Circle { radius } => SharedShape::ball(radius),
+        ShapeKind::Rectangle { size } => SharedShape::cuboid(size.x / 2.0, size.y / 2.0),
+        ShapeKind::Capsule { height, radius } => {
+            SharedShape::capsule_y(height / 2.0 - radius, radius)
+        }
+    }
 }
 
 fn check_settings(settings: &BodySettings, position: Vec2, rotation: f32) -> EngineResult<()> {

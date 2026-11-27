@@ -64,35 +64,65 @@ impl BodyMarks {
     }
 }
 
-/// Draws the shape of the 2D `body` of a node placed at `global`: where
-/// the node is and turned as it is, but not scaled, as the physics has it.
+/// Draws the shape of the 2D `body` of a node placed at `global`.
 pub(super) fn draw_body_2d(
     body: &BodySettings,
     global: Affine2,
     marks: &BodyMarks,
     frame: &mut Frame,
 ) {
-    let global = GlobalTransform2D::from_affine(global);
-    let position = global.position();
-    let base = Mat4::from_translation(Vec3::new(position.x, position.y, 0.0))
-        * Mat4::from_rotation_z(global.rotation());
-    for (mesh, place) in pieces_2d(&body.shape, marks) {
-        frame.draw(mesh, base * place);
+    for (mesh, place) in placed_pieces_2d(body, global, marks) {
+        frame.draw(mesh, place);
     }
 }
 
-/// Draws the shape of the 3D `body` of a node placed at `global`: where
-/// the node is and turned as it is, but not scaled, as the physics has it.
+/// Draws the shape of the 3D `body` of a node placed at `global`.
 pub(super) fn draw_body_3d(
     body: &BodySettings<Shape3d>,
     global: Mat4,
     marks: &BodyMarks,
     frame: &mut Frame,
 ) {
-    let base = super::drawing::without_scale(global);
-    for (mesh, place) in pieces_3d(&body.shape, marks) {
-        frame.draw(mesh, base * place);
+    for (mesh, place) in placed_pieces_3d(body, global, marks) {
+        frame.draw(mesh, place);
     }
+}
+
+/// The meshes that draw the shape of the 2D `body` of a node placed at
+/// `global`, in the world: where the node is and turned as it is,
+/// stretched by its scale as the physics stretches it (not skewed nor
+/// mirrored).
+fn placed_pieces_2d(
+    body: &BodySettings,
+    global: Affine2,
+    marks: &BodyMarks,
+) -> Vec<(MeshId, Mat4)> {
+    let global = GlobalTransform2D::from_affine(global);
+    let position = global.position();
+    let base = Mat4::from_translation(Vec3::new(position.x, position.y, 0.0))
+        * Mat4::from_rotation_z(global.rotation());
+    let shape = body.shape.scaled(global.scale()).unwrap_or(body.shape);
+    let mut pieces = pieces_2d(&shape, marks);
+    for (_, place) in &mut pieces {
+        *place = base * *place;
+    }
+    pieces
+}
+
+/// The meshes that draw the shape of the 3D `body` of a node placed at
+/// `global`, in the world, as [`placed_pieces_2d`] does in 2D.
+fn placed_pieces_3d(
+    body: &BodySettings<Shape3d>,
+    global: Mat4,
+    marks: &BodyMarks,
+) -> Vec<(MeshId, Mat4)> {
+    let base = super::drawing::without_scale(global);
+    let shape = body.shape.scaled(global.scale()).unwrap_or(body.shape);
+    let mut pieces = pieces_3d(&shape, marks);
+    for (_, place) in &mut pieces {
+        *place = base * *place;
+    }
+    pieces
 }
 
 /// The meshes that draw `shape`, each placed around the body's center.
@@ -315,20 +345,36 @@ mod tests {
     }
 
     #[test]
-    fn bodies_are_drawn_where_their_nodes_are_but_not_scaled() {
+    fn bodies_are_drawn_where_their_nodes_are_and_stretched_with_them() {
         let shape = Shape2d::rectangle(Vec2::new(2.0, 1.0)).unwrap();
         let body = BodySettings::new(BodyKind::Static, shape);
         let global =
-            Affine2::from_scale_rotation_translation(Vec2::new(3.0, 3.0), 0.0, Vec2::new(4.0, 1.0));
-        let mut frame = Frame::new();
+            Affine2::from_scale_rotation_translation(Vec2::new(3.0, 2.0), 0.0, Vec2::new(4.0, 1.0));
 
-        draw_body_2d(&body, global, &MARKS, &mut frame);
-
-        assert_eq!(frame.draw_count(), 1);
-        let [(_, place)] = pieces_2d(&body.shape, &MARKS)[..] else {
+        let [(_, place)] = placed_pieces_2d(&body, global, &MARKS)[..] else {
             panic!("a rectangle is one square");
         };
+
         let corner = place.transform_point(Vec3::new(0.5, 0.5, 0.0));
-        assert!((corner - Vec3::new(1.0, 0.5, 0.0)).length() < EPSILON);
+        assert!(
+            (corner - Vec3::new(7.0, 2.0, 0.0)).length() < EPSILON,
+            "{corner:?}"
+        );
+    }
+
+    #[test]
+    fn spheres_are_drawn_round_on_stretched_nodes() {
+        let shape = Shape3d::sphere(1.0).unwrap();
+        let body = BodySettings::new(BodyKind::Static, shape);
+        let global = Mat4::from_scale(Vec3::new(1.0, 3.0, 2.0));
+
+        let [(_, place)] = placed_pieces_3d(&body, global, &MARKS)[..] else {
+            panic!("a sphere is one mesh");
+        };
+
+        for axis in [Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0)] {
+            let edge = place.transform_point(axis);
+            assert!((edge.length() - 3.0).abs() < EPSILON, "{edge:?}");
+        }
     }
 }

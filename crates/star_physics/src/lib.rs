@@ -21,6 +21,6 @@ pub use body::{BodyKind, BodySettings, DEFAULT_DENSITY, DEFAULT_FRICTION};
 pub use contact::{Contact, ContactPhase};
 pub use physics_2d::{BodyId, DEFAULT_GRAVITY, Physics2d};
 pub use physics_3d::{BodyId3d, DEFAULT_GRAVITY_3D, Physics3d};
-pub use shape::{Shape2d, ShapeKind};
+pub use shape::{MIN_SHAPE_SCALE, Shape2d, ShapeKind};
 pub use shape_3d::{Shape3d, ShapeKind3d};
 pub use step_clock::{FIXED_STEP, MAX_STEPS_PER_ADVANCE};
