@@ -10,6 +10,7 @@
 
 mod asset_folder;
 mod asset_path;
+mod builtin_image;
 mod file_watcher;
 mod gltf_model;
 mod image_format;
@@ -20,6 +21,7 @@ mod sound_format;
 
 pub use asset_folder::{AssetFolder, DEFAULT_ASSET_FOLDER, PackagedFiles};
 pub use asset_path::AssetPath;
+pub use builtin_image::{BuiltinImage, CIRCLE_IMAGE, SQUARE_IMAGE};
 pub use file_watcher::{DEFAULT_CHECK_INTERVAL, FileWatcher};
 pub use gltf_model::{ReadBeside, decode_gltf};
 pub use image_format::ImageFormat;

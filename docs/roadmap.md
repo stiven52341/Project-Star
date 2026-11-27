@@ -1500,6 +1500,17 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
     - [ ] Basic 2D bodies: shape nodes for 2D (a box, for example) that
           can be scaled, given collisions and used as a floor, and hidden
           while their collisions and everything else stay (as in Unity).
+          Plan agreed with the owner (decision 86): no new node, but
+          images the engine brings, `@square` and `@circle`, for a
+          `Sprite` with its color; a body on a node whose sprite shows one
+          always takes that shape and the sprite's size; `visible = false`
+          already hides a node and keeps its collisions.
+      - [x] a. `star_assets`: the built-in images, read by `load_image`
+            wherever an image is read (games, the editor).
+      - [ ] b. Bodies copy them: scenes, StarScript nodes (compiled and
+            interpreted, a window game) and the physics of nodes.
+      - [ ] c. The editor: the images offered to sprites, “Create > 2D >
+            Square / Circle”, the body's shape shown as the sprite's.
     - [ ] An audio editor, to manage a project's sounds (after Unity's).
     - [ ] A sprite editor (after Godot's).
 - [ ] **Future — Consoles** (PlayStation, Xbox).

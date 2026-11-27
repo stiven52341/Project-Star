@@ -136,13 +136,18 @@ impl AssetFolder {
             .map_err(|_| EngineError::Asset(format!("\"{path}\" is not UTF-8 text")))
     }
 
-    /// Reads and decodes the image at `path`, in the format of its extension.
+    /// Reads and decodes the image at `path`, in the format of its
+    /// extension; an image the engine brings ([`BuiltinImage`](crate::BuiltinImage))
+    /// is made without reading anything.
     ///
     /// # Errors
     ///
     /// Returns [`EngineError::Asset`] if the format is not supported, or the
     /// file cannot be read or is not a valid image.
     pub fn load_image(&self, path: &AssetPath) -> EngineResult<Image> {
+        if let Some(builtin) = path.builtin_image() {
+            return builtin.image();
+        }
         let format = ImageFormat::of(path)?;
         let bytes = self.read(path)?;
         format
@@ -240,6 +245,16 @@ mod tests {
         folder.write("levels/one.txt", b"hello");
 
         assert_eq!(folder.0.read(&path("levels/one.txt")).unwrap(), b"hello");
+    }
+
+    #[test]
+    fn the_images_the_engine_brings_need_no_file() {
+        let folder = TemporaryFolder::new("builtin");
+
+        let circle = folder.0.load_image(&path(crate::CIRCLE_IMAGE)).unwrap();
+
+        assert!(circle.width() > 1);
+        assert!(folder.0.load_image(&path("@triangle")).is_err());
     }
 
     #[test]
