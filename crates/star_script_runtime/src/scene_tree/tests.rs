@@ -230,6 +230,7 @@ fn bodies_take_the_scene_s_surface() {
         width: 1.0,
         height: 1.0,
         depth: 1.0,
+        offset: [0.0, 0.5, 0.0],
         gravity_scale: 0.5,
         fixed_rotation: true,
         friction: 0.1,

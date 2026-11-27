@@ -225,6 +225,8 @@ pub struct SceneBody {
     pub height: f32,
     /// Of boxes.
     pub depth: f32,
+    /// Where the shape's center is from the node (`z` is left out in 2D).
+    pub offset: [f32; 3],
     /// How much gravity pulls it.
     pub gravity_scale: f32,
     /// Whether collisions never turn it.

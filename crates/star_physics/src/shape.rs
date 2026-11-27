@@ -3,13 +3,16 @@
 use star_core::{EngineError, EngineResult};
 use star_math::Vec2;
 
-/// The outline of a body, centered on it, in world units.
+/// The outline of a body, centered on it or at its
+/// [`offset`](Self::offset), in world units.
 ///
 /// Built through its constructors, which reject sizes that are not
 /// positive and finite.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Shape2d {
     kind: ShapeKind,
+    /// Where its center is from the body's, in the body's space.
+    offset: Vec2,
 }
 
 /// What a [`Shape2d`] is, with its validated sizes.
@@ -45,6 +48,7 @@ impl Shape2d {
         check_size("circle radius", radius)?;
         Ok(Self {
             kind: ShapeKind::Circle { radius },
+            offset: Vec2::ZERO,
         })
     }
 
@@ -58,6 +62,7 @@ impl Shape2d {
         check_size("rectangle height", size.y)?;
         Ok(Self {
             kind: ShapeKind::Rectangle { size },
+            offset: Vec2::ZERO,
         })
     }
 
@@ -78,13 +83,15 @@ impl Shape2d {
         }
         Ok(Self {
             kind: ShapeKind::Capsule { height, radius },
+            offset: Vec2::ZERO,
         })
     }
 
     /// The shape stretched by `scale`, the scale of its node in the world
     /// (mirroring is ignored): a rectangle along each axis, a circle by
     /// the larger one, and a capsule with its height by `y` and its radius
-    /// by `x`, kept at least as high as its half circles. A factor smaller
+    /// by `x`, kept at least as high as its half circles. The offset is
+    /// stretched too, and mirrored by a negative factor. A factor smaller
     /// than [`MIN_SHAPE_SCALE`] counts as that one, so a node shrunk to
     /// nothing keeps a tiny body.
     ///
@@ -92,6 +99,11 @@ impl Shape2d {
     ///
     /// [`EngineError::Physics`] if a factor is not finite.
     pub fn scaled(self, scale: Vec2) -> EngineResult<Self> {
+        let offset = Vec2::new(self.offset.x * scale.x, self.offset.y * scale.y);
+        Ok(self.scaled_size(scale)?.with_offset_unchecked(offset))
+    }
+
+    fn scaled_size(self, scale: Vec2) -> EngineResult<Self> {
         let [x, y] = [scale.x, scale.y].map(scale_factor);
         let (x, y) = (x?, y?);
         match self.kind {
@@ -102,6 +114,33 @@ impl Shape2d {
                 Self::capsule((height * y).max(2.0 * radius), radius)
             }
         }
+    }
+
+    /// The same shape with its center `offset` from the body's, in the
+    /// body's space (before its node's scale, which stretches it too).
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Physics`] if `offset` is not finite.
+    pub fn with_offset(self, offset: Vec2) -> EngineResult<Self> {
+        if offset.x.is_finite() && offset.y.is_finite() {
+            Ok(self.with_offset_unchecked(offset))
+        } else {
+            Err(EngineError::Physics(format!(
+                "the offset of a body must be finite, not {offset:?}"
+            )))
+        }
+    }
+
+    const fn with_offset_unchecked(mut self, offset: Vec2) -> Self {
+        self.offset = offset;
+        self
+    }
+
+    /// Where its center is from the body's, in the body's space.
+    #[must_use]
+    pub const fn offset(&self) -> Vec2 {
+        self.offset
     }
 
     /// What the shape is, with its sizes.
@@ -197,6 +236,20 @@ mod tests {
         assert_eq!(flattened, Shape2d::capsule(1.0, 0.5).unwrap());
         assert!(matches!(vanished.kind(), ShapeKind::Capsule { radius, .. } if radius > 0.0));
         assert!(capsule.scaled(Vec2::new(f32::NAN, 1.0)).is_err());
+    }
+
+    #[test]
+    fn offsets_stretch_with_the_node() {
+        let shape = Shape2d::circle(0.5)
+            .unwrap()
+            .with_offset(Vec2::new(1.0, 1.0))
+            .unwrap();
+
+        assert_eq!(
+            shape.scaled(Vec2::new(3.0, -2.0)).unwrap().offset(),
+            Vec2::new(3.0, -2.0)
+        );
+        assert!(shape.with_offset(Vec2::new(0.0, f32::INFINITY)).is_err());
     }
 
     #[test]

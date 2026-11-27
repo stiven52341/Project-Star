@@ -5,13 +5,16 @@ use star_math::Vec3;
 
 use crate::shape::{check_size, scale_factor};
 
-/// The volume of a 3D body, centered on it, in world units.
+/// The volume of a 3D body, centered on it or at its
+/// [`offset`](Self::offset), in world units.
 ///
 /// Built through its constructors, which reject sizes that are not
 /// positive and finite.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Shape3d {
     kind: ShapeKind3d,
+    /// Where its center is from the body's, in the body's space.
+    offset: Vec3,
 }
 
 /// What a [`Shape3d`] is, with its validated sizes.
@@ -52,6 +55,7 @@ impl Shape3d {
         check_size("sphere radius", radius)?;
         Ok(Self {
             kind: ShapeKind3d::Sphere { radius },
+            offset: Vec3::ZERO,
         })
     }
 
@@ -66,6 +70,7 @@ impl Shape3d {
         check_size("box depth", size.z)?;
         Ok(Self {
             kind: ShapeKind3d::Box { size },
+            offset: Vec3::ZERO,
         })
     }
 
@@ -86,6 +91,7 @@ impl Shape3d {
         }
         Ok(Self {
             kind: ShapeKind3d::Capsule { height, radius },
+            offset: Vec3::ZERO,
         })
     }
 
@@ -93,14 +99,24 @@ impl Shape3d {
     /// (mirroring is ignored): a box along each axis, a sphere by the
     /// largest one, and a capsule with its height by `y` and its radius by
     /// the larger of `x` and `z`, kept at least as high as its half
-    /// spheres. A mesh stays as it is: its triangles are stretched when
-    /// the physics is given them. A factor smaller than
+    /// spheres. A mesh's triangles are stretched when the physics is given
+    /// them. The offset is stretched too, and mirrored by a negative
+    /// factor. A factor smaller than
     /// [`MIN_SHAPE_SCALE`](crate::MIN_SHAPE_SCALE) counts as that one.
     ///
     /// # Errors
     ///
     /// [`EngineError::Physics`] if a factor is not finite.
     pub fn scaled(self, scale: Vec3) -> EngineResult<Self> {
+        let offset = Vec3::new(
+            self.offset.x * scale.x,
+            self.offset.y * scale.y,
+            self.offset.z * scale.z,
+        );
+        Ok(self.scaled_size(scale)?.with_offset_unchecked(offset))
+    }
+
+    fn scaled_size(self, scale: Vec3) -> EngineResult<Self> {
         let [x, y, z] = [scale.x, scale.y, scale.z].map(scale_factor);
         let (x, y, z) = (x?, y?, z?);
         match self.kind {
@@ -117,11 +133,42 @@ impl Shape3d {
         }
     }
 
+    /// The same shape with its center `offset` from the body's, in the
+    /// body's space (before its node's scale, which stretches it too).
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Physics`] if `offset` is not finite.
+    pub fn with_offset(self, offset: Vec3) -> EngineResult<Self> {
+        if [offset.x, offset.y, offset.z]
+            .iter()
+            .all(|part| part.is_finite())
+        {
+            Ok(self.with_offset_unchecked(offset))
+        } else {
+            Err(EngineError::Physics(format!(
+                "the offset of a body must be finite, not {offset:?}"
+            )))
+        }
+    }
+
+    const fn with_offset_unchecked(mut self, offset: Vec3) -> Self {
+        self.offset = offset;
+        self
+    }
+
+    /// Where its center is from the body's, in the body's space.
+    #[must_use]
+    pub const fn offset(&self) -> Vec3 {
+        self.offset
+    }
+
     /// The shape of the triangles of the mesh or model its node shows.
     #[must_use]
     pub const fn mesh() -> Self {
         Self {
             kind: ShapeKind3d::Mesh,
+            offset: Vec3::ZERO,
         }
     }
 
@@ -191,6 +238,20 @@ mod tests {
                 .scaled(Vec3::new(1.0, f32::INFINITY, 1.0))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn offsets_stretch_and_mirror_with_the_node() {
+        let shape = Shape3d::sphere(0.5)
+            .unwrap()
+            .with_offset(Vec3::new(0.0, 1.0, 2.0))
+            .unwrap();
+
+        let scaled = shape.scaled(Vec3::new(1.0, 2.0, -1.0)).unwrap();
+
+        assert_eq!(scaled.offset(), Vec3::new(0.0, 2.0, -2.0));
+        assert_eq!(Shape3d::mesh().offset(), Vec3::ZERO);
+        assert!(shape.with_offset(Vec3::new(f32::NAN, 0.0, 0.0)).is_err());
     }
 
     #[test]

@@ -114,6 +114,10 @@ fn build_node<H: Host>(node: &SceneNode) -> Result<H::Node, String> {
             solid.radius,
             [solid.width, solid.height, solid.depth],
         );
+        let [offset_x, offset_y, offset_z] = solid.offset;
+        body.offset_x.set(offset_x);
+        body.offset_y.set(offset_y);
+        body.offset_z.set(offset_z);
         body.gravity_scale.set(solid.gravity_scale);
         body.fixed_rotation.set(solid.fixed_rotation);
         body.friction.set(solid.friction);

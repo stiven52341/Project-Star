@@ -141,6 +141,11 @@ fn with_body<H: Host>(fields: &NodeFields<H>, then: impl FnOnce(Option<ScriptBod
                 width: body.width.get(),
                 height: body.height.get(),
                 depth: body.depth.get(),
+                offset: Vec3::new(
+                    body.offset_x.get(),
+                    body.offset_y.get(),
+                    body.offset_z.get(),
+                ),
                 gravity_scale: body.gravity_scale.get(),
                 fixed_rotation: body.fixed_rotation.get(),
                 friction: body.friction.get(),

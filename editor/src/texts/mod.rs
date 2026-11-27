@@ -206,6 +206,12 @@ pub(crate) struct Texts {
     pub(crate) sprite_section: &'static str,
     pub(crate) image: &'static str,
     pub(crate) size: &'static str,
+    /// Where a body's shape is from its node.
+    pub(crate) shape_offset: &'static str,
+    /// The button that fits a 3D body's shape around its node's mesh or
+    /// model, and what it does.
+    pub(crate) fit_shape: &'static str,
+    pub(crate) fit_shape_hint: &'static str,
     pub(crate) color: &'static str,
     pub(crate) layer: &'static str,
     pub(crate) filter: &'static str,

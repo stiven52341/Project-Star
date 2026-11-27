@@ -30,6 +30,9 @@ class Main {
         const ground = Mesh("Ground", "plane")
         ground.body = Body.mesh("static")
         Debug.print((ground.body?.kind ?? "") + " " + (ground.body?.shape ?? ""))
+        const standing = Body.capsule("dynamic", 2.0, 0.5)
+        standing.offset_y = 1.0
+        Debug.print(standing.offset_x.to_string() + " " + standing.offset_y.to_string() + " " + standing.offset_z.to_string())
 
         // A node without a body is not a body.
         hero.body = null

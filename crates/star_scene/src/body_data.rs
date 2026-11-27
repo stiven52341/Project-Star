@@ -32,6 +32,10 @@ pub(crate) struct BodyTable<Shape: TableShape> {
     /// Of capsules, round ends included.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) height: Option<f32>,
+    /// Where the shape's center is from the node; written only when it is
+    /// not at the node.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) offset: Option<Shape::Size>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) gravity_scale: Option<f32>,
     #[serde(default, skip_serializing_if = "is_false")]
@@ -87,6 +91,16 @@ pub(crate) trait TableShape: Copy + Debug + PartialEq {
 
     /// The name and sizes the shape is written with.
     fn describe(self) -> (Self::Name, ShapeSizes<Self::Size>);
+
+    /// The shape's offset, as written; `None` at the node.
+    fn written_offset(self) -> Option<Self::Size>;
+
+    /// The shape with its center at `offset`.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Physics`] if `offset` is not finite.
+    fn offset_by(self, offset: Self::Size) -> EngineResult<Self>;
 }
 
 /// The shape of a 2D body, as written in files.
@@ -118,6 +132,15 @@ const TAKES_NOTHING: [bool; 3] = [false, false, false];
 impl TableShape for Shape2d {
     type Name = ShapeData;
     type Size = [f32; 2];
+
+    fn written_offset(self) -> Option<[f32; 2]> {
+        let offset = self.offset();
+        (offset != Vec2::ZERO).then_some([offset.x, offset.y])
+    }
+
+    fn offset_by(self, [x, y]: [f32; 2]) -> EngineResult<Self> {
+        self.with_offset(Vec2::new(x, y))
+    }
 
     fn label(name: ShapeData) -> &'static str {
         match name {
@@ -168,6 +191,15 @@ impl TableShape for Shape2d {
 impl TableShape for Shape3d {
     type Name = Shape3dData;
     type Size = [f32; 3];
+
+    fn written_offset(self) -> Option<[f32; 3]> {
+        let offset = self.offset();
+        (offset != Vec3::ZERO).then_some([offset.x, offset.y, offset.z])
+    }
+
+    fn offset_by(self, [x, y, z]: [f32; 3]) -> EngineResult<Self> {
+        self.with_offset(Vec3::new(x, y, z))
+    }
 
     fn label(name: Shape3dData) -> &'static str {
         match name {
@@ -265,6 +297,7 @@ impl<Shape: TableShape> BodyTable<Shape> {
             radius: sizes.radius,
             size: sizes.size,
             height: sizes.height,
+            offset: settings.shape.written_offset(),
             gravity_scale: differs(settings.gravity_scale, defaults.gravity_scale),
             fixed_rotation: settings.fixed_rotation,
             friction: differs(settings.friction, defaults.friction),
@@ -285,12 +318,17 @@ impl<Shape: TableShape> BodyTable<Shape> {
         wants("radius", radius, self.radius.is_some())?;
         wants("size", size, self.size.is_some())?;
         wants("height", height, self.height.is_some())?;
-        Shape::build(ShapeSizes {
+        let shape = Shape::build(ShapeSizes {
             radius: self.radius,
             size: self.size,
             height: self.height,
-        })
-        .map_err(|error| EngineError::Scene(error.to_string()))
+        });
+        shape
+            .and_then(|shape| match self.offset {
+                Some(offset) => shape.offset_by(offset),
+                None => Ok(shape),
+            })
+            .map_err(|error| EngineError::Scene(error.to_string()))
     }
 }
 
@@ -436,5 +474,23 @@ mod tests {
 
         assert_eq!(parse(&text).unwrap(), settings);
         assert!(text.contains("shape = \"box\""), "{text}");
+        assert!(!text.contains("offset"), "{text}");
+    }
+
+    #[test]
+    fn offsets_are_read_and_written() {
+        let settings = parse::<Shape3d>(
+            "shape = \"capsule\"\nradius = 0.5\nheight = 2.0\noffset = [0.0, 1.0, 0.0]",
+        )
+        .unwrap();
+
+        assert_eq!(settings.shape.offset(), Vec3::new(0.0, 1.0, 0.0));
+        let text = toml::to_string(&Body3dData::from_settings(&settings)).unwrap();
+        assert!(text.contains("offset = [0.0, 1.0, 0.0]"), "{text}");
+        assert_eq!(parse::<Shape3d>(&text).unwrap(), settings);
+        let flat =
+            parse::<Shape2d>("shape = \"circle\"\nradius = 1.0\noffset = [2.0, 0.5]").unwrap();
+        assert_eq!(flat.shape.offset(), Vec2::new(2.0, 0.5));
+        assert!(parse::<Shape2d>("shape = \"circle\"\nradius = 1.0\noffset = [2.0]").is_err());
     }
 }

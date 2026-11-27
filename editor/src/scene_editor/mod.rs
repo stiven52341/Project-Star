@@ -9,6 +9,7 @@ mod animating;
 mod animation_rows;
 mod animator_rows;
 mod body_drawing;
+mod body_fit;
 mod class_choice;
 mod class_drop;
 mod components;

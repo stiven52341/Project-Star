@@ -126,6 +126,7 @@ pub fn scene_body(body: &ScriptBody<'_>) -> SceneBody {
         width: body.width,
         height: body.height,
         depth: body.depth,
+        offset: [body.offset.x, body.offset.y, body.offset.z],
         gravity_scale: body.gravity_scale,
         fixed_rotation: body.fixed_rotation,
         friction: body.friction,

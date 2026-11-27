@@ -167,6 +167,7 @@ impl Physics2d {
         for &collider in rigid_body.colliders() {
             if let Some(collider) = self.world.colliders.get_mut(collider) {
                 collider.set_shape(shared_shape(shape));
+                collider.set_translation_wrt_parent(to_vector(shape.offset()));
             }
         }
     }
@@ -213,6 +214,7 @@ fn body_builder(settings: &BodySettings) -> RigidBodyBuilder {
 
 fn collider_builder(settings: &BodySettings) -> ColliderBuilder {
     ColliderBuilder::new(shared_shape(&settings.shape))
+        .translation(to_vector(settings.shape.offset()))
         .friction(settings.friction)
         .restitution(settings.bounciness)
         .density(settings.density)

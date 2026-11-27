@@ -102,6 +102,8 @@ fn placed_pieces_2d(
     let base = Mat4::from_translation(Vec3::new(position.x, position.y, 0.0))
         * Mat4::from_rotation_z(global.rotation());
     let shape = body.shape.scaled(global.scale()).unwrap_or(body.shape);
+    let offset = shape.offset();
+    let base = base * Mat4::from_translation(Vec3::new(offset.x, offset.y, 0.0));
     let mut pieces = pieces_2d(&shape, marks);
     for (_, place) in &mut pieces {
         *place = base * *place;
@@ -118,6 +120,7 @@ fn placed_pieces_3d(
 ) -> Vec<(MeshId, Mat4)> {
     let base = super::drawing::without_scale(global);
     let shape = body.shape.scaled(global.scale()).unwrap_or(body.shape);
+    let base = base * Mat4::from_translation(shape.offset());
     let mut pieces = pieces_3d(&shape, marks);
     for (_, place) in &mut pieces {
         *place = base * *place;
@@ -362,6 +365,23 @@ mod tests {
             (corner - Vec3::new(7.0, 2.0, 0.0)).length() < EPSILON,
             "{corner:?}"
         );
+    }
+
+    #[test]
+    fn shapes_are_drawn_at_their_stretched_offset() {
+        let shape = Shape3d::cuboid(Vec3::ONE)
+            .unwrap()
+            .with_offset(Vec3::new(0.0, 0.5, 0.0))
+            .unwrap();
+        let body = BodySettings::new(BodyKind::Static, shape);
+        let global = Mat4::from_scale(Vec3::new(1.0, 2.0, 1.0));
+
+        let [(_, place)] = placed_pieces_3d(&body, global, &MARKS)[..] else {
+            panic!("a box is one cube");
+        };
+
+        let bottom = place.transform_point(Vec3::new(0.0, -0.5, 0.0));
+        assert!(bottom.length() < EPSILON, "{bottom:?}");
     }
 
     #[test]

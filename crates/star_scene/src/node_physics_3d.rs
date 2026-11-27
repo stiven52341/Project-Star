@@ -129,19 +129,19 @@ fn add_body(
     place: &Place,
     triangles: Option<&TriangleMesh>,
 ) -> EngineResult<BodyId3d> {
+    let settings = BodySettings {
+        shape: settings.shape.scaled(place.scale)?,
+        ..*settings
+    };
     if let Some(triangles) = triangles {
         return physics.add_mesh_body(
-            settings,
+            &settings,
             triangles,
             place.scale,
             place.position,
             place.rotation,
         );
     }
-    let settings = BodySettings {
-        shape: settings.shape.scaled(place.scale)?,
-        ..*settings
-    };
     physics.add_body(&settings, place.position, place.rotation)
 }
 
@@ -161,7 +161,7 @@ fn move_body(
         return Ok(());
     };
     if let Some(triangles) = triangles {
-        return physics.set_mesh(id, triangles, place.scale);
+        physics.set_mesh(id, triangles, place.scale)?;
     }
     physics.set_shape(id, &body.settings().shape.scaled(place.scale)?);
     Ok(())
@@ -388,6 +388,38 @@ mod tests {
         // On top of the stretched cube, whose top is at 0.5.
         let landed = position(&world, crate_node).y;
         assert!((landed - 1.0).abs() < 0.05, "{landed}");
+    }
+
+    #[test]
+    fn shapes_sit_at_their_offset() {
+        let mut world = world();
+        let floor = body_node(&mut world, "Floor", BodyKind::Static, Vec3::ZERO);
+        world.get_mut::<Transform3D>(floor).unwrap().scale = Vec3::new(10.0, 1.0, 10.0);
+        // Its origin at its feet: the box is above it, scaled with it.
+        let shape = Shape3d::cuboid(Vec3::ONE)
+            .unwrap()
+            .with_offset(Vec3::new(0.0, 0.5, 0.0))
+            .unwrap();
+        let standing = world.spawn_node("Standing", None).unwrap();
+        world
+            .insert(
+                standing,
+                Transform3D::from_position(Vec3::new(0.0, 3.0, 0.0))
+                    .with_scale(Vec3::new(1.0, 2.0, 1.0)),
+            )
+            .unwrap();
+        world
+            .insert(
+                standing,
+                Body3D::new(BodySettings::new(BodyKind::Dynamic, shape)),
+            )
+            .unwrap();
+
+        frames(&mut world, 90);
+
+        // Its feet on the floor's top, at 0.5.
+        let feet = position(&world, standing).y;
+        assert!((feet - 0.5).abs() < 0.05, "{feet}");
     }
 
     #[test]

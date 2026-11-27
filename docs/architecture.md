@@ -266,8 +266,12 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   node along its rotation, picks it by clicking it, and starts the nodes
   added under a bone at its end.
   The editor also draws the shape of every body (`[node.body]`,
-  `[node.body_3d]`), placed, turned and stretched as its node, as the
-  physics has it (decision 84); its “Physics” menu creates static, rigid and kinematic
+  `[node.body_3d]`), placed, turned and stretched as its node and at its
+  offset, as the physics has it (decision 84); the inspector edits a
+  shape's offset, offers the `mesh` shape for 3D bodies, and its “Fit”
+  (`scene_editor/body_fit.rs`) sizes a 3D box, sphere or capsule around
+  the bounds of the node's mesh shape or model (read from its file), and
+  centers it on them; its “Physics” menu creates static, rigid and kinematic
   bodies and areas (static sensors, which detect every kind of body).
   Nodes may have `tags = ["enemy", …]` (the `Tags` component in worlds).
   Unknown fields are errors, so typos are not silently ignored. Scenes keep
@@ -468,7 +472,9 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
 - Scenes keep bodies: a `[node.body]` table has the `kind` (`dynamic` by
   default, `static`, `kinematic`), the `shape` (`circle` with `radius`,
   `rectangle` with `size`, `capsule` with `height` and `radius`; a size of
-  another shape is an error) and, only when they are not the defaults,
+  another shape is an error), its `offset` (where the shape's center is
+  from the node, `[x, y]`; `with_offset` on shapes, stretched with the
+  node's scale, decision 84) and, only when they are not the defaults,
   `gravity_scale`, `fixed_rotation`, `friction`, `bounciness`, `density`
   and `sensor`.
 - A `Body2D` also takes a velocity (`set_velocity`) and impulses

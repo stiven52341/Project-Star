@@ -479,7 +479,7 @@ The engine provides them; their names cannot be used for other classes.
 | `TweenOptions` | `init()`; fields `delay: float` (0.0), `back: bool` (`false`), `repeats: int` (1; `-1` repeats forever): what `tween_with` does besides going to its value once |
 | `Time` | `static async wait(seconds: float)`, `static async next_frame()`: what coroutines wait for (section 7); `static now() -> float`: the seconds of the game so far (the sum of the frames' `delta`s, the clock `wait` counts with); `static delta() -> float`: the seconds of the frame going on, the same `delta` that `update` gets, for code away from `update` (0 before the first frame) |
 | `Decorator` | `before(method: string) -> bool` (`true`), `after(method: string)`: what the program's decorators redefine (see “Decorators”) |
-| `Body` | no `init`: `static circle(kind: string, radius: float) -> Body`, `static rectangle(kind: string, width: float, height: float) -> Body`, `static capsule(kind: string, height: float, radius: float) -> Body`, `static sphere(kind: string, radius: float) -> Body`, `static box(kind: string, width: float, height: float, depth: float) -> Body`, `static mesh(kind: string) -> Body`; fields `kind`, `shape: string`, `radius` (0.5), `width`, `height`, `depth` (1.0), `gravity_scale` (1.0), `friction` (0.5), `bounciness` (0.0), `density` (1.0), `velocity_x`, `velocity_y`, `velocity_z: float` (0.0), `fixed_rotation`, `sensor: bool` (`false`); `apply_impulse(x: float, y: float)`, `apply_impulse_3d(x: float, y: float, z: float)`, `touching() -> [Node]`, `just_touched() -> [Node]`, `just_separated() -> [Node]` |
+| `Body` | no `init`: `static circle(kind: string, radius: float) -> Body`, `static rectangle(kind: string, width: float, height: float) -> Body`, `static capsule(kind: string, height: float, radius: float) -> Body`, `static sphere(kind: string, radius: float) -> Body`, `static box(kind: string, width: float, height: float, depth: float) -> Body`, `static mesh(kind: string) -> Body`; fields `kind`, `shape: string`, `radius` (0.5), `width`, `height`, `depth` (1.0), `offset_x`, `offset_y`, `offset_z` (0.0), `gravity_scale` (1.0), `friction` (0.5), `bounciness` (0.0), `density` (1.0), `velocity_x`, `velocity_y`, `velocity_z: float` (0.0), `fixed_rotation`, `sensor: bool` (`false`); `apply_impulse(x: float, y: float)`, `apply_impulse_3d(x: float, y: float, z: float)`, `touching() -> [Node]`, `just_touched() -> [Node]`, `just_separated() -> [Node]` |
 | `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool`, `static strength(action: string) -> float`, `static axis(negative: string, positive: string) -> float`, `static pointer_x() -> float`, `static pointer_y() -> float`, `static has_pointer() -> bool` |
 
 **A game is a class that extends `Game`**:
@@ -931,6 +931,9 @@ class Hero extends Sprite {
   `sensor`): the engine then replaces the body. Only the sizes of the
   shape are used: `radius` for circles, `width` and `height` for
   rectangles, `height` (half circles included) and `radius` for capsules.
+  `offset_x`, `offset_y` and `offset_z` (2D bodies leave `z` out) place
+  the shape's center away from the node's origin, in the node's space: a
+  character whose origin is at its feet keeps its capsule above them.
   Shapes are stretched by the node's scale in the world (decision 84):
   rectangles and boxes along each axis, circles and spheres by the
   largest factor, capsules with their height by `y` and their radius by

@@ -217,11 +217,20 @@ impl Physics3d {
 
     /// Gives `body` another shape, keeping where it is and how it moves:
     /// the shape of a node whose scale changed. Its mass follows the new
-    /// shape. A [`mesh`](Shape3d::mesh) shape is changed with
-    /// [`set_mesh`](Self::set_mesh) instead.
+    /// shape, and its offset. A [`mesh`](Shape3d::mesh) shape only moves
+    /// to its offset: its triangles change with
+    /// [`set_mesh`](Self::set_mesh).
     pub fn set_shape(&mut self, body: BodyId3d, shape: &Shape3d) {
-        if let Some(shape) = shared_shape(shape) {
-            self.replace_shape(body, &shape);
+        if let Some(triangles) = shared_shape(shape) {
+            self.replace_shape(body, &triangles);
+        }
+        let Some(rigid_body) = self.world.bodies.get(body.0) else {
+            return;
+        };
+        for &collider in rigid_body.colliders() {
+            if let Some(collider) = self.world.colliders.get_mut(collider) {
+                collider.set_translation_wrt_parent(to_vector(shape.offset()));
+            }
         }
     }
 
@@ -299,6 +308,7 @@ fn body_builder(settings: &BodySettings<Shape3d>) -> RigidBodyBuilder {
 
 fn collider_builder(settings: &BodySettings<Shape3d>, shape: SharedShape) -> ColliderBuilder {
     ColliderBuilder::new(shape)
+        .translation(to_vector(settings.shape.offset()))
         .friction(settings.friction)
         .restitution(settings.bounciness)
         .density(settings.density)

@@ -27,6 +27,12 @@ pub struct BodyFields<H: Host> {
     pub height: Field<f32>,
     /// `depth`
     pub depth: Field<f32>,
+    /// `offset_x`: where the shape's center is from the node.
+    pub offset_x: Field<f32>,
+    /// `offset_y`
+    pub offset_y: Field<f32>,
+    /// `offset_z`
+    pub offset_z: Field<f32>,
     /// `gravity_scale`
     pub gravity_scale: Field<f32>,
     /// `friction`
@@ -113,6 +119,9 @@ impl<H: Host> BodyFields<H> {
             width: Field::new(width),
             height: Field::new(height),
             depth: Field::new(depth),
+            offset_x: Field::new(0.0),
+            offset_y: Field::new(0.0),
+            offset_z: Field::new(0.0),
             gravity_scale: Field::new(1.0),
             friction: Field::new(FRICTION),
             bounciness: Field::new(0.0),

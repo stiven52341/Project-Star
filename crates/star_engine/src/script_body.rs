@@ -53,6 +53,8 @@ pub struct ScriptBody<'a> {
     pub height: f32,
     /// Of boxes.
     pub depth: f32,
+    /// Where the shape's center is from the node (`z` is left out in 2D).
+    pub offset: Vec3,
     /// How much gravity pulls it.
     pub gravity_scale: f32,
     /// Whether collisions never turn it.
@@ -106,12 +108,14 @@ impl ScriptBody<'static> {
                 (CAPSULE, radius, Vec2::new(DEFAULT_SIZE, height))
             }
         };
+        let offset = settings.shape.offset();
         Self::at_rest(
             settings,
             shape,
             radius,
             Vec3::new(size.x, size.y, DEFAULT_SIZE),
         )
+        .with_offset(Vec3::new(offset.x, offset.y, 0.0))
     }
 
     /// The script body that `settings` of a 3D body describe, at rest.
@@ -127,7 +131,12 @@ impl ScriptBody<'static> {
             ),
             ShapeKind3d::Mesh => (MESH, DEFAULT_RADIUS, Vec3::ONE * DEFAULT_SIZE),
         };
-        Self::at_rest(settings, shape, radius, size)
+        Self::at_rest(settings, shape, radius, size).with_offset(settings.shape.offset())
+    }
+
+    const fn with_offset(mut self, offset: Vec3) -> Self {
+        self.offset = offset;
+        self
     }
 
     fn at_rest<Shape>(
@@ -148,6 +157,7 @@ impl ScriptBody<'static> {
             width: size.x,
             height: size.y,
             depth: size.z,
+            offset: Vec3::ZERO,
             gravity_scale: settings.gravity_scale,
             fixed_rotation: settings.fixed_rotation,
             friction: settings.friction,
@@ -179,7 +189,8 @@ impl ScriptBody<'_> {
                     "a body of a 2D node is a \"{CIRCLE}\", a \"{RECTANGLE}\" or a \"{CAPSULE}\", not a \"{other}\""
                 )));
             }
-        }?;
+        }?
+        .with_offset(Vec2::new(self.offset.x, self.offset.y))?;
         self.with_surface(kind, shape)
     }
 
@@ -202,7 +213,8 @@ impl ScriptBody<'_> {
                     "a body of a 3D node is a \"{SPHERE}\", a \"{BOX}\", a \"{CAPSULE}\" or a \"{MESH}\", not a \"{other}\""
                 )));
             }
-        }?;
+        }?
+        .with_offset(self.offset)?;
         self.with_surface(kind, shape)
     }
 
@@ -246,7 +258,10 @@ mod tests {
     fn settings_become_script_bodies_and_back() {
         let shapes = [
             Shape2d::circle(0.3).unwrap(),
-            Shape2d::rectangle(Vec2::new(4.0, 1.0)).unwrap(),
+            Shape2d::rectangle(Vec2::new(4.0, 1.0))
+                .unwrap()
+                .with_offset(Vec2::new(1.0, -2.0))
+                .unwrap(),
             Shape2d::capsule(2.0, 0.5).unwrap(),
         ];
         for (kind, shape) in [BodyKind::Dynamic, BodyKind::Static, BodyKind::Kinematic]
@@ -268,7 +283,10 @@ mod tests {
         let shapes = [
             Shape3d::sphere(0.3).unwrap(),
             Shape3d::cuboid(Vec3::new(4.0, 1.0, 2.0)).unwrap(),
-            Shape3d::capsule(2.0, 0.5).unwrap(),
+            Shape3d::capsule(2.0, 0.5)
+                .unwrap()
+                .with_offset(Vec3::new(0.0, 1.0, -0.5))
+                .unwrap(),
             Shape3d::mesh(),
         ];
         for shape in shapes {

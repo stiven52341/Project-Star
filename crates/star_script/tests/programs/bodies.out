@@ -5,4 +5,5 @@ dynamic circle 0.25
 10.0
 2.0 capsule
 static mesh
+0.0 1.0 0.0
 true

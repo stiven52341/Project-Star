@@ -1,6 +1,8 @@
 //! The inspector of a scene node: every part it has, in its own section,
 //! with its values to edit, and a menu to add the parts it lacks.
 
+use std::path::Path;
+
 use eframe::egui;
 use star_engine::prelude::{
     BodyKind, BodySettings, LightNode, MeshShape, Quat, Shape2d, Shape3d, ShapeKind, ShapeKind3d,
@@ -18,6 +20,7 @@ use star_engine::star_scene::{
 
 use super::animation_rows::{AssetFiles, animation_rows};
 use super::animator_rows::edit_animator;
+use super::body_fit::{Shown, fitted};
 use super::components::{
     DEFAULT_CAPSULE_HEIGHT, DEFAULT_RADIUS, LightKind, add_component_menu, new_light, new_light_2d,
 };
@@ -90,7 +93,13 @@ pub(super) fn edit_node(
         |ui, light| edit_light_2d(ui, light, keys),
     );
     changed |= optional_section(ui, texts.body_section, &mut node.body, edit_body);
-    changed |= optional_section(ui, texts.body_3d_section, &mut node.body_3d, edit_body_3d);
+    let shown = Shown::of(node);
+    let fit = shown
+        .as_ref()
+        .map(|shown| (shown, context.animations.folder));
+    changed |= optional_section(ui, texts.body_3d_section, &mut node.body_3d, |ui, body| {
+        edit_body_3d(ui, body, fit)
+    });
     changed |= optional_section(ui, texts.camera_2d, &mut node.camera, |ui, camera| {
         edit_camera_2d(ui, camera, keys)
     });
@@ -664,6 +673,8 @@ fn edit_shape(ui: &mut egui::Ui, shape: &mut Shape2d) -> bool {
             number_from_row(ui, texts.radius, radius, MIN_SIZE);
         }
     }
+    let mut offset = shape.offset();
+    vec2_row(ui, texts.shape_offset, &mut offset);
     // The physics checks the sizes (a capsule at least as high as it is
     // wide); sizes it refuses leave the shape as it was.
     let rebuilt = match kind {
@@ -671,7 +682,10 @@ fn edit_shape(ui: &mut egui::Ui, shape: &mut Shape2d) -> bool {
         ShapeKind::Rectangle { size } => Shape2d::rectangle(size),
         ShapeKind::Capsule { height, radius } => Shape2d::capsule(height, radius),
     };
-    replace_if_valid(shape, rebuilt.ok())
+    replace_if_valid(
+        shape,
+        rebuilt.and_then(|shape| shape.with_offset(offset)).ok(),
+    )
 }
 
 /// The kinds of 3D body shape, to choose one.
@@ -683,8 +697,35 @@ enum Shape3dChoice {
     Mesh,
 }
 
-fn edit_body_3d(ui: &mut egui::Ui, body: &mut BodySettings<Shape3d>) -> bool {
-    edit_shape_3d(ui, &mut body.shape) | edit_body_settings(ui, body)
+/// The rows of a 3D body; with `fit`, what its node shows and the assets
+/// folder, a button that fits its shape around it.
+fn edit_body_3d(
+    ui: &mut egui::Ui,
+    body: &mut BodySettings<Shape3d>,
+    fit: Option<(&Shown, &Path)>,
+) -> bool {
+    edit_shape_3d(ui, &mut body.shape)
+        | fit_row(ui, &mut body.shape, fit)
+        | edit_body_settings(ui, body)
+}
+
+/// A button that fits `shape` around what its node shows, when it is not
+/// a mesh and `fit` says what that is.
+fn fit_row(ui: &mut egui::Ui, shape: &mut Shape3d, fit: Option<(&Shown, &Path)>) -> bool {
+    let Some((shown, folder)) = fit.filter(|_| shape.kind() != ShapeKind3d::Mesh) else {
+        return false;
+    };
+    let texts = texts::current();
+    ui.label("");
+    let clicked = ui
+        .button(texts.fit_shape)
+        .on_hover_text(texts.fit_shape_hint)
+        .clicked();
+    ui.end_row();
+    let Some(bounds) = clicked.then(|| shown.bounds(folder)).flatten() else {
+        return false;
+    };
+    replace_if_valid(shape, Some(fitted(*shape, bounds)))
 }
 
 fn edit_shape_3d(ui: &mut egui::Ui, shape: &mut Shape3d) -> bool {
@@ -729,13 +770,18 @@ fn edit_shape_3d(ui: &mut egui::Ui, shape: &mut Shape3d) -> bool {
             number_from_row(ui, texts.radius, radius, MIN_SIZE);
         }
     }
+    let mut offset = shape.offset();
+    vec3_row(ui, texts.shape_offset, &mut offset);
     let rebuilt = match kind {
         ShapeKind3d::Sphere { radius } => Shape3d::sphere(radius),
         ShapeKind3d::Box { size } => Shape3d::cuboid(size),
         ShapeKind3d::Capsule { height, radius } => Shape3d::capsule(height, radius),
         ShapeKind3d::Mesh => Ok(Shape3d::mesh()),
     };
-    replace_if_valid(shape, rebuilt.ok())
+    replace_if_valid(
+        shape,
+        rebuilt.and_then(|shape| shape.with_offset(offset)).ok(),
+    )
 }
 
 /// Puts `new` in `value` if it is valid and different. Returns whether

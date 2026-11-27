@@ -1452,7 +1452,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
 - [ ] **Owner's requests (2026-11-26)**, done one by one, each with a
       plan agreed with the owner first:
   - To fix:
-    - [ ] 3D collision shapes follow their node: a `Body3D` on a simple
+    - [x] 3D collision shapes follow their node: a `Body3D` on a simple
           mesh that was changed (a cube scaled, for example) gets a
           collision shape of the mesh's real size, not of the unscaled
           one. Complex models (a soldier, for example) can still take a
@@ -1470,9 +1470,16 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
             or `Model` (a skinned model in its rest pose): its exact
             triangles for static and kinematic bodies, its convex hull for
             dynamic ones (triangles have no volume to fall and roll with).
-      - [ ] c. A “Fit” button in the body's inspector section that sizes
+      - [x] c. A “Fit” button in the body's inspector section that sizes
             its box, sphere or capsule to the bounds of the node's mesh or
-            model.
+            model. Agreed after: shapes get an `offset` from their node
+            (as the center of Unity's colliders), so a model whose origin
+            is at its feet gets a shape around it, not half underground:
+        - [x] c1. `offset` of 2D and 3D shapes: physics (stretched with
+              the scale), `.scene` files, the inspector and the drawing,
+              and StarScript (`offset_x`, `offset_y`, `offset_z` of
+              `Body`, compiled and interpreted).
+        - [x] c2. The “Fit” button: sizes and offset from the bounds.
   - To do:
     - [ ] Frames per second shown while a game runs.
     - [ ] Basic 2D bodies: shape nodes for 2D (a box, for example) that
