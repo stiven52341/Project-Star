@@ -11,6 +11,7 @@ mod opening;
 mod project_table;
 mod settings;
 mod show_fps;
+mod sound_groups;
 #[cfg(test)]
 mod test_support;
 
@@ -30,5 +31,6 @@ pub(crate) use name::{MAX_NAME_LENGTH, ProjectNameError};
 pub(crate) use opening::{OpenProjectError, Project, open_project};
 pub(crate) use settings::{ProjectSettings, ProjectSettingsError};
 pub(crate) use show_fps::{read_show_fps, set_show_fps};
+pub(crate) use sound_groups::{read_sound_groups, set_sound_groups};
 #[cfg(test)]
 pub(crate) use test_support::TestDirectory;

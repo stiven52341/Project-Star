@@ -9,6 +9,7 @@ use eframe::egui;
 
 use crate::blueprint_editor::BlueprintTab;
 use crate::frames_editor::FramesTab;
+use crate::mixer_editor::MixerTab;
 use crate::project::ProjectDimension;
 use crate::project_check::OpenTexts;
 use crate::scene_editor::SceneDocument;
@@ -33,6 +34,7 @@ enum Tab {
     Frames(FramesTab),
     States(StatesTab),
     Sound(SoundTab),
+    Mixer(MixerTab),
 }
 
 impl Tab {
@@ -43,6 +45,7 @@ impl Tab {
             Self::Frames(tab) => tab.path(),
             Self::States(tab) => tab.path(),
             Self::Sound(tab) => tab.path(),
+            Self::Mixer(tab) => tab.path(),
         }
     }
 
@@ -53,6 +56,7 @@ impl Tab {
             Self::Frames(tab) => tab.title(),
             Self::States(tab) => tab.title(),
             Self::Sound(tab) => tab.title(),
+            Self::Mixer(tab) => tab.title(),
         }
     }
 
@@ -63,6 +67,7 @@ impl Tab {
             Self::Frames(tab) => tab.is_unsaved(),
             Self::States(tab) => tab.is_unsaved(),
             Self::Sound(_) => false,
+            Self::Mixer(tab) => tab.is_unsaved(),
         }
     }
 
@@ -73,6 +78,7 @@ impl Tab {
             Self::Frames(tab) => tab.save(),
             Self::States(tab) => tab.save(),
             Self::Sound(_) => true,
+            Self::Mixer(tab) => tab.save(),
         }
     }
 }
@@ -85,6 +91,7 @@ pub(crate) enum ActiveDocument<'documents> {
     Frames(&'documents mut FramesTab),
     States(&'documents mut StatesTab),
     Sound(&'documents mut SoundTab),
+    Mixer(&'documents mut MixerTab),
 }
 
 impl Documents {
@@ -122,6 +129,14 @@ impl Documents {
         self.show_or_open(path, |path| Tab::States(StatesTab::open(assets, path)));
     }
 
+    /// Shows the mixer of the project in `directory`, opening it if it is
+    /// not open yet.
+    pub(crate) fn open_mixer(&mut self, directory: &Path) {
+        self.show_or_open(crate::mixer_editor::MIXER_TAB.to_owned(), |_| {
+            Tab::Mixer(MixerTab::open(directory))
+        });
+    }
+
     /// Shows the sound at `path` of the `assets` folder, opening it if it
     /// is not open yet.
     pub(crate) fn open_sound(&mut self, assets: &Path, path: String) {
@@ -137,7 +152,11 @@ impl Documents {
                 Tab::Script(script) => script
                     .text()
                     .map(|text| (script.path().to_owned(), text.to_owned())),
-                Tab::Blueprint(_) | Tab::Frames(_) | Tab::States(_) | Tab::Sound(_) => None,
+                Tab::Blueprint(_)
+                | Tab::Frames(_)
+                | Tab::States(_)
+                | Tab::Sound(_)
+                | Tab::Mixer(_) => None,
             })
             .collect()
     }
@@ -235,6 +254,8 @@ impl Documents {
                 Tab::Frames(_) => Tab::Frames(FramesTab::open(assets, path)),
                 Tab::States(_) => Tab::States(StatesTab::open(assets, path)),
                 Tab::Sound(_) => Tab::Sound(SoundTab::open(assets, path)),
+                // Not a file of the assets: it never changes there.
+                Tab::Mixer(_) => continue,
             };
         }
     }
@@ -307,6 +328,7 @@ impl Documents {
             Some(Tab::Frames(tab)) => ActiveDocument::Frames(tab),
             Some(Tab::States(tab)) => ActiveDocument::States(tab),
             Some(Tab::Sound(tab)) => ActiveDocument::Sound(tab),
+            Some(Tab::Mixer(tab)) => ActiveDocument::Mixer(tab),
             None => ActiveDocument::Scene,
         }
     }
@@ -360,6 +382,7 @@ mod tests {
             ActiveDocument::Frames(tab) => Some(tab.path().to_owned()),
             ActiveDocument::States(tab) => Some(tab.path().to_owned()),
             ActiveDocument::Sound(tab) => Some(tab.path().to_owned()),
+            ActiveDocument::Mixer(tab) => Some(tab.path().to_owned()),
         }
     }
 

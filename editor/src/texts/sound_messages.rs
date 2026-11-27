@@ -14,6 +14,37 @@ impl Texts {
         self.pick("Stop", "Detener")
     }
 
+    pub(crate) const fn mixer(&self) -> &'static str {
+        self.pick("Mixer", "Mezclador")
+    }
+
+    pub(crate) const fn open_mixer(&self) -> &'static str {
+        self.pick("Audio mixer", "Mezclador de audio")
+    }
+
+    pub(crate) const fn mixer_hint(&self) -> &'static str {
+        self.pick(
+            "The groups of sounds and the volume each starts at. Sound players and sounds play in a group; scripts change a group's volume with Audio.set_group_volume. Saved in project.toml.",
+            "Los grupos de sonidos y el volumen con el que empieza cada uno. Los reproductores y los sonidos suenan en un grupo; los scripts cambian el volumen de un grupo con Audio.set_group_volume. Se guarda en project.toml.",
+        )
+    }
+
+    pub(crate) const fn add_group(&self) -> &'static str {
+        self.pick("Add group", "Añadir grupo")
+    }
+
+    pub(crate) const fn remove_group(&self) -> &'static str {
+        self.pick("Remove", "Quitar")
+    }
+
+    pub(crate) const fn no_group(&self) -> &'static str {
+        self.pick("None", "Ninguno")
+    }
+
+    pub(crate) const fn sound_group(&self) -> &'static str {
+        self.pick("Group", "Grupo")
+    }
+
     pub(crate) const fn sound_player_section(&self) -> &'static str {
         self.pick("Sound player", "Reproductor de sonido")
     }

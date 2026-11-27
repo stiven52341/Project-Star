@@ -14,6 +14,7 @@ mod game_run;
 mod language_menu;
 mod last_scenes;
 mod launcher;
+mod mixer_editor;
 mod preferences;
 mod project;
 mod project_check;

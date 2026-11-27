@@ -958,8 +958,13 @@ warned once. Closing the tab stops its sound. The assets' menu of a sound
 has “Play” too, which plays it in place of the last one it played.
 A node gets a sound player from the inspector's “Add” (the first sound of
 the assets), or by dropping a sound on the scene, where it lands; its
-section chooses the sound among those of the assets, its volume, “Loop”
-and “Play on start”.
+section chooses the sound among those of the assets, its volume, “Loop”,
+“Play on start” and its group, among the project's (read from
+`project.toml` only while the list is open). The Project menu's “Audio
+mixer” opens the mixer tab (`mixer_editor.rs`): the groups of
+`[audio.groups]` with the volume each starts at (0 to 2), to add, change
+and remove, saved into the user's `project.toml` in place of the table it
+had (`project/sound_groups.rs`).
 
 3D models (`.glb`, `.gltf`, decision 83) are assets of their own kind:
 dragged onto the scene of a 3D project they become a node with a

@@ -33,7 +33,7 @@ use super::fields::{
 use super::key_buttons::{KeyButtons, keyed};
 use star_script::semantic::ClassTable;
 
-use crate::project::ProjectDimension;
+use crate::project::{ProjectDimension, read_sound_groups};
 use crate::style::PROPERTY_SPACING;
 use crate::texts;
 
@@ -132,7 +132,14 @@ pub(super) fn edit_node(
         ui,
         texts.sound_player_section(),
         &mut node.sound_player,
-        |ui, player| edit_sound_player(ui, player, context.animations.sounds),
+        |ui, player| {
+            edit_sound_player(
+                ui,
+                player,
+                context.animations.sounds,
+                context.animations.folder,
+            )
+        },
     );
     changed |= optional_section(ui, texts.model_section(), &mut node.model, |ui, model| {
         edit_model(ui, model, context.animations.models)
@@ -580,8 +587,14 @@ fn edit_camera_2d(ui: &mut egui::Ui, camera: &mut Camera2dNode, keys: Option<&Ke
 }
 
 /// The rows of a sound player: its sound, among the `sounds` of the
-/// assets folder, its volume, and whether it loops and plays on start.
-fn edit_sound_player(ui: &mut egui::Ui, player: &mut SoundPlayerNode, sounds: &[String]) -> bool {
+/// `assets` folder, its volume, whether it loops and plays on start, and
+/// its group, among those of the project.
+fn edit_sound_player(
+    ui: &mut egui::Ui,
+    player: &mut SoundPlayerNode,
+    sounds: &[String],
+    assets: &Path,
+) -> bool {
     let texts = texts::current();
     let current = player.sound.as_str().to_owned();
     let mut chosen = Some(current.as_str());
@@ -597,7 +610,40 @@ fn edit_sound_player(ui: &mut egui::Ui, player: &mut SoundPlayerNode, sounds: &[
     changed |= number_from_row(ui, texts.volume(), &mut player.volume, 0.0);
     changed |= checkbox_row(ui, texts.looping(), &mut player.looping);
     changed |= checkbox_row(ui, texts.play_on_start(), &mut player.play_on_start);
-    changed
+    changed | group_row(ui, &mut player.group, assets)
+}
+
+/// The group a player plays in, chosen among the groups of the project
+/// (read from its `project.toml` only while the list is open), or none.
+fn group_row(ui: &mut egui::Ui, group: &mut Option<String>, assets: &Path) -> bool {
+    let texts = texts::current();
+    ui.label(texts.sound_group());
+    let mut chosen = None;
+    egui::ComboBox::from_id_salt("sound_group")
+        .selected_text(group.as_deref().unwrap_or(texts.no_group()))
+        .show_ui(ui, |ui| {
+            if ui
+                .selectable_label(group.is_none(), texts.no_group())
+                .clicked()
+            {
+                chosen = Some(None);
+            }
+            let project = assets.parent().unwrap_or(assets);
+            for (name, _) in read_sound_groups(project) {
+                let current = group.as_deref() == Some(name.as_str());
+                if ui.selectable_label(current, &name).clicked() {
+                    chosen = Some(Some(name));
+                }
+            }
+        });
+    ui.end_row();
+    match chosen {
+        Some(new) if new != *group => {
+            *group = new;
+            true
+        }
+        _ => false,
+    }
 }
 
 /// The model's file, among the `models` of the assets folder.

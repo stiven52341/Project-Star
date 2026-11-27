@@ -249,6 +249,11 @@ impl EditorWindow {
                     ui.separator();
                     ui.weak(texts::current().sound_inspector_hint());
                 }
+                ActiveDocument::Mixer(_) => {
+                    ui.strong(texts::current().inspector);
+                    ui.separator();
+                    ui.weak(texts::current().mixer_hint());
+                }
                 ActiveDocument::Frames(tab) => {
                     ui.strong(texts::current().inspector);
                     ui.separator();
@@ -333,6 +338,7 @@ impl EditorWindow {
                 Some(MenuAction::ChangeLanguage(language)) => {
                     action = Some(EditorAction::ChangeLanguage(language));
                 }
+                Some(MenuAction::OpenMixer) => self.documents.open_mixer(self.project.directory()),
                 Some(MenuAction::SetShowFps(choice)) => {
                     match set_show_fps(self.project.directory(), choice) {
                         Ok(()) => self.show_fps = choice,
@@ -353,7 +359,8 @@ impl EditorWindow {
             | ActiveDocument::Script(_)
             | ActiveDocument::Frames(_)
             | ActiveDocument::States(_)
-            | ActiveDocument::Sound(_) => None,
+            | ActiveDocument::Sound(_)
+            | ActiveDocument::Mixer(_) => None,
         }
     }
 
@@ -520,6 +527,7 @@ impl EditorWindow {
             ActiveDocument::Frames(tab) => tab.show(ui, self.assets.images()),
             ActiveDocument::States(tab) => tab.show(ui, self.assets.keyframes()),
             ActiveDocument::Sound(tab) => tab.show(ui, &mut self.audio),
+            ActiveDocument::Mixer(tab) => tab.show(ui),
             ActiveDocument::Script(tab) => {
                 let edited = tab.show(ui, self.live_check.problems(), self.live_check.outline());
                 if edited.changed {

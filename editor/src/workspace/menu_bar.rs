@@ -38,6 +38,8 @@ pub(crate) enum MenuAction {
     ChangeLanguage(Language),
     /// Changes when the game shows its frames per second.
     SetShowFps(ShowFps),
+    /// Opens the tab of the groups of sounds.
+    OpenMixer,
 }
 
 /// Whether the scene shown has changes to undo and to redo.
@@ -103,6 +105,9 @@ pub(crate) fn show_menu_bar(ui: &mut egui::Ui, state: MenuState) -> Option<MenuA
             ui.separator();
             if let Some(chosen) = show_fps_menu(ui, show_fps) {
                 action = Some(MenuAction::SetShowFps(chosen));
+            }
+            if ui.button(texts::current().open_mixer()).clicked() {
+                action = Some(MenuAction::OpenMixer);
             }
         });
         ui.menu_button(texts::current().menu_help, |ui| {
