@@ -375,6 +375,7 @@ pub(super) fn new_node(name: String, dimension: ProjectDimension) -> NodeOutline
         animator: None,
         bone: None,
         model: None,
+        sound_player: None,
         fields: std::collections::BTreeMap::new(),
     }
 }

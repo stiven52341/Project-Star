@@ -1519,6 +1519,10 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
       - [ ] b. A `SoundPlayer` node (as Unity's audio source): its sound,
             volume, looping and “play on start”, in the inspector, scenes
             and StarScript (`play`, `stop`, compiled and interpreted).
+        - [x] b1. `[node.sound_player]` in scenes, played by the engine.
+        - [ ] b2. StarScript's `SoundPlayer`, compiled and interpreted.
+        - [ ] b3. The editor: its inspector section, “Create”, and a sound
+              dropped on the scene.
       - [ ] c. Groups and a mixer: groups of sounds (music, effects…)
             with their volume, in a mixer tab; each sound and player
             belongs to one; StarScript `Audio.set_group_volume`.

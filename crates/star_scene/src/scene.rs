@@ -13,6 +13,7 @@ use crate::bone_node::Bone2dNode;
 use crate::model_node::ModelNode;
 use crate::node_3d_data::MeshOutline;
 use crate::scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
+use crate::sound_player_node::SoundPlayerNode;
 use crate::sprite_body::{SpriteLook, shaped_by_sprite};
 use crate::{
     Body2D, Body3D, Camera2dNode, Camera3dNode, Children, FieldValue, Hidden, Hierarchy,
@@ -57,6 +58,7 @@ struct SceneNode {
     /// Kept, as `class` is: bones only move the nodes under them.
     bone: Option<Bone2dNode>,
     model: Option<ModelNode>,
+    sound_player: Option<SoundPlayerNode>,
     light_2d: Option<Light2dNode>,
     /// Kept, as `class` is, for the scene to be written again whole.
     fields: BTreeMap<String, FieldValue>,
@@ -228,6 +230,9 @@ impl Scene {
             if let Some(model) = &node.model {
                 world.insert(entity, model.clone())?;
             }
+            if let Some(player) = &node.sound_player {
+                world.insert(entity, player.clone())?;
+            }
             if let Some(light) = node.light_2d {
                 world.insert(entity, light)?;
             }
@@ -298,6 +303,7 @@ fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResul
         animator: outline.animator,
         bone: outline.bone,
         model: outline.model,
+        sound_player: outline.sound_player,
         light_2d: outline.light_2d,
         fields: outline.fields,
     })
@@ -349,6 +355,7 @@ fn outline_node(node: &SceneNode, sources: &impl SceneSources) -> EngineResult<N
         animator: node.animator.clone(),
         bone: node.bone,
         model: node.model.clone(),
+        sound_player: node.sound_player.clone(),
         light_2d: node.light_2d,
         fields: node.fields.clone(),
     })
@@ -425,6 +432,9 @@ fn capture_node(world: &World, entity: Entity, parent: Option<usize>) -> SceneNo
         animator: None,
         bone: None,
         model: world.get::<ModelNode>(entity).map(|model| model.clone()),
+        sound_player: world
+            .get::<SoundPlayerNode>(entity)
+            .map(|player| player.clone()),
         light_2d: world.get::<Light2dNode>(entity).map(|light| *light),
         fields: BTreeMap::new(),
     }

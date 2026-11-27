@@ -17,6 +17,7 @@ use crate::light_2d_node::Light2dData;
 use crate::model_node::{ModelData, ModelNode};
 use crate::node_3d_data::{LightData, MeshOutline, MeshTable, Transform3dData};
 use crate::scene_file::{FORMAT_VERSION, NodeData, SceneFile, SpriteData};
+use crate::sound_player_node::{SoundPlayerData, SoundPlayerNode};
 use crate::{
     Camera2dNode, Camera3dNode, FieldValue, Light2dNode, LightNode, Transform2D, Transform3D,
 };
@@ -73,6 +74,8 @@ pub struct NodeOutline {
     pub bone: Option<Bone2dNode>,
     /// The 3D model it shows, if any.
     pub model: Option<ModelNode>,
+    /// The sound it plays, if any.
+    pub sound_player: Option<SoundPlayerNode>,
     /// The values of the `export` fields of its class, by name.
     pub fields: BTreeMap<String, FieldValue>,
 }
@@ -398,6 +401,8 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
     let light_2d = read_part(node.light_2d.as_ref(), Light2dData::to_light).map_err(named)?;
     let bone = read_part(node.bone.as_ref(), BoneData::to_bone).map_err(named)?;
     let model = read_part(node.model.as_ref(), ModelData::to_model).map_err(named)?;
+    let sound_player =
+        read_part(node.sound_player.as_ref(), SoundPlayerData::to_player).map_err(named)?;
     if node
         .class
         .as_deref()
@@ -430,6 +435,7 @@ fn read_node(node: NodeData) -> EngineResult<NodeOutline> {
         animator,
         bone,
         model,
+        sound_player,
         fields: node.fields,
     })
 }
@@ -485,6 +491,7 @@ fn write_node(node: &NodeOutline) -> NodeData {
         animator: node.animator.as_ref().map(AnimatorData::from_outline),
         bone: node.bone.map(BoneData::from_bone),
         model: node.model.as_ref().map(ModelData::from_model),
+        sound_player: node.sound_player.as_ref().map(SoundPlayerData::from_player),
         fields: node.fields.clone(),
     }
 }

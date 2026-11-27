@@ -15,9 +15,11 @@ use star_scene::{
     ModelPose, Name, Scene, SceneAssets, SpriteNode, is_shown,
 };
 
+use crate::EngineWorld as _;
 use crate::mesh_file::MeshFile;
 use crate::model_library::{ModelLibrary, upload_to};
 use crate::sound_library::SoundLibrary;
+use crate::sound_players::SoundPlayers;
 use crate::sprite_file::SpriteFile;
 use crate::texture_library::TextureLibrary;
 
@@ -35,6 +37,7 @@ pub(crate) struct GameAssets {
     /// The nodes warned that their mesh body has nothing to take its
     /// triangles from.
     unshaped: HashSet<Entity>,
+    sound_players: SoundPlayers,
 }
 
 impl GameAssets {
@@ -48,6 +51,7 @@ impl GameAssets {
             models: ModelLibrary::default(),
             model_drawing: ModelDrawing::default(),
             unshaped: HashSet::new(),
+            sound_players: SoundPlayers::default(),
         }
     }
 
@@ -80,6 +84,26 @@ impl GameAssets {
         let mesh = renderer.create_mesh_3d(&shape.to_mesh_data()?)?;
         self.meshes.push((shape, mesh));
         Ok(mesh)
+    }
+
+    /// Starts the sound players of `world` that play on start, and stops
+    /// those that are gone (see [`SoundPlayers::update`]).
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Ecs`](star_core::EngineError::Ecs) if a running query
+    /// holds the players.
+    pub(crate) fn play_sound_players(&mut self, world: &World) -> EngineResult<()> {
+        let audio = world.audio();
+        let Self {
+            folder,
+            sounds,
+            sound_players,
+            ..
+        } = self;
+        sound_players.update(world, &audio, |player| {
+            sounds.load(folder, player.sound.clone())
+        })
     }
 
     /// The sound at `path`, decoded the first time.

@@ -428,6 +428,16 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   so a file is decoded once; a failed load is tried again. Sounds have no
   hot-reload yet. Example: `sounds_2d`.
 
+- **Sound players** (decision 87): a `star_scene::SoundPlayerNode` (its
+  `sound`, `volume`, `looping` and `play_on_start`, true by default) makes
+  a node play a sound, as Unity's audio sources do. Scenes keep it in a
+  `[node.sound_player]` table that writes only what is not the default
+  (`sound = "music/theme.ogg"`, `volume`, `looping`, `play_on_start`).
+  The engine (`sound_players.rs`) starts a player that plays on start the
+  first frame it sees it, loading its sound once, and stops its sound when
+  the node or its player goes away; StarScript's players play through the
+  runtime instead.
+
 ## Physics
 
 - `star_physics` simulates 2D bodies with rapier2d (decision 46). A

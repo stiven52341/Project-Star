@@ -20,6 +20,7 @@ mod script_3d;
 mod script_body;
 pub mod script_nodes;
 mod sound_library;
+mod sound_players;
 mod sprite_file;
 mod texture_library;
 mod texture_slot;
