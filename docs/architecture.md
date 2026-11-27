@@ -435,8 +435,11 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   (`sound = "music/theme.ogg"`, `volume`, `looping`, `play_on_start`).
   The engine (`sound_players.rs`) starts a player that plays on start the
   first frame it sees it, loading its sound once, and stops its sound when
-  the node or its player goes away; StarScript's players play through the
-  runtime instead.
+  the node or its player goes away. StarScript's players
+  (`star_script_runtime::sound_players`, `SoundPlayerFields`) play through
+  the runtime's audio backend instead: the frame a player starts, before
+  its `start()`, if it plays on start; `remove()` stops the sounds of the
+  players under the node. Scenes give StarScript a `SceneSoundPlayer`.
 
 ## Physics
 

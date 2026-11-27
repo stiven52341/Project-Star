@@ -107,12 +107,13 @@ pub(crate) enum EngineClass {
     TweenOptions,
     Bone2D,
     Model,
+    SoundPlayer,
 }
 
 impl EngineClass {
     /// Every engine class the interpreter knows, in the order of their
     /// places.
-    pub(crate) const ALL: [Self; 16] = [
+    pub(crate) const ALL: [Self; 17] = [
         Self::Color,
         Self::Node,
         Self::Camera2D,
@@ -129,6 +130,7 @@ impl EngineClass {
         Self::TweenOptions,
         Self::Bone2D,
         Self::Model,
+        Self::SoundPlayer,
     ];
 
     /// Its place among the classes.
@@ -155,6 +157,7 @@ impl EngineClass {
             Self::TweenOptions => "TweenOptions",
             Self::Bone2D => "Bone2D",
             Self::Model => "Model",
+            Self::SoundPlayer => "SoundPlayer",
         }
     }
 }
@@ -294,6 +297,10 @@ pub(crate) enum EngineField {
     Length,
     /// `file` of `Model`.
     ModelFile,
+    /// `sound` of `SoundPlayer`: the file it plays.
+    SoundFile,
+    /// `play_on_start` of `SoundPlayer`.
+    PlayOnStart,
     /// `body` of `Node`.
     Body,
     /// `view_height` and `main` of `Camera2D` (`main` of `Camera3D` too).
@@ -504,6 +511,10 @@ pub(crate) enum NodeMethod {
     SetFlag,
     Trigger,
     State,
+    /// `play`, `stop` and `is_playing` of `SoundPlayer`.
+    PlayerPlay,
+    PlayerStop,
+    PlayerIsPlaying,
 }
 
 impl NodeMethod {
@@ -549,6 +560,16 @@ impl NodeMethod {
     }
 
     /// The method of `Animator` called `name`, if the runtime runs it.
+    /// The method of `SoundPlayer` called `name`.
+    pub(crate) fn of_sound_player(name: &str) -> Option<Self> {
+        Some(match name {
+            "play" => Self::PlayerPlay,
+            "stop" => Self::PlayerStop,
+            "is_playing" => Self::PlayerIsPlaying,
+            _ => return None,
+        })
+    }
+
     pub(crate) fn of_animator(name: &str) -> Option<Self> {
         Some(match name {
             "play" => Self::AnimatorPlay,

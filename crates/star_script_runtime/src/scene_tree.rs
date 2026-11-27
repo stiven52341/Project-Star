@@ -45,6 +45,11 @@ pub enum NewNode<'scene> {
         /// The model file it shows.
         file: &'scene str,
     },
+    /// `SoundPlayer` playing `sound`.
+    SoundPlayer {
+        /// The sound file it plays.
+        sound: &'scene str,
+    },
     /// A class of the program, created with `init()`.
     Script(&'scene str),
 }
@@ -107,6 +112,7 @@ fn build_node<H: Host>(node: &SceneNode) -> Result<H::Node, String> {
     view::<H>(&object, node, class)?;
     animate::<H>(&object, node, class)?;
     joint::<H>(&object, node, class)?;
+    sound::<H>(&object, node, class)?;
     if let Some(solid) = &node.body {
         let body = BodyFields::new(
             solid.kind.clone(),
@@ -168,6 +174,12 @@ fn new_node<'scene>(
             Some(file) => NewNode::Model { file },
             None => return missing("model"),
         },
+        "SoundPlayer" => match &node.sound_player {
+            Some(player) => NewNode::SoundPlayer {
+                sound: &player.sound,
+            },
+            None => return missing("sound_player"),
+        },
         script => NewNode::Script(script),
     })
 }
@@ -179,6 +191,8 @@ fn default_class(node: &SceneNode) -> &'static str {
         "Sprite"
     } else if node.model.is_some() {
         "Model"
+    } else if node.sound_player.is_some() {
+        "SoundPlayer"
     } else if node.mesh.is_some() {
         "Mesh"
     } else if node.light.is_some() {
@@ -307,6 +321,19 @@ fn joint<H: Host>(object: &H::Node, node: &SceneNode, class: &str) -> Result<(),
     };
     H::with_bone(object, |fields| fields.length.set(bone.length))
         .ok_or_else(|| format!("it is a bone, but `{class}` is not a `Bone2D`"))
+}
+
+/// Gives `object` how the scene says it plays its sound.
+fn sound<H: Host>(object: &H::Node, node: &SceneNode, class: &str) -> Result<(), String> {
+    let Some(player) = &node.sound_player else {
+        return Ok(());
+    };
+    H::with_sound_player(object, |fields| {
+        fields.volume.set(player.volume);
+        fields.looping.set(player.looping);
+        fields.play_on_start.set(player.play_on_start);
+    })
+    .ok_or_else(|| format!("it plays a sound, but `{class}` is not a `SoundPlayer`"))
 }
 
 /// Gives `object` the camera settings the scene says it has.

@@ -23,6 +23,7 @@ use star_script_runtime::node_classes::{
 use star_script_runtime::nodes::{Host, Node3dFields, NodeFields};
 use star_script_runtime::scene_fields::SceneValue;
 use star_script_runtime::scene_tree::NewNode;
+use star_script_runtime::sound_players::SoundPlayerFields;
 use star_script_runtime::tweens::TweenOptionsFields;
 
 use crate::play;
@@ -76,6 +77,7 @@ pub(crate) enum ClassParts {
     Animator(AnimatorFields),
     Bone2D(BoneFields),
     Model(ModelFields),
+    SoundPlayer(SoundPlayerFields),
 }
 
 impl NodeParts {
@@ -150,6 +152,14 @@ impl NodeParts {
     pub(crate) const fn model(&self) -> Option<&ModelFields> {
         match &self.class {
             ClassParts::Model(fields) => Some(fields),
+            _ => None,
+        }
+    }
+
+    /// The fields of `SoundPlayer`, if it is one.
+    pub(crate) const fn sound_player(&self) -> Option<&SoundPlayerFields> {
+        match &self.class {
+            ClassParts::SoundPlayer(fields) => Some(fields),
             _ => None,
         }
     }
@@ -288,6 +298,13 @@ impl Host for Interpreted {
 
     fn with_model<R>(node: &Self::Node, read: impl FnOnce(&ModelFields) -> R) -> Option<R> {
         node.engine.model().map(read)
+    }
+
+    fn with_sound_player<R>(
+        node: &Self::Node,
+        read: impl FnOnce(&SoundPlayerFields) -> R,
+    ) -> Option<R> {
+        node.engine.sound_player().map(read)
     }
 
     fn with_bone<R>(node: &Self::Node, read: impl FnOnce(&BoneFields) -> R) -> Option<R> {

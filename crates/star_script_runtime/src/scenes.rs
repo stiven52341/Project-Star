@@ -51,6 +51,8 @@ pub struct SceneNode {
     /// The asset path of the 3D model it shows; only `Model` objects can
     /// show one.
     pub model: Option<String>,
+    /// The sound it plays; only `SoundPlayer` objects can play one.
+    pub sound_player: Option<SceneSoundPlayer>,
     /// The 2D camera it is; only `Camera2D` objects can be one.
     pub camera: Option<SceneCamera>,
     /// The 3D camera it is; only `Camera3D` objects can be one.
@@ -207,6 +209,19 @@ pub struct SceneSprite {
     pub animation: String,
 }
 
+/// The sound a [`SceneNode`] plays, as a `SoundPlayer`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SceneSoundPlayer {
+    /// The asset path of its sound file.
+    pub sound: String,
+    /// How loud: 1 as recorded.
+    pub volume: f32,
+    /// Whether it starts again when it ends.
+    pub looping: bool,
+    /// Whether it plays when it starts.
+    pub play_on_start: bool,
+}
+
 /// The physics body of a [`SceneNode`], with the words and values of
 /// StarScript's `Body`. Every size is given, also those its shape does not
 /// use.
@@ -335,6 +350,7 @@ mod tests {
             light_2d: None,
             bone: None,
             model: None,
+            sound_player: None,
             camera: None,
             camera_3d: None,
             animator: None,

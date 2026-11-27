@@ -34,6 +34,7 @@ pub mod properties;
 pub mod scene_fields;
 pub mod scene_tree;
 pub mod scenes;
+pub mod sound_players;
 pub mod tasks;
 #[cfg(test)]
 mod test_host;

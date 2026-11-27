@@ -499,6 +499,32 @@ const MODEL: NodeClass = NodeClass {
     bodies: &[],
 };
 
+const SOUND_PLAYER_METHODS: [Method; 3] = [
+    PLAYING_METHODS[1],
+    PLAYING_METHODS[2],
+    Method {
+        name: "play",
+        parameters: "",
+        arguments: "",
+        returns: "",
+    },
+];
+
+const SOUND_PLAYER: NodeClass = NodeClass {
+    name: "SoundPlayer",
+    about: "the sound file it plays, how loud, whether again and again and whether from the start",
+    ancestors: &["Node"],
+    fields: "::star_script_runtime::sound_players::SoundPlayerFields",
+    new_fields: "Fields::new(sound)",
+    parameters: &[("sound", STRING)],
+    methods: &SOUND_PLAYER_METHODS,
+    bodies: &[
+        "HasFields::fields(&**this_).stop()",
+        "HasFields::fields(&**this_).is_playing()",
+        "HasFields::fields(&**this_).play()",
+    ],
+};
+
 const LIGHT: NodeClass = NodeClass {
     name: "Light",
     about: "the kind of light it shines, its color, how bright it is, how far it reaches and the cone of spots",
@@ -525,7 +551,17 @@ const CAMERA_3D: NodeClass = NodeClass {
 /// `Mesh`, `Light` and `Camera3D`.
 pub(super) fn node_class_modules(out: &mut Writer) {
     for class in [
-        SPRITE, CAMERA_2D, LIGHT_2D, ANIMATOR, BONE_2D, NODE_3D, MESH, MODEL, LIGHT, CAMERA_3D,
+        SPRITE,
+        CAMERA_2D,
+        LIGHT_2D,
+        ANIMATOR,
+        BONE_2D,
+        NODE_3D,
+        MESH,
+        MODEL,
+        SOUND_PLAYER,
+        LIGHT,
+        CAMERA_3D,
     ] {
         out.line("");
         module(out, &class);

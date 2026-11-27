@@ -36,8 +36,8 @@ pub use natives::{
     ANIMATOR_CLASS, AUDIO_CLASS, BASIC_TYPE_NAMES, BODY_CLASS, BONE_2D_CLASS, BuiltinMethod,
     BuiltinSignature, CAMERA_3D_CLASS, CAMERA_CLASS, COLOR_CLASS, DEBUG_CLASS, GAME_CLASS,
     INPUT_CLASS, LIGHT_2D_CLASS, LIGHT_CLASS, MESH_CLASS, MODEL_CLASS, NODE_3D_CLASS, NODE_CLASS,
-    PRINT_METHOD, SCENE_CLASS, SOUND_CLASS, SPRITE_CLASS, TWEEN_OPTIONS_CLASS, basic_type,
-    builtin_method, builtin_methods, is_debug_print, is_printable,
+    PRINT_METHOD, SCENE_CLASS, SOUND_CLASS, SOUND_PLAYER_CLASS, SPRITE_CLASS, TWEEN_OPTIONS_CLASS,
+    basic_type, builtin_method, builtin_methods, is_debug_print, is_printable,
 };
 pub use scene_classes::SceneClassError;
 pub use types::Type;

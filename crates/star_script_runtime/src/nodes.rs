@@ -19,6 +19,7 @@ use crate::node_classes::{
 use crate::placement::{Place2d, Place3d};
 use crate::scene_fields::SceneValue;
 use crate::scene_tree::NewNode;
+use crate::sound_players::SoundPlayerFields;
 use crate::{Field, List};
 
 /// What the objects of a way of running StarScript are: references to
@@ -82,6 +83,11 @@ pub trait Host: Sized + 'static {
     fn with_animator<R>(node: &Self::Node, read: impl FnOnce(&AnimatorFields) -> R) -> Option<R>;
     /// Runs `read` on the fields of `Model` in `node`, if it is one.
     fn with_model<R>(node: &Self::Node, read: impl FnOnce(&ModelFields) -> R) -> Option<R>;
+    /// Runs `read` on the fields of `SoundPlayer` in `node`, if it is one.
+    fn with_sound_player<R>(
+        node: &Self::Node,
+        read: impl FnOnce(&SoundPlayerFields) -> R,
+    ) -> Option<R>;
     /// Runs `read` on the fields of `Bone2D` in `node`, if it is one.
     fn with_bone<R>(node: &Self::Node, read: impl FnOnce(&BoneFields) -> R) -> Option<R>;
     /// A new list of tags holding `tags`.
@@ -281,6 +287,7 @@ pub fn add_child<H: Host>(this: &H::Node, child: H::Node) {
 
 /// `func remove`: takes the node, with its children, out of the tree.
 pub fn remove<H: Host>(this: &H::Node) {
+    crate::sound_players::removed::<H>(this);
     let parent = H::node(this).parent.borrow_mut().take();
     if let Some(parent) = parent.as_ref().and_then(H::upgrade) {
         H::node(&parent)

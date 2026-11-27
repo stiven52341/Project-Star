@@ -156,6 +156,13 @@ impl Host for TestHost {
         None
     }
 
+    fn with_sound_player<R>(
+        _node: &Self::Node,
+        _read: impl FnOnce(&crate::sound_players::SoundPlayerFields) -> R,
+    ) -> Option<R> {
+        None
+    }
+
     fn with_bone<R>(node: &Self::Node, read: impl FnOnce(&BoneFields) -> R) -> Option<R> {
         node.bone.as_ref().map(read)
     }

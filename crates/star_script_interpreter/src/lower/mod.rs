@@ -66,7 +66,7 @@ impl Tables {
 
 /// The engine classes that classes of the program can extend: the game
 /// and the nodes, as compiled.
-const EXTENDABLE: [EngineClass; 12] = [
+const EXTENDABLE: [EngineClass; 13] = [
     EngineClass::Node,
     EngineClass::Camera2D,
     EngineClass::Game,
@@ -79,6 +79,7 @@ const EXTENDABLE: [EngineClass; 12] = [
     EngineClass::Animator,
     EngineClass::Bone2D,
     EngineClass::Model,
+    EngineClass::SoundPlayer,
 ];
 
 /// A member of the program, before its code is lowered.

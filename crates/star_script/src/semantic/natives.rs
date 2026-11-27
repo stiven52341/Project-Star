@@ -63,6 +63,9 @@ pub const ANIMATOR_CLASS: &str = "Animator";
 /// Name of the engine class of the 3D nodes that show a model file.
 pub const MODEL_CLASS: &str = "Model";
 
+/// Name of the engine class of the nodes that play a sound file.
+pub const SOUND_PLAYER_CLASS: &str = "SoundPlayer";
+
 /// Name of the engine class of the bones of cut-out 2D characters.
 pub const BONE_2D_CLASS: &str = "Bone2D";
 
@@ -196,6 +199,7 @@ pub(super) fn add_native_classes(classes: &mut ClassTable) {
     let node_3d = add_node_3d_class(classes, node);
     add_mesh_class(classes, node_3d, color);
     add_model_class(classes, node_3d);
+    add_sound_player_class(classes, node);
     add_light_class(classes, node_3d, color);
     let camera_3d = add_camera_3d_class(classes, node_3d);
     add_animator_class(classes, node);
@@ -609,6 +613,29 @@ fn add_node_3d_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
         native_method("translate_global_3d", &point, Type::Void, false),
     ];
     classes.add(node_3d)
+}
+
+/// `SoundPlayer`: a node that plays a sound file (decision 87), as
+/// Unity's audio sources do.
+fn add_sound_player_class(classes: &mut ClassTable, node: ClassId) -> ClassId {
+    let mut player = ClassInfo::new(SOUND_PLAYER_CLASS.to_owned(), ClassOrigin::Native);
+    player.base = Some(node);
+    player.fields = vec![
+        native_field("sound", Type::String),
+        native_field("volume", Type::Float),
+        native_field("looping", Type::Bool),
+        native_field("play_on_start", Type::Bool),
+    ];
+    player.constructor = Some(native_constructor(&[
+        ("name", Type::String),
+        ("sound", Type::String),
+    ]));
+    player.methods = vec![
+        native_method("play", &[], Type::Void, false),
+        native_method("stop", &[], Type::Void, false),
+        native_method("is_playing", &[], Type::Bool, false),
+    ];
+    classes.add(player)
 }
 
 /// `Mesh`: a 3D node that shows a basic shape with a PBR surface.

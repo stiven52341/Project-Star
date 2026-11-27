@@ -7,7 +7,7 @@ use star_engine::star_scene::{FieldValue, NodeOutline, SceneOutline};
 use star_script_runtime::scene_fields::SceneValue;
 use star_script_runtime::scenes::{
     SceneAnimator, SceneBody, SceneBone, SceneCamera, SceneCamera3D, SceneLight, SceneMesh,
-    SceneNode, SceneSprite, SceneTransform, SceneTransform3D,
+    SceneNode, SceneSoundPlayer, SceneSprite, SceneTransform, SceneTransform3D,
 };
 
 /// Reads the scene at `path` of the asset `folder`. Parts of a scene that
@@ -92,6 +92,12 @@ fn scene_node(node: NodeOutline) -> SceneNode {
             .model
             .as_ref()
             .map(|model| model.file.as_str().to_owned()),
+        sound_player: node.sound_player.as_ref().map(|player| SceneSoundPlayer {
+            sound: player.sound.as_str().to_owned(),
+            volume: player.volume,
+            looping: player.looping,
+            play_on_start: player.play_on_start,
+        }),
         bone: node.bone.map(|bone| SceneBone {
             length: bone.length,
         }),

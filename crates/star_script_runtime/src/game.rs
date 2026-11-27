@@ -98,6 +98,7 @@ pub fn run_frame<H: Host>(game: &H::Game, delta: f32, nodes: &mut Vec<H::Node>) 
         }
         if H::node(node).start_once() {
             fields.see_from_if_main(node);
+            crate::sound_players::started::<H>(node);
             H::start(node);
         }
         H::update(node, delta);

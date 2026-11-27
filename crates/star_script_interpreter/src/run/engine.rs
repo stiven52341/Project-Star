@@ -18,6 +18,7 @@ use star_script_runtime::node_classes::{
     ModelFields, SpriteFields,
 };
 use star_script_runtime::nodes::{self, Host as _, Node3dFields};
+use star_script_runtime::sound_players::SoundPlayerFields;
 use star_script_runtime::tweens::{self, Goal, Tween, TweenOptionsFields};
 use star_script_runtime::{Field, List};
 use star_script_runtime::{animations, machines, tracks};
@@ -185,6 +186,13 @@ fn class_slot(class: &ClassParts, field: EngineField) -> Option<Slot<'_>> {
             EngineField::ModelFile => Some(Slot::Text(&model.file)),
             _ => None,
         },
+        ClassParts::SoundPlayer(player) => match field {
+            EngineField::SoundFile => Some(Slot::Text(&player.sound)),
+            EngineField::Volume => Some(Slot::Float(&player.volume)),
+            EngineField::Looping => Some(Slot::Bool(&player.looping)),
+            EngineField::PlayOnStart => Some(Slot::Bool(&player.play_on_start)),
+            _ => None,
+        },
         ClassParts::Bone2D(bone) => match field {
             EngineField::Length => Some(Slot::Float(&bone.length)),
             _ => None,
@@ -337,7 +345,8 @@ pub(super) fn new_object(
         | EngineClass::Camera3D
         | EngineClass::Animator
         | EngineClass::Bone2D
-        | EngineClass::Model => Value::Node(Rc::new(Object::new(
+        | EngineClass::Model
+        | EngineClass::SoundPlayer => Value::Node(Rc::new(Object::new(
             class,
             fields,
             node_parts(engine, arguments)?,
@@ -387,6 +396,10 @@ fn node_parts(engine: EngineClass, arguments: &[Value]) -> Result<NodeParts, Run
         }
         (EngineClass::Animator, [name]) => (name, ClassParts::Animator(AnimatorFields::new())),
         (EngineClass::Bone2D, [name]) => (name, ClassParts::Bone2D(BoneFields::new())),
+        (EngineClass::SoundPlayer, [name, sound]) => (
+            name,
+            ClassParts::SoundPlayer(SoundPlayerFields::new(text(sound)?.to_owned())),
+        ),
         (EngineClass::Model, [name, file]) => {
             let model = ClassParts::Model(ModelFields::new(text(file)?.to_owned()));
             return Ok(NodeParts::new_3d(text(name)?.to_owned(), model));
@@ -635,7 +648,28 @@ fn node_method(
             | NodeMethod::State,
             _,
         ) => animator_method(method, node, arguments)?,
+        (NodeMethod::PlayerPlay | NodeMethod::PlayerStop | NodeMethod::PlayerIsPlaying, []) => {
+            player_method(method, node)?
+        }
         _ => return Err(RunError::Internal("method of `Node` with other arguments")),
+    })
+}
+
+/// A method of `SoundPlayer`: playing its sound.
+fn player_method(method: NodeMethod, node: &Rc<NodeObject>) -> Result<Value, RunError> {
+    let player = node.engine.sound_player().ok_or(RunError::Internal(
+        "a method of `SoundPlayer` on another node",
+    ))?;
+    Ok(match method {
+        NodeMethod::PlayerPlay => {
+            player.play();
+            Value::Null
+        }
+        NodeMethod::PlayerStop => {
+            player.stop();
+            Value::Null
+        }
+        _ => Value::Bool(player.is_playing()),
     })
 }
 

@@ -180,6 +180,7 @@ pub(crate) fn create(name: String, class: NewNode<'_>) -> Result<Rc<NodeObject>,
         NewNode::Animator => (EngineClass::Animator, Vec::new()),
         NewNode::Bone2D => (EngineClass::Bone2D, Vec::new()),
         NewNode::Model { file } => (EngineClass::Model, vec![text(file)]),
+        NewNode::SoundPlayer { sound } => (EngineClass::SoundPlayer, vec![text(sound)]),
         NewNode::Script(class) => {
             return play::scene_program()
                 .ok_or_else(|| NO_PROGRAM.to_owned())?

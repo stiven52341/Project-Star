@@ -30,6 +30,16 @@ pub fn set_property<H: Host>(node: &H::Node, name: &str, value: &SceneValue) -> 
             .flatten()
         })
         .or_else(|| {
+            H::with_sound_player(node, |player| match name {
+                "sound" => Some(set_text(&player.sound, name, value)),
+                "volume" => Some(set_float(&player.volume, name, value)),
+                "looping" => Some(set_bool(&player.looping, name, value)),
+                "play_on_start" => Some(set_bool(&player.play_on_start, name, value)),
+                _ => None,
+            })
+            .flatten()
+        })
+        .or_else(|| {
             H::with_bone(node, |bone| match name {
                 "length" => Some(set_float(&bone.length, name, value)),
                 _ => None,
@@ -68,6 +78,16 @@ pub fn property<H: Host>(node: &H::Node, name: &str) -> Result<SceneValue, Strin
         .or_else(|| {
             H::with_model(node, |model| match name {
                 "file" => Some(SceneValue::Text(model.file.get())),
+                _ => None,
+            })
+            .flatten()
+        })
+        .or_else(|| {
+            H::with_sound_player(node, |player| match name {
+                "sound" => Some(SceneValue::Text(player.sound.get())),
+                "volume" => Some(float(&player.volume)),
+                "looping" => Some(SceneValue::Bool(player.looping.get())),
+                "play_on_start" => Some(SceneValue::Bool(player.play_on_start.get())),
                 _ => None,
             })
             .flatten()
