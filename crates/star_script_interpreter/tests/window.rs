@@ -61,7 +61,7 @@ struct Game {
 
 const COUNTING_GAME: &str = game_file!("counting_game.star");
 
-const GAMES: [Game; 13] = [
+const GAMES: [Game; 14] = [
     Game {
         name: "counting_game",
         source: COUNTING_GAME,
@@ -111,6 +111,15 @@ const GAMES: [Game; 13] = [
         bindings: &BINDINGS,
         main_scene: None,
         ending: Ending::Prints(game_file!("physics_3d_game.out")),
+        warns: None,
+    },
+    Game {
+        name: "square_game",
+        source: game_file!("square_game.star"),
+        scenes: &[],
+        bindings: &BINDINGS,
+        main_scene: None,
+        ending: Ending::Prints(game_file!("square_game.out")),
         warns: None,
     },
     Game {

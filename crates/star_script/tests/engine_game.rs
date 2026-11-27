@@ -24,6 +24,7 @@ const NODE_GAME: &str = include_str!("games/node_game.star");
 const PHYSICS_GAME: &str = include_str!("games/physics_game.star");
 const PHYSICS_3D_GAME: &str = include_str!("games/physics_3d_game.star");
 const MESH_GAME: &str = include_str!("games/mesh_game.star");
+const SQUARE_GAME: &str = include_str!("games/square_game.star");
 const COROUTINE_GAME: &str = include_str!("games/coroutine_game.star");
 const ANIMATION_GAME: &str = include_str!("games/animation_game.star");
 const HERO_FRAMES: &str = include_str!("games/hero.frames");
@@ -86,6 +87,7 @@ fn games_run_in_the_engine_until_they_quit() {
         ("physics_game", PHYSICS_GAME),
         ("physics_3d_game", PHYSICS_3D_GAME),
         ("mesh_game", MESH_GAME),
+        ("square_game", SQUARE_GAME),
         ("coroutine_game", COROUTINE_GAME),
         ("animation_game", ANIMATION_GAME),
         ("animator_game", ANIMATOR_GAME),
@@ -135,6 +137,9 @@ fn games_run_in_the_engine_until_they_quit() {
 
     let (stdout, _) = play(&directory, "mesh_game");
     assert_eq!(stdout, include_str!("games/mesh_game.out"));
+
+    let (stdout, _) = play(&directory, "square_game");
+    assert_eq!(stdout, include_str!("games/square_game.out"));
 
     let (stdout, _) = play(&directory, "coroutine_game");
     // The blinker's coroutine ends with frame 3, when it leaves the tree.

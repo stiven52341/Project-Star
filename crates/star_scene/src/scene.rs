@@ -13,6 +13,7 @@ use crate::bone_node::Bone2dNode;
 use crate::model_node::ModelNode;
 use crate::node_3d_data::MeshOutline;
 use crate::scene_outline::{NodeOutline, SceneOutline, SpriteOutline};
+use crate::sprite_body::{SpriteLook, shaped_by_sprite};
 use crate::{
     Body2D, Body3D, Camera2dNode, Camera3dNode, Children, FieldValue, Hidden, Hierarchy,
     Light2dNode, LightNode, MeshNode, Name, SpriteNode, Tags, Transform2D, Transform3D,
@@ -268,6 +269,17 @@ fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResul
         .map(|mesh| load_mesh(mesh, assets))
         .transpose()
         .map_err(named)?;
+    let body = outline.body.map(|body| match &outline.sprite {
+        Some(sprite) => shaped_by_sprite(
+            body,
+            SpriteLook {
+                texture: sprite.texture.as_str(),
+                size: sprite.size,
+                anchor: sprite.anchor,
+            },
+        ),
+        None => body,
+    });
     Ok(SceneNode {
         name: outline.name,
         class: outline.class,
@@ -276,7 +288,7 @@ fn load_node(outline: NodeOutline, assets: &mut impl SceneAssets) -> EngineResul
         parent: outline.parent,
         transform: outline.transform,
         sprite,
-        body: outline.body,
+        body,
         transform_3d: outline.transform_3d,
         mesh,
         light: outline.light,
@@ -513,6 +525,28 @@ mod tests {
             .iter()
             .map(|&node| world.get::<Name>(node).unwrap().0.clone())
             .collect()
+    }
+
+    #[test]
+    fn bodies_take_the_shape_of_the_squares_and_circles_they_show() {
+        let textures = Textures::default();
+        let scene = read(
+            "format = 1\n\n[[node]]\nname = \"Floor\"\n\n[node.sprite]\ntexture = \"@square\"\nsize = [10.0, 1.0]\n\n\
+             [node.body]\nkind = \"static\"\nshape = \"circle\"\nradius = 0.5\n",
+            &textures,
+        )
+        .unwrap();
+        let mut world = World::new();
+
+        let floor = scene.instantiate(&mut world, None).unwrap();
+
+        let body = world.get::<Body2D>(floor).unwrap();
+        assert_eq!(
+            body.settings().shape.kind(),
+            star_physics::ShapeKind::Rectangle {
+                size: Vec2::new(10.0, 1.0)
+            }
+        );
     }
 
     #[test]

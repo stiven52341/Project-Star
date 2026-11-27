@@ -270,7 +270,11 @@ Tools:   star_script ── StarScript → Rust compiler (no dependencies; the
   The editor also draws the shape of every body (`[node.body]`,
   `[node.body_3d]`), placed, turned and stretched as its node and at its
   offset, as the physics has it (decision 84); the inspector edits a
-  shape's offset, offers the `mesh` shape for 3D bodies, and its “Fit”
+  shape's offset, offers the `mesh` shape for 3D bodies, the images the
+  engine brings among a sprite's images (and “Create > Square / Circle”
+  in 2D projects, decision 86), shows the shape of a body on such a
+  sprite as the sprite's (kept so in the file, and drawn so), and its
+  “Fit”
   (`scene_editor/body_fit.rs`) sizes a 3D box, sphere or capsule around
   the bounds of the node's mesh shape or model (read from its file), and
   centers it on them; its “Physics” menu creates static, rigid and kinematic
@@ -479,6 +483,13 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   node's scale, decision 84) and, only when they are not the defaults,
   `gravity_scale`, `fixed_rotation`, `friction`, `bounciness`, `density`
   and `sensor`.
+- **Sprite shapes** (decision 86): `star_scene::shaped_by_sprite` gives
+  a 2D body the shape of the image the engine brings that its node's
+  sprite shows (`@square`: a rectangle of the sprite's size; `@circle`:
+  a circle as wide as its largest side), centered where the sprite is
+  drawn (its anchor). Scenes apply it when they are read, and the mirror
+  of StarScript nodes every frame, so a script that resizes the sprite
+  resizes the body.
 - A `Body2D` also takes a velocity (`set_velocity`) and impulses
   (`apply_impulse`), passed to the body before the next step, so they work
   on the frame the component is added; `velocity()` is the velocity after

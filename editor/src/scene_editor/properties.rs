@@ -8,14 +8,14 @@ use star_engine::prelude::{
     BodyKind, BodySettings, LightNode, MeshShape, Quat, Shape2d, Shape3d, ShapeKind, ShapeKind3d,
     TextureFilter, Transform2D, Transform3D, Vec2, Vec3,
 };
-use star_engine::star_assets::AssetPath;
+use star_engine::star_assets::{AssetPath, BuiltinImage};
 use star_engine::star_render::{
     DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, MAX_SPHERE_DIVISIONS, MIN_SPHERE_RINGS,
     MIN_SPHERE_SEGMENTS, SpriteSheet,
 };
 use star_engine::star_scene::{
     Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, MeshOutline, ModelNode, NodeOutline,
-    SpriteOutline,
+    SpriteLook, SpriteOutline, shaped_by_sprite,
 };
 
 use super::animation_rows::{AssetFiles, animation_rows};
@@ -92,7 +92,29 @@ pub(super) fn edit_node(
         &mut node.light_2d,
         |ui, light| edit_light_2d(ui, light, keys),
     );
-    changed |= optional_section(ui, texts.body_section, &mut node.body, edit_body);
+    let look = node
+        .sprite
+        .as_ref()
+        .map(|sprite| (sprite.texture.clone(), sprite.size, sprite.anchor));
+    let follows_sprite = look
+        .as_ref()
+        .is_some_and(|(texture, _, _)| texture.builtin_image().is_some());
+    changed |= optional_section(ui, texts.body_section, &mut node.body, |ui, body| {
+        edit_body(ui, body, follows_sprite)
+    });
+    // A body on a square or circle of the engine is that shape, and the
+    // file says so.
+    if let (Some(body), Some((texture, size, anchor))) = (&mut node.body, &look) {
+        let shaped = shaped_by_sprite(
+            *body,
+            SpriteLook {
+                texture: texture.as_str(),
+                size: *size,
+                anchor: *anchor,
+            },
+        );
+        changed |= replace_if_valid(body, Some(shaped));
+    }
     let shown = Shown::of(node);
     let fit = shown
         .as_ref()
@@ -328,9 +350,11 @@ fn image_row(
     if optional {
         choices.push((None, texts.no_image));
     }
+    choices.extend(BuiltinImage::ALL.map(|image| (Some(image.path()), texts.builtin_image(image))));
     // The image shown stays a choice even if it is not in the folder.
     if let Some(current) = current.as_deref()
         && !images.iter().any(|image| image == current)
+        && BuiltinImage::of(current).is_none()
     {
         choices.push((Some(current), current));
     }
@@ -632,8 +656,19 @@ enum ShapeChoice {
     Capsule,
 }
 
-fn edit_body(ui: &mut egui::Ui, body: &mut BodySettings) -> bool {
-    edit_shape(ui, &mut body.shape) | edit_body_settings(ui, body)
+/// The rows of a 2D body; its shape is only shown when it follows the
+/// sprite of its node.
+fn edit_body(ui: &mut egui::Ui, body: &mut BodySettings, follows_sprite: bool) -> bool {
+    let shaped = if follows_sprite {
+        let texts = texts::current();
+        ui.label(texts.shape);
+        ui.weak(texts.shape_of_sprite());
+        ui.end_row();
+        false
+    } else {
+        edit_shape(ui, &mut body.shape)
+    };
+    shaped | edit_body_settings(ui, body)
 }
 
 fn edit_shape(ui: &mut egui::Ui, shape: &mut Shape2d) -> bool {

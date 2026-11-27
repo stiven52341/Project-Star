@@ -931,6 +931,13 @@ class Hero extends Sprite {
   `sensor`): the engine then replaces the body. Only the sizes of the
   shape are used: `radius` for circles, `width` and `height` for
   rectangles, `height` (half circles included) and `radius` for capsules.
+  A body on a `Sprite` whose `texture` is one of the images the engine
+  brings, `"@square"` or `"@circle"` (white, shown in the sprite's
+  `color`; decision 86), always takes that shape and the sprite's
+  `width` and `height`: a rectangle, or a circle as wide as the larger
+  of them, so a floor is `Sprite("Floor", "@square")` with any body,
+  stretched by its size or its scale. `visible = false` hides it and
+  keeps its body.
   `offset_x`, `offset_y` and `offset_z` (2D bodies leave `z` out) place
   the shape's center away from the node's origin, in the node's space: a
   character whose origin is at its feet keeps its capsule above them.

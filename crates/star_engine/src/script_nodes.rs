@@ -25,11 +25,11 @@ use star_core::EngineResult;
 use star_ecs::{Entity, World};
 use star_math::{Mat4, Vec2, Vec3};
 use star_physics::{BodySettings, ContactPhase};
-use star_render::{Camera, Color, SpriteSheet, TextureFilter};
+use star_render::{Camera, Color, Sprite, SpriteSheet, TextureFilter};
 use star_scene::{
     Body2D, Body3D, ClipAt, GlobalTransform2D, GlobalTransform3D, Hidden, Hierarchy, Light2dNode,
     LightNode, ModelNode, ModelPose, Name, NodeBody, NodeContact, PhysicsNodes, PhysicsNodes3d,
-    Transform2D, Transform3D,
+    SpriteLook, Transform2D, Transform3D, shaped_by_sprite,
 };
 
 pub use crate::script_3d::{
@@ -428,6 +428,18 @@ impl ScriptNodes {
             })
         } else {
             script_body.to_settings().and_then(|settings| {
+                // Script sprites are drawn around their node.
+                let settings = match node.sprite {
+                    Some(sprite) => shaped_by_sprite(
+                        settings,
+                        SpriteLook {
+                            texture: sprite.texture,
+                            size: sprite.size,
+                            anchor: Sprite::CENTER,
+                        },
+                    ),
+                    None => settings,
+                };
                 sync_body::<_, star_physics::BodyId, Transform2D, Vec2>(
                     world,
                     entity,

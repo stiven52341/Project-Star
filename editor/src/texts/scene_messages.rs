@@ -1,6 +1,7 @@
 //! Texts about scenes and the values of their nodes, in each language.
 
 use star_engine::prelude::{BodyKind, TextureFilter};
+use star_engine::star_assets::BuiltinImage;
 use star_script::ShowFps;
 
 use super::{Language, Texts};
@@ -73,6 +74,19 @@ impl Texts {
             }
             ShowFps::Never => self.pick("Never (F3 shows them)", "Nunca (F3 los muestra)"),
         }
+    }
+
+    /// An image the engine brings, as image choices and “Create” name it.
+    pub(crate) const fn builtin_image(&self, image: BuiltinImage) -> &'static str {
+        match image {
+            BuiltinImage::Square => self.pick("Square", "Cuadrado"),
+            BuiltinImage::Circle => self.pick("Circle", "Círculo"),
+        }
+    }
+
+    /// The body's shape row when it is the shape of its sprite.
+    pub(crate) const fn shape_of_sprite(&self) -> &'static str {
+        self.pick("From the sprite", "La del sprite")
     }
 
     pub(crate) const fn body_kind_name(&self, kind: BodyKind) -> &'static str {

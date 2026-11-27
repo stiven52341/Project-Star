@@ -6,7 +6,7 @@ use star_engine::prelude::{
     BodyKind, BodySettings, Color, LightNode, MeshShape, Shape2d, Shape3d, Sprite, TextureFilter,
     TextureRegion, Transform2D, Transform3D, Vec2, Vec3,
 };
-use star_engine::star_assets::AssetPath;
+use star_engine::star_assets::{AssetPath, BuiltinImage};
 use star_engine::star_render::{
     DEFAULT_ROUGHNESS, DEFAULT_SPHERE_RINGS, DEFAULT_SPHERE_SEGMENTS, DEFAULT_SPOT_ANGLE,
     DEFAULT_SPOT_BLEND, SpriteSheet,
@@ -160,6 +160,8 @@ fn model_entry(ui: &mut egui::Ui, node: &mut NodeOutline, models: &[String]) -> 
 pub(super) enum NodeTemplate {
     Empty,
     Sprite,
+    /// A sprite of an image the engine brings, whose body takes its shape.
+    Shape(BuiltinImage),
     Cube,
     Sphere,
     Plane,
@@ -226,6 +228,8 @@ impl NodeTemplate {
             ProjectDimension::TwoD => &[
                 Self::Empty,
                 Self::Sprite,
+                Self::Shape(BuiltinImage::Square),
+                Self::Shape(BuiltinImage::Circle),
                 Self::PointLight2D,
                 Self::SpotLight2D,
                 Self::Camera2D,
@@ -250,6 +254,7 @@ impl NodeTemplate {
         match self {
             Self::Empty => texts.empty_node,
             Self::Sprite => texts.sprite_section,
+            Self::Shape(image) => texts.builtin_image(image),
             Self::Cube => texts.cube,
             Self::Sphere => texts.sphere,
             Self::Plane => texts.plane,
@@ -304,6 +309,11 @@ impl NodeTemplate {
         });
         match self {
             Self::Sprite => node.sprite = new_sprite(images),
+            Self::Shape(image) => {
+                node.sprite = AssetPath::new(image.path())
+                    .ok()
+                    .map(|texture| sprite_of(texture, Vec2::ONE));
+            }
             Self::DirectionalLight => node.light = Some(new_light(LightKind::Directional)),
             Self::PointLight => node.light = Some(new_light(LightKind::Point)),
             Self::SpotLight => node.light = Some(new_light(LightKind::Spot)),
@@ -548,6 +558,14 @@ mod tests {
         let sun = build(NodeTemplate::DirectionalLight, ProjectDimension::ThreeD);
 
         assert!(sprite.sprite.is_some() && sprite.transform.is_some());
+        let circle = build(
+            NodeTemplate::Shape(BuiltinImage::Circle),
+            ProjectDimension::TwoD,
+        );
+        assert_eq!(
+            circle.sprite.map(|sprite| sprite.texture.builtin_image()),
+            Some(Some(BuiltinImage::Circle))
+        );
         assert!(matches!(
             sphere.mesh.map(|mesh| mesh.shape),
             Some(MeshShape::Sphere { .. })

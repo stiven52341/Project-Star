@@ -14,7 +14,7 @@ use star_engine::star_platform::WindowConfig;
 use star_engine::star_scene::{
     Bone2dNode, Camera2dNode, Camera3dNode, Light2dNode, LightNode, NodeOutline, SpriteOutline,
 };
-use star_engine::star_scene::{ModelDrawing, ShownModel};
+use star_engine::star_scene::{ModelDrawing, ShownModel, SpriteLook, shaped_by_sprite};
 
 use super::body_drawing::{BodyMarks, draw_body_2d, draw_body_3d};
 
@@ -93,7 +93,17 @@ pub(crate) fn draw_scene(
     }
     for (node, place) in nodes.iter().zip(&places) {
         if let (Some(body), Some(global)) = (&node.body, place.flat) {
-            draw_body_2d(body, global, &marks.bodies, frame);
+            let body = node.sprite.as_ref().map_or(*body, |sprite| {
+                shaped_by_sprite(
+                    *body,
+                    SpriteLook {
+                        texture: sprite.texture.as_str(),
+                        size: sprite.size,
+                        anchor: sprite.anchor,
+                    },
+                )
+            });
+            draw_body_2d(&body, global, &marks.bodies, frame);
         }
         if let (Some(body), Some(global)) = (&node.body_3d, place.solid) {
             draw_body_3d(body, global, &marks.bodies, frame);
