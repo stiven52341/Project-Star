@@ -656,6 +656,7 @@ mod tests {
                     parts: vec![part, part],
                     skeleton: None,
                     animations: Vec::new(),
+                    collision: None,
                 })
             })
         }

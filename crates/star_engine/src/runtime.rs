@@ -85,6 +85,10 @@ impl<G: Game> Runtime<G> {
         self.schedule.run_stage(Stage::First, &mut self.world)?;
         self.game.update(&mut self.world);
         self.schedule.run_stage(Stage::Update, &mut self.world)?;
+        if let Some(renderer) = &mut self.renderer {
+            self.assets
+                .give_collision_meshes(&mut self.world, renderer)?;
+        }
         // Bodies are placed where their parents are now.
         self.transforms.run(&mut self.world)?;
         let elapsed = self.world.time().delta().as_secs_f32();

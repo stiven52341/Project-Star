@@ -680,6 +680,7 @@ enum Shape3dChoice {
     Sphere,
     Box,
     Capsule,
+    Mesh,
 }
 
 fn edit_body_3d(ui: &mut egui::Ui, body: &mut BodySettings<Shape3d>) -> bool {
@@ -693,11 +694,13 @@ fn edit_shape_3d(ui: &mut egui::Ui, shape: &mut Shape3d) -> bool {
         ShapeKind3d::Sphere { .. } => Shape3dChoice::Sphere,
         ShapeKind3d::Box { .. } => Shape3dChoice::Box,
         ShapeKind3d::Capsule { .. } => Shape3dChoice::Capsule,
+        ShapeKind3d::Mesh => Shape3dChoice::Mesh,
     };
     let choices = [
         (Shape3dChoice::Sphere, texts.sphere),
         (Shape3dChoice::Box, texts.box_shape),
         (Shape3dChoice::Capsule, texts.capsule),
+        (Shape3dChoice::Mesh, texts.mesh_shape),
     ];
     if choice_row(ui, texts.shape, &mut choice, &choices) {
         kind = match choice {
@@ -709,9 +712,12 @@ fn edit_shape_3d(ui: &mut egui::Ui, shape: &mut Shape3d) -> bool {
                 height: DEFAULT_CAPSULE_HEIGHT,
                 radius: DEFAULT_RADIUS,
             },
+            Shape3dChoice::Mesh => ShapeKind3d::Mesh,
         };
     }
     match &mut kind {
+        // Its triangles are those of the node's mesh or model.
+        ShapeKind3d::Mesh => {}
         ShapeKind3d::Sphere { radius } => {
             number_from_row(ui, texts.radius, radius, MIN_SIZE);
         }
@@ -727,6 +733,7 @@ fn edit_shape_3d(ui: &mut egui::Ui, shape: &mut Shape3d) -> bool {
         ShapeKind3d::Sphere { radius } => Shape3d::sphere(radius),
         ShapeKind3d::Box { size } => Shape3d::cuboid(size),
         ShapeKind3d::Capsule { height, radius } => Shape3d::capsule(height, radius),
+        ShapeKind3d::Mesh => Ok(Shape3d::mesh()),
     };
     replace_if_valid(shape, rebuilt.ok())
 }

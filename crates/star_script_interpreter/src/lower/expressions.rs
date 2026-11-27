@@ -610,6 +610,7 @@ pub(super) fn static_method(class: &str, name: &str) -> Option<EngineMethod> {
         (BODY_CLASS, "capsule") => EngineMethod::NewBody(BodyShape::Capsule),
         (BODY_CLASS, "sphere") => EngineMethod::NewBody(BodyShape::Sphere),
         (BODY_CLASS, "box") => EngineMethod::NewBody(BodyShape::Box),
+        (BODY_CLASS, "mesh") => EngineMethod::NewBody(BodyShape::Mesh),
         (SOUND_CLASS, "load") => EngineMethod::LoadSound,
         (AUDIO_CLASS, "volume") => EngineMethod::Volume,
         (AUDIO_CLASS, "set_volume") => EngineMethod::SetVolume,

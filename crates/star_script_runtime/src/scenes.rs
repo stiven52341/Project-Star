@@ -214,8 +214,8 @@ pub struct SceneSprite {
 pub struct SceneBody {
     /// `"dynamic"`, `"static"` or `"kinematic"`.
     pub kind: String,
-    /// `"circle"`, `"rectangle"` or `"capsule"` in 2D; `"sphere"`, `"box"`
-    /// or `"capsule"` in 3D.
+    /// `"circle"`, `"rectangle"` or `"capsule"` in 2D; `"sphere"`, `"box"`,
+    /// `"capsule"` or `"mesh"` in 3D.
     pub shape: String,
     /// Of circles, spheres and capsules.
     pub radius: f32,

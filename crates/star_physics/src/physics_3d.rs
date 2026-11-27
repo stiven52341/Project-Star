@@ -4,13 +4,14 @@ use rapier3d::prelude::{
     ActiveCollisionTypes, ActiveEvents, ColliderBuilder, ColliderHandle, PhysicsWorld, Pose,
     RigidBodyBuilder, RigidBodyHandle, Rotation, SharedShape, Vector,
 };
-use star_core::EngineResult;
+use star_core::{EngineError, EngineResult};
 use star_math::{Quat, Vec3};
 
 use crate::body::check_finite;
 use crate::contact::ContactLog;
+use crate::shape::scale_factor;
 use crate::step_clock::StepClock;
-use crate::{BodyKind, BodySettings, Contact, FIXED_STEP, Shape3d, ShapeKind3d};
+use crate::{BodyKind, BodySettings, Contact, FIXED_STEP, Shape3d, ShapeKind3d, TriangleMesh};
 
 /// Gravity of a new [`Physics3d`]: Earth's, downwards (-y), taking a world
 /// unit as a meter.
@@ -90,12 +91,59 @@ impl Physics3d {
             ("rotation", w),
         ])?;
         settings.check()?;
+        let shape = shared_shape(&settings.shape).ok_or_else(|| {
+            EngineError::Physics("a mesh body needs the triangles of its mesh".to_owned())
+        })?;
+        Ok(self.insert(settings, shape, position, rotation))
+    }
+
+    /// Adds a body with a [`mesh`](Shape3d::mesh) shape, made of the
+    /// triangles of `mesh` stretched by `scale`, as
+    /// [`add_body`](Self::add_body) adds the others: static and kinematic
+    /// bodies collide with every triangle, and dynamic ones with the
+    /// convex hull around them, which has a volume to fall and roll with.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Physics`] for the reasons of `add_body`, if a factor
+    /// of `scale` is not finite, or the triangles cannot make a shape (a
+    /// dynamic body's are flat, for example).
+    pub fn add_mesh_body(
+        &mut self,
+        settings: &BodySettings<Shape3d>,
+        mesh: &TriangleMesh,
+        scale: Vec3,
+        position: Vec3,
+        rotation: Quat,
+    ) -> EngineResult<BodyId3d> {
+        let [x, y, z, w] = rotation.to_xyzw();
+        check_finite(&[
+            ("position", position.x),
+            ("position", position.y),
+            ("position", position.z),
+            ("rotation", x),
+            ("rotation", y),
+            ("rotation", z),
+            ("rotation", w),
+        ])?;
+        settings.check()?;
+        let shape = mesh_shape(mesh, scale, settings.kind == BodyKind::Dynamic)?;
+        Ok(self.insert(settings, shape, position, rotation))
+    }
+
+    fn insert(
+        &mut self,
+        settings: &BodySettings<Shape3d>,
+        shape: SharedShape,
+        position: Vec3,
+        rotation: Quat,
+    ) -> BodyId3d {
         let body = body_builder(settings)
             .pose(Pose::from_parts(to_vector(position), to_rotation(rotation)));
-        let (body, collider) = self.world.insert(body, collider_builder(settings));
+        let (body, collider) = self.world.insert(body, collider_builder(settings, shape));
         let id = BodyId3d(body);
         self.contacts.add_owner(collider, id);
-        Ok(id)
+        id
     }
 
     /// Removes a body. Its contacts that were going on end with the next
@@ -169,14 +217,42 @@ impl Physics3d {
 
     /// Gives `body` another shape, keeping where it is and how it moves:
     /// the shape of a node whose scale changed. Its mass follows the new
-    /// shape.
+    /// shape. A [`mesh`](Shape3d::mesh) shape is changed with
+    /// [`set_mesh`](Self::set_mesh) instead.
     pub fn set_shape(&mut self, body: BodyId3d, shape: &Shape3d) {
+        if let Some(shape) = shared_shape(shape) {
+            self.replace_shape(body, &shape);
+        }
+    }
+
+    /// Gives `body` the triangles of `mesh` stretched by `scale`, as
+    /// [`add_mesh_body`](Self::add_mesh_body) makes them for its kind.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Physics`] if a factor of `scale` is not finite, or
+    /// the triangles cannot make a shape.
+    pub fn set_mesh(
+        &mut self,
+        body: BodyId3d,
+        mesh: &TriangleMesh,
+        scale: Vec3,
+    ) -> EngineResult<()> {
+        let Some(rigid_body) = self.world.bodies.get(body.0) else {
+            return Ok(());
+        };
+        let shape = mesh_shape(mesh, scale, rigid_body.is_dynamic())?;
+        self.replace_shape(body, &shape);
+        Ok(())
+    }
+
+    fn replace_shape(&mut self, body: BodyId3d, shape: &SharedShape) {
         let Some(rigid_body) = self.world.bodies.get(body.0) else {
             return;
         };
         for &collider in rigid_body.colliders() {
             if let Some(collider) = self.world.colliders.get_mut(collider) {
-                collider.set_shape(shared_shape(shape));
+                collider.set_shape(shape.clone());
             }
         }
     }
@@ -221,8 +297,8 @@ fn body_builder(settings: &BodySettings<Shape3d>) -> RigidBodyBuilder {
     }
 }
 
-fn collider_builder(settings: &BodySettings<Shape3d>) -> ColliderBuilder {
-    ColliderBuilder::new(shared_shape(&settings.shape))
+fn collider_builder(settings: &BodySettings<Shape3d>, shape: SharedShape) -> ColliderBuilder {
+    ColliderBuilder::new(shape)
         .friction(settings.friction)
         .restitution(settings.bounciness)
         .density(settings.density)
@@ -233,14 +309,41 @@ fn collider_builder(settings: &BodySettings<Shape3d>) -> ColliderBuilder {
         .active_collision_types(ActiveCollisionTypes::all())
 }
 
-/// The collider shape of `shape`.
-fn shared_shape(shape: &Shape3d) -> SharedShape {
-    match shape.kind() {
+/// The collider shape of `shape`; `None` for a mesh, whose triangles it
+/// does not have.
+fn shared_shape(shape: &Shape3d) -> Option<SharedShape> {
+    Some(match shape.kind() {
         ShapeKind3d::Sphere { radius } => SharedShape::ball(radius),
         ShapeKind3d::Box { size } => SharedShape::cuboid(size.x / 2.0, size.y / 2.0, size.z / 2.0),
         ShapeKind3d::Capsule { height, radius } => {
             SharedShape::capsule_y(height / 2.0 - radius, radius)
         }
+        ShapeKind3d::Mesh => return None,
+    })
+}
+
+/// The collider shape of the triangles of `mesh` stretched by `scale`
+/// (mirrored by a negative factor): the convex hull around them for a
+/// `dynamic` body, the triangles themselves otherwise.
+fn mesh_shape(mesh: &TriangleMesh, scale: Vec3, dynamic: bool) -> EngineResult<SharedShape> {
+    let signed = |factor: f32| scale_factor(factor).map(|size| size.copysign(factor));
+    let (x, y, z) = (signed(scale.x)?, signed(scale.y)?, signed(scale.z)?);
+    let corners: Vec<Vector> = mesh
+        .corners()
+        .iter()
+        .map(|corner| Vector::new(corner.x * x, corner.y * y, corner.z * z))
+        .collect();
+    if dynamic {
+        SharedShape::convex_hull(&corners)
+            .filter(|hull| hull.mass_properties(1.0).mass() > f32::EPSILON)
+            .ok_or_else(|| {
+                EngineError::Physics(
+                    "a dynamic mesh body needs a mesh with a volume, not a flat one".to_owned(),
+                )
+            })
+    } else {
+        SharedShape::trimesh(corners, mesh.triangles().to_vec())
+            .map_err(|error| EngineError::Physics(format!("a mesh body cannot be made: {error}")))
     }
 }
 
@@ -294,6 +397,136 @@ mod tests {
             elapsed += FRAME;
         }
         contacts
+    }
+
+    /// Two triangles making a square of 2 x 2 on the XZ plane, facing up.
+    fn square() -> TriangleMesh {
+        let corners = vec![
+            Vec3::new(-1.0, 0.0, -1.0),
+            Vec3::new(1.0, 0.0, -1.0),
+            Vec3::new(1.0, 0.0, 1.0),
+            Vec3::new(-1.0, 0.0, 1.0),
+        ];
+        TriangleMesh::new(corners, vec![[0, 2, 1], [0, 3, 2]]).unwrap()
+    }
+
+    /// The eight corners of a cube 1 across, and its twelve triangles.
+    fn cube() -> TriangleMesh {
+        let corners = (0..8)
+            .map(|corner| {
+                let side = |bit: u32| if corner & bit == 0 { -0.5 } else { 0.5 };
+                Vec3::new(side(1), side(2), side(4))
+            })
+            .collect();
+        let faces = [
+            [0, 1, 3, 2],
+            [4, 6, 7, 5],
+            [0, 4, 5, 1],
+            [2, 3, 7, 6],
+            [0, 2, 6, 4],
+            [1, 5, 7, 3],
+        ];
+        let triangles = faces
+            .iter()
+            .flat_map(|[a, b, c, d]| [[*a, *b, *c], [*a, *c, *d]])
+            .collect();
+        TriangleMesh::new(corners, triangles).unwrap()
+    }
+
+    fn mesh(kind: BodyKind) -> BodySettings<Shape3d> {
+        BodySettings::new(kind, Shape3d::mesh())
+    }
+
+    #[test]
+    fn bodies_land_on_the_triangles_of_static_meshes() {
+        let mut physics = Physics3d::default();
+        let scale = Vec3::new(5.0, 1.0, 5.0);
+        physics
+            .add_mesh_body(
+                &mesh(BodyKind::Static),
+                &square(),
+                scale,
+                Vec3::ZERO,
+                Quat::IDENTITY,
+            )
+            .unwrap();
+        // Beyond the unscaled square, within the stretched one.
+        let falling = add(
+            &mut physics,
+            &ball(BodyKind::Dynamic),
+            Vec3::new(3.0, 2.0, 3.0),
+        );
+
+        run(&mut physics, 2.0);
+
+        let landed = physics.position(falling).unwrap();
+        assert!((landed.y - 0.5).abs() < 0.05, "{landed:?}");
+    }
+
+    #[test]
+    fn dynamic_meshes_rest_on_their_convex_hull() {
+        let mut physics = Physics3d::default();
+        add(&mut physics, &floor(), Vec3::new(0.0, -0.5, 0.0));
+        let block = physics
+            .add_mesh_body(
+                &mesh(BodyKind::Dynamic),
+                &cube(),
+                Vec3::new(1.0, 2.0, 1.0),
+                Vec3::new(0.0, 3.0, 0.0),
+                Quat::IDENTITY,
+            )
+            .unwrap();
+
+        run(&mut physics, 3.0);
+
+        let rested = physics.position(block).unwrap();
+        assert!((rested.y - 1.0).abs() < 0.05, "{rested:?}");
+    }
+
+    #[test]
+    fn changed_meshes_keep_their_body() {
+        let mut physics = Physics3d::default();
+        let ground = physics
+            .add_mesh_body(
+                &mesh(BodyKind::Static),
+                &square(),
+                Vec3::ONE,
+                Vec3::ZERO,
+                Quat::IDENTITY,
+            )
+            .unwrap();
+        let falling = add(
+            &mut physics,
+            &ball(BodyKind::Dynamic),
+            Vec3::new(3.0, 2.0, 0.0),
+        );
+
+        physics
+            .set_mesh(ground, &square(), Vec3::new(5.0, 1.0, 5.0))
+            .unwrap();
+        run(&mut physics, 2.0);
+
+        assert!((physics.position(falling).unwrap().y - 0.5).abs() < 0.05);
+    }
+
+    #[test]
+    fn mesh_bodies_need_their_triangles_and_a_volume_to_fall() {
+        let mut physics = Physics3d::default();
+        let flat = physics.add_mesh_body(
+            &mesh(BodyKind::Dynamic),
+            &square(),
+            Vec3::ONE,
+            Vec3::ZERO,
+            Quat::IDENTITY,
+        );
+
+        assert!(
+            physics
+                .add_body(&mesh(BodyKind::Static), Vec3::ZERO, Quat::IDENTITY)
+                .is_err()
+        );
+        assert!(matches!(flat, Err(EngineError::Physics(_))));
+        assert_eq!(physics.body_count(), 0);
     }
 
     #[test]

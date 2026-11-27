@@ -479,7 +479,7 @@ The engine provides them; their names cannot be used for other classes.
 | `TweenOptions` | `init()`; fields `delay: float` (0.0), `back: bool` (`false`), `repeats: int` (1; `-1` repeats forever): what `tween_with` does besides going to its value once |
 | `Time` | `static async wait(seconds: float)`, `static async next_frame()`: what coroutines wait for (section 7); `static now() -> float`: the seconds of the game so far (the sum of the frames' `delta`s, the clock `wait` counts with); `static delta() -> float`: the seconds of the frame going on, the same `delta` that `update` gets, for code away from `update` (0 before the first frame) |
 | `Decorator` | `before(method: string) -> bool` (`true`), `after(method: string)`: what the program's decorators redefine (see “Decorators”) |
-| `Body` | no `init`: `static circle(kind: string, radius: float) -> Body`, `static rectangle(kind: string, width: float, height: float) -> Body`, `static capsule(kind: string, height: float, radius: float) -> Body`, `static sphere(kind: string, radius: float) -> Body`, `static box(kind: string, width: float, height: float, depth: float) -> Body`; fields `kind`, `shape: string`, `radius` (0.5), `width`, `height`, `depth` (1.0), `gravity_scale` (1.0), `friction` (0.5), `bounciness` (0.0), `density` (1.0), `velocity_x`, `velocity_y`, `velocity_z: float` (0.0), `fixed_rotation`, `sensor: bool` (`false`); `apply_impulse(x: float, y: float)`, `apply_impulse_3d(x: float, y: float, z: float)`, `touching() -> [Node]`, `just_touched() -> [Node]`, `just_separated() -> [Node]` |
+| `Body` | no `init`: `static circle(kind: string, radius: float) -> Body`, `static rectangle(kind: string, width: float, height: float) -> Body`, `static capsule(kind: string, height: float, radius: float) -> Body`, `static sphere(kind: string, radius: float) -> Body`, `static box(kind: string, width: float, height: float, depth: float) -> Body`, `static mesh(kind: string) -> Body`; fields `kind`, `shape: string`, `radius` (0.5), `width`, `height`, `depth` (1.0), `gravity_scale` (1.0), `friction` (0.5), `bounciness` (0.0), `density` (1.0), `velocity_x`, `velocity_y`, `velocity_z: float` (0.0), `fixed_rotation`, `sensor: bool` (`false`); `apply_impulse(x: float, y: float)`, `apply_impulse_3d(x: float, y: float, z: float)`, `touching() -> [Node]`, `just_touched() -> [Node]`, `just_separated() -> [Node]` |
 | `Input` | `static is_down(action: string) -> bool`, `static just_pressed(action: string) -> bool`, `static just_released(action: string) -> bool`, `static strength(action: string) -> float`, `static axis(negative: string, positive: string) -> float`, `static pointer_x() -> float`, `static pointer_y() -> float`, `static has_pointer() -> bool` |
 
 **A game is a class that extends `Game`**:
@@ -1016,10 +1016,19 @@ class World3D extends Game {
   `Input.pointer_x` and `pointer_y` are not known (`has_pointer()` is
   `false`).
 - The `body` of a `Node3D` is a body of the 3D physics: `Body.sphere`,
-  `Body.box` (with `depth`) or `Body.capsule` (vertical), and it moves in
-  `z`, `pitch` and `yaw` too, with `velocity_z` and `apply_impulse_3d`. A
-  2D shape on a 3D node (or a 3D one on a 2D node) is left out, and the
-  reason is written once.
+  `Body.box` (with `depth`), `Body.capsule` (vertical) or `Body.mesh`, and
+  it moves in `z`, `pitch` and `yaw` too, with `velocity_z` and
+  `apply_impulse_3d`. A 2D shape on a 3D node (or a 3D one on a 2D node)
+  is left out, and the reason is written once.
+- `Body.mesh` (shape `"mesh"`, decision 84) collides with the triangles of
+  what its node shows: the shape of a `Mesh`, or the file of a `Model` (a
+  model with a skeleton as it is at rest). Static and kinematic bodies
+  collide with every triangle, for floors, walls and whole levels;
+  dynamic ones with the convex hull around them, which has a volume to
+  fall and roll with (a flat mesh such as a plane cannot be dynamic). The
+  triangles are taken when the body is added, stretched by the node's
+  scale; the body waits for them, so a node that shows nothing never gets
+  one (warned once).
 - `Scene.load` builds 3D nodes too: a node with `[node.transform_3d]` is a
   `Node3D`, with `[node.mesh]` a `Mesh` and with `[node.light]` a `Light`
   (or the class it names, which must extend them); `[node.body_3d]` gives

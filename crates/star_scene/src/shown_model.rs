@@ -5,7 +5,7 @@ use star_core::{Model, ModelAnimation, Skeleton};
 use star_math::Mat4;
 use star_render::{Frame, ModelMeshPart};
 
-use crate::{ClipAt, Poser};
+use crate::{ClipAt, CollisionMesh, Poser};
 
 /// A model's meshes as uploaded, with what poses them.
 #[derive(Debug, Clone, PartialEq)]
@@ -16,6 +16,9 @@ pub struct ShownModel {
     pub skeleton: Option<Skeleton>,
     /// The animations that move its skeleton.
     pub animations: Vec<ModelAnimation>,
+    /// Its triangles, for bodies with a mesh shape; `None` if it has too
+    /// many corners to count.
+    pub collision: Option<CollisionMesh>,
 }
 
 /// The working space of drawing posed models, kept between frames so it
@@ -34,6 +37,7 @@ impl ShownModel {
             parts,
             skeleton: model.skeleton().cloned(),
             animations: model.animations().to_vec(),
+            collision: CollisionMesh::from_model(model).ok(),
         }
     }
 
@@ -118,6 +122,7 @@ mod tests {
             parts: vec![part(true), part(false)],
             skeleton: Some(skeleton(joints)),
             animations: Vec::new(),
+            collision: None,
         };
         let mut frame = Frame::new();
         let result = model.draw(

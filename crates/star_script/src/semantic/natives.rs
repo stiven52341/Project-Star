@@ -89,13 +89,15 @@ pub const BODY_CLASS: &str = "Body";
 pub const TWEEN_OPTIONS_CLASS: &str = "TweenOptions";
 
 /// The static methods of `Body` that make one, with the sizes of their
-/// shape after the kind: of 2D, of 3D, and the capsule of both.
-pub(super) const BODY_SHAPES: [(&str, &[&str]); 5] = [
+/// shape after the kind: of 2D, of 3D, and the capsule of both. A mesh
+/// takes the triangles of its node and no sizes.
+pub(super) const BODY_SHAPES: [(&str, &[&str]); 6] = [
     ("circle", &["radius"]),
     ("rectangle", &["width", "height"]),
     ("capsule", &["height", "radius"]),
     ("sphere", &["radius"]),
     ("box", &["width", "height", "depth"]),
+    ("mesh", &[]),
 ];
 
 /// The methods of `Body` that list the nodes it touches.

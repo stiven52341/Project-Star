@@ -1,16 +1,18 @@
 //! The assets of a running game: where they are read from and what is loaded.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
 use star_assets::{AssetFolder, AssetPath};
 use star_core::{EngineResult, Sound};
-use star_ecs::World;
+use star_ecs::{Entity, World};
 use star_math::Mat4;
+use star_physics::ShapeKind3d;
 use star_render::{Frame, Mesh3dId, MeshShape, Renderer, TextureFilter, TextureId};
 use star_scene::{
-    GlobalTransform2D, GlobalTransform3D, ModelDrawing, ModelNode, ModelPose, Scene, SceneAssets,
-    SpriteNode, is_shown,
+    Body3D, CollisionMesh, GlobalTransform2D, GlobalTransform3D, MeshNode, ModelDrawing, ModelNode,
+    ModelPose, Name, Scene, SceneAssets, SpriteNode, is_shown,
 };
 
 use crate::mesh_file::MeshFile;
@@ -30,6 +32,9 @@ pub(crate) struct GameAssets {
     models: ModelLibrary,
     /// Where posed models are worked out, kept between frames.
     model_drawing: ModelDrawing,
+    /// The nodes warned that their mesh body has nothing to take its
+    /// triangles from.
+    unshaped: HashSet<Entity>,
 }
 
 impl GameAssets {
@@ -42,6 +47,7 @@ impl GameAssets {
             meshes: Vec::new(),
             models: ModelLibrary::default(),
             model_drawing: ModelDrawing::default(),
+            unshaped: HashSet::new(),
         }
     }
 
@@ -181,6 +187,69 @@ impl GameAssets {
                 log::warn!("the model \"{}\" is not drawn whole: {error}", node.file);
             }
         })
+    }
+
+    /// Gives a [`CollisionMesh`] to every node whose 3D body has a mesh
+    /// shape and that has none yet: the triangles of its [`ModelNode`]'s
+    /// model (read and uploaded the first time), or of the shape of its
+    /// [`MeshFile`] or [`MeshNode`]. A node that shows neither keeps waiting, warned once.
+    ///
+    /// # Errors
+    ///
+    /// [`EngineError::Ecs`](star_core::EngineError::Ecs) if a running query
+    /// holds the components it uses.
+    pub(crate) fn give_collision_meshes(
+        &mut self,
+        world: &mut World,
+        renderer: &mut Renderer,
+    ) -> EngineResult<()> {
+        let mut waiting = Vec::new();
+        world.each::<&Body3D>(|node, body| {
+            if body.settings().shape.kind() == ShapeKind3d::Mesh
+                && world.get::<CollisionMesh>(node).is_none()
+            {
+                waiting.push(node);
+            }
+        })?;
+        for node in waiting {
+            if let Some(mesh) = self.collision_mesh(world, node, renderer) {
+                world.insert(node, mesh)?;
+            } else if self.unshaped.insert(node) {
+                log::warn!(
+                    "the mesh body of \"{}\" waits for a mesh or a model to take its triangles from",
+                    world
+                        .get::<Name>(node)
+                        .map_or_else(String::new, |name| name.0.clone())
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// The triangles of what `node` shows, if they are known.
+    fn collision_mesh(
+        &mut self,
+        world: &World,
+        node: Entity,
+        renderer: &mut Renderer,
+    ) -> Option<CollisionMesh> {
+        if let Some(file) = world.get::<ModelNode>(node).map(|model| model.file.clone()) {
+            let model = self
+                .models
+                .load(&self.folder, &file, |model| upload_to(renderer, model))?;
+            return model.collision.clone();
+        }
+        let shape = if let Some(file) = world.get::<MeshFile>(node) {
+            file.shape
+        } else {
+            let mesh = world.get::<MeshNode>(node)?.mesh;
+            self.meshes.iter().find(|(_, built)| *built == mesh)?.0
+        };
+        shape
+            .to_mesh_data()
+            .and_then(|data| CollisionMesh::from_mesh(&data))
+            .inspect_err(|error| log::warn!("{error}"))
+            .ok()
     }
 
     /// Uploads again the textures whose files changed. A file that cannot be

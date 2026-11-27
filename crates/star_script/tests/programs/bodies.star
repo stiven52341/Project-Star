@@ -27,6 +27,9 @@ class Main {
         const hero = Node("Hero")
         hero.body = Body.capsule("kinematic", 2.0, 0.5)
         Debug.print((hero.body?.height ?? 0.0).to_string() + " " + (hero.body?.shape ?? ""))
+        const ground = Mesh("Ground", "plane")
+        ground.body = Body.mesh("static")
+        Debug.print((ground.body?.kind ?? "") + " " + (ground.body?.shape ?? ""))
 
         // A node without a body is not a body.
         hero.body = null

@@ -1,13 +1,17 @@
 //! The 3D physics of the nodes: bodies that follow their 3D nodes, and
 //! nodes that follow their bodies.
 
+use std::sync::Arc;
+
 use star_core::EngineResult;
 use star_ecs::{Entity, World};
-use star_math::{Mat4, Quat};
-use star_physics::{BodyKind, BodySettings, Physics3d};
+use star_math::{Mat4, Quat, Vec3};
+use star_physics::{
+    BodyId3d, BodyKind, BodySettings, Physics3d, Shape3d, ShapeKind3d, TriangleMesh,
+};
 
 use crate::node_physics::{named_error, rescaled};
-use crate::{Body3D, GlobalTransform3D, Parent, PhysicsNodes3d, Transform3D};
+use crate::{Body3D, CollisionMesh, GlobalTransform3D, Parent, PhysicsNodes3d, Transform3D};
 
 /// Runs the 3D physics of the nodes for a frame that took `elapsed`
 /// seconds, with the [`Physics3d`] and [`PhysicsNodes3d`] resources of
@@ -73,42 +77,94 @@ fn place_bodies(
         if !rescaled && !body.was_moved(local) {
             return;
         }
-        let shape = match body.settings().shape.scaled(scale) {
-            Ok(shape) => shape,
-            Err(error) => {
-                failure = Some(named_error(world, node, &error));
-                return;
-            }
-        };
-        let position = global.translation();
-        // A node scaled to nothing keeps no rotation.
-        let rotation = Quat::from_mat4(global).unwrap_or(Quat::IDENTITY);
-        if let Some(id) = body.id() {
-            physics.set_position(id, position);
-            physics.set_rotation(id, rotation);
-            if rescaled {
-                physics.set_shape(id, &shape);
-            }
-            body.wrote(*local);
-        } else {
-            let settings = BodySettings {
-                shape,
-                ..*body.settings()
-            };
-            match physics.add_body(&settings, position, rotation) {
-                Ok(id) => {
-                    body.placed(id, *local);
-                    nodes.add(id, node);
-                }
-                Err(error) => {
-                    failure = Some(named_error(world, node, &error));
-                    return;
-                }
-            }
+        let triangles = world
+            .get::<CollisionMesh>(node)
+            .map(|mesh| Arc::clone(&mesh.0));
+        let wants_triangles = body.settings().shape.kind() == ShapeKind3d::Mesh;
+        if wants_triangles && triangles.is_none() {
+            // Its mesh or model is not known yet.
+            return;
         }
-        body.shaped(scale);
+        let triangles = triangles.filter(|_| wants_triangles);
+        let place = Place {
+            scale,
+            position: global.translation(),
+            // A node scaled to nothing keeps no rotation.
+            rotation: Quat::from_mat4(global).unwrap_or(Quat::IDENTITY),
+        };
+        let placed = match body.id() {
+            Some(id) => move_body(
+                physics,
+                id,
+                &place,
+                rescaled.then_some(body),
+                triangles.as_deref(),
+            )
+            .map(|()| body.wrote(*local)),
+            None => add_body(physics, body.settings(), &place, triangles.as_deref()).map(|id| {
+                body.placed(id, *local);
+                nodes.add(id, node);
+            }),
+        };
+        match placed {
+            Ok(()) => body.shaped(scale),
+            Err(error) => failure = Some(named_error(world, node, &error)),
+        }
     })?;
     failure.map_or(Ok(()), Err)
+}
+
+/// Where a node puts its body in the world, and how it stretches it.
+struct Place {
+    scale: Vec3,
+    position: Vec3,
+    rotation: Quat,
+}
+
+/// Adds the body `settings` describe at `place`, made of `triangles` if
+/// its shape is a mesh.
+fn add_body(
+    physics: &mut Physics3d,
+    settings: &BodySettings<Shape3d>,
+    place: &Place,
+    triangles: Option<&TriangleMesh>,
+) -> EngineResult<BodyId3d> {
+    if let Some(triangles) = triangles {
+        return physics.add_mesh_body(
+            settings,
+            triangles,
+            place.scale,
+            place.position,
+            place.rotation,
+        );
+    }
+    let settings = BodySettings {
+        shape: settings.shape.scaled(place.scale)?,
+        ..*settings
+    };
+    physics.add_body(&settings, place.position, place.rotation)
+}
+
+/// Moves body `id` to `place`, and stretches the shape of `rescaled` (its
+/// node's body, when its scale changed) by it: `triangles` if its shape is
+/// a mesh.
+fn move_body(
+    physics: &mut Physics3d,
+    id: BodyId3d,
+    place: &Place,
+    rescaled: Option<&Body3D>,
+    triangles: Option<&TriangleMesh>,
+) -> EngineResult<()> {
+    physics.set_position(id, place.position);
+    physics.set_rotation(id, place.rotation);
+    let Some(body) = rescaled else {
+        return Ok(());
+    };
+    if let Some(triangles) = triangles {
+        return physics.set_mesh(id, triangles, place.scale);
+    }
+    physics.set_shape(id, &body.settings().shape.scaled(place.scale)?);
+    Ok(())
 }
 
 fn push_bodies(world: &World, physics: &mut Physics3d) -> EngineResult<()> {
@@ -171,8 +227,7 @@ fn parent_global(world: &World, node: Entity) -> Mat4 {
 mod tests {
     use std::f32::consts::FRAC_PI_2;
 
-    use star_math::Vec3;
-    use star_physics::{ContactPhase, Shape3d};
+    use star_physics::ContactPhase;
 
     use super::*;
     use crate::{Hierarchy, NodeContact, TransformPropagation};
@@ -294,6 +349,45 @@ mod tests {
         assert!((resting - 1.0).abs() < 0.05, "{resting}");
         let risen = position(&world, crate_node).y;
         assert!((risen - 2.0).abs() < 0.05, "{risen}");
+    }
+
+    #[test]
+    fn mesh_bodies_wait_for_their_triangles_and_follow_their_scale() {
+        let mut world = world();
+        let ground = world.spawn_node("Ground", None).unwrap();
+        world
+            .insert(
+                ground,
+                Transform3D::IDENTITY.with_scale(Vec3::new(8.0, 1.0, 8.0)),
+            )
+            .unwrap();
+        world
+            .insert(
+                ground,
+                Body3D::new(BodySettings::new(BodyKind::Static, Shape3d::mesh())),
+            )
+            .unwrap();
+        let crate_node = body_node(
+            &mut world,
+            "Crate",
+            BodyKind::Dynamic,
+            Vec3::new(3.0, 1.0, 0.0),
+        );
+        frames(&mut world, 1);
+        assert_eq!(world.get::<Body3D>(ground).unwrap().id(), None);
+
+        let cube = star_render::MeshShape::Cube { size: Vec3::ONE }
+            .to_mesh_data()
+            .unwrap();
+        world
+            .insert(ground, CollisionMesh::from_mesh(&cube).unwrap())
+            .unwrap();
+        frames(&mut world, 60);
+
+        assert!(world.get::<Body3D>(ground).unwrap().id().is_some());
+        // On top of the stretched cube, whose top is at 0.5.
+        let landed = position(&world, crate_node).y;
+        assert!((landed - 1.0).abs() < 0.05, "{landed}");
     }
 
     #[test]

@@ -26,6 +26,9 @@ pub const CAPSULE: &str = "capsule";
 pub const SPHERE: &str = "sphere";
 /// How StarScript names boxes.
 pub const BOX: &str = "box";
+/// How StarScript names the shape of the triangles of a 3D node's mesh or
+/// model.
+pub const MESH: &str = "mesh";
 
 /// The radius of a script body whose shape does not give one.
 pub const DEFAULT_RADIUS: f32 = 0.5;
@@ -39,8 +42,8 @@ pub const DEFAULT_SIZE: f32 = 1.0;
 pub struct ScriptBody<'a> {
     /// [`DYNAMIC`], [`STATIC`] or [`KINEMATIC`].
     pub kind: &'a str,
-    /// [`CIRCLE`], [`RECTANGLE`] or [`CAPSULE`] in 2D; [`SPHERE`], [`BOX`]
-    /// or [`CAPSULE`] in 3D.
+    /// [`CIRCLE`], [`RECTANGLE`] or [`CAPSULE`] in 2D; [`SPHERE`], [`BOX`],
+    /// [`CAPSULE`] or [`MESH`] in 3D.
     pub shape: &'a str,
     /// Of circles, spheres and capsules.
     pub radius: f32,
@@ -122,6 +125,7 @@ impl ScriptBody<'static> {
                 radius,
                 Vec3::new(DEFAULT_SIZE, height, DEFAULT_SIZE),
             ),
+            ShapeKind3d::Mesh => (MESH, DEFAULT_RADIUS, Vec3::ONE * DEFAULT_SIZE),
         };
         Self::at_rest(settings, shape, radius, size)
     }
@@ -192,9 +196,10 @@ impl ScriptBody<'_> {
             SPHERE => Shape3d::sphere(self.radius),
             BOX => Shape3d::cuboid(Vec3::new(self.width, self.height, self.depth)),
             CAPSULE => Shape3d::capsule(self.height, self.radius),
+            MESH => Ok(Shape3d::mesh()),
             other => {
                 return Err(EngineError::Physics(format!(
-                    "a body of a 3D node is a \"{SPHERE}\", a \"{BOX}\" or a \"{CAPSULE}\", not a \"{other}\""
+                    "a body of a 3D node is a \"{SPHERE}\", a \"{BOX}\", a \"{CAPSULE}\" or a \"{MESH}\", not a \"{other}\""
                 )));
             }
         }?;
@@ -264,6 +269,7 @@ mod tests {
             Shape3d::sphere(0.3).unwrap(),
             Shape3d::cuboid(Vec3::new(4.0, 1.0, 2.0)).unwrap(),
             Shape3d::capsule(2.0, 0.5).unwrap(),
+            Shape3d::mesh(),
         ];
         for shape in shapes {
             let mut settings = BodySettings::new(BodyKind::Kinematic, shape);

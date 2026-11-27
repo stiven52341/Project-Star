@@ -105,12 +105,15 @@ pub(crate) enum Shape3dData {
     Sphere,
     Box,
     Capsule,
+    /// The triangles of the node's mesh or model, which take no sizes.
+    Mesh,
 }
 
 /// Which of radius, size and height a shape takes.
 const TAKES_RADIUS: [bool; 3] = [true, false, false];
 const TAKES_SIZE: [bool; 3] = [false, true, false];
 const TAKES_RADIUS_AND_HEIGHT: [bool; 3] = [true, false, true];
+const TAKES_NOTHING: [bool; 3] = [false, false, false];
 
 impl TableShape for Shape2d {
     type Name = ShapeData;
@@ -171,6 +174,7 @@ impl TableShape for Shape3d {
             Shape3dData::Sphere => "sphere",
             Shape3dData::Box => "box",
             Shape3dData::Capsule => "capsule",
+            Shape3dData::Mesh => "mesh",
         }
     }
 
@@ -179,6 +183,7 @@ impl TableShape for Shape3d {
             Shape3dData::Sphere => TAKES_RADIUS,
             Shape3dData::Box => TAKES_SIZE,
             Shape3dData::Capsule => TAKES_RADIUS_AND_HEIGHT,
+            Shape3dData::Mesh => TAKES_NOTHING,
         }
     }
 
@@ -189,6 +194,8 @@ impl TableShape for Shape3d {
                 Self::cuboid(Vec3::new(width, height, depth))
             }
             (Some(radius), None, Some(height)) => Self::capsule(height, radius),
+            // Only a mesh takes no sizes.
+            (None, None, None) => Ok(Self::mesh()),
             _ => Err(EngineError::Physics("a body has no size".to_owned())),
         }
     }
@@ -202,6 +209,7 @@ impl TableShape for Shape3d {
             ShapeKind3d::Capsule { height, radius } => {
                 (Shape3dData::Capsule, Some(radius), None, Some(height))
             }
+            ShapeKind3d::Mesh => (Shape3dData::Mesh, None, None, None),
         };
         (
             name,
@@ -395,6 +403,10 @@ mod tests {
             Shape3d::cuboid(Vec3::new(1.0, 2.0, 3.0)).unwrap()
         );
         assert_eq!(capsule.shape, Shape3d::capsule(2.0, 0.5).unwrap());
+        let ground = parse::<Shape3d>("kind = \"static\"\nshape = \"mesh\"").unwrap();
+        assert_eq!(ground.shape, Shape3d::mesh());
+        let written = toml::to_string(&Body3dData::from_settings(&ground)).unwrap();
+        assert_eq!(written, "kind = \"static\"\nshape = \"mesh\"\n");
     }
 
     #[test]
@@ -405,6 +417,7 @@ mod tests {
             "shape = \"box\"\nsize = [1.0, 1.0, -1.0]",
             "shape = \"circle\"\nradius = 1.0",
             "shape = \"capsule\"\nheight = 1.0",
+            "shape = \"mesh\"\nradius = 1.0",
         ] {
             assert!(parse::<Shape3d>(text).is_err(), "{text}");
         }

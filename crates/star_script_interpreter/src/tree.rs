@@ -420,6 +420,7 @@ pub(crate) enum BodyShape {
     Capsule,
     Sphere,
     Box,
+    Mesh,
 }
 
 /// A method of `Body` that the runtime's fields of bodies run.

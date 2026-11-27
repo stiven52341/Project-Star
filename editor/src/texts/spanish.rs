@@ -104,6 +104,7 @@ pub(super) static SPANISH: Texts = Texts {
     capsule: "Cápsula",
     sphere: "Esfera",
     box_shape: "Caja",
+    mesh_shape: "Malla",
     cube: "Cubo",
     plane: "Plano",
     radius: "Radio",

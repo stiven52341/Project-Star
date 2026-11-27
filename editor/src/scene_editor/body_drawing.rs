@@ -144,6 +144,8 @@ fn pieces_3d(shape: &Shape3d, marks: &BodyMarks) -> Vec<(MeshId, Mat4)> {
         ShapeKind3d::Capsule { height, radius } => {
             capsule(height, radius, [marks.half_sphere, marks.sides_3d], radius)
         }
+        // The node's own mesh or model already shows its triangles.
+        ShapeKind3d::Mesh => Vec::new(),
     }
 }
 

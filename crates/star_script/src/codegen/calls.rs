@@ -301,7 +301,7 @@ fn native_call(class: &str, method: &str, arguments: &str) -> Option<String> {
             Some(format!("crate::classes::Scene::{method}({arguments})"))
         }
         ("Sound", "load") => Some(format!("crate::classes::Sound::load({arguments})")),
-        ("Body", "circle" | "rectangle" | "capsule" | "sphere") => {
+        ("Body", "circle" | "rectangle" | "capsule" | "sphere" | "mesh") => {
             Some(format!("crate::classes::Body::{method}({arguments})"))
         }
         // `box` is a reserved word of Rust.

@@ -485,6 +485,7 @@ fn new_body(shape: BodyShape, kind: &Value, sizes: &[Value]) -> Result<Value, Ru
         (BodyShape::Box, [width, height, depth]) => {
             BodyFields::cuboid(kind, float(width)?, float(height)?, float(depth)?)
         }
+        (BodyShape::Mesh, []) => BodyFields::mesh(kind),
         _ => return Err(RunError::Internal("a body without its sizes")),
     };
     Ok(Value::Body(Interpreted::new_body(fields)))

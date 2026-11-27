@@ -1466,7 +1466,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
             height by y and their radius by the largest of the others; a
             scale that changes while playing rebuilds the shape, and the
             editor draws it scaled.
-      - [ ] b. A `mesh` shape for 3D bodies, made from the node's `Mesh`
+      - [x] b. A `mesh` shape for 3D bodies, made from the node's `Mesh`
             or `Model` (a skinned model in its rest pose): its exact
             triangles for static and kinematic bodies, its convex hull for
             dynamic ones (triangles have no volume to fall and roll with).

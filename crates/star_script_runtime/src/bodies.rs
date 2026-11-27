@@ -17,7 +17,7 @@ pub struct BodyFields<H: Host> {
     /// `kind`: `"dynamic"`, `"static"` or `"kinematic"`.
     pub kind: Field<String>,
     /// `shape`: `"circle"`, `"rectangle"` or `"capsule"` in 2D, `"sphere"`,
-    /// `"box"` or `"capsule"` in 3D.
+    /// `"box"`, `"capsule"` or `"mesh"` in 3D.
     pub shape: Field<String>,
     /// `radius`
     pub radius: Field<f32>,
@@ -94,6 +94,12 @@ impl<H: Host> BodyFields<H> {
     #[must_use]
     pub fn cuboid(kind: String, width: f32, height: f32, depth: f32) -> Self {
         Self::new(kind, "box", UNUSED_RADIUS, [width, height, depth])
+    }
+
+    /// `Body.mesh`: the triangles of its node's mesh or model.
+    #[must_use]
+    pub fn mesh(kind: String) -> Self {
+        Self::new(kind, "mesh", UNUSED_RADIUS, [1.0, 1.0, 1.0])
     }
 
     /// A body of `kind` and `shape` at rest, with the engine's surface;

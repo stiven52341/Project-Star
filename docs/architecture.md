@@ -489,9 +489,24 @@ OS ──winit──▶ star_platform (InputEvent) ──▶ star_input::Input (
   written back into the parent's space; under a parent scaled differently
   along each axis and turned, the rotation is only approximate. Scenes
   keep them in a `[node.body_3d]` table, like `[node.body]` with the
-  shapes `sphere` (`radius`), `box` (`size` of three numbers) and
-  `capsule` (`height` and `radius`). StarScript nodes get them through
-  `Body` (decision 50).
+  shapes `sphere` (`radius`), `box` (`size` of three numbers),
+  `capsule` (`height` and `radius`) and `mesh` (no sizes). StarScript
+  nodes get them through `Body` (decision 50).
+- **Mesh bodies** (decision 84): a `Shape3d::mesh()` has no sizes; its
+  triangles are a `TriangleMesh` (corners and triangles, checked) given
+  apart, through `Physics3d::add_mesh_body(settings, mesh, scale,
+  position, rotation)` and `set_mesh`: every triangle for static and
+  kinematic bodies (a parry trimesh), the convex hull for dynamic ones
+  (rejected when it has no volume). On nodes, a `star_scene::CollisionMesh`
+  component holds the triangles of what the node shows
+  (`CollisionMesh::from_mesh`, `from_model`; a skinned part at rest), and
+  `step_node_physics_3d` adds a mesh body only once its node has one,
+  stretching the triangles by the node's scale. The engine gives it each
+  frame before the physics (`GameAssets::give_collision_meshes`) to nodes
+  with a mesh body and none yet: from their `ModelNode`'s model (whose
+  `ShownModel::collision` is made when it is read), `MeshFile` or
+  `MeshNode` shape; a node with neither waits, warned once. A game with a
+  mesh of its own inserts the component itself.
 
 ## Rendering
 

@@ -35,6 +35,11 @@ pub enum ShapeKind3d {
         /// Radius of the cylinder and the half spheres.
         radius: f32,
     },
+    /// The triangles of the mesh or model its node shows, which the
+    /// physics is given apart ([`TriangleMesh`](crate::TriangleMesh)):
+    /// exact for static and kinematic bodies, wrapped in their convex hull
+    /// for dynamic ones.
+    Mesh,
 }
 
 impl Shape3d {
@@ -88,7 +93,8 @@ impl Shape3d {
     /// (mirroring is ignored): a box along each axis, a sphere by the
     /// largest one, and a capsule with its height by `y` and its radius by
     /// the larger of `x` and `z`, kept at least as high as its half
-    /// spheres. A factor smaller than
+    /// spheres. A mesh stays as it is: its triangles are stretched when
+    /// the physics is given them. A factor smaller than
     /// [`MIN_SHAPE_SCALE`](crate::MIN_SHAPE_SCALE) counts as that one.
     ///
     /// # Errors
@@ -106,6 +112,16 @@ impl Shape3d {
                 let radius = radius * x.max(z);
                 Self::capsule((height * y).max(2.0 * radius), radius)
             }
+            // Its triangles are stretched when they are given.
+            ShapeKind3d::Mesh => Ok(self),
+        }
+    }
+
+    /// The shape of the triangles of the mesh or model its node shows.
+    #[must_use]
+    pub const fn mesh() -> Self {
+        Self {
+            kind: ShapeKind3d::Mesh,
         }
     }
 

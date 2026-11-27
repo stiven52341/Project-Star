@@ -189,6 +189,8 @@ pub(crate) struct Texts {
     pub(crate) capsule: &'static str,
     pub(crate) sphere: &'static str,
     pub(crate) box_shape: &'static str,
+    /// The shape of a 3D body made of the triangles of its node's mesh.
+    pub(crate) mesh_shape: &'static str,
     pub(crate) cube: &'static str,
     pub(crate) plane: &'static str,
     pub(crate) radius: &'static str,

@@ -258,6 +258,11 @@ pub mod Body {
     pub fn box_(kind: ::std::string::String, width: f32, height: f32, depth: f32) -> Ref {
         of_(Fields::cuboid(kind, width, height, depth))
     }
+
+    /// `static func mesh`
+    pub fn mesh(kind: ::std::string::String) -> Ref {
+        of_(Fields::mesh(kind))
+    }
 }";
 
 const NODE_MODULE: &str = "/// `class Node`, provided by the engine.

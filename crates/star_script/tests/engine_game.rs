@@ -23,6 +23,7 @@ const GAME: &str = include_str!("games/counting_game.star");
 const NODE_GAME: &str = include_str!("games/node_game.star");
 const PHYSICS_GAME: &str = include_str!("games/physics_game.star");
 const PHYSICS_3D_GAME: &str = include_str!("games/physics_3d_game.star");
+const MESH_GAME: &str = include_str!("games/mesh_game.star");
 const COROUTINE_GAME: &str = include_str!("games/coroutine_game.star");
 const ANIMATION_GAME: &str = include_str!("games/animation_game.star");
 const HERO_FRAMES: &str = include_str!("games/hero.frames");
@@ -83,6 +84,7 @@ fn games_run_in_the_engine_until_they_quit() {
         ("node_game", NODE_GAME),
         ("physics_game", PHYSICS_GAME),
         ("physics_3d_game", PHYSICS_3D_GAME),
+        ("mesh_game", MESH_GAME),
         ("coroutine_game", COROUTINE_GAME),
         ("animation_game", ANIMATION_GAME),
         ("animator_game", ANIMATOR_GAME),
@@ -129,6 +131,9 @@ fn games_run_in_the_engine_until_they_quit() {
     std::fs::write(levels.join("floor_3d.scene"), FLOOR_3D_SCENE).expect("scene written");
     let (stdout, _) = play(&directory, "physics_3d_game");
     assert_eq!(stdout, include_str!("games/physics_3d_game.out"));
+
+    let (stdout, _) = play(&directory, "mesh_game");
+    assert_eq!(stdout, include_str!("games/mesh_game.out"));
 
     let (stdout, _) = play(&directory, "coroutine_game");
     // The blinker's coroutine ends with frame 3, when it leaves the tree.
