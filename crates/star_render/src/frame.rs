@@ -43,6 +43,8 @@ pub struct Frame {
     /// The joint matrices of every skinned draw, one after the other.
     joints: Vec<Mat4>,
     sprites: Vec<Sprite>,
+    /// Sprites over everything, in window pixels.
+    overlays: Vec<Sprite>,
 }
 
 impl Frame {
@@ -63,6 +65,7 @@ impl Frame {
         self.surfaces.clear();
         self.joints.clear();
         self.sprites.clear();
+        self.overlays.clear();
     }
 
     /// Changes the color the frame is filled with before drawing.
@@ -181,6 +184,22 @@ impl Frame {
     /// texture together (for instance in a sprite sheet) draws faster.
     pub fn draw_sprite(&mut self, sprite: Sprite) {
         self.sprites.push(sprite);
+    }
+
+    /// Draws `sprite` over everything else, unlit and wherever the camera
+    /// is: its `position` and `size` are in physical pixels of the window,
+    /// from its top-left corner with Y growing downwards. For what a game
+    /// shows on the screen rather than in its world, such as counters.
+    /// Overlays are drawn by layer, like sprites.
+    pub fn draw_overlay(&mut self, sprite: Sprite) {
+        self.overlays.push(sprite);
+    }
+
+    /// The sprites drawn over everything in this frame, in the order they
+    /// were added.
+    #[must_use]
+    pub fn overlays(&self) -> &[Sprite] {
+        &self.overlays
     }
 
     /// Color the frame is filled with before drawing.

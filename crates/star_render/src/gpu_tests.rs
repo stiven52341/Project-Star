@@ -183,6 +183,29 @@ fn targets_of_other_sizes_are_drawn_with_their_own_depth() {
     );
 }
 
+#[test]
+#[ignore = "needs a GPU"]
+fn overlays_are_drawn_over_everything_in_window_pixels() {
+    let mut gpu = Gpu::new();
+    let white = gpu.texture(1, 1, &[[255; 4]]);
+    let mut frame = Frame::new();
+    // Far from the overlays, and in the dark: neither reaches them.
+    frame.set_camera(Camera::centered_2d(Vec2::new(50.0, 50.0), VIEW_HEIGHT));
+    frame.set_ambient_light_2d(AmbientLight::NONE);
+    let half = f32::from(u8::try_from(SIZE / 2).unwrap());
+    let corner = Sprite::new(white, Vec2::ZERO, Vec2::new(half, half))
+        .with_anchor(Vec2::new(0.0, 1.0))
+        .with_color(Color::rgb(0.0, 0.0, 1.0));
+    frame.draw_overlay(corner);
+
+    let pixels = gpu.render(&frame);
+
+    assert_eq!(pixel(&pixels, 0, 0), BLUE, "the top-left corner");
+    assert_eq!(pixel(&pixels, SIZE / 2 - 1, SIZE / 2 - 1), BLUE);
+    assert_ne!(pixel(&pixels, SIZE / 2, SIZE / 2), BLUE, "only the corner");
+    assert_ne!(pixel(&pixels, 0, SIZE - 1), BLUE, "not the bottom");
+}
+
 /// A white full-screen sprite in the dark, lit by `light`: the red of its
 /// left edge, center and right edge (the screen is two units wide).
 fn lit_sprite(light: impl Into<crate::Light2d>) -> [u8; 3] {

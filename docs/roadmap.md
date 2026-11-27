@@ -1481,7 +1481,22 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
               `Body`, compiled and interpreted).
         - [x] c2. The “Fit” button: sizes and offset from the bounds.
   - To do:
-    - [ ] Frames per second shown while a game runs.
+    - [ ] Frames per second shown while a game runs. Plan agreed with the
+          owner (decision 85): a small counter in a corner of the game's
+          window (frames per second and milliseconds per frame), drawn
+          with a tiny digit font of the engine's own, no dependencies;
+          `show_fps` in `project.toml` (`"editor"`, the default: when
+          played from the editor; `"always"`; `"never"`), chosen in the
+          editor's Project menu; F3 shows or hides it while playing, and
+          StarScript's `Debug.show_fps(shown)` too.
+      - [x] a. `star_render`: overlay sprites, in window pixels, drawn
+            over everything in a pass of their own.
+      - [ ] b. `star_engine`: the counter, its font and the overlay, F3,
+            `App::with_fps_shown`.
+      - [ ] c. StarScript `Debug.show_fps(shown: bool)`, compiled and
+            interpreted.
+      - [ ] d. `show_fps` in `project.toml`, honored by Play, Play
+            compiled and exported games, and the Project menu.
     - [ ] Basic 2D bodies: shape nodes for 2D (a box, for example) that
           can be scaled, given collisions and used as a floor, and hidden
           while their collisions and everything else stay (as in Unity).

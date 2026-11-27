@@ -11,7 +11,12 @@ use crate::store::Store;
 use crate::surface_pipeline::{FrameLights, GpuSurfaceMesh, SurfacePipeline, SurfaceUniforms};
 use crate::texture::{GpuTexture, TextureBindings};
 use crate::vertex::encode_vertices;
-use crate::{Color, Frame, Image, Mesh3dId, MeshData, MeshId, TextureFilter, TextureId, Vertex};
+use star_math::{Mat4, Vec2};
+
+use crate::{
+    AmbientLight, Color, Frame, Image, Mesh3dId, MeshData, MeshId, Sprite, TextureFilter,
+    TextureId, Vertex,
+};
 
 /// GPU resources shared by every render target: device, pipelines, meshes
 /// and textures.
@@ -23,6 +28,12 @@ pub(crate) struct SceneRenderer {
     mesh_pipeline: MeshPipeline,
     surface_pipeline: SurfacePipeline,
     sprite_pipeline: SpritePipeline,
+    /// The sprites over everything, with their own camera.
+    overlay_pipeline: SpritePipeline,
+    /// The overlays of the frame being drawn, placed for their camera.
+    overlay_staging: Vec<Sprite>,
+    /// The size of the targets, in pixels, which overlays are placed in.
+    size: (u32, u32),
     texture_bindings: TextureBindings,
     meshes: Store<GpuMesh>,
     surface_meshes: Store<GpuSurfaceMesh>,
@@ -52,6 +63,13 @@ impl SceneRenderer {
             ),
             white_texture,
             sprite_pipeline: SpritePipeline::new(&device, target_format, texture_bindings.layout()),
+            overlay_pipeline: SpritePipeline::new(
+                &device,
+                target_format,
+                texture_bindings.layout(),
+            ),
+            overlay_staging: Vec::new(),
+            size: (width, height),
             texture_bindings,
             meshes: Store::default(),
             surface_meshes: Store::default(),
@@ -73,6 +91,7 @@ impl SceneRenderer {
     /// Matches the depth buffer to a new target size.
     pub(crate) fn resize(&mut self, width: u32, height: u32) {
         self.depth_buffer = DepthBuffer::new(&self.device, width, height);
+        self.size = (width, height);
     }
 
     /// Uploads `vertices`, grouped as `topology`, to the GPU.
@@ -204,9 +223,42 @@ impl SceneRenderer {
             },
             |color| color.in_target_space(target_format),
         )?;
+        self.prepare_overlays(frame, target_format)?;
         let commands = self.encode(target, depth.unwrap_or(self.depth_buffer.view()), frame)?;
         self.queue.submit([commands]);
         Ok(())
+    }
+
+    /// Copies the overlays of `frame` to the GPU, seen by a camera of the
+    /// target's pixels, Y up from its top-left corner: their Y, downwards,
+    /// is turned around.
+    fn prepare_overlays(
+        &mut self,
+        frame: &Frame,
+        target_format: wgpu::TextureFormat,
+    ) -> EngineResult<()> {
+        self.overlay_staging.clear();
+        self.overlay_staging
+            .extend(frame.overlays().iter().map(|sprite| Sprite {
+                position: Vec2::new(sprite.position.x, -sprite.position.y),
+                ..*sprite
+            }));
+        let (width, height) = self.size;
+        // Window sizes are far below where `f32` skips whole pixels.
+        #[allow(clippy::cast_precision_loss)]
+        let (width, height) = (width as f32, height as f32);
+        let pixels = Mat4::orthographic(0.0, width, -height, 0.0, OVERLAY_NEAR, OVERLAY_FAR);
+        self.overlay_pipeline.prepare(
+            &self.device,
+            &self.queue,
+            pixels,
+            &self.overlay_staging,
+            &SpriteLights {
+                ambient: AmbientLight::FULL,
+                lights: &[],
+            },
+            |color| color.in_target_space(target_format),
+        )
     }
 
     /// sRGB render targets expect linear colors; the GPU re-encodes them.
@@ -252,6 +304,12 @@ impl SceneRenderer {
                 self.mesh_pipeline.draw(&mut pass, slot, mesh);
             }
             self.sprite_pipeline.draw(&mut pass, |id| {
+                self.texture(id).map(|texture| &texture.bind_group)
+            })?;
+        }
+        if !frame.overlays().is_empty() {
+            let mut pass = begin_overlay_pass(&mut encoder, target, depth);
+            self.overlay_pipeline.draw(&mut pass, |id| {
                 self.texture(id).map(|texture| &texture.bind_group)
             })?;
         }
@@ -305,4 +363,38 @@ impl SceneRenderer {
             ..Default::default()
         })
     }
+}
+
+/// The depth overlays are seen between: they lie at depth 0.
+const OVERLAY_NEAR: f32 = -1.0;
+const OVERLAY_FAR: f32 = 1.0;
+
+/// A pass over what the main pass drew, keeping its colors, with a depth
+/// of its own so nothing of the scene hides the overlays.
+fn begin_overlay_pass<'encoder>(
+    encoder: &'encoder mut wgpu::CommandEncoder,
+    target: &wgpu::TextureView,
+    depth: &wgpu::TextureView,
+) -> wgpu::RenderPass<'encoder> {
+    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("overlay pass"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view: target,
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Load,
+                store: wgpu::StoreOp::Store,
+            },
+        })],
+        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+            view: depth,
+            depth_ops: Some(wgpu::Operations {
+                load: wgpu::LoadOp::Clear(FARTHEST_DEPTH),
+                store: wgpu::StoreOp::Discard,
+            }),
+            stencil_ops: None,
+        }),
+        ..Default::default()
+    })
 }
