@@ -9,6 +9,7 @@
 pub mod app;
 mod engine_world;
 mod fallback_logger;
+mod fps_counter;
 pub mod game;
 mod game_assets;
 mod mesh_file;
@@ -24,6 +25,7 @@ mod texture_library;
 mod texture_slot;
 
 pub use engine_world::EngineWorld;
+pub use fps_counter::{FPS_UPDATE_SECONDS, FpsDisplay};
 pub use mesh_file::MeshFile;
 pub use sprite_file::SpriteFile;
 pub use star_assets;

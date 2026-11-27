@@ -8,14 +8,17 @@ use star_ecs::{Schedule, Stage, World};
 use star_input::Input;
 use star_math::Vec2;
 use star_physics::{Physics2d, Physics3d};
+use star_platform::Key;
 use star_platform::{InputEvent, Window, WindowEventHandler, WindowSize};
-use star_render::{Color, Frame, Renderer, RendererConfig};
+use star_render::{Color, Frame, Renderer, RendererConfig, TextureFilter, TextureId};
 use star_scene::{
     PhysicsNodes, PhysicsNodes3d, TransformPropagation, draw_3d_nodes, draw_sprite_nodes,
     step_node_physics, step_node_physics_3d,
 };
 
 use crate::EngineWorld as _;
+use crate::FpsDisplay;
+use crate::fps_counter::{FpsCounter, font_image};
 use crate::game::{Game, GameContext};
 use crate::game_assets::GameAssets;
 
@@ -33,6 +36,9 @@ pub(crate) struct Runtime<G: Game> {
     transforms: TransformPropagation,
     assets: GameAssets,
     last_frame_start: Option<Instant>,
+    fps: FpsCounter,
+    /// The texture of the counter's font, once the window is open.
+    fps_font: Option<TextureId>,
 }
 
 impl<G: Game> Runtime<G> {
@@ -56,6 +62,8 @@ impl<G: Game> Runtime<G> {
             transforms: TransformPropagation::new(),
             assets,
             last_frame_start: None,
+            fps: FpsCounter::default(),
+            fps_font: None,
         }
     }
 
@@ -65,6 +73,7 @@ impl<G: Game> Runtime<G> {
             .last_frame_start
             .map_or(Duration::ZERO, |last| now.duration_since(last));
         self.last_frame_start = Some(now);
+        self.fps.tick(delta.as_secs_f32());
         if let Some(mut time) = self.world.resource_mut::<Time>() {
             time.advance(delta);
         }
@@ -99,6 +108,11 @@ impl<G: Game> Runtime<G> {
         }
         self.transforms.run(&mut self.world)?;
         if let Some(mut input) = self.world.resource_mut::<Input>() {
+            if input.keyboard().just_pressed(Key::F3)
+                && let Some(mut display) = self.world.resource_mut::<FpsDisplay>()
+            {
+                display.shown = !display.shown;
+            }
             input.end_frame();
         }
         Ok(())
@@ -119,6 +133,7 @@ pub(crate) fn engine_world(input: Input, audio: Audio, gravity: Vec2) -> World {
     world.insert_resource(PhysicsNodes::new());
     world.insert_resource(Physics3d::default());
     world.insert_resource(PhysicsNodes3d::new());
+    world.insert_resource(FpsDisplay::default());
     world
 }
 
@@ -136,6 +151,10 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
             &mut self.world,
             &mut self.assets,
         ))?;
+        self.fps_font = font_image()
+            .and_then(|font| renderer.create_texture(&font, TextureFilter::Pixelated))
+            .inspect_err(|error| log::warn!("The FPS counter cannot be shown: {error}"))
+            .ok();
         self.renderer = Some(renderer);
         Ok(())
     }
@@ -182,6 +201,13 @@ impl<G: Game> WindowEventHandler for Runtime<G> {
         self.assets
             .draw_models(&self.world, renderer, &mut self.frame)?;
         self.game.draw(&self.world, &mut self.frame);
+        let shown = self
+            .world
+            .resource::<FpsDisplay>()
+            .is_some_and(|display| display.shown);
+        if let (true, Some(font)) = (shown, self.fps_font) {
+            self.fps.draw(font, &mut self.frame);
+        }
         renderer.render(&self.frame)
     }
 
@@ -270,6 +296,31 @@ mod tests {
 
         assert!(runtime.world.has_resource::<Time>());
         assert!(runtime.world.input().is_some());
+    }
+
+    #[test]
+    fn f3_shows_and_hides_the_fps_counter() {
+        let mut runtime = runtime(EmptyGame, Input::new(), Schedule::new());
+        let shown =
+            |runtime: &Runtime<EmptyGame>| runtime.world.resource::<FpsDisplay>().unwrap().shown;
+        let press_f3 = |runtime: &mut Runtime<EmptyGame>, state| {
+            runtime.on_input(InputEvent::Key {
+                key: Key::F3,
+                state,
+            });
+        };
+        assert!(!shown(&runtime));
+
+        press_f3(&mut runtime, ButtonState::Pressed);
+        runtime.simulate().unwrap();
+        assert!(shown(&runtime));
+        runtime.simulate().unwrap();
+        assert!(shown(&runtime), "held, it does not toggle again");
+
+        press_f3(&mut runtime, ButtonState::Released);
+        press_f3(&mut runtime, ButtonState::Pressed);
+        runtime.simulate().unwrap();
+        assert!(!shown(&runtime));
     }
 
     #[test]

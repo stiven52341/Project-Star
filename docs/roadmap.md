@@ -1491,7 +1491,7 @@ Work advances in phases; every phase leaves the engine compiling with its tests 
           StarScript's `Debug.show_fps(shown)` too.
       - [x] a. `star_render`: overlay sprites, in window pixels, drawn
             over everything in a pass of their own.
-      - [ ] b. `star_engine`: the counter, its font and the overlay, F3,
+      - [x] b. `star_engine`: the counter, its font and the overlay, F3,
             `App::with_fps_shown`.
       - [ ] c. StarScript `Debug.show_fps(shown: bool)`, compiled and
             interpreted.

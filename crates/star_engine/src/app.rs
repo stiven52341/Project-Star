@@ -30,6 +30,7 @@ pub struct App {
     hot_reload: bool,
     gravity: Vec2,
     platform: TargetPlatform,
+    fps_shown: bool,
 }
 
 impl App {
@@ -46,7 +47,17 @@ impl App {
             hot_reload: cfg!(debug_assertions),
             gravity: DEFAULT_GRAVITY,
             platform: TargetPlatform::current(),
+            fps_shown: false,
         }
+    }
+
+    /// Shows the frames-per-second counter from the start, or not (the
+    /// default). F3 shows and hides it while playing, and the game can
+    /// through the world's [`FpsDisplay`](crate::FpsDisplay).
+    #[must_use]
+    pub const fn with_fps_shown(mut self, shown: bool) -> Self {
+        self.fps_shown = shown;
+        self
     }
 
     /// Sets the window title.
@@ -209,11 +220,15 @@ impl App {
         let audio = audio_output
             .as_ref()
             .map_or_else(Audio::silent, AudioOutput::audio);
+        let mut world = engine_world(input, audio, self.gravity);
+        world.insert_resource(crate::FpsDisplay {
+            shown: self.fps_shown,
+        });
         let mut runtime = Runtime::new(
             game,
             self.renderer_config,
             self.clear_color,
-            engine_world(input, audio, self.gravity),
+            world,
             self.schedule,
             GameAssets::new(self.assets, self.hot_reload),
         );

@@ -614,6 +614,16 @@ game → star_engine::App ──(GraphicsBackend: Auto | Vulkan | DirectX12 | Me
   own after the main one that keeps its colors and clears the depth. They
   are for what is shown on the screen rather than in the world (the FPS
   counter, later the interface).
+- **FPS counter** (`star_engine::fps_counter`, decision 85): the runtime
+  counts frames and, every `FPS_UPDATE_SECONDS` (0.5), writes the frames
+  per second and milliseconds per frame of that time into a label
+  (`"60 FPS 16.7 ms"`, no allocation once it has room). When the world's
+  `FpsDisplay` resource says `shown` (`App::with_fps_shown`, off by
+  default), the label is drawn as overlays in the window's top-left
+  corner over a translucent dark box, its characters cut from a 3 x 5
+  pixel font written in code (digits, `.`, `F`, `P`, `S`, `m`, `s`),
+  uploaded once as a pixelated texture and scaled 3 times. F3 shows or
+  hides it while playing.
 - **Sprite batching**: every frame, the sprites are sorted (unstable sort by
   layer and position: no allocation), their 4 corners written to one shared
   vertex buffer, and consecutive sprites with the same texture drawn by a
